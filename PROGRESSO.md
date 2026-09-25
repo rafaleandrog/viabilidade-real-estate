@@ -10,6 +10,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #746: o seletor de lotes exclui também parcelamentos vinculados a setor habitacional
+
+O filtro do seletor **Buscar lote** (Incorporação, `frontend/tela-terreno-nucleo.ts`) já excluía os
+lotes de parcelamento com `regularizacao=true`; passa a excluir também os de parcelamento com
+`setor_habitacional_id` preenchido — o segundo critério do pedido do autor, e uma coluna que o
+contrato do Núcleo no bundle do SDK expõe (`docs/nucleo.md` do pacote lista `parcelamentos
+(setor_habitacional_id)` entre os filtros). O aviso de indisponibilidade e o contador de lotes
+elegíveis nomeiam os dois critérios. O caso de render `terreno-nucleo-filtro-regularizacao` ganhou
+um terceiro parcelamento (setor habitacional, sem `regularizacao`) e um terceiro lote, e o teste
+exige que só o lote do parcelamento normal sobreviva — voltar o filtro a só `regularizacao` deixa
+o teste vermelho, medido. `docs/preliminar.md`, `docs/administracao.md` e `docs/modelo-de-dados.md`
+descrevem os dois critérios. **A causa imediata do relato é operacional e fica com o administrador:**
+sem o toggle `parcelamentos → ler` concedido na instância (*Admin → Apps → viabilidade → Núcleo*),
+toda chamada a `/parcelamentos` falha, o filtro se desliga com aviso e todos os lotes aparecem.
+
 ## 2026-09-25 — #747: o gráfico de Cenários do Avançado ganha eixo Y estático e séries em R$ milhões
 
 Dois defeitos no uso do `urbi-grafico-linha` da aba Cenários (`frontend/tela-cenarios.ts`),

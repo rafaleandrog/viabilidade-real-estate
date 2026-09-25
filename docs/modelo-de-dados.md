@@ -129,7 +129,8 @@ tipo de empreendimento e o identificador não muda quando o estudo é renomeado.
 
 O app declara `dependencias_nucleo: ["imoveis", "parcelamentos"]` e `permissoes_nucleo` de leitura
 para os dois: glebas e lotes vêm de `imoveis`, e `parcelamentos` serve só para excluir do seletor
-de terreno da Incorporação os lotes de parcelamento em regularização. O consumo segue o contrato
+de terreno da Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um
+setor habitacional. O consumo segue o contrato
 padrão do Núcleo: o shell provê as rotas `nucleo/*` do app e o frontend as chama pelo cliente do
 Núcleo. A permissão é ligada pelo administrador da instância; sem ela os endpoints respondem 403 e
 a interface degrada com aviso, sem quebrar — ver [Administração](administracao).
