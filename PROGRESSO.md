@@ -21,8 +21,9 @@ faixas dos sliders, sempre com o zero, arredondado para fora em passo 1/2/5 × 1
 divide as séries por 1e6 e o card publica a unidade no título, com `formato="numero"`. Testes: o
 domínio, a divisão pura, uma grade que mede a premissa de linearidade (nenhuma posição
 intermediária dos sliders sai do domínio dos cantos) e a fiação — apagar `min-y`/`max-y` do
-template deixa o teste vermelho, medido. Caso de render `tabela-fluxo-cenarios` declara os dois
-atributos; `docs/avancado.md` descreve o eixo fixo. `minY`/`maxY` e o union de `formato` conferidos
+template deixa o teste vermelho, medido. Caso de render `tabela-fluxo-cenarios` declara as duas
+propriedades (`minY`/`maxY`, chave por propriedade, como o `render-check` monta); `docs/avancado.md`
+descreve o eixo fixo. `minY`/`maxY` e o union de `formato` conferidos
 em `node_modules/@urbiverso/sdk/dist/index.d.ts` no pin `57.0.0`.
 
 ## 2026-09-25 — #756: as seis leituras de "todas as linhas" de `avancado.ts` viram `varrerTudo`
