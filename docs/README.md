@@ -1,61 +1,127 @@
 ---
 titulo: Estudo de Viabilidade
-descricao: Propósito, escopo e fluxo do app de análise de viabilidade imobiliária.
+descricao: Estudos de viabilidade econômico-financeira de Loteamento e Incorporação — Proforma automática, fluxo de caixa mensal, cenários, benchmarks e análise de mercado por IA.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
-# Estudo de Viabilidade — Visão Geral
+# Estudo de Viabilidade
 
-> Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação).
+> Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação), do estudo rápido de uma premissa ao fluxo de caixa mensal com funding.
 
 ## O que é
 
-App do UrbiVerso que substitui planilhas dispersas por uma aplicação centralizada: cria estudos de viabilidade, calcula automaticamente uma **Proforma** com indicadores financeiros, compara cenários, roda análise de sensibilidade e avalia o **apelo comercial** do imóvel com IA.
+O app substitui as planilhas de viabilidade por estudos guardados na instância, calculados
+automaticamente e compartilhados por membros com funções distintas. Um estudo parte de um terreno e
+de um conjunto de premissas (áreas, custos, preços, permutas, produtos) e devolve uma **Proforma** —
+a tabela de receitas, deduções, custos e resultado — com indicadores comparados a **benchmarks** da
+empresa, cenários de sensibilidade e uma leitura do mercado local.
 
-**Tipos de empreendimento:** Loteamento e Incorporação. **Níveis de análise:** **Preliminar** (indicadores estáticos, sem dimensão temporal) e **Avançado** (fluxo de caixa mensal, TIR, VPL, payback e exposição), este último com páginas próprias descritas abaixo.
+## Conceitos
+
+| Conceito | O que significa |
+|---|---|
+| **Tipo de empreendimento** | **Loteamento** (venda de lotes de uma gleba) ou **Incorporação** (venda de unidades construídas sobre um ou mais lotes). Define quais premissas, custos e indicadores aparecem. Só muda enquanto o estudo está em Rascunho. |
+| **Nível de análise** | **Preliminar**: análise estática, sem dimensão temporal — a Proforma sai das premissas na hora. **Avançado**: cronograma, vendas por safra, custos distribuídos no tempo, funding e fluxo de caixa mensal, com TIR, VPL, payback e exposição máxima. Escolhido na criação e imutável depois. |
+| **Terreno** | Vem do **Núcleo** da instância (uma gleba para Loteamento; um ou mais lotes para Incorporação, com a área somada) ou é **inserido manualmente** (nome e área digitados). A origem se escolhe na criação e o vínculo só muda em Rascunho. |
+| **Proforma** | A tabela de resultado do estudo: VGV, deduções da receita, custos diretos e indiretos, resultado e indicadores (margem, ROI, custo de obras sobre VGV). Ver [Fórmulas da Proforma](formulas). |
+| **Benchmark** | Valores de referência por tipo de empreendimento, mantidos pelo administrador: validam os indicadores (verde ou vermelho) e dão as faixas padrão dos cenários. Ver [Benchmarks](benchmarks). |
+| **Membro e função** | Cada estudo tem os próprios membros. `leitor` vê e exporta; `editor` cria e edita; `aprovador` aprova, reprova e devolve. Ver [Permissões e ciclo de vida](permissoes). |
 
 ## Para usuários
 
-- **Dashboard** — tabela de estudos (filtros por tipo e status), com criar, duplicar e remover. Aba **Terrenos** lista imóveis (via Núcleo, quando disponível).
-  - **VGV / Resultado / Margem na listagem** (#406/#407) — Preliminar lê os campos fixos do estudo (motor `proforma.ts`), incluindo o catálogo de Produtos quando presente (#315/#407: `GET /estudos` devolve `produtos`, senão o guard `vgv > 0` mostrava "—" mesmo com o catálogo preenchido). **Avançado não tem campos fixos** — a listagem calcula sob demanda no cliente, por linha, reproduzindo exatamente a sub-aba **Proforma** de Resultados (`proformaAvancado`, **desalavancada** desde a #426: nenhuma ponta do funding entra, então a listagem nem carrega as operações do estudo) — não a aba Resumo, que usa outra base (VGV potencial com permuta física, resultado de caixa em vez de econômico). Cada linha Avançada mostra "…" até o próprio cálculo terminar; "—" é só para estudo sem receita modelada. Decisão deliberada de **não** agregar isso no backend, para preservar o contrato de que as fórmulas rodam no frontend.
-- **Detalhe do estudo** — quatro abas:
-  - **Premissas** — formulário de entrada + KPIs ao vivo + Preço Sugerido/m².
-  - **Proforma** — tabela linha a linha, comparação de cenários e análise de sensibilidade; exportação PDF/Excel.
-  - **Gráficos** — faixa de 5 KPIs (VGV do incorporador, Resultado final, Margem sobre VGV de
-    tabela, Margem sobre receita líquida, Custo obras / VGV), cascata do resultado (substituiu
-    pizza de custos + barras Receita×Custos, Rodada 12), cadeia de áreas em barras horizontais
-    proporcionais (substituiu a(s) pizza(s) de alocação, Rodada 12) e indicadores vs. benchmark.
-  - **Apelo Comercial** — análise qualitativa por IA (6 fatores) a partir de documentos anexados.
-- **Estudo Avançado** — páginas próprias, nesta ordem na lista lateral: Resumo, Empreendimento, Custos, Viabilidade, Resultados, Cenários, **Análise de mercado** e **Apelo Comercial**. Custos precede Viabilidade desde a #589 — é ordem de apresentação, não mudança de rota: os slugs públicos seguem `custos` e `resultados`, com `obra`/`fluxo` aceitos como alias.
-  - **Análise de mercado** (#199) — compara os números do estudo com os do mercado (preço e custo por m², velocidade de vendas, macros). O lado "projeto" é derivado do próprio estudo, não digitado. Ver [Análise de Mercado](analise-mercado).
-  - **Viabilidade → Financeiro** — a aba do **Bloco G**, hoje reduzida a **três controles** (`taxa_desconto_aa`, `imposto_percentual` — este sempre desabilitado — e `juros_tabela_aa_padrao`) desde a #450. ⚠️ Esta linha já dizia *"~25 campos persistidos e renderizados mas não alimentam o motor"*, e **as duas metades venceram**: o render tem três (`frontend/tela-financeiro.ts:76`), e `juros_tabela_aa_padrao` **alimenta** o motor, obrigatoriamente, desde a #585 (`frontend/fluxo-caixa-motor.ts:687`). As colunas antigas continuam no schema, sem formulário e sem leitor. ⚠️ E já dizia que *"a epic #239 a transforma no módulo Capital Stack (funding, dívida, equity e waterfall)"*, **e isso deixou de valer**: a #355 apagou o Capital Stack em 2026-08-12, e a epic #239 não existe mais como caminho. O funding vigente é a aba **Funding**, com três operações independentes — sem waterfall, sem prioridades; ver [Fluxo do Investidor](funding). `Custos → Financeiro` é outra coisa: permanece grupo de **custos** operacionais.
+### O Painel
 
-## Endereços das telas
+A tela inicial tem cinco abas: **Estudos**, **Terrenos**, **Benchmark**, **Curvas** e **Regiões
+monitoradas**. A aba **Estudos** lista os estudos aos quais você tem acesso, com filtros por tipo e
+status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV e Margem. Na
+linha de cada estudo ficam as ações que a sua função permite: abrir, renomear, duplicar, remover e
+os botões de transição de status. A aba **Terrenos** mostra os imóveis do Núcleo disponíveis para
+vincular. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
+(curvas de distribuição de custos no tempo, usadas pelo estudo Avançado) e **Regiões monitoradas**
+([Análise de Mercado](analise-mercado)).
 
-**Comportamento vigente:** a URL é `/detalhe/:id/:pagina` (`frontend/index.ts` → `parsearSubRota`).
-As **subabas** — Cronograma, Tipologias, Receitas, Terreno, Obras e as demais — vivem apenas no
-estado do componente e **não participam do histórico do navegador**: abrir um link direto ou dar
-refresh volta à subaba padrão. O slug da página de Custos ainda é o legado `/obra` (a #40 renomeou o
-rótulo e preservou o id).
+### Criar um estudo
 
-**Evolução dependente de issue:** a gramática passa a `/detalhe/:id/:pagina/:subaba` — por exemplo
-`/detalhe/11/empreendimento/cronograma` —, com deep link, refresh e back/forward preservando a
-subaba, e as URLs antigas continuando válidas como alias da subaba padrão (**#251**). No mesmo
-movimento, `/custos` vira o slug público e `/obra` permanece como alias legado (**#250**). Nenhuma
-das duas altera identificador interno de domínio nem o `manifesto.json`.
+1. Em **Estudos**, clique em **Criar estudo**.
+2. Informe o nome, a UF, o **tipo de empreendimento** e o **nível de análise**. O nível não muda
+   depois; o tipo só muda em Rascunho.
+3. Escolha a origem do terreno: **Buscar terreno** (Núcleo) ou **Inserir novo** (manual). Se a
+   instância ainda não liberou o Núcleo para o app, o modo Núcleo avisa e o manual continua
+   disponível.
+4. O estudo nasce em **Rascunho**, com você como `editor`.
 
-## Origem do terreno
+O estudo recebe um identificador legível e estável, composto pela sigla do tipo, a UF e uma
+sequência. Renomear o estudo não altera esse identificador.
 
-Na criação, escolhe-se **Buscar terreno** (Núcleo) ou **Inserir novo** (manual, nome + área digitados).
+### Estudo Preliminar
 
-No modo **Núcleo**, o estudo referencia imóveis do Núcleo compartilhado — **1 gleba** para Loteamento, **1 ou mais lotes** para Incorporação — e o app consome a **área** desses imóveis (somada) como área do terreno da Proforma. A seleção é feita na aba Premissas e só é editável em Rascunho. O acesso ao Núcleo é declarado no manifesto (`dependencias_nucleo: ["imoveis", "parcelamentos"]`, `permissoes_nucleo: { "imoveis": ["ler"], "parcelamentos": ["ler"] }`) e precisa ser **autorizado pelo admin da instância** em *Admin → Apps → viabilidade → Núcleo*. Enquanto a permissão não for concedida (ou a instância não expuser glebas/lotes), o modo Núcleo degrada com um aviso e o modo **manual** continua disponível.
+Quatro abas. Em **Premissas** você preenche, em sub-abas, **Terreno & Áreas**, **Custos**,
+**Permutas** e **Produtos** (o catálogo de tipologias com preço), e vê os KPIs e o preço sugerido
+por m² recalculados a cada edição. Em **Resultado** ficam a **Proforma** completa e a aba
+**Cenários** — o tornado de alavancas, a margem de segurança e a sensibilidade Bear, Base e Bull —
+com exportação para PDF e Excel. **Gráficos** traz a faixa de KPIs, a cascata do resultado, a
+cadeia de áreas e os indicadores contra benchmark. **Análise de Mercado** é a avaliação qualitativa
+do imóvel por IA, a partir de documentos anexados.
 
-## Ciclo de vida
+### Estudo Avançado
 
-`Rascunho → Em análise → Aprovado | Reprovado`, com devolução ao Rascunho e reabertura de Arquivado pelo aprovador. Estudos parados (exceto Aprovado) por 30 dias são arquivados automaticamente.
+Páginas na lista lateral, nesta ordem: **Resumo**, **Empreendimento** (cronograma, tipologias,
+receitas e absorção, terreno), **Custos** (orçamento distribuído no tempo por curvas), **Viabilidade**
+(parâmetros financeiros), **Funding** (dívida, equity e financiamento à produção), **Resultados**
+(Fluxo de Caixa, Proforma e Análise Financeira), **Cenários**, **Análise de mercado** (os números do
+estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
+[Funding](funding) e [Análise de Mercado](analise-mercado).
+
+### Endereço das telas
+
+Cada estudo abre em `/viabilidade/detalhe/<id>/<pagina>`; as sub-abas não entram na URL, então
+um link direto ou um refresh volta à sub-aba padrão daquela página.
+
+### Ciclo de vida
+
+`Rascunho → Em análise → Aprovado | Reprovado`. O `editor` envia para análise; o `aprovador` aprova,
+reprova ou devolve ao Rascunho. Estudos parados (exceto os Aprovados) são arquivados
+automaticamente depois do prazo configurado pelo administrador; o `aprovador` pode reabrir um
+Arquivado. Aprovado é estado final. Detalhe em [Permissões e ciclo de vida](permissoes).
+
+### Exportar
+
+A Proforma sai em PDF e Excel a partir da própria aba, no Preliminar e no Avançado; o fluxo de
+caixa do Avançado também. Ver [Exportação](exportacao).
+
+## Para administradores
+
+Antes do primeiro estudo: conceda ao app a leitura de **imóveis** e **parcelamentos** do Núcleo em
+*Admin → Apps → viabilidade → Núcleo* (sem isso, só o terreno manual funciona); crie os
+**benchmarks** de cada tipo de empreendimento; revise os **parâmetros** do app (alíquotas e
+percentuais padrão, prazo de arquivamento, limite da coleta de mercado) em *Admin → Apps →
+viabilidade*; e, se for usar a análise de mercado, cadastre as **regiões monitoradas**
+na aba do Painel. Ver [Benchmarks](benchmarks) e [Análise de Mercado](analise-mercado).
+
+## Instruções para não humanos
+
+Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é por estudo: quem não
+é membro (nem `admin` do app) recebe `403`, e um `leitor` não vê estudos em Rascunho ou Arquivado.
+
+| Recurso | Rotas |
+|---|---|
+| Estudos | `GET /estudos` · `POST /estudos` · `GET /estudos/:id` · `PATCH /estudos/:id` · `DELETE /estudos/:id` · `POST /estudos/:id/duplicar` · `POST /estudos/:id/status` |
+| Membros | `GET /estudos/:id/membros` · `POST /estudos/:id/membros` · `PATCH /estudos/:id/membros/:usuarioId` · `PATCH /estudos/:id/membros/:usuarioId/remover` |
+| Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `DELETE /estudos/:id/imoveis/:vinculoId` |
+| Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` |
+| Análise de mercado | `GET`/`POST /estudos/:id/analise-mercado` · `PATCH /estudos/:id/analise-mercado/regiao` · `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` |
+| Benchmarks | `GET /benchmarks` · `POST`/`PATCH`/`DELETE /benchmarks` · `POST /benchmarks/semear` |
+| Configuração e manutenção | `GET /config` · `POST /manutencao/arquivar-inativos` |
+
+As páginas do estudo Avançado têm as próprias rotas, descritas em [Funding](funding) e em
+[Análise de Mercado](analise-mercado). As transições de status são validadas no servidor: uma transição inválida
+responde `422 TRANSICAO_INVALIDA`, e uma sem alçada `403 SEM_PERMISSAO`.
+
+O app publica três eventos no barramento da instância: `estudo_criado`, `estudo_status_alterado` e
+`apelo_comercial_concluido`. Os membros do estudo são inscritos automaticamente.
 
 ## Veja também
 
-- [Modelo de dados](modelo-de-dados) · [Fórmulas](formulas) · [Benchmarks](benchmarks) · [Apelo Comercial](apelo-comercial) · [Análise de Mercado](analise-mercado) · [Permissões](permissoes) · [Exportação](exportacao)
-- Incorporação: Padrão de Viabilidade (`referencia/padrao-incorporacao.md`) (dinâmica funcional do app) · Inteligência EVI (`referencia/inteligencia-evi-incorporacao.md`) (significado econômico de negócio)
-  - Os dois são **consultivos**. O modelo de recebíveis por **safras** que eles descrevem — safra, componentes de pagamento, primeiro vencimento em `s + 1`, PMT, carteira e repasse — é **modelo funcional de referência, ainda não implementado**; depende das issues da Rodada 5. Ver `historico/revisao-recebiveis-calliandra-2026-07-31.md`.
+- Regras: [Fórmulas da Proforma](formulas) · [Funding](funding) · [Benchmarks](benchmarks) · [Permissões e ciclo de vida](permissoes)
+- Mercado: [Análise de Mercado](analise-mercado) · [Apelo Comercial (IA)](apelo-comercial)
+- Dados: [Modelo de Dados](modelo-de-dados) · [Exportação](exportacao)

@@ -4,6 +4,33 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 14, PR 4 — `docs/README.md` reescrito no estilo da fabrica (2026-09-25)
+
+Primeira PR de conteúdo da rodada. A visão geral era diário de desenvolvimento: números de issue e
+de rodada, correções de linha ("⚠️ esta linha já dizia…"), endereços `arquivo:linha`, uma seção de
+"evolução dependente de issue" e links para os documentos consultivos que deixaram de ser servidos.
+O README novo segue a régua do plano (`historico/rodada-14/planejamento.md` § PRs 4–9) e o modelo
+de `apps/fabrica/docs/README.md`: `## O que é` → `## Conceitos` (tabela: tipo, nível, terreno,
+Proforma, benchmark, membro) → `## Para usuários` (Painel com as cinco abas, criar estudo passo a
+passo, as abas do Preliminar e as páginas do Avançado, endereço das telas, ciclo de vida, exportar)
+→ `## Para administradores` → `## Instruções para não humanos` (tabela das rotas por recurso,
+códigos de erro das transições, eventos) → `## Veja também`. Fatos conferidos no código antes de
+escrever: rótulos das abas e do botão **Criar estudo** (`tela-dashboard.ts`), abas e sub-abas do
+Preliminar (`tela-preliminar.ts`), páginas do Avançado (`tela-avancado.ts`), rotas
+(`backend/rotas/*.ts`), status e códigos de erro (`estudos.ts`).
+
+**Decisões:** frontmatter só com `titulo` e `descricao` (a `descricao` nova resume o app para a
+barra lateral e para o assistente de docs). O README **não linka** os guias que ainda não existem
+(`preliminar`, `avancado`, `administracao`): o visualizador só abre slug listado, e link morto na
+página inicial é o pior lugar para um; as PRs 5 e 7 acrescentam os links quando os guias entram.
+Todo slug linkado foi conferido contra `docs/`. Zero número de issue, rodada ou endereço no texto.
+
+**Verificação:** `guard-enderecos-doc.mjs` (docs/ é raiz) e `validar-frontend.sh` verdes; `pnpm
+build && pnpm exec urbi-empacotar` inalterado (só `.md` no topo de `docs/`). Sem migração, `versao`
+mantida.
+
+---
+
 ## Rodada 14, PR 3 — processo: a skill de revisão cobra o guia em `docs/*.md` (2026-09-25)
 
 PR de processo puro (regra R1: `.claude/**` não viaja com código de produto). A convenção "Doc no
