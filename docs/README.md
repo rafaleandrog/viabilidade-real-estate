@@ -63,20 +63,20 @@ por m² recalculados a cada edição. Em **Resultado** ficam a **Proforma** comp
 **Cenários** — o tornado de alavancas, a margem de segurança e a sensibilidade Bear, Base e Bull —
 com exportação para PDF e Excel. **Gráficos** traz a faixa de KPIs, a cascata do resultado, a
 cadeia de áreas e os indicadores contra benchmark. **Análise de Mercado** é a avaliação qualitativa
-do imóvel por IA, a partir de documentos anexados.
+do imóvel por IA, a partir de documentos anexados. Ver [Estudo Preliminar](preliminar).
 
 ### Estudo Avançado
 
 Páginas na lista lateral, nesta ordem: **Resumo**; **Empreendimento** (sub-abas Informações — dados
 do terreno, imagem e anexos —, Cronograma e Tipologias); **Custos** (Terreno, Obras, Diretos,
 Indiretos e Financeiro; a distribuição de cada custo no tempo é linear ou por uma curva do
-catálogo, o preço do terreno pode também ser atrelado à entrega das unidades ou à receita de
-vendas, e três linhas não escolhem: a corretagem sai no mês da venda, a permuta física na entrega
+catálogo, o preço do terreno pode também acompanhar a receita das vendas — a que entra em caixa
+ou o VGV vendido —, e três linhas não escolhem: a corretagem sai no mês da venda, a permuta física na entrega
 das unidades e a permuta financeira conforme a receita entra); **Viabilidade** (Receitas —
 absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity e financiamento
 à produção); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise
 de mercado** (os números do estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
-[Funding](funding) e [Análise de Mercado](analise-mercado).
+[Estudo Avançado](avancado), [Funding](funding) e [Análise de Mercado](analise-mercado).
 
 ### Endereço das telas
 
@@ -130,8 +130,8 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é
 | Avançado — parâmetros, funding, cenários | `GET`/`PATCH /estudos/:id/avancado/parametros` · `GET`/`POST /estudos/:id/avancado/funding` · `PATCH`/`DELETE …/funding/:oid` · `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH`/`DELETE …/cenarios/:cid` |
 | Avançado — curvas e anexos | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` · `GET`/`POST /estudos/:id/empreendimento/documentos` · `DELETE …/documentos/:docId` |
 
-As regras de cálculo por trás das rotas do Avançado estão em [Funding](funding) e em
-[Fórmulas da Proforma](formulas). As transições de status são validadas no servidor: uma transição inválida
+As rotas do Avançado estão descritas por página em [Estudo Avançado](avancado); as regras de
+cálculo por trás delas, em [Funding](funding) e em [Fórmulas da Proforma](formulas). As transições de status são validadas no servidor: uma transição inválida
 responde `422 TRANSICAO_INVALIDA`, e uma sem alçada `403 SEM_PERMISSAO`.
 
 O app publica três eventos no barramento da instância: `estudo_criado`, `estudo_status_alterado` e
@@ -139,6 +139,7 @@ O app publica três eventos no barramento da instância: `estudo_criado`, `estud
 
 ## Veja também
 
+- Telas: [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado)
 - Regras: [Fórmulas da Proforma](formulas) · [Funding](funding) · [Benchmarks](benchmarks) · [Permissões e ciclo de vida](permissoes)
 - Mercado: [Análise de Mercado](analise-mercado) · [Apelo Comercial (IA)](apelo-comercial)
 - Dados: [Modelo de Dados](modelo-de-dados) · [Exportação](exportacao)
