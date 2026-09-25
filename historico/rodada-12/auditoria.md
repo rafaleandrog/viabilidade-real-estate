@@ -67,8 +67,7 @@ nesta mesma rodada (ver `CLAUDE.md`, seção da armadilha 11).
 
 Os blocos "Margem de segurança" (handoff §4.3) e benchmark editável por tipologia/praça (§Fase 3)
 exigem um campo `base_calculo` por linha de custo, hoje inexistente de forma uniforme no schema do
-Preliminar — fora do escopo desta rodada por decisão do autor.
- Ver o plano completo da rodada
+Preliminar — fora do escopo desta rodada por decisão do autor. Ver o plano completo da rodada
 (registrado na conversa que a abriu) para a lista completa de decisões e a ordem de PRs.
 
 > ⚠️ **A premissa do `base_calculo` não se sustentou — corrigida em 2026-09-25 (Rodada 13).** A
