@@ -5,7 +5,7 @@
 // é passar"), calibrado com valores pequenos de propósito; trocar a fixture
 // ali apagaria essa calibração.
 //
-// `_renderKpis` (`frontend/tela-proforma.ts:494-529`) não mostra NENHUM
+// `_renderKpis` (`frontend/tela-proforma.ts:537-553`) não mostra NENHUM
 // valor monetário nesta faixa — só m²/un/% (Área vendável, Nº de unidades,
 // [Área permutada], [Vendável / gleba, só no Loteamento — #613], Custo
 // obras / VGV, Margem sobre VGV). O lever é "Área
