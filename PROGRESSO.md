@@ -25,6 +25,15 @@ barra lateral e para o assistente de docs). O README **não linka** os guias que
 página inicial é o pior lugar para um; as PRs 5 e 7 acrescentam os links quando os guias entram.
 Todo slug linkado foi conferido contra `docs/`. Zero número de issue, rodada ou endereço no texto.
 
+**Rodada 1 de revisão (App do Codex + 2 lentes Kimi) derrubou sete afirmações do texto novo**, todas
+consertadas antes do merge: sub-abas ENTRAM na URL (rota de quatro segmentos, deep link e histórico
+preservados); renomear é ação do cabeçalho do estudo, não da linha do Painel; Empreendimento tem
+Informações/Cronograma/Tipologias (Receitas e Financeiro são de Viabilidade; Custos tem cinco
+sub-abas); o identificador legível inclui o nome de criação; a lista de colunas tinha omitido ROI e
+Criador; a Proforma do Avançado não exporta (o que sai é o Fluxo de Caixa); `PATCH`/`DELETE` de
+benchmarks levam `:id`. Lição para as PRs seguintes: conferir cada rótulo e cada rota **no arquivo**,
+não de memória do README antigo — foi ele a fonte dos erros de URL e de renomear.
+
 **Verificação:** `guard-enderecos-doc.mjs` (docs/ é raiz) e `validar-frontend.sh` verdes; `pnpm
 build && pnpm exec urbi-empacotar` inalterado (só `.md` no topo de `docs/`). Sem migração, `versao`
 mantida.

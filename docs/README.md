@@ -33,9 +33,10 @@ empresa, cenários de sensibilidade e uma leitura do mercado local.
 
 A tela inicial tem cinco abas: **Estudos**, **Terrenos**, **Benchmark**, **Curvas** e **Regiões
 monitoradas**. A aba **Estudos** lista os estudos aos quais você tem acesso, com filtros por tipo e
-status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV e Margem. Na
-linha de cada estudo ficam as ações que a sua função permite: abrir, renomear, duplicar, remover e
-os botões de transição de status. A aba **Terrenos** mostra os imóveis do Núcleo disponíveis para
+status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV, Margem, ROI e
+Criador. Na linha de cada estudo ficam as ações que a sua função permite: os botões de transição
+de status, **Duplicar** e **Remover**; clicar na linha abre o estudo, e é no cabeçalho do estudo
+aberto que se **renomeia**. A aba **Terrenos** mostra os imóveis do Núcleo disponíveis para
 vincular. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
 (curvas de distribuição de custos no tempo, usadas pelo estudo Avançado) e **Regiões monitoradas**
 ([Análise de Mercado](analise-mercado)).
@@ -50,8 +51,9 @@ vincular. As outras três são telas de configuração: **Benchmark** ([Benchmar
    disponível.
 4. O estudo nasce em **Rascunho**, com você como `editor`.
 
-O estudo recebe um identificador legível e estável, composto pela sigla do tipo, a UF e uma
-sequência. Renomear o estudo não altera esse identificador.
+O estudo recebe um identificador legível e estável, composto pela sigla do tipo, o nome dado na
+criação, a UF e uma sequência. Renomear o estudo depois muda só o nome exibido, nunca esse
+identificador.
 
 ### Estudo Preliminar
 
@@ -65,17 +67,19 @@ do imóvel por IA, a partir de documentos anexados.
 
 ### Estudo Avançado
 
-Páginas na lista lateral, nesta ordem: **Resumo**, **Empreendimento** (cronograma, tipologias,
-receitas e absorção, terreno), **Custos** (orçamento distribuído no tempo por curvas), **Viabilidade**
-(parâmetros financeiros), **Funding** (dívida, equity e financiamento à produção), **Resultados**
-(Fluxo de Caixa, Proforma e Análise Financeira), **Cenários**, **Análise de mercado** (os números do
-estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
+Páginas na lista lateral, nesta ordem: **Resumo**; **Empreendimento** (sub-abas Informações — dados
+do terreno, imagem e anexos —, Cronograma e Tipologias); **Custos** (Terreno, Obras, Diretos,
+Indiretos e Financeiro, cada custo distribuído no tempo por uma curva); **Viabilidade** (Receitas —
+absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity e financiamento
+à produção); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise
+de mercado** (os números do estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
 [Funding](funding) e [Análise de Mercado](analise-mercado).
 
 ### Endereço das telas
 
-Cada estudo abre em `/viabilidade/detalhe/<id>/<pagina>`; as sub-abas não entram na URL, então
-um link direto ou um refresh volta à sub-aba padrão daquela página.
+Cada estudo abre em `/viabilidade/detalhe/<id>/<pagina>/<subaba>`. A sub-aba faz parte da URL:
+um link direto, um refresh ou o voltar/avançar do navegador devolvem exatamente a sub-aba em que
+você estava. Sem o último segmento, a página abre na sub-aba padrão.
 
 ### Ciclo de vida
 
@@ -86,8 +90,9 @@ Arquivado. Aprovado é estado final. Detalhe em [Permissões e ciclo de vida](pe
 
 ### Exportar
 
-A Proforma sai em PDF e Excel a partir da própria aba, no Preliminar e no Avançado; o fluxo de
-caixa do Avançado também. Ver [Exportação](exportacao).
+No Preliminar, a Proforma sai em PDF e Excel a partir da própria aba. No Avançado, o que se exporta
+é o **Fluxo de Caixa** (CSV e PDF), na visão mensal ou anual escolhida; a Proforma do Avançado não
+tem exportação própria. Ver [Exportação](exportacao).
 
 ## Para administradores
 
@@ -110,7 +115,7 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é
 | Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `DELETE /estudos/:id/imoveis/:vinculoId` |
 | Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` |
 | Análise de mercado | `GET`/`POST /estudos/:id/analise-mercado` · `PATCH /estudos/:id/analise-mercado/regiao` · `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` |
-| Benchmarks | `GET /benchmarks` · `POST`/`PATCH`/`DELETE /benchmarks` · `POST /benchmarks/semear` |
+| Benchmarks | `GET /benchmarks` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` |
 | Configuração e manutenção | `GET /config` · `POST /manutencao/arquivar-inativos` |
 
 As páginas do estudo Avançado têm as próprias rotas, descritas em [Funding](funding) e em
