@@ -49,6 +49,9 @@ export const caso = {
     // tela inteira (a tabela "Análise de sensibilidade" continua abaixo do
     // tornado).
     'urbi-badge.cor',
+    // #734: o alerta de cenário inviável do bloco de consumo do colchão
+    // (a alavanca de maior amplitude deste fixture já estoura a folga).
+    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).urbiVerso.api = async (rota: string) => {

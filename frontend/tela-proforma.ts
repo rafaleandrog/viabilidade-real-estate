@@ -823,7 +823,7 @@ export class ViabTelaProforma extends LitElement {
     return html`
       <div class="colchao ${consumo?.inviavel ? 'inviavel' : ''}">
         <p class="colchao-var">Variável selecionada: <strong>${rotulo}</strong></p>
-        <p class="colchao-texto">${textoPontoDeEquilibrio(margem, this._margemAlvoPct())}</p>
+        <p class="colchao-texto">${textoPontoDeEquilibrio(margem, this._margemAlvoPct(), custoLike)}</p>
         ${consumo?.inviavel
           ? html`<urbi-banner variante="alerta">${textoConsumo(consumo, estresseBear)}</urbi-banner>`
           : html`<p class="colchao-texto">${textoConsumo(consumo, estresseBear)}</p>`}
