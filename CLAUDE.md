@@ -531,7 +531,7 @@ conferência daquele endereço para sempre, e caladamente.
 
 > Ele é deliberadamente **conservador** — prefere deixar passar citação ambígua a acusar prosa
 > correta, porque guard que atrapalha trabalho legítimo é desligado, e aí não guarda mais nada.
-> `historico/rodada-8/**` fica de fora de propósito: é fotografia datada, e envelhecer é o comportamento
+> `historico/**` (a Rodada 8 inclusive) fica de fora de propósito: é fotografia datada, e envelhecer é o comportamento
 > certo dela.
 
 **3 · CI verde sobre base vencida.**
