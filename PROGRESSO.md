@@ -4,6 +4,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-09-25 — Rodada 14, PR 5: guias novos `docs/preliminar.md` e `docs/avancado.md`
+
+Quinta PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). Dois guias novos, tela a
+tela, no estilo da `fabrica`: **Estudo Preliminar** (as quatro abas, as quatro sub-abas de
+Premissas com os campos por tipo de empreendimento, as linhas da Proforma, os três blocos de
+Cenários, os gráficos e a Análise de Mercado) e **Estudo Avançado** (as nove páginas com as
+sub-abas de cada uma, o catálogo de categorias e subcategorias de custo, as formas de distribuição
+no tempo, o fluxo de pagamento, os Resultados e os Cenários, mais a tabela de rotas por página). O
+`README.md` passa a linkar os dois (seções Preliminar/Avançado, Instruções para não humanos e Veja
+também), como o PR 4 tinha deixado combinado.
+
+**Método, e ele é a lição do PR 4 aplicada de saída:** todo rótulo, sub-aba, opção de select e
+regra citados foram lidos do arquivo de tela correspondente antes de entrar no texto —
+`tela-premissas.ts` (labels dos campos e dos interruptores *Considerar…*), `tela-proforma.ts`
+(subtítulos dos cards de Cenários: o tornado varia a premissa em ±5/10/15 % escolhidos no card, e a
+margem de segurança mede *"até o resultado zerar"*, não até o piso do benchmark, como o primeiro
+rascunho dizia), `tela-apelo.ts`, `tela-empreendimento-info.ts`, `tela-fluxo-cronograma.ts`,
+`tela-fluxo-custos.ts` (catálogo de subcategorias, unidades de orçamento, formas *Linear* / *Unit
+Delivery* / *Sales Revenue*), `tela-fluxo-receitas.ts`, `tela-fluxo-ver.ts`, `tela-cenarios.ts`,
+`tela-analise-mercado.ts`, `estudo-status.ts` (quem edita em status travado) e `backend/rotas/*.ts`
+(rotas e a cópia do nível em Duplicar). Sem número de issue, rodada, data ou endereço
+`arquivo:linha` nos guias. Sem migração, sem `schema.json`, `versao` mantida.
+
 ## Rodada 14, PR 4 — `docs/README.md` reescrito no estilo da fabrica (2026-09-25)
 
 Primeira PR de conteúdo da rodada. A visão geral era diário de desenvolvimento: números de issue e
