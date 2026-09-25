@@ -121,7 +121,7 @@ test('#730 fiação: a aba Cenários monta a tabela pelo módulo — sete coluna
     'particionarInvariantes(monetarias)',
     'rotuloInvariantes(invariantes.length)',
     '<details class="sens-invariantes">',
-    "rotuloEstresse('bear', rotuloVar, varNeg, varPos, custoLike)",
+    'rotuloEstresse(id, rotuloVar, varNeg, varPos, custoLike)',
     '${celulaDelta(x.deltaBear)}',
     '${celulaDelta(x.deltaBull)}',
     'fmtVariacao(x.amplitudePct)',

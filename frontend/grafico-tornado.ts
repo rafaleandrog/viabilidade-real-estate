@@ -13,6 +13,10 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Alavanca } from './tornado-alavancas.js';
 import type { VariavelSensibilidade } from './proforma.js';
+import { rotuloComposto, type CenarioComposto } from './cenario-composto.js';
+
+/** #735: o que o tornado seleciona — uma alavanca, ou o cenário composto. */
+export type SelecaoTornado = VariavelSensibilidade | 'composto';
 import { fmtR$, fmtPct } from './viab-format.js';
 
 const N_DESTAQUE = 3;
@@ -21,7 +25,13 @@ const N_DESTAQUE = 3;
 export class ViabGraficoTornado extends LitElement {
   @property({ attribute: false }) alavancas: Alavanca[] = [];
   /** Variável hoje selecionada — dirige a tabela Bear/Base/Bull abaixo. */
-  @property({ attribute: false }) ativa: VariavelSensibilidade | null = null;
+  @property({ attribute: false }) ativa: SelecaoTornado | null = null;
+  /**
+   * #735: o cenário composto, desenhado como o item do TOPO — pré-existente
+   * à seleção das barras individuais. `null` = sem composto (menos de duas
+   * alavancas não circulares).
+   */
+  @property({ attribute: false }) composto: CenarioComposto | null = null;
 
   static styles = css`
     :host { display: block; }
@@ -46,6 +56,9 @@ export class ViabGraficoTornado extends LitElement {
       box-shadow: inset 2px 0 0 var(--cor-primaria-solida, #2aa9e0);
     }
     .linha.circular { opacity: 0.55; }
+    /* #735: o composto, no topo, separado das alavancas individuais. */
+    .linha.composto { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--cor-borda-sutil, rgba(255, 255, 255, 0.08)); }
+    .linha.composto .rotulo { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); font-weight: 600; }
     .rotulo {
       font-size: 12px;
       color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
@@ -86,13 +99,13 @@ export class ViabGraficoTornado extends LitElement {
     }
   `;
 
-  private _selecionar(variavel: VariavelSensibilidade) {
+  private _selecionar(variavel: SelecaoTornado) {
     this.dispatchEvent(new CustomEvent('viab:tornado-selecionar', { detail: { variavel }, bubbles: true, composed: true }));
   }
 
   // Mesmo par Enter/Espaço de `viab-grafico-cascata` — a linha é um `div` com
   // `role="button"`, e o navegador só ativa por teclado o que é botão nativo.
-  private _tecla(ev: KeyboardEvent, variavel: VariavelSensibilidade) {
+  private _tecla(ev: KeyboardEvent, variavel: SelecaoTornado) {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     ev.preventDefault();
     if (ev.repeat) return;
@@ -106,14 +119,36 @@ export class ViabGraficoTornado extends LitElement {
     // Escalado pela MAIOR amplitude do conjunto, nunca pela primeira — foi o
     // achado mais caro da Rodada 12 (PR #707, cadeia de áreas): a lista chega
     // ordenada, mas ordenada é contrato do chamador, não do desenho.
-    const maiorAmplitude = Math.max(...this.alavancas.map((a) => a.amplitudeRS), 0.01);
+    // #735: o composto entra na escala — é, por construção, a maior amplitude.
+    const maiorAmplitude = Math.max(...this.alavancas.map((a) => a.amplitudeRS), this.composto?.amplitudeRS ?? 0, 0.01);
     // As 3 primeiras em destaque, mas a base circular NUNCA entra na contagem
     // — mesmo rankeada alto, ela sai atenuada (issue #728, item 5).
     const destaque = new Set(
       this.alavancas.filter((a) => !a.circular).slice(0, N_DESTAQUE).map((a) => a.variavel),
     );
+    const c = this.composto;
+    const compostoAtivo = this.ativa === 'composto';
     return html`
       <div>
+        ${c ? html`
+          <div
+            class="linha composto ${compostoAtivo ? 'ativa' : ''}"
+            data-variavel="composto"
+            role="button"
+            aria-pressed=${compostoAtivo ? 'true' : 'false'}
+            tabindex="0"
+            title="${rotuloComposto(c)}: ${fmtR$(c.resultadoBear)} a ${fmtR$(c.resultadoBull)} — as três estressadas juntas"
+            @click=${() => this._selecionar('composto')}
+            @keydown=${(ev: KeyboardEvent) => this._tecla(ev, 'composto')}
+          >
+            <span class="rotulo" title=${rotuloComposto(c)}>${rotuloComposto(c)}</span>
+            <div class="trilho">
+              <div class="eixo"></div>
+              <div class="barra esquerda destaque" style="width: ${(Math.max(0, c.resultadoBase - c.resultadoBear) / maiorAmplitude) * 50}%;"></div>
+              <div class="barra direita destaque" style="width: ${(Math.max(0, c.resultadoBull - c.resultadoBase) / maiorAmplitude) * 50}%;"></div>
+            </div>
+            <span class="valor">${fmtR$(c.amplitudeRS)}</span>
+          </div>` : nothing}
         ${this.alavancas.map((a) => {
           const ativa = this.ativa === a.variavel;
           const emDestaque = destaque.has(a.variavel);

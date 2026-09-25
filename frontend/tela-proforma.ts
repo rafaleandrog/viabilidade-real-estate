@@ -28,6 +28,7 @@ import { montarFaixaCenarios } from './faixa-cenarios-motor.js';
 import {
   consumoDoColchao, ehBaixaAlavanca, textoConsumo, textoPontoDeEquilibrio, TEXTO_BAIXA_ALAVANCA, TEXTO_CIRCULAR,
 } from './consumo-colchao.js';
+import { cenarioComposto, rotuloComposto, descreverLado, type CenarioComposto } from './cenario-composto.js';
 import './faixa-cenarios.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
@@ -70,6 +71,8 @@ export function celulaProformaM2(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>, area
 // BUG7-08: mesmo conjunto de variáveis estressáveis que o motor resolve —
 // reexportado como alias em vez de duplicar a união (proforma.ts é a fonte).
 type VarSens = VariavelSensibilidade;
+/** #735: o tornado seleciona uma alavanca OU o cenário composto (as três maiores juntas). */
+type SelecaoTornado = VarSens | 'composto';
 
 // #11: cada linha da tabela de cenários é receita ou despesa — é o que colore o
 // rótulo e o fundo da linha. #568: é também o que decide a NOTAÇÃO da célula,
@@ -247,7 +250,7 @@ export class ViabTelaProforma extends LitElement {
   // tornado seleciona a de maior amplitude por padrão. `null` = "segue o
   // ranking"; um clique na barra grava a escolha explícita do usuário, que
   // então vence mesmo quando o ranking recalcula (passo, edição de Premissas).
-  @state() private _varSensManual: VarSens | null = null;
+  @state() private _varSensManual: SelecaoTornado | null = null;
   @state() private _passoPct: 5 | 10 | 15 = 10;
   /** #730: a coluna Amplitude é ordenável — `true` = |amplitude| decrescente; `false` = ordem do proforma. */
   @state() private _sensPorAmplitude = false;
@@ -801,6 +804,16 @@ export class ViabTelaProforma extends LitElement {
    * segurança) e são percentuais ASSINADOS sobre a mesma premissa — a
    * divisão em módulo mora em `consumoDoColchao`, não aqui.
    */
+  /** #735: no composto, a leitura por premissa (margem, colchão) é das alavancas individuais — o bloco diz isso. */
+  private _renderCompostoNota(c: CenarioComposto): TemplateResult {
+    return html`
+      <div class="colchao composto">
+        <p class="colchao-var">Cenário selecionado: <strong>${rotuloComposto(c)}</strong></p>
+        <p class="colchao-texto">As três premissas de maior alavanca erram juntas — no Bear, todas no sentido desfavorável; no Bull, todas no favorável. O resultado composto sai de uma execução do motor com as três, não da soma dos efeitos isolados: os custos percentuais sobre o VGV fazem os efeitos interagirem.</p>
+        <p class="colchao-texto colchao-baixa">Ponto de equilíbrio e consumo do colchão são por premissa: selecione uma alavanca para vê-los.</p>
+      </div>`;
+  }
+
   private _renderColchao(
     entrada: ProformaInput, alavancas: Alavanca[], variavel: VarSens, varNeg: number, custoLike: boolean,
   ): TemplateResult {
@@ -964,10 +977,19 @@ export class ViabTelaProforma extends LitElement {
     // desenha atenuada e fora do destaque porque ela "não mede nada isolado"
     // (tornado-alavancas.ts); deixá-la virar a seleção DEFAULT da tabela
     // Bear/Base/Bull contradiria isso (achado da lente L1, PR #757).
-    const varSensAtual: VarSens = this._varSensManual
+    // #735: o cenário composto — as três maiores alavancas não circulares,
+    // estressadas juntas numa execução do motor — é o item do topo do tornado.
+    const composto = cenarioComposto(entrada, alavancas, this._passoPct);
+    const selecao: SelecaoTornado = (this._varSensManual === 'composto' && composto ? 'composto' : null)
+      ?? (this._varSensManual !== 'composto' ? this._varSensManual : null)
       ?? alavancas.find((a) => !a.circular)?.variavel
       ?? alavancas[0]?.variavel
       ?? 'preco';
+    const ehComposto = selecao === 'composto';
+    // Para a margem, o colchão e o indicador do benchmark, a variável de
+    // referência do composto é a maior das três (a leitura por premissa é
+    // dita no bloco do colchão).
+    const varSensAtual: VarSens = ehComposto ? (composto!.variaveis[0]) : selecao;
 
     // A variação +/- vem do indicador de sensibilidade do benchmark (por variável),
     // não mais de um par único do estudo. Sem benchmark → fallback 10%.
@@ -988,7 +1010,17 @@ export class ViabTelaProforma extends LitElement {
     // motor de novo com os campos legados zerados (no-op quando há canônico),
     // deriva-se do próprio Proforma já calculado do cenário (mesma identidade
     // de exportar.ts:39), sem 2ª execução.
-    const proforma = (fator: number) => calcularProforma(this._aplicarFator(varSensAtual, fator));
+    // #735: no composto os três cenários rodam com o CONJUNTO de fatores —
+    // nunca a soma dos efeitos isolados.
+    // O LADO é explícito: derivar Bear/Bull do sinal do fator acoplaria o
+    // composto à variável de referência (achado do Kimi, PR 777).
+    const proforma = (lado: 'bear' | 'base' | 'bull') => {
+      if (ehComposto) {
+        const fatores = lado === 'bear' ? composto!.fatoresBear : lado === 'bull' ? composto!.fatoresBull : null;
+        return calcularProforma(this._entrada(fatores ? { sensibilidade: { fatores } } : {}));
+      }
+      return calcularProforma(this._aplicarFator(varSensAtual, lado === 'bear' ? fatorBear : lado === 'bull' ? fatorBull : 1));
+    };
     const vgvBrutoDe = (cen: Proforma) => vgvBrutoDeProforma(cen);
     // #730: as dez linhas (oito monetárias, dois indicadores em % como
     // urbi-badge) moram em `LINHAS_SENSIBILIDADE` (`sensibilidade-tabela.ts`),
@@ -1013,15 +1045,20 @@ export class ViabTelaProforma extends LitElement {
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS seguem a mesma cor do
     // cenário, por classe `cen-*` (ver o CSS) — exceto quando o valor é negativo.
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
-    const pBear = proforma(fatorBear), pBase = proforma(1), pBull = proforma(fatorBull);
+    const pBear = proforma('bear'), pBase = proforma('base'), pBull = proforma('bull');
     // #730: o cabeçalho declara o ESTRESSE aplicado (`📉 Bear −10% Preço de
     // venda`), não só o nome do cenário — `rotuloEstresse` usa o mesmo
     // `custoLike` que montou os fatores acima.
     const rotuloVar = alavancas.find((a) => a.variavel === varSensAtual)?.rotulo ?? varSensAtual;
+    // #735 (§4.6.E): "nenhum cenário pode alterar duas premissas sem declarar
+    // ambas" — no composto o cabeçalho lista as três, com o sentido de cada.
+    const rot = (id: 'bear' | 'base' | 'bull') => (ehComposto
+      ? (id === 'base' ? '📊 Base' : `${id === 'bear' ? '📉 Bear' : '🚀 Bull'} ${descreverLado(composto!, id, this._passoPct)}`)
+      : rotuloEstresse(id, rotuloVar, varNeg, varPos, custoLike));
     const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma; vgvBruto: number }[] = [
-      { id: 'bear', rot: rotuloEstresse('bear', rotuloVar, varNeg, varPos, custoLike), p: pBear, vgvBruto: vgvBrutoDe(pBear) },
-      { id: 'base', rot: rotuloEstresse('base', rotuloVar, varNeg, varPos, custoLike), p: pBase, vgvBruto: vgvBrutoDe(pBase) },
-      { id: 'bull', rot: rotuloEstresse('bull', rotuloVar, varNeg, varPos, custoLike), p: pBull, vgvBruto: vgvBrutoDe(pBull) },
+      { id: 'bear', rot: rot('bear'), p: pBear, vgvBruto: vgvBrutoDe(pBear) },
+      { id: 'base', rot: rot('base'), p: pBase, vgvBruto: vgvBrutoDe(pBase) },
+      { id: 'bull', rot: rot('bull'), p: pBull, vgvBruto: vgvBrutoDe(pBull) },
     ];
     const porId = { bear: cenarios[0], base: cenarios[1], bull: cenarios[2] };
     // #730: cada linha ganha Δ% de cada lado contra a base e a amplitude
@@ -1107,8 +1144,9 @@ export class ViabTelaProforma extends LitElement {
           <p class="cenarios-subtitulo">Variação do resultado para ±${this._passoPct}% na premissa</p>
           <viab-grafico-tornado
             .alavancas=${alavancas}
-            .ativa=${varSensAtual}
-            @viab:tornado-selecionar=${(e: CustomEvent) => { this._varSensManual = e.detail.variavel as VarSens; }}
+            .composto=${composto}
+            .ativa=${selecao}
+            @viab:tornado-selecionar=${(e: CustomEvent) => { this._varSensManual = e.detail.variavel as SelecaoTornado; }}
           ></viab-grafico-tornado>
           <div class="sens-passo">
             <urbi-select
@@ -1122,14 +1160,15 @@ export class ViabTelaProforma extends LitElement {
               @urbi:select-change=${(e: CustomEvent) => { this._passoPct = Number(e.detail.valor) as 5 | 10 | 15; }}
             ></urbi-select>
           </div>
-          ${this._renderColchao(entrada, alavancas, varSensAtual, varNeg, custoLike)}
+          ${ehComposto ? this._renderCompostoNota(composto!) : this._renderColchao(entrada, alavancas, varSensAtual, varNeg, custoLike)}
         </urbi-card>
         ${this._renderMargemSeguranca(entrada, lot)}
       </div>
       <urbi-card titulo="Análise de sensibilidade">
         <p class="sens-var">
-          Variável estressada: <strong>${alavancas.find((a) => a.variavel === varSensAtual)?.rotulo ?? varSensAtual}</strong>
-          (−${varNeg}% / +${varPos}%) — clique numa alavanca acima para trocar.
+          ${ehComposto
+            ? html`Cenário estressado: <strong>${rotuloComposto(composto!)}</strong> (±${this._passoPct}% em cada premissa, juntas) — clique numa alavanca acima para trocar.`
+            : html`Variável estressada: <strong>${rotuloVar}</strong> (−${varNeg}% / +${varPos}%) — clique numa alavanca acima para trocar.`}
         </p>
         <div class="pf-wrap">
           <table class="pf sens">

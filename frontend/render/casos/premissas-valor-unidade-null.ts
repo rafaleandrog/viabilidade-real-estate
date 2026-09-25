@@ -24,7 +24,7 @@
 // permuta física é a cascata de área do TERRENO (`areaVendavel`), que a
 // fixture `ESTUDO` deixa em 4.800 m² mesmo sem produto — não zera por causa
 // só de `produtos: []`. Na Incorporação, sem catálogo (`semProdutos`), a base
-// é `area_pvt_r_fechada` (`frontend/proforma.ts:558`): zerando esse campo dá
+// é `area_pvt_r_fechada` (`frontend/proforma.ts:597`): zerando esse campo dá
 // a ligação ZERADA sem precisar reconstruir a cascata de terreno inteira.
 //
 // ⚠️ DESENHO INVERTIDO (rodada 5 de revisão — Codex achou defeito real e
