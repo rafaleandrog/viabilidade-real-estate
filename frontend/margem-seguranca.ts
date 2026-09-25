@@ -5,7 +5,7 @@
 // exigiria um campo `base_calculo` por linha de custo no schema — mas essa
 // decomposição é um jeito de CALCULAR, não o resultado: `calcularProforma` já
 // sabe, no código, qual base cada linha usa. Invertendo o motor numericamente
-// (o precedente é `precoSugeridoM2`, `frontend/proforma.ts:892`) recuperam-se
+// (o precedente é `precoSugeridoM2`, `frontend/proforma.ts:899`) recuperam-se
 // os mesmos números sem campo novo, sem migração — e continua correto se uma
 // linha mudar de base amanhã.
 
@@ -38,7 +38,7 @@ export interface MargemDeSeguranca {
   folgaPct: number | null;
 }
 
-// O piso do motor (`fatorSens` capa em `Math.max(0, fator)`, proforma.ts:472)
+// O piso do motor (`fatorSens` capa em `Math.max(0, fator)`, proforma.ts:479)
 // faz de 0 o mínimo alcançável; 5 (+400%) é folga generosa para qualquer
 // "estouro de obra" plausível, e limita a bisseção a um intervalo finito.
 const FATOR_MIN = 0;
