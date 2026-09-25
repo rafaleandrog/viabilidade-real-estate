@@ -61,9 +61,9 @@ export const caso = {
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const p = calcularProforma(ESTUDO_INCORP);
-    const etapas = calcularCascataResultado(p);
+    const { etapas, zeroPct, eixoMin } = calcularCascataResultado(p);
     const el = document.createElement('viab-grafico-cascata');
-    forcarEstado(el, { etapas, idExpandivel: 'custo_direto', expandido: true });
+    forcarEstado(el, { etapas, zeroPct, eixoMin, idExpandivel: 'custo_direto', expandido: true });
     raiz.appendChild(el);
     await (el as any).updateComplete;
   },

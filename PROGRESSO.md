@@ -12,6 +12,25 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #720: a cascata do resultado desenha o déficit abaixo da linha do zero
+
+`calcularCascataResultado` (`frontend/cascata-resultado-motor.ts`) deixa de clampar a geometria em
+`[0, 100]` sobre o VGV de tabela: o eixo de valor vai de `eixoMin` (o menor saldo, nunca acima de
+zero) a `eixoMax` (nunca abaixo do VGV), cada etapa é o intervalo `[de, ate]` em R$ projetado nesse
+eixo, e a função devolve `{ etapas, zeroPct, eixoMin, eixoMax }` — `zeroPct` é a posição da linha
+do zero no trilho e cada etapa diz se fica `negativo`. Num projeto saudável `eixoMin = 0`,
+`zeroPct = 0` e a geometria é a de antes (teste recomputa a fórmula antiga e compara). Num
+deficitário o Resultado começa na linha do zero e desce até o piso, e a dedução que cruza o zero
+atravessa a linha. `viab-grafico-cascata` ganha `zeroPct`/`eixoMin`, desenha a linha (`.zero`, uma
+por trilho, só quando `zeroPct > 0`), marca a barra negativa e o rodapé declara a escala com piso.
+A trava de inventário de `fmtR$` em `frontend/cascata-milhoes.test.ts` sobe de 2 para 4 chamadas,
+com o motivo ao lado (a base nos dois ramos do rodapé e o piso do ramo deficitário). Provas:
+testes de motor (saudável, deficitário, só custos sem VGV) e de fiação; caso de render novo
+`grafico-cascata-deficit` mede em px que o Resultado vai da linha ao piso e o VGV da linha ao topo —
+apagar `.zeroPct` da tela ou a linha do componente deixa vermelho, medido. `docs/preliminar.md`
+descreve o déficit.
+
 ## 2026-09-25 — #724: as colunas de licenciamento estão aposentadas (ramo b), e a premissa da issue era outra
 
 A issue descrevia um custo "digitado, salvo e que nunca entra no proforma". A metade certa: as

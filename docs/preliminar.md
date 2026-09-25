@@ -79,7 +79,8 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
 Faixa de cinco KPIs com o denominador visível (VGV do incorporador, Resultado final, Margem sobre
 VGV de tabela, Margem sobre receita líquida, Custo obras / VGV); a **cascata do resultado**, do VGV
 ao resultado, barra a barra (os rótulos saem em R$ milhões, o valor exato fica no detalhe de cada
-barra); a **cadeia de áreas**, do terreno à área vendida, em barras proporcionais; e os indicadores
+barra; num projeto deficitário o resultado é desenhado abaixo de uma linha do zero, e o rodapé diz a
+escala); a **cadeia de áreas**, do terreno à área vendida, em barras proporcionais; e os indicadores
 contra benchmark. Um aviso aparece quando o catálogo de produtos não fecha com as áreas informadas —
 é informativo e não impede salvar.
 

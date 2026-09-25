@@ -49,6 +49,15 @@ export class ViabGraficoCascata extends LitElement {
   /** Altura do trilho das colunas. Mesmo nome e default de `UrbiGraficoBase`. */
   @property() altura = '240px';
   /**
+   * #720 — posição da linha do ZERO no trilho, em % (de `CascataResultado`).
+   * `0` (default) é o trilho de sempre, começando no zero: nenhuma linha é
+   * desenhada. Acima de `0`, cada trilho ganha a linha e o que fica abaixo
+   * dela é déficit.
+   */
+  @property({ attribute: false }) zeroPct = 0;
+  /** #720 — o piso do eixo em R$ (`eixoMin`), só para o rodapé dizer a escala. */
+  @property({ attribute: false }) eixoMin = 0;
+  /**
    * Se o painel que a coluna de `idExpandivel` abre está aberto AGORA. Só
    * existe para alimentar `aria-expanded`: quem guarda o estado é a tela, e sem
    * ele o leitor de tela anunciaria um botão de alternância cujo estado nunca
@@ -112,12 +121,10 @@ export class ViabGraficoCascata extends LitElement {
       overflow: hidden;
     }
     /* min-height e o piso de altura da barra: quando a altura calculada fica
-       abaixo de FILETE_PX, ela assume, e a coluna deixa um rastro visivel em
-       vez de sumir da tela. E so isso -- nao tente enumerar aqui QUAIS casos
-       do motor caem nesse piso: duas versoes deste comentario tentaram e as
-       duas erraram, porque o motor clampa INICIO e TAMANHO por caminhos
-       diferentes (cascata-resultado-motor.ts). Quem quiser a analise por caso
-       tem os numeros no motor e na issue 720. */
+       abaixo de FILETE_PX (uma deducao minuscula frente ao eixo), ela assume,
+       e a coluna deixa um rastro visivel em vez de sumir da tela. Desde a 720
+       o motor nao clampa mais: resultado negativo vira barra ABAIXO da linha
+       do zero (.zero), e o piso so cobre o caso pequeno de verdade. */
     .barra {
       position: absolute;
       left: 12%;
@@ -129,6 +136,16 @@ export class ViabGraficoCascata extends LitElement {
        (VGV de tabela, receita bruta, liquida, operacional) e sai verde;
        deducao e DESPESA e sai vermelha; o Resultado final, que nao e nem uma
        nem outra, sai azul para se distinguir dos dois. Sem cinza. */
+    /* #720: a linha do zero, uma por trilho, so quando ha valor negativo. */
+    .zero {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--cor-borda-forte, rgba(255, 255, 255, 0.45));
+      pointer-events: none;
+      z-index: 1;
+    }
     .barra.subtotal { background: var(--cor-sucesso, #13a98d); }
     .barra.deducao { background: var(--cor-erro, #d45a3a); }
     .barra.total { background: var(--cor-primaria-solida, #2aa9e0); }
@@ -212,8 +229,9 @@ export class ViabGraficoCascata extends LitElement {
             >
               <span class="valor">${fmtR$Milhoes(e.valor)}</span>
               <div class="trilho" style="height: ${this.altura};">
+                ${this.zeroPct > 0 ? html`<div class="zero" style="bottom: ${this.zeroPct}%;"></div>` : nothing}
                 <div
-                  class="barra ${e.tipo}"
+                  class="barra ${e.tipo} ${e.negativo ? 'negativa' : ''}"
                   style="bottom: min(${e.inicioPct}%, calc(100% - ${FILETE_PX}px)); height: ${e.tamanhoPct}%;"
                 ></div>
               </div>
@@ -224,8 +242,11 @@ export class ViabGraficoCascata extends LitElement {
       </div>
       ${base > 0
         ? html`<div class="rodape">
-            Escala: altura total = VGV de tabela (${fmtR$(base)}). Valores das barras em R$ milhões;
-            o valor exato aparece ao passar o mouse.
+            ${this.zeroPct > 0
+              ? html`Escala: do menor saldo (${fmtR$(this.eixoMin)}) ao VGV de tabela (${fmtR$(base)}); a
+                linha marca o zero, e o que fica abaixo dela é déficit.`
+              : html`Escala: altura total = VGV de tabela (${fmtR$(base)}).`}
+            Valores das barras em R$ milhões; o valor exato aparece ao passar o mouse.
           </div>`
         : nothing}
     `;
