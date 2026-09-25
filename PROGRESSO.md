@@ -15,6 +15,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #734: consumo do colchão, alerta de cenário inviável e a regra da baixa alavanca
+
+Rodada 13, PR 9 da fila. Abaixo do tornado, para a alavanca selecionada, a aba Cenários do
+Preliminar passa a publicar a leitura decisória: o ponto de equilíbrio (quanto a premissa pode
+errar até o resultado zerar, e até a margem-alvo), o consumo do colchão — o estresse do Bear
+dividido pela folga da margem de segurança, os dois em módulo porque são percentuais assinados
+sobre a mesma premissa —, o alerta em palavras quando o consumo passa de 100 % ("o cenário Bear já
+é inviável"), a nota de baixa alavanca quando a variação do resultado fica abaixo de
+`LIMIAR_BAIXA_ALAVANCA_PCT` (2 %, constante nomeada) e o motivo visível de uma base circular ficar
+fora do ranking. O módulo puro é `frontend/consumo-colchao.ts`; `folgaPct === null` não divide
+nada (sem `Infinity`). A margem-alvo saiu para `_margemAlvoPct()`, compartilhada com o bloco de
+cartões. Provas: `frontend/consumo-colchao.test.ts` (−40 %/−10 % ⇒ 25 %; estresse maior que a folga
+⇒ > 100 % e o texto do alerta; folga nula ⇒ sem consumo; limiar da baixa alavanca com a mutação
+medida; os três estados do ponto de equilíbrio; fiação) e o caso de render `cenarios-colchao`,
+que no fixture padrão (o preço suporta cair 7,1 % e o Bear aplica −10 %, consumo de 140,6 %) mede
+o alerta em palavras, o ponto de equilíbrio e, ao trocar para "Permuta financeira", a mensagem de
+baixa alavanca sem alerta. Achado de harness registrado no caso: `medir()` roda antes da sonda de
+montagem, então a sonda que troca a seleção precisa devolvê-la. `docs/preliminar.md` descreve o
+bloco.
+
 ## 2026-09-25 — #731: os indicadores da aba Cenários viram faixas bear–base–bull contra o benchmark
 
 Rodada 13, PR 7 da fila. As duas linhas em % da tabela de sensibilidade ("Custo obras / VGV",
