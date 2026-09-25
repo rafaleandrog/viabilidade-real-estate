@@ -7,6 +7,17 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — Rodada 14, fechamento: a seção "Documentação da app" entra no `CLAUDE.md`
+
+A única pendência que a fila deixou para o autor era o texto do `CLAUDE.md` (anexo do plano,
+`historico/rodada-14/planejamento.md`): as nove PRs anteriores só puderam trocar caminhos nele. Esta
+alteração aplica o anexo, atualizado com o que a fila entregou: a linha da Rodada 14 na tabela do
+backlog (concluída, os nove PRs, o placar da revisão e a lição), o bullet de `docs/*.md` em "Fontes
+de verdade" e a seção "Documentação da app" — layout `docs/` · `referencia/` · `historico/` ·
+`ideias.md`, a régua de um guia servido, o aviso "rótulo existir no arquivo não prova que a tela o
+renderiza" e as ferramentas que leem esses caminhos. Só `CLAUDE.md` e este arquivo mudam.
+
 ## 2026-09-25 — Rodada 14, PR 9: os cinco guias curtos limpos pela régua, e o `ideias.md` — fila fechada
 
 Nona e última PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). `analise-mercado`,
