@@ -1029,7 +1029,9 @@ rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Respo
     if (tipo) filtrosFases.tipo = tipo;
     const [fases, alocacoes] = await Promise.all([
       req.dados!.listar('avancado_fases', { filtros: filtrosFases, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
-      req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc' }),
+      // Varre em `id asc` (default) e ordena em memória: `ordenar` numa varredura
+      // paginada com a app no ar pode repetir ou pular linha (doc do SDK).
+      req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id } }).then(porOrdem),
     ]);
     const porFase = new Map<number, any[]>();
     for (const a of alocacoes) {
@@ -1156,6 +1158,11 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
 });
 
 // ── Alocações de venda (tipologia → fase) ──
+
+/** Ordena linhas por `ordem` crescente (desempate pelo `id asc` da varredura). */
+function porOrdem<T extends { ordem?: unknown }>(linhas: T[]): T[] {
+  return [...linhas].sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
+}
 
 /**
  * Σ de unidades desta tipologia entregues como PERMUTA FÍSICA no estudo — as
@@ -1346,7 +1353,9 @@ rotasAvancado.get('/estudos/:id/avancado/receitas', async (req: Request, res: Re
     // gantt, sem alocação, e não devem virar "linhas de receita" vazias no motor.
     const [fases, alocacoes, tipologias] = await Promise.all([
       req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo: 'receita' }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
-      req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc' }),
+      // Varre em `id asc` (default) e ordena em memória: `ordenar` numa varredura
+      // paginada com a app no ar pode repetir ou pular linha (doc do SDK).
+      req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id } }).then(porOrdem),
       req.dados!.listar('avancado_tipologias', { filtros: { estudo_id: estudo.id }, por_pagina: 500 }),
     ]);
     const linhas = montarLinhasReceita(fases.dados, alocacoes, tipologias.dados);
