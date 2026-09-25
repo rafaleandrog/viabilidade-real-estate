@@ -15,9 +15,11 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 O filtro do seletor **Buscar lote** (Incorporação, `frontend/tela-terreno-nucleo.ts`) já excluía os
 lotes de parcelamento com `regularizacao=true`; passa a excluir também os de parcelamento com
-`setor_habitacional_id` preenchido — o segundo critério do pedido do autor, e uma coluna que o
-contrato do Núcleo no bundle do SDK expõe (`docs/nucleo.md` do pacote lista `parcelamentos
-(setor_habitacional_id)` entre os filtros). O aviso de indisponibilidade e o contador de lotes
+`setor_habitacional_id` preenchido — o segundo critério do pedido do autor. O contrato do Núcleo
+no bundle do SDK (`docs/nucleo.md` do pacote) lista `parcelamentos (setor_habitacional_id)` entre
+os filtros de igualdade, o que implica a coluna na entidade; o payload da listagem não é tipado no
+bundle, então "a listagem devolve o campo em toda página" é verificação da Pinguim, não desta
+árvore — ausente o campo, o critério novo fica inerte (nada quebra). O aviso de indisponibilidade e o contador de lotes
 elegíveis nomeiam os dois critérios. O caso de render `terreno-nucleo-filtro-regularizacao` ganhou
 um terceiro parcelamento (setor habitacional, sem `regularizacao`) e um terceiro lote, e o teste
 exige que só o lote do parcelamento normal sobreviva — voltar o filtro a só `regularizacao` deixa

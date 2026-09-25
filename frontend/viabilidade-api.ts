@@ -343,8 +343,10 @@ export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Prom
   if (busca) qs.set('busca', busca);
   return urbiVerso.nucleo(`/lotes?${qs}`);
 }
-// Parcelamentos — usado só para descobrir quais são "regularização fundiária"
-// (`regularizacao=true`) e excluir os lotes deles do seletor de Incorporação
+// Parcelamentos — usado só para descobrir quais parcelamentos ficam FORA do
+// seletor de lotes da Incorporação: os de regularização fundiária
+// (`regularizacao=true`) e os vinculados a setor habitacional
+// (`setor_habitacional_id` preenchido), #746
 // (#terreno-nucleo-filtro). Não há filtro server-side por essa coluna no
 // Núcleo hoje (camposFiltro de `lotes` não faz join até `parcelamentos`), daí
 // resolver o conjunto de ids aqui e filtrar no cliente.
