@@ -17,6 +17,17 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #736: fechamento da Rodada 13
+
+Rodada 13 encerrada na mesma alteração que fecha a última issue: `historico/rodada-13/planejamento.md`
+ganhou a seção "Como foi executada" (os seis PRs de produto, o que ficou de fora e por quê, as duas
+premissas que não se sustentaram); a tabela de backlog do `CLAUDE.md` marca a rodada concluída, com
+os PRs e o desfecho de cada issue; as duas notas envelhecidas de `historico/rodada-12/auditoria.md`
+(tornado "para uma rodada futura"; margem de segurança "exige `base_calculo`") ganharam a nota
+datada que as supera, no lugar onde estão. Nenhum contador de estado de revisão nos documentos;
+nenhum número de aritmética mental. Fica aberta só a #726, decisão do autor.
+
 ## 2026-09-25 — #735: cenário composto — as três maiores alavancas estressadas juntas
 
 Rodada 13, PR 10 da fila, a última de código. O motor passa a aceitar um CONJUNTO de fatores:

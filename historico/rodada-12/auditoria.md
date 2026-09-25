@@ -49,6 +49,11 @@ resultado. O handoff resolveria isso com um "tornado de alavancas" (§4.2), que 
 o proforma ±10% por premissa — calculável hoje sem mudança de schema, mas **fora do escopo
 aprovado** desta rodada (Fases 0–1 só). Fica registrado para uma rodada futura.
 
+> ⚠️ **Superada em 2026-09-25 (Rodada 13).** O tornado foi entregue no PR 757 (issues #727/#728/#729:
+> `frontend/tornado-alavancas.ts` e `viab-grafico-tornado`), e a aba Cenários inteira foi
+> reconstruída em seguida (#730, #731, #734, #735). A nota acima fica como fotografia do que a
+> Rodada 12 decidiu; ver `historico/rodada-13/planejamento.md`.
+
 ### Achado que NÃO se sustentou: o bug do ROI (armadilha 11 do `CLAUDE.md`)
 
 A armadilha 11 do `CLAUDE.md` deste repo registra um bug histórico — catálogo precificado sem
@@ -64,3 +69,11 @@ Os blocos "Margem de segurança" (handoff §4.3) e benchmark editável por tipol
 exigem um campo `base_calculo` por linha de custo, hoje inexistente de forma uniforme no schema do
 Preliminar — fora do escopo desta rodada por decisão do autor. Ver o plano completo da rodada
 (registrado na conversa que a abriu) para a lista completa de decisões e a ordem de PRs.
+
+> ⚠️ **A premissa do `base_calculo` não se sustentou — corrigida em 2026-09-25 (Rodada 13).** A
+> decomposição analítica por base de cálculo é um jeito de CALCULAR, não o resultado:
+> `calcularProforma` já sabe qual base cada linha usa, e **inverter o motor numericamente**
+> (secante + bisseção com verificação do resíduo, precedente `precoSugeridoM2`) entregou a margem
+> de segurança sem campo novo, sem migração e sem bump da `versao` — `frontend/margem-seguranca.ts`,
+> PR 757 (#732/#733). O benchmark por praça continua fora, esse sim por exigir schema.
+
