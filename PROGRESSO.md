@@ -28,13 +28,13 @@ passam sem edição. `frontend/cenario-composto.ts` (puro) escolhe as `N_COMPOST
 maior amplitude entre as não circulares, monta os fatores de cada lado (Bear: todas desfavoráveis;
 Bull: todas favoráveis, pelo mesmo `ehCustoLike` do tornado) e roda o motor com as três juntas —
 o resultado composto DIFERE da soma dos deltas isolados, e o teste prova (custos percentuais sobre
-o VGV fazem os efeitos interagir). O tornado (`viab-grafico-tornado`) ganha a prop `composto` e o
+o VGV fazem os efeitos interagir; "pior que o pior isolado" vale na fixture, não em geral). O tornado (`viab-grafico-tornado`) ganha a prop `composto` e o
 desenha como o item do topo, selecionável; a tela (`frontend/tela-proforma.ts`) aceita a seleção
 `'composto'`, roda a tabela Bear/Base/Bull com o conjunto e declara as três premissas no cabeçalho
 ("📉 Bear −10% Preço de venda · +10% Custo de obra · +10% Permuta financeira") e no subtítulo;
 margem de segurança e colchão continuam por premissa, e o bloco diz isso. Provas:
 `frontend/cenario-composto.test.ts` (as duas formas dão a mesma Proforma; três fatores movem as
-três grandezas e o piso é por fator; composto ≠ soma e pior que o pior isolado; escolha entre as
+três grandezas e o piso é por fator; composto ≠ soma (e, nesta fixture, pior que o pior isolado); escolha entre as
 não circulares — reduzir `N_COMPOSTO` a 2 deixa vermelho, medido; rótulos; fiação) e o caso de
 render `cenarios-composto`, que clica no item do topo e lê o cabeçalho com as três premissas e o
 Resultado do Bear composto pior que o do Bear de preço. Sete citações `arquivo:linha` de

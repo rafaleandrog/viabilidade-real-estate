@@ -123,8 +123,15 @@ export type FatorSensibilidade = FatorSensibilidadeUnico | FatoresSensibilidade;
 /** Normaliza qualquer forma de `sensibilidade` no mapa variável → fator. Sem sensibilidade, mapa vazio. */
 export function fatoresDe(s: FatorSensibilidade | undefined | null): Partial<Record<VariavelSensibilidade, number>> {
   if (!s) return {};
-  if ('fatores' in s) return { ...s.fatores };
-  return { [s.variavel]: s.fator };
+  const bruto: Partial<Record<VariavelSensibilidade, number>> = 'fatores' in s ? { ...s.fatores } : { [s.variavel]: s.fator };
+  // Fronteira fail-closed do conjunto (armadilha 14): fator que não é número
+  // finito NÃO entra — `Math.max(0, NaN)` é NaN e contaminaria a Proforma
+  // inteira; `null` viraria 0 e zeraria a variável em silêncio. Ausente = 1.
+  const limpo: Partial<Record<VariavelSensibilidade, number>> = {};
+  for (const [k, v] of Object.entries(bruto)) {
+    if (typeof v === 'number' && Number.isFinite(v)) limpo[k as VariavelSensibilidade] = v;
+  }
+  return limpo;
 }
 
 export interface ProdutoPreliminar {

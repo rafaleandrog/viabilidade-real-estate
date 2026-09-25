@@ -1012,9 +1012,15 @@ export class ViabTelaProforma extends LitElement {
     // de exportar.ts:39), sem 2ª execução.
     // #735: no composto os três cenários rodam com o CONJUNTO de fatores —
     // nunca a soma dos efeitos isolados.
-    const proforma = (fator: number) => (ehComposto
-      ? calcularProforma(this._entrada(fator === 1 ? {} : { sensibilidade: { fatores: fator < 1 === !ehCustoLike(varSensAtual) ? composto!.fatoresBear : composto!.fatoresBull } }))
-      : calcularProforma(this._aplicarFator(varSensAtual, fator)));
+    // O LADO é explícito: derivar Bear/Bull do sinal do fator acoplaria o
+    // composto à variável de referência (achado do Kimi, PR 777).
+    const proforma = (lado: 'bear' | 'base' | 'bull') => {
+      if (ehComposto) {
+        const fatores = lado === 'bear' ? composto!.fatoresBear : lado === 'bull' ? composto!.fatoresBull : null;
+        return calcularProforma(this._entrada(fatores ? { sensibilidade: { fatores } } : {}));
+      }
+      return calcularProforma(this._aplicarFator(varSensAtual, lado === 'bear' ? fatorBear : lado === 'bull' ? fatorBull : 1));
+    };
     const vgvBrutoDe = (cen: Proforma) => vgvBrutoDeProforma(cen);
     // #730: as dez linhas (oito monetárias, dois indicadores em % como
     // urbi-badge) moram em `LINHAS_SENSIBILIDADE` (`sensibilidade-tabela.ts`),
@@ -1039,7 +1045,7 @@ export class ViabTelaProforma extends LitElement {
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS seguem a mesma cor do
     // cenário, por classe `cen-*` (ver o CSS) — exceto quando o valor é negativo.
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
-    const pBear = proforma(fatorBear), pBase = proforma(1), pBull = proforma(fatorBull);
+    const pBear = proforma('bear'), pBase = proforma('base'), pBull = proforma('bull');
     // #730: o cabeçalho declara o ESTRESSE aplicado (`📉 Bear −10% Preço de
     // venda`), não só o nome do cenário — `rotuloEstresse` usa o mesmo
     // `custoLike` que montou os fatores acima.

@@ -66,9 +66,10 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
   variada em ±5, ±10 ou ±15 % (o passo é escolhido no card) e ranqueada pela amplitude do impacto
   no resultado. A barra mais longa é a premissa que mais merece atenção. O custo do terreno não
   entra no tornado: ele tem o próprio cartão ao lado. No topo da lista fica o **Cenário composto**:
-  as três alavancas de maior amplitude (as de base circular ficam fora) estressadas juntas — todas
-  no sentido desfavorável no Bear, todas no favorável no Bull —, porque na prática as premissas
-  erram ao mesmo tempo e o estresse de uma variável isolada subestima o risco. O rótulo e o
+  as três alavancas de maior amplitude (as de base circular ficam fora; com só duas elegíveis, as
+  duas) estressadas juntas — todas no sentido desfavorável no Bear, todas no favorável no Bull —,
+  porque na prática as premissas erram ao mesmo tempo e o estresse de uma variável isolada
+  subestima o risco. O rótulo e o
   cabeçalho da tabela declaram as três premissas; o resultado composto sai de uma execução do
   motor com as três, não da soma dos efeitos isolados. Abaixo do tornado, para a alavanca
   selecionada, a leitura decisória: o **ponto de equilíbrio** (quanto ela pode errar até o

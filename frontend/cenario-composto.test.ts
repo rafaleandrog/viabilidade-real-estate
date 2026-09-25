@@ -21,6 +21,9 @@ test('#735 critério 3: a forma antiga (uma variável) e a nova (conjunto) norma
   assert.deepEqual(fatoresDe({ fatores: { preco: 0.9, custo_obras: 1.1 } }), { preco: 0.9, custo_obras: 1.1 });
   assert.deepEqual(fatoresDe(undefined), {});
   assert.deepEqual(fatoresDe(null), {});
+  // Fronteira fail-closed: NaN, null e string não entram no mapa (ausente = 1).
+  assert.deepEqual(fatoresDe({ fatores: { preco: NaN, custo_obras: null as any, custo_infra: '0.9' as any, custo_terreno: 1.2 } }), { custo_terreno: 1.2 });
+  assert.equal(calcularProforma({ ...ENTRADA, sensibilidade: { fatores: { preco: NaN } } }).resultado, calcularProforma(ENTRADA).resultado);
   // Uma variável só, nas duas formas, dá a MESMA Proforma.
   const a = calcularProforma({ ...ENTRADA, sensibilidade: { variavel: 'preco', fator: 0.9 } });
   const b = calcularProforma({ ...ENTRADA, sensibilidade: { fatores: { preco: 0.9 } } });
@@ -50,7 +53,11 @@ test('#735 critério 2: o resultado composto DIFERE da soma dos três deltas iso
   const base = c.resultadoBase;
   const somaBear = c.variaveis.reduce((s, v) => s + (alavancas.find((a) => a.variavel === v)!.resultadoBear - base), 0);
   assert.ok(Math.abs((c.resultadoBear - base) - somaBear) > 1, `composto ${c.resultadoBear - base} vs soma ${somaBear} — deveriam diferir`);
-  // E o composto é PIOR que a pior alavanca isolada: é o ponto do handoff.
+  // Nesta fixture o composto é PIOR que a pior alavanca isolada — o ponto do
+  // handoff. NÃO é teorema: uma dedução em % do VGV estressada para cima
+  // enquanto o preço cai fica MENOR em R$ (1,1 × 0,9 < 1), e num composto de
+  // só duas alavancas (preço + permuta financeira) o composto pode sair
+  // melhor que o Bear de preço isolado (achado do Kimi, PR 777).
   const piorIsolado = Math.min(...c.variaveis.map((v) => alavancas.find((a) => a.variavel === v)!.resultadoBear));
   assert.ok(c.resultadoBear < piorIsolado, `composto ${c.resultadoBear} não é pior que o pior isolado ${piorIsolado}`);
   assert.ok(c.resultadoBull > base && c.resultadoBear < base);
