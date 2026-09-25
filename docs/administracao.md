@@ -55,12 +55,12 @@ tipo de empreendimento, escolhido nas fichas **Loteamento** e **Incorporação**
 - **Indicador de Benchmark** — os indicadores de meta, com **Valor** e **Regra** (*atingir ou
   superar* ou *não exceder*): `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`,
   `resultado_final` e, só no Loteamento, `eficiencia_aproveitamento`.
-- **Faixas do medidor** — para os mesmos indicadores de meta, **Mín**, **Faixa 1 até**, **Faixa 2
-  até** e **Máx**: os limites e cortes do velocímetro da aba Gráficos; em branco, as faixas saem
-  automaticamente da meta.
 - **Indicador de Sensibilidade** — as quatro variáveis que a análise de sensibilidade estressa
   (`preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras`), com **Var + (%)** e **Var − (%)**,
   as variações padrão dos cenários Bull e Bear.
+- **Faixas do medidor** — para os mesmos indicadores de meta, **Mín**, **Faixa 1 até**, **Faixa 2
+  até** e **Máx**: os limites e cortes do velocímetro da aba Gráficos; em branco, as faixas saem
+  automaticamente da meta.
 
 Na primeira abertura por quem pode escrever, o app semeia sozinho, nos dois tipos, os indicadores
 padrão que ainda faltam — os de meta e os quatro de sensibilidade. **Novo indicador** cria um com
