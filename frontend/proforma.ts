@@ -101,7 +101,31 @@ export interface ProformaInput {
 }
 
 export type VariavelSensibilidade = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras' | 'custo_terreno' | 'custo_indireto';
-export interface FatorSensibilidade { variavel: VariavelSensibilidade; fator: number; }
+/** Uma variável estressada por vez — a forma original (BUG7-08). */
+export interface FatorSensibilidadeUnico { variavel: VariavelSensibilidade; fator: number; }
+/**
+ * #735 — um CONJUNTO de fatores, um por variável, aplicados JUNTOS numa
+ * execução do motor: é o cenário composto (as três maiores alavancas erram
+ * ao mesmo tempo). Variável ausente do mapa fica em 1. O piso `Math.max(0, …)`
+ * continua POR FATOR, não pelo conjunto.
+ */
+export interface FatoresSensibilidade { fatores: Partial<Record<VariavelSensibilidade, number>>; }
+/**
+ * As duas formas são aceitas na entrada e NORMALIZADAS por `fatoresDe` num
+ * mapa só, uma vez, no topo de `calcularProforma` — nenhum dos oito pontos
+ * que consultam `fatorSens` sabe qual forma chegou. A forma única continua
+ * existindo porque é a que os outros motores (tornado, margem de segurança)
+ * e os testes usam, e um formato só para "uma variável" seria `{ fatores: { x } }`
+ * em todo call site sem ganho de leitura.
+ */
+export type FatorSensibilidade = FatorSensibilidadeUnico | FatoresSensibilidade;
+
+/** Normaliza qualquer forma de `sensibilidade` no mapa variável → fator. Sem sensibilidade, mapa vazio. */
+export function fatoresDe(s: FatorSensibilidade | undefined | null): Partial<Record<VariavelSensibilidade, number>> {
+  if (!s) return {};
+  if ('fatores' in s) return { ...s.fatores };
+  return { [s.variavel]: s.fator };
+}
 
 export interface ProdutoPreliminar {
   area_media_m2?: number | string | null;
@@ -442,8 +466,13 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // `variacao_negativa_pct > 100` e a tela deriva `1 − varNeg/100`, então o
   // Bear pode pedir fator negativo: variação além de 100% degrada para preço
   // ZERO, nunca para preço negativo — VGV negativo é o que a #563 proibiu.
-  const fatorSens = (variavel: VariavelSensibilidade): number =>
-    e.sensibilidade?.variavel === variavel ? Math.max(0, e.sensibilidade.fator) : 1;
+  // #735: montado UMA vez a partir de qualquer forma de `sensibilidade`
+  // (uma variável ou um conjunto); os oito pontos abaixo consultam o mapa.
+  const fatores = fatoresDe(e.sensibilidade);
+  const fatorSens = (variavel: VariavelSensibilidade): number => {
+    const f = fatores[variavel];
+    return f === undefined ? 1 : Math.max(0, f);
+  };
 
   // ── Áreas + VGV ──
   // Os dois preços abaixo são hoje o preço da PERMUTA FÍSICA da INCORPORAÇÃO

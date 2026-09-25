@@ -352,7 +352,7 @@ test('#613: _renderKpis recebe `lot` como parâmetro OBRIGATÓRIO (a mutação v
 // variável "Permuta financeira" da análise de sensibilidade (`imposto`,
 // `corretagem` e `marketing` são % fixo do VGV; `permutaFinResidencial`/
 // `permutaFinNaoResidencial` são os únicos termos que `calcularProforma`
-// escala por `fatorSens('permuta_financeira')`, `frontend/proforma.ts:638,642`).
+// escala por `fatorSens('permuta_financeira')`, `frontend/proforma.ts:670,674`).
 //
 // A linha do array `linhas` de `_renderSensibilidade` é PRIVADA (nenhum
 // teste deste repositório monta `viab-tela-proforma` fora do harness de
