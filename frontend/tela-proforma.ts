@@ -24,6 +24,8 @@ import {
 } from './exportar.js';
 export { ehLinhaReceitaOuResultado, celulaProforma };
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
+import { montarFaixaCenarios } from './faixa-cenarios-motor.js';
+import './faixa-cenarios.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
 // e não recopiada: a cópia inline divergiria da função que o teste exercita.
@@ -397,6 +399,8 @@ export class ViabTelaProforma extends LitElement {
     }
     /* #34: indicadores da sensibilidade numa tabela separada com espaçamento. */
     .sens-indicadores { margin-top: 20px; }
+    /* #731 — as faixas bear–base–bull dos indicadores, abaixo da tabela. */
+    .sens-faixas { margin-top: 20px; display: flex; flex-direction: column; gap: 6px; }
     /* #11 — distinção receita × despesa: cor do rótulo (1ª coluna) + fundo da
        linha, exclusivamente por tokens do design system (color-mix mantém o
        token, sem cor literal). */
@@ -853,6 +857,39 @@ export class ViabTelaProforma extends LitElement {
     `;
   }
 
+  /**
+   * #731 (handoff §4.6.C): cada indicador em % vira UMA faixa horizontal com
+   * o benchmark ao fundo e os três cenários como marcadores numa escala só —
+   * "o projeto sai da faixa aceitável no cenário ruim?" num relance. Sem
+   * benchmark válido (`montarFaixaCenarios` devolve `null`: meta ≤ 0, ou
+   * indicador sem valor nos três cenários) o indicador continua na tabela de
+   * badges de antes — comportamento antigo declarado, sem barra fantasma.
+   */
+  private _renderIndicadoresCenarios(
+    indicadores: LinhaCalculada[], colgroup: TemplateResult, cabecalho: TemplateResult,
+    renderLinha: (x: LinhaCalculada) => TemplateResult,
+  ): TemplateResult {
+    const comFaixa: { x: LinhaCalculada; faixa: NonNullable<ReturnType<typeof montarFaixaCenarios>> }[] = [];
+    const comBadge: LinhaCalculada[] = [];
+    for (const x of indicadores) {
+      const faixa = x.linha.bmCampo ? montarFaixaCenarios(this._bm(x.linha.bmCampo), x.valores) : null;
+      if (faixa) comFaixa.push({ x, faixa }); else comBadge.push(x);
+    }
+    return html`
+      ${comFaixa.length > 0 ? html`
+        <div class="sens-faixas">
+          ${comFaixa.map(({ x, faixa }) => html`<viab-faixa-cenarios rotulo=${x.linha.l} .faixa=${faixa}></viab-faixa-cenarios>`)}
+        </div>` : nothing}
+      ${comBadge.length > 0 ? html`
+        <div class="pf-wrap sens-indicadores">
+          <table class="pf sens">
+            ${colgroup}
+            ${cabecalho}
+            <tbody>${comBadge.map(renderLinha)}</tbody>
+          </table>
+        </div>` : nothing}`;
+  }
+
   private _renderSensibilidade(lot: boolean): TemplateResult {
     const entrada = this._entrada();
     // Rodada 13 (#727/#729): o tornado ranqueia as alavancas e escolhe a
@@ -1047,13 +1084,7 @@ export class ViabTelaProforma extends LitElement {
               </table>
             </div>
           </details>` : nothing}
-        <div class="pf-wrap sens-indicadores">
-          <table class="pf sens">
-            ${colgroup}
-            ${cabecalho(false)}
-            <tbody>${indicadores.map(renderLinha)}</tbody>
-          </table>
-        </div>
+        ${this._renderIndicadoresCenarios(indicadores, colgroup, cabecalho(false), renderLinha)}
       </urbi-card>`;
   }
 

@@ -14,6 +14,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #731: os indicadores da aba Cenários viram faixas bear–base–bull contra o benchmark
+
+Rodada 13, PR 7 da fila. As duas linhas em % da tabela de sensibilidade ("Custo obras / VGV",
+"Margem sobre VGV") deixam de sair como três badges com bola colorida — que diziam em qual faixa
+cada valor caiu, nunca quão perto da borda — e passam a UMA faixa horizontal cada
+(`viab-faixa-cenarios`, `frontend/faixa-cenarios.ts`): o benchmark ao fundo nas cores da regra
+(verde embaixo em *não exceder*), a Base como marcador cheio, Bear e Bull como marcadores finos
+ligados por um segmento, os três valores à direita. A escala é ÚNICA por indicador
+(`montarFaixaCenarios`, `frontend/faixa-cenarios-motor.ts`): `montarMedidor` — a mesma tabela de
+faixas das duas telas de medidor — é chamado uma vez, no maior dos três valores, e os limites são
+estendidos até caber os três (chamado três vezes devolveria três escalas, e os marcadores ficariam
+incomparáveis; a mutação foi medida). Cenário sem indicador (VGV ≤ 0) não desenha o marcador dele;
+benchmark sem configuração válida (`meta ≤ 0`) devolve `null` e o indicador continua como badge —
+comportamento antigo declarado, sem barra fantasma. Provas: `frontend/faixa-cenarios-motor.test.ts`
+(escala única — mudar o Bull não move o Bear —, cores invertidas em *não exceder*, marcador nulo,
+benchmark inválido, fiação) e o caso de render `cenarios-faixas` (benchmarks válidos nas duas
+regras), que mede no DOM os segmentos por faixa, a cor da região baixa, os três marcadores e a
+ordem deles no trilho, os valores e a ausência de badge de indicador, nas três larguras e nas
+quatro variantes de tema. `docs/preliminar.md` descreve as faixas.
+
 ## 2026-09-25 — #730: a tabela de sensibilidade ganha Δ%, amplitude e o grupo de linhas invariantes
 
 Rodada 13, PR 6 da fila. A tabela Bear/Base/Bull da aba Cenários do Preliminar

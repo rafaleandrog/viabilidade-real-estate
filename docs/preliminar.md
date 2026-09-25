@@ -77,8 +77,13 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
   despesa, e a **Amplitude** — (Bull − Bear) ÷ |Base|, com sinal: numa despesa estressada para cima
   no Bear ela sai negativa —, cujo cabeçalho ordena a tabela monetária ao clicar. As linhas que
   não se movem com a variável ficam recolhidas num grupo **N linhas não afetadas por esta variável**,
-  expansível. As variações para cima e para baixo vêm do indicador de sensibilidade do benchmark
-  daquela variável; sem benchmark, 10 %.
+  expansível. Os dois indicadores em % — **Custo obras / VGV** e **Margem sobre VGV** — saem abaixo
+  como uma **faixa** cada: o benchmark ao fundo, nas cores da regra de comparação (verde na região
+  baixa quando a regra é *não exceder*), o valor Base como marcador cheio, Bear e Bull como
+  marcadores finos ligados por um segmento, numa escala única, e os três valores à direita; se um
+  cenário não tem o indicador (VGV zerado), o marcador dele não é desenhado, e sem benchmark válido
+  o indicador continua como badges. As variações para cima e para baixo vêm do indicador de
+  sensibilidade do benchmark daquela variável; sem benchmark, 10 %.
 
 ### Gráficos
 
