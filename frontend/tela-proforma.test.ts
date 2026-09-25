@@ -410,10 +410,18 @@ test('Cenários "Deduções sobre VGV": a linha "VGV"/"Receita bruta" NÃO varia
   assert.equal(bear.vgv, bull.vgv, 'Receita bruta (VGV) não deveria variar com a variável "Permuta financeira"');
 });
 
-test('Cenários — FIAÇÃO: o array de `_renderSensibilidade` tem "Deduções sobre VGV" entre "Receita bruta" e "Receita líquida"', () => {
-  const iReceitaBruta = FONTE_PROFORMA.indexOf("l: 'Receita bruta'");
-  const iDeducoes = FONTE_PROFORMA.indexOf("l: 'Deduções sobre VGV'");
-  const iReceitaLiquida = FONTE_PROFORMA.indexOf("l: 'Receita líquida'");
+const FONTE_SENSIBILIDADE = semComentariosProforma(
+  readFileSync(new URL('./sensibilidade-tabela.ts', import.meta.url), 'utf8'),
+);
+
+test('Cenários — FIAÇÃO: o catálogo `LINHAS_SENSIBILIDADE` tem "Deduções sobre VGV" entre "Receita bruta" e "Receita líquida"', () => {
+  // #730: o catálogo saiu de `_renderSensibilidade` para o módulo puro
+  // `sensibilidade-tabela.ts`; a tela o consome por `LINHAS_SENSIBILIDADE`
+  // (conferido abaixo) — a prova de fiação continua em duas metades.
+  assert.ok(FONTE_PROFORMA.includes('LINHAS_SENSIBILIDADE.map('), 'tela-proforma.ts deixou de consumir LINHAS_SENSIBILIDADE');
+  const iReceitaBruta = FONTE_SENSIBILIDADE.indexOf("l: 'Receita bruta'");
+  const iDeducoes = FONTE_SENSIBILIDADE.indexOf("l: 'Deduções sobre VGV'");
+  const iReceitaLiquida = FONTE_SENSIBILIDADE.indexOf("l: 'Receita líquida'");
   assert.ok(iReceitaBruta >= 0, '"Receita bruta" sumiu do array de Cenários');
   assert.ok(iDeducoes >= 0, '"Deduções sobre VGV" não está no array de Cenários — a linha existe na Proforma mas não em Cenários');
   assert.ok(iReceitaLiquida >= 0, '"Receita líquida" sumiu do array de Cenários');
@@ -422,11 +430,11 @@ test('Cenários — FIAÇÃO: o array de `_renderSensibilidade` tem "Deduções 
   // A mesma fórmula da Proforma (`deducoesVgv`, `montarLinhasProforma`) — não
   // uma reimplementação que pudesse divergir dela.
   assert.ok(
-    /f:\s*\(c\)\s*=>\s*c\.p\.imposto\s*\+\s*c\.p\.corretagem\s*\+\s*c\.p\.marketing\s*\+\s*c\.p\.permutaFinResidencial\s*\+\s*c\.p\.permutaFinNaoResidencial/.test(FONTE_PROFORMA),
+    /f:\s*\(c\)\s*=>\s*c\.p\.imposto\s*\+\s*c\.p\.corretagem\s*\+\s*c\.p\.marketing\s*\+\s*c\.p\.permutaFinResidencial\s*\+\s*c\.p\.permutaFinNaoResidencial/.test(FONTE_SENSIBILIDADE),
     '"Deduções sobre VGV" em Cenários deixou de somar imposto + corretagem + marketing + permuta financeira R/NR',
   );
   assert.ok(
-    /l:\s*'Deduções sobre VGV'.*natureza:\s*'despesa'/.test(FONTE_PROFORMA),
+    /l:\s*'Deduções sobre VGV'.*natureza:\s*'despesa'/.test(FONTE_SENSIBILIDADE),
     '"Deduções sobre VGV" deveria ser `natureza: \'despesa\'` (sempre entre parênteses, sem classe pos/neg) — igual a Custo direto/indireto total',
   );
 });

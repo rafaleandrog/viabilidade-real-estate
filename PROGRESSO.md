@@ -13,6 +13,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #730: a tabela de sensibilidade ganha Δ%, amplitude e o grupo de linhas invariantes
+
+Rodada 13, PR 6 da fila. A tabela Bear/Base/Bull da aba Cenários do Preliminar
+(`frontend/tela-proforma.ts`, `_renderSensibilidade`) passa a sete colunas — rótulo, Bear, Δ%,
+Base, Bull, Δ%, Amplitude. O catálogo das dez linhas saiu da tela para o módulo puro
+`frontend/sensibilidade-tabela.ts` (`LINHAS_SENSIBILIDADE`), que também calcula o Δ% de cada lado
+pela mesma `calcularVariacao`/`fmtVariacao` do Avançado (o `maiorMelhor` obrigatório vem da
+`natureza` da linha: despesa que sobe é piora), a amplitude `(bull − bear) ÷ |base|` e a partição
+das linhas invariantes (mesma tolerância `EPSILON_PCT`, agora exportada de `cenario-variacao.ts`).
+As invariantes vão para um `<details>` recolhido — "N linhas não afetadas por esta variável" —, o
+cabeçalho declara o estresse (`📉 Bear +10% Permuta financeira`), a coluna Amplitude ordena ao
+clicar e `null` continua `—`. A tabela tem `min-width` e o `.pf-wrap` rola, para as sete colunas
+não serem espremidas a 600px. Provas: `frontend/sensibilidade-tabela.test.ts` (partição com
+permuta financeira — 4 visíveis, 4 recolhidas —, amplitude ao centavo, sentido invertido para
+despesa com a mutação de `maiorMelhor` medida, tolerância, ordenação, rótulos, fiação); o caso de
+render `cenarios-sensibilidade` exige as 7 colunas e o novo `cenarios-invariantes` mede no DOM as
+linhas visíveis, as recolhidas (o grupo nasce fechado e ganha caixa ao abrir), o rótulo com a
+contagem e o cabeçalho com o estresse, nas três larguras. Achado de passagem: os dois casos de
+render forçavam `_varSensManual` antes de montar e `_init()` a zerava — o caso antigo só passava
+porque o preço também é a alavanca de maior amplitude; agora os dois selecionam depois do
+assentamento. `docs/preliminar.md` descreve a tabela nova.
+
 ## 2026-09-25 — #720: a cascata do resultado desenha o déficit abaixo da linha do zero
 
 `calcularCascataResultado` (`frontend/cascata-resultado-motor.ts`) deixa de clampar a geometria em

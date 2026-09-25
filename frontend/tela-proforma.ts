@@ -7,6 +7,10 @@ import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type P
 import { rankearAlavancas, ehCustoLike, ehCircular } from './tornado-alavancas.js';
 import { margemDeSeguranca, terrenoMaximo, type MargemDeSeguranca } from './margem-seguranca.js';
 import { fmtVariacao } from './cenario-variacao.js';
+import {
+  LINHAS_SENSIBILIDADE, calcularLinha, particionarInvariantes, rotuloInvariantes, ordenarPorAmplitude,
+  rotuloEstresse, type LinhaCalculada,
+} from './sensibilidade-tabela.js';
 import './grafico-tornado.js';
 // ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
 // unificação da notação de sinal (registro dos PRs 617/618, achado 10 da
@@ -65,7 +69,8 @@ type VarSens = VariavelSensibilidade;
 // #11: cada linha da tabela de cenários é receita ou despesa — é o que colore o
 // rótulo e o fundo da linha. #568: é também o que decide a NOTAÇÃO da célula,
 // no lugar do par `tipo`/`natureza` da tabela principal.
-export type NaturezaSensibilidade = 'receita' | 'despesa';
+export type { NaturezaSensibilidade } from './sensibilidade-tabela.js';
+import type { NaturezaSensibilidade } from './sensibilidade-tabela.js';
 
 /**
  * #568 — célula monetária da tabela de CENÁRIOS.
@@ -239,6 +244,8 @@ export class ViabTelaProforma extends LitElement {
   // então vence mesmo quando o ranking recalcula (passo, edição de Premissas).
   @state() private _varSensManual: VarSens | null = null;
   @state() private _passoPct: 5 | 10 | 15 = 10;
+  /** #730: a coluna Amplitude é ordenável — `true` = |amplitude| decrescente; `false` = ordem do proforma. */
+  @state() private _sensPorAmplitude = false;
   // #9: grupos consolidados colapsados (default: expandido). O total é o header.
   // `receita` é a exceção — default RECOLHIDO (2026-09-14): a composição por
   // produto só existe para explicar o VGV quando pedida, não para duplicar a
@@ -404,7 +411,29 @@ export class ViabTelaProforma extends LitElement {
     /* #78 — larguras fixas por colgroup (mesma geometria nas duas tabelas de
        sensibilidade: monetária e indicadores) para os cenários bear/base/bull
        alinharem entre si. */
-    .pf.sens { table-layout: fixed; }
+    .pf.sens { table-layout: fixed; min-width: 640px; }
+    /* #730 — Δ% e amplitude: fonte menor que o valor, cor pela direção
+       (melhor/pior), rótulo do cabeçalho ordenável. */
+    .pf.sens td.delta, .pf.sens td.amplitude { font-size: 0.78rem; font-weight: 500; }
+    .pf.sens th.delta, .pf.sens th.amplitude { font-size: 0.75rem; }
+    .pf.sens td.delta.var-melhor { color: var(--cor-sucesso, #13A98D); }
+    .pf.sens td.delta.var-pior { color: var(--cor-erro, #D45A3A); }
+    .pf.sens th.amplitude button.ordenar {
+      all: unset;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      user-select: none;
+    }
+    .pf.sens th.amplitude button.ordenar:focus-visible { outline: 2px solid var(--cor-primaria-solida, #2aa9e0); outline-offset: 2px; }
+    .sens-invariantes { margin-top: 8px; }
+    .sens-invariantes summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    }
+    .sens-invariantes summary:focus-visible { outline: 2px solid var(--cor-primaria-solida, #2aa9e0); outline-offset: -2px; }
     /* BUG7-12 — cabeçalho (badge via .sens-cab, acima) e valores alinhados à
        direita, como o resto do app; sobrepõe o '.pf th.num { text-align: center }'
        genérico (usado pela tabela principal do Proforma) só dentro de '.pf.sens'. */
@@ -860,37 +889,12 @@ export class ViabTelaProforma extends LitElement {
     // de exportar.ts:39), sem 2ª execução.
     const proforma = (fator: number) => calcularProforma(this._aplicarFator(varSensAtual, fator));
     const vgvBrutoDe = (cen: Proforma) => vgvBrutoDeProforma(cen);
-    // Linhas monetárias (8) e, separados por uma divisória com mais respiro, os dois
-    // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
-    // com a cor do cenário.
-    // #11: `natureza` classifica cada linha como receita ou despesa para colorir o
-    // rótulo (1ª coluna) e o fundo da linha (só tokens do design system).
-    type Cen = { p: Proforma; vgvBruto: number };
+    // #730: as dez linhas (oito monetárias, dois indicadores em % como
+    // urbi-badge) moram em `LINHAS_SENSIBILIDADE` (`sensibilidade-tabela.ts`),
+    // para a partição e o Δ% serem testáveis sem montar este componente.
+    // #11: `natureza` classifica cada linha como receita ou despesa para colorir
+    // o rótulo (1ª coluna) e o fundo da linha (só tokens do design system).
     type Natureza = NaturezaSensibilidade;
-    // #571: `f` pode devolver `null` — só as duas linhas `pct: true`
-    // (Custo obras/VGV, Margem sobre VGV) o fazem, quando o cenário cai com
-    // VGV ≤ 0; as monetárias continuam sempre `number`.
-    const linhas: { l: string; f: (c: Cen) => number | null; natureza: Natureza; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
-      { l: 'VGV', f: (c) => c.vgvBruto, natureza: 'receita' },
-      { l: 'Receita bruta', f: (c) => c.p.vgv, natureza: 'receita' },
-      // Mesma linha da Proforma (`= Deduções sobre VGV`, `montarLinhasProforma`
-      // acima — imposto + corretagem + marketing + permuta financeira R/NR),
-      // sem cálculo próprio: `c.p.*` já vem do MESMO `calcularProforma` que a
-      // Proforma chama, reprecificado pelo fator do cenário. `permutaFinResidencial`/
-      // `permutaFinNaoResidencial` já escalam com `fatorSens('permuta_financeira')`
-      // dentro do motor (`frontend/proforma.ts`), então esta linha reage
-      // corretamente quando a variável estressada é "Permuta financeira" — sem
-      // isto, a única variável que a afeta, ela nem aparecia em Cenários
-      // (pedido do autor, 2026-09-14).
-      { l: 'Deduções sobre VGV', f: (c) => c.p.imposto + c.p.corretagem + c.p.marketing + c.p.permutaFinResidencial + c.p.permutaFinNaoResidencial, natureza: 'despesa' },
-      { l: 'Receita líquida', f: (c) => c.p.receitaLiquida, natureza: 'receita' },
-      { l: 'Custo direto total', f: (c) => c.p.custoDiretoTotal, natureza: 'despesa' },
-      { l: 'Receita operacional', f: (c) => c.p.receitaOperacional, natureza: 'receita' },
-      { l: 'Custo indireto total', f: (c) => c.p.custoIndiretoTotal, natureza: 'despesa' },
-      { l: 'Resultado', f: (c) => c.p.resultado, natureza: 'receita' },
-      { l: 'Custo obras / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
-      { l: 'Margem sobre VGV', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
-    ];
     // BUG7-12: sem símbolo "R$" — número puro (o cabeçalho da coluna já o diz).
     // #492: `fmtNum` com 2 casas dava *até* 2 casas (declara só o
     // `maximumFractionDigits`, nunca o `minimumFractionDigits`), então
@@ -909,48 +913,92 @@ export class ViabTelaProforma extends LitElement {
     // cenário, por classe `cen-*` (ver o CSS) — exceto quando o valor é negativo.
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
     const pBear = proforma(fatorBear), pBase = proforma(1), pBull = proforma(fatorBull);
+    // #730: o cabeçalho declara o ESTRESSE aplicado (`📉 Bear −10% Preço de
+    // venda`), não só o nome do cenário — `rotuloEstresse` usa o mesmo
+    // `custoLike` que montou os fatores acima.
+    const rotuloVar = alavancas.find((a) => a.variavel === varSensAtual)?.rotulo ?? varSensAtual;
     const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma; vgvBruto: number }[] = [
-      { id: 'bear', rot: '📉 Bear', p: pBear, vgvBruto: vgvBrutoDe(pBear) },
-      { id: 'base', rot: '📊 Base', p: pBase, vgvBruto: vgvBrutoDe(pBase) },
-      { id: 'bull', rot: '🚀 Bull', p: pBull, vgvBruto: vgvBrutoDe(pBull) },
+      { id: 'bear', rot: rotuloEstresse('bear', rotuloVar, varNeg, varPos, custoLike), p: pBear, vgvBruto: vgvBrutoDe(pBear) },
+      { id: 'base', rot: rotuloEstresse('base', rotuloVar, varNeg, varPos, custoLike), p: pBase, vgvBruto: vgvBrutoDe(pBase) },
+      { id: 'bull', rot: rotuloEstresse('bull', rotuloVar, varNeg, varPos, custoLike), p: pBull, vgvBruto: vgvBrutoDe(pBull) },
     ];
-    const linhasMonetarias = linhas.filter((m) => !m.divisoria && !m.badge);
-    const linhasIndicadores = linhas.filter((m) => m.divisoria || m.badge);
-    // #78: colgroup compartilhado — rótulo + 3 cenários de largura igual. Com
-    // `table-layout: fixed`, garante que as colunas bear/base/bull tenham a mesma
-    // largura nas duas tabelas (monetária e indicadores) e que o cabeçalho fique
-    // alinhado com o conteúdo.
+    const porId = { bear: cenarios[0], base: cenarios[1], bull: cenarios[2] };
+    // #730: cada linha ganha Δ% de cada lado contra a base e a amplitude
+    // (bull − bear) ÷ base; as que não se movem vão para o grupo recolhido.
+    // `calcularLinha` deriva o `maiorMelhor` da natureza — despesa que sobe é
+    // piora. Só as linhas MONETÁRIAS entram na partição por invariância; os
+    // dois indicadores ficam na segunda tabela, com as mesmas colunas.
+    const calculadas: LinhaCalculada[] = LINHAS_SENSIBILIDADE.map((m) => calcularLinha(m, {
+      bear: m.f(porId.bear), base: m.f(porId.base), bull: m.f(porId.bull),
+    }));
+    const monetarias = calculadas.filter((x) => !x.linha.divisoria && !x.linha.badge);
+    const indicadores = calculadas.filter((x) => x.linha.divisoria || x.linha.badge);
+    const { visiveis, invariantes } = particionarInvariantes(monetarias);
+    const linhasMonetarias = this._sensPorAmplitude ? ordenarPorAmplitude(visiveis) : visiveis;
+    // #78/#730: colgroup compartilhado — rótulo + Bear + Δ% + Base + Bull +
+    // Δ% + amplitude, sete colunas. Com `table-layout: fixed` e um `min-width`
+    // na tabela (o `.pf-wrap` rola na horizontal quando falta espaço), as
+    // colunas ficam iguais nas duas tabelas e o cabeçalho alinhado com o
+    // conteúdo — a tabela nunca é espremida a 600px.
     const colgroup = html`
       <colgroup>
-        <col style="width: 40%" />
-        <col style="width: 20%" />
-        <col style="width: 20%" />
-        <col style="width: 20%" />
+        <col style="width: 25%" />
+        <col style="width: 14%" />
+        <col style="width: 8%" />
+        <col style="width: 14%" />
+        <col style="width: 14%" />
+        <col style="width: 8%" />
+        <col style="width: 17%" />
       </colgroup>`;
-    const cabecalho = html`
+    const thCenario = (c: typeof cenarios[0]) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`;
+    // O cabeçalho é uma função porque só a tabela MONETÁRIA ordena: o `th`
+    // continua `columnheader` (é onde `aria-sort` vale) e o controle é um
+    // `<button>` dentro dele; nas outras duas tabelas a coluna é só rótulo.
+    const cabecalho = (ordenavel: boolean) => html`
       <thead>
         <tr>
           <th></th>
-          ${cenarios.map((c) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`)}
+          ${thCenario(porId.bear)}
+          <th class="num delta" title="Variação do Bear contra a Base">Δ%</th>
+          ${thCenario(porId.base)}
+          ${thCenario(porId.bull)}
+          <th class="num delta" title="Variação do Bull contra a Base">Δ%</th>
+          <th class="num amplitude" aria-sort=${ordenavel ? (this._sensPorAmplitude ? 'descending' : 'none') : nothing}
+            title="(Bull − Bear) ÷ |Base|">
+            ${ordenavel
+              ? html`<button type="button" class="ordenar" title="Ordenar pela amplitude"
+                  @click=${() => { this._sensPorAmplitude = !this._sensPorAmplitude; }}
+                >Amplitude ${this._sensPorAmplitude ? '↓' : ''}</button>`
+              : html`Amplitude`}
+          </th>
         </tr>
       </thead>`;
-    const renderLinha = (m: typeof linhas[0]) => html`
-      <tr class="nat-${m.natureza}">
-        <td>${m.l}</td>
-        ${cenarios.map((c) => {
-          const valNum = m.f(c);
-          const txt = fmt(m, valNum);
-          if (m.badge) {
-            const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
-            return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
-          }
-          // #568: `neg` é o que faz um Resultado negativo aparecer vermelho
-          // mesmo na coluna Base — e é a única marca desta tabela que depende
-          // do NÚMERO do cenário, e não da coluna. `valNum` nunca é `null`
-          // aqui: só as duas linhas `pct` (que são `badge`) podem sê-lo.
-          const sinal = sinalSensibilidade(valNum ?? 0, m.natureza);
-          return html`<td class="num cen-${c.id} ${sinal}">${txt}</td>`;
-        })}
+    const celulaDelta = (d: LinhaCalculada['deltaBear']) =>
+      html`<td class="num delta ${d === null ? '' : d.melhor ? 'var-melhor' : 'var-pior'}">${d === null ? '—' : d.texto}</td>`;
+    const celulaValor = (x: LinhaCalculada, c: typeof cenarios[0]) => {
+      const m = x.linha;
+      const valNum = m.f(c);
+      const txt = fmt(m, valNum);
+      if (m.badge) {
+        const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
+        return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
+      }
+      // #568: `neg` é o que faz um Resultado negativo aparecer vermelho
+      // mesmo na coluna Base — e é a única marca desta tabela que depende
+      // do NÚMERO do cenário, e não da coluna. `valNum` nunca é `null`
+      // aqui: só as duas linhas `pct` (que são `badge`) podem sê-lo.
+      const sinal = sinalSensibilidade(valNum ?? 0, m.natureza);
+      return html`<td class="num cen-${c.id} ${sinal}">${txt}</td>`;
+    };
+    const renderLinha = (x: LinhaCalculada) => html`
+      <tr class="nat-${x.linha.natureza}">
+        <td>${x.linha.l}</td>
+        ${celulaValor(x, porId.bear)}
+        ${celulaDelta(x.deltaBear)}
+        ${celulaValor(x, porId.base)}
+        ${celulaValor(x, porId.bull)}
+        ${celulaDelta(x.deltaBull)}
+        <td class="num amplitude">${x.amplitudePct === null ? '—' : fmtVariacao(x.amplitudePct)}</td>
       </tr>`;
     return html`
       <div class="cenarios-topo">
@@ -984,15 +1032,26 @@ export class ViabTelaProforma extends LitElement {
         <div class="pf-wrap">
           <table class="pf sens">
             ${colgroup}
-            ${cabecalho}
+            ${cabecalho(true)}
             <tbody>${linhasMonetarias.map(renderLinha)}</tbody>
           </table>
         </div>
+        ${invariantes.length > 0 ? html`
+          <details class="sens-invariantes">
+            <summary>${rotuloInvariantes(invariantes.length)}</summary>
+            <div class="pf-wrap">
+              <table class="pf sens">
+                ${colgroup}
+                ${cabecalho(false)}
+                <tbody>${invariantes.map(renderLinha)}</tbody>
+              </table>
+            </div>
+          </details>` : nothing}
         <div class="pf-wrap sens-indicadores">
           <table class="pf sens">
             ${colgroup}
-            ${cabecalho}
-            <tbody>${linhasIndicadores.map(renderLinha)}</tbody>
+            ${cabecalho(false)}
+            <tbody>${indicadores.map(renderLinha)}</tbody>
           </table>
         </div>
       </urbi-card>`;

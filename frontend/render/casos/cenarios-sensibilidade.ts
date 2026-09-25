@@ -63,6 +63,14 @@ export const caso = {
     { seletor: 'table.pf.sens td.num.cen-base.pos', minimo: 5 },
     // Badges: 3 no cabeçalho de cada tabela + 2 linhas de indicador × 3.
     { seletor: 'urbi-badge', minimo: 12 },
+    // #730: sete colunas (rótulo, Bear, Δ%, Base, Bull, Δ%, amplitude) nas
+    // duas tabelas, o Δ% de cada lado em toda linha e a coluna de amplitude
+    // ordenável. Estressando o PREÇO tudo se move: nenhum grupo recolhido.
+    { seletor: 'table.pf.sens colgroup col', minimo: 14 },
+    { seletor: 'table.pf.sens th.delta', minimo: 4 },
+    { seletor: 'table.pf.sens td.delta', minimo: 20 },
+    { seletor: 'table.pf.sens th.amplitude[aria-sort] button.ordenar', minimo: 1 },
+    { seletor: 'table.pf.sens td.amplitude', minimo: 10 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
   // uma. O harness confronta nos dois sentidos (usada e não declarada → falha;
@@ -98,9 +106,16 @@ export const caso = {
     forcarEstado(el, {
       estudo: ESTUDO_SENSIBILIDADE, secao: 'cenarios', benchmarks: [],
       produtos: PRODUTOS_SENSIBILIDADE, aliquotaRet: 4,
-      _varSensManual: 'preco',
     });
     raiz.appendChild(el);
+    await (el as any).updateComplete;
+    // #730: `_init()` (connectedCallback) zera `_varSensManual` depois de dois
+    // `await`, então forçá-la ANTES de montar não sobrevivia — o caso só
+    // passava porque o preço também é a alavanca de maior amplitude no
+    // ranking. Espera o assentamento e seleciona, como o clique no tornado.
+    await new Promise((r) => setTimeout(r, 0));
+    await (el as any).updateComplete;
+    (el as any)._varSensManual = 'preco';
     await (el as any).updateComplete;
   },
 };
