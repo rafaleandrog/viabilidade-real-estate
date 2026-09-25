@@ -6,6 +6,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — Rodada 14, PR 8: `docs/formulas.md` e `docs/modelo-de-dados.md` limpos pela régua
+
+Oitava PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). Os dois guias eram diário de
+desenvolvimento: 66 e 49 números de issue, 16 e 8 datas, 38 e 4 endereços `arquivo:linha`, blocos
+"⚠️ esta linha já dizia…", tabela de conformidade linha a linha com histórico de cada célula. Foram
+**reescritos** pela régua — só comportamento vigente, presente do indicativo, sem issue, rodada,
+data ou endereço — mantendo o conteúdo que descreve o app hoje.
+
+- **Fórmulas** ganhou seções para os Cenários do Preliminar e para a Proforma do Avançado (blocos
+  canônicos, desalavancagem, o fecho de três linhas), perdeu a tabela "onde as fórmulas vivem"
+  (endereços de linha do motor) e a narrativa das correções. A seção **Estado de conformidade**
+  continua existindo com esse nome — `CLAUDE.md` e `frontend/kpi-casas-decimais.test.ts` a citam —
+  e passa a ser a lista das três exceções de exibição e da regra geral, sem histórico por célula.
+- **Modelo de Dados** perdeu as três seções consultivas ("Evolução de domínio prevista para
+  recebíveis", "…para Terreno, valores e funding" e "Instrumento de capital — a evolução que foi
+  cancelada"), que **não foram apagadas**: viraram `referencia/modelo-de-dados-evolucoes.md`, com
+  o cabeçalho dizendo de onde vieram e que nada ali é tabela a criar. O guia ganhou as tabelas da
+  instância (`benchmarks`, `avancado_curvas`, `mercado_regioes`, `mercado_coletas`, que faltavam)
+  e uma seção para não humanos com as três regras transversais do `PATCH`.
+- As **duas exceções** de `scripts/enderecos-doc-excecoes.mjs` que citavam endereços vencidos
+  nesses dois guias saíram — o guard reprova exceção que deixa de ser necessária, e as duas
+  deixaram: os endereços não existem mais na prosa. 21 → 19 entradas.
+
+Conferido contra o código o que foi re-derivado (sentido Bull/Bear por variável, os quatro cartões
+da margem de segurança, as colunas do `schema.json` de cada tabela, os códigos de erro, o filtro
+de parcelamentos em regularização). Sem migração, sem `schema.json`, `versao` mantida.
+
 ## 2026-09-25 — Rodada 14, PR 7: guia novo `docs/administracao.md`
 
 Sétima PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). O que o administrador da

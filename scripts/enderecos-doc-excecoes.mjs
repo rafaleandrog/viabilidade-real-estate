@@ -67,12 +67,6 @@ export const EXCECOES = [
       "VENCIDO DE VERDADE — nada em ±3 linhas de :502-509 — \"eCorretagem\" está em :643. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/formulas.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:605,617,624,633",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :591,603,610,619 — \"taxaMensal\" está em :691; \"sinalPct\" está em :688. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
     arquivo: "referencia/funding-capital-stack.md",
     endereco: "shell/backend/src/dados/validador-schema.ts:45-58",
     motivo:
@@ -95,12 +89,6 @@ export const EXCECOES = [
     endereco: "schema.json:136",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :136 — \"pct_receita\" está em :169; \"pct_resultado\" está em :169. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/modelo-de-dados.md",
-    endereco: "frontend/exportar.ts:9",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :9 — \"maximumFractionDigits\" não aparece em frontend/exportar.ts; \"toFixed\" está em :20. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "referencia/padrao-incorporacao.md",
