@@ -43,10 +43,10 @@
 
 export const EXCECOES = [
   {
-    arquivo: "docs/ui-urbiverso/LEIA.md",
+    arquivo: "referencia/ui-urbiverso/LEIA.md",
     endereco: "ui/src/urbi-primitivo.ts:34-40",
     motivo:
-      "LIMITE DO GUARD — caminho do monorepo `urbiverso/urbiverso`, que NAO esta nesta arvore. O LEIA.md e GERADO por scripts/sincronizar-referencia-ui.mjs (nao se edita a mao) e entrou na varredura quando `docs/` inteiro virou raiz do guard (Rodada 14, PR 1); a citacao e legitima e continua valendo.",
+      "LIMITE DO GUARD — caminho do monorepo `urbiverso/urbiverso`, que NAO esta nesta arvore. O LEIA.md e GERADO por scripts/sincronizar-referencia-ui.mjs (nao se edita a mao); entrou na varredura quando `docs/` inteiro virou raiz (Rodada 14, PR 1) e mudou para `referencia/` junto com o espelho (PR 2); a citacao e legitima e continua valendo.",
   },
   {
     arquivo: "backend/rotas/funding.ts",

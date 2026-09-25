@@ -8,7 +8,7 @@
 //
 // ⚠️ O `urbi-modal` aqui é o stub do espelho: carrega as declarações `:host`
 // reais, mas não o overlay nem o posicionamento internos, que
-// `docs/ui-urbiverso/` não espelha. Este teste julga o layout do CONTEÚDO do
+// `referencia/ui-urbiverso/` não espelha. Este teste julga o layout do CONTEÚDO do
 // modal, e não o comportamento do primitivo por dentro.
 
 import { test } from 'node:test';

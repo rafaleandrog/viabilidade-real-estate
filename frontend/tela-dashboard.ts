@@ -607,7 +607,7 @@ export class ViabTelaDashboard extends LitElement {
         // dentro, reproduzindo em silêncio o bug de acessibilidade que esta
         // issue existe para consertar. Confirmado em
         // `node_modules/@urbiverso/sdk/dist/index.d.ts` (SDK 57.0.0 instalado),
-        // no monorepo (leitura) e em `docs/ui-urbiverso/primitivos.json`
+        // no monorepo (leitura) e em `referencia/ui-urbiverso/primitivos.json`
         // (`"atributo": "arialabel"` para `ariaLabel` em `urbi-botao`) — este
         // PR resincronizou esse espelho junto, porque a versão anterior dele
         // (2026-08-22) ainda não conhecia a prop e o guard de props recusava

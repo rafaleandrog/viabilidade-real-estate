@@ -11,7 +11,7 @@
 // verde, porque não havia render nenhum sendo medido.
 //
 // O guard estático `scripts/guard-box-model-urbi.mjs` acusa o RISCO lendo o
-// espelho `docs/ui-urbiverso/`. Este harness prova o EFEITO. As duas camadas
+// espelho `referencia/ui-urbiverso/`. Este harness prova o EFEITO. As duas camadas
 // somam: o guard pega o padrão perigoso antes de ele render; o harness diz se
 // a caixa realmente transbordou e pintou sobre a vizinha.
 //
@@ -35,7 +35,7 @@
 //
 // ── DE ONDE VÊM OS PRIMITIVOS `urbi-*` ──────────────────────────────────────
 //
-// Do espelho `docs/ui-urbiverso/primitivos.json`, e NÃO do monorepo. Não é
+// Do espelho `referencia/ui-urbiverso/primitivos.json`, e NÃO do monorepo. Não é
 // preferência: o CI faz checkout só deste repositório, então um harness que
 // lesse `/home/user/urbiverso/ui/src/` rodaria na máquina e seria IMPOSSÍVEL
 // no runner — exatamente o modo de falha "passa aqui, quebra lá" que esta
@@ -47,7 +47,7 @@
 // a parte de que a medição depende. O que o espelho NÃO carrega é o markup
 // interno de cada primitivo; então o stub tem conteúdo genérico, e este
 // harness NÃO serve para julgar o layout de DENTRO de um `urbi-*`. Ver
-// `docs/ui-urbiverso/LEIA.md`.
+// `referencia/ui-urbiverso/LEIA.md`.
 //
 // ── DETERMINISMO ────────────────────────────────────────────────────────────
 //
@@ -77,8 +77,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ESPELHO_PRIMITIVOS = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
-const ESPELHO_TOKENS = join(RAIZ, 'docs', 'ui-urbiverso', 'tokens.json');
+const ESPELHO_PRIMITIVOS = join(RAIZ, 'referencia', 'ui-urbiverso', 'primitivos.json');
+const ESPELHO_TOKENS = join(RAIZ, 'referencia', 'ui-urbiverso', 'tokens.json');
 
 // ── constantes de determinismo ──────────────────────────────────────────────
 // Tudo que fixa o ambiente do navegador mora AQUI, e só aqui. Espalhar isto
@@ -272,7 +272,7 @@ export function inventarioDeReproducao() {
 
 function gerarPrimitivos() {
   if (!existsSync(ESPELHO_PRIMITIVOS)) {
-    throw new Error(`docs/ui-urbiverso/primitivos.json não existe — rode scripts/sincronizar-referencia-ui.mjs.`);
+    throw new Error(`referencia/ui-urbiverso/primitivos.json não existe — rode scripts/sincronizar-referencia-ui.mjs.`);
   }
   const { carimbo, primitivos } = JSON.parse(readFileSync(ESPELHO_PRIMITIVOS, 'utf8'));
   const defs = [];
@@ -295,7 +295,7 @@ function gerarPrimitivos() {
     const dimensiona = PROPS_QUE_DIMENSIONAM[tag] ?? {};
     defs.push({ tag, regras, props, dimensiona });
   }
-  return `// GERADO por scripts/render-check.mjs a partir de docs/ui-urbiverso/primitivos.json
+  return `// GERADO por scripts/render-check.mjs a partir de referencia/ui-urbiverso/primitivos.json
 // Espelho de ${carimbo.sha.slice(0, 8)} (monorepo ${carimbo.versao_monorepo}, ${carimbo.data_do_commit}).
 const DEFS = ${JSON.stringify(defs)};
 // Estilo INTERNO do stub. Mínimo de propósito: o espelho não carrega o markup
@@ -421,7 +421,7 @@ for (const { tag, regras, props, dimensiona } of DEFS) {
  */
 function gerarTemas() {
   if (!existsSync(ESPELHO_TOKENS)) {
-    throw new Error('docs/ui-urbiverso/tokens.json não existe — rode scripts/sincronizar-referencia-ui.mjs.');
+    throw new Error('referencia/ui-urbiverso/tokens.json não existe — rode scripts/sincronizar-referencia-ui.mjs.');
   }
   const { tokens } = JSON.parse(readFileSync(ESPELHO_TOKENS, 'utf8'));
   const nomes = Object.keys(tokens);
@@ -1228,7 +1228,7 @@ export async function verificarRender(opcoes) {
       if (m.semStub.length) {
         throw new Error(
           `o caso "${caso}" usa primitivo(s) sem stub: ${m.semStub.join(', ')}.\n` +
-          '  Eles não estão em docs/ui-urbiverso/primitivos.json, então o navegador os trata como\n' +
+          '  Eles não estão em referencia/ui-urbiverso/primitivos.json, então o navegador os trata como\n' +
           '  elemento desconhecido (display:inline, sem shadow root, sem as declarações :host que\n' +
           '  governam o box model) — a geometria dessa região é ficção e nenhuma lente reclama.\n' +
           '  O espelho só varre `frontend/*.ts`, sem recursão: use o primitivo numa tela de verdade\n' +

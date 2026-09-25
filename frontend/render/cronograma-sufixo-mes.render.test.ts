@@ -11,7 +11,7 @@
 //
 // ⚠️ `viab-num` é componente DESTE repositório, não um primitivo `urbi-*`
 // stubado — aqui o harness mede o markup real do shadow DOM. O caveat de
-// `docs/ui-urbiverso/LEIA.md` sobre o layout de dentro de um primitivo não se
+// `referencia/ui-urbiverso/LEIA.md` sobre o layout de dentro de um primitivo não se
 // aplica.
 //
 // MEDIDO (é o que fecha o critério 4 da issue): com o teto anterior de 18ch

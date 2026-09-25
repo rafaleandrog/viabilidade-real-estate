@@ -4,6 +4,35 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 14, PR 2 — espelho de UI sai de `docs/`: `docs/ui-urbiverso/` → `referencia/ui-urbiverso/` (2026-09-25)
+
+Segunda PR da fila do plano (`historico/rodada-14/planejamento.md`). O espelho gerado da referência
+de UI (`LEIA.md`, `primitivos.json`, `tokens.json`) era o último conteúdo não-doc dentro de `docs/`:
+o shell o ignora (subpasta) mas o empacotador o copiava para o tarball de toda instância, e o
+framework de documentação proíbe subpasta e arquivo não-`.md` ali. Ele passa a morar em
+`referencia/ui-urbiverso/`, ao lado dos documentos consultivos — é referência de autoria, não
+documentação servida.
+
+**O que mudou:** só o caminho. `git mv` da pasta inteira (o conteúdo, carimbado em `ec0e3470` do
+monorepo, não foi regenerado de propósito: regenerar traria o `main` de hoje e mudaria o espelho junto
+com a mudança de pasta). Consumidores que citavam o caminho fixo, todos atualizados no mesmo diff:
+`scripts/sincronizar-referencia-ui.mjs` (`SAIDA` e a mensagem dos marcadores), `guard-tokens-css.mjs`,
+`guard-props-urbi.mjs`, `guard-box-model-urbi.mjs`, `render-check.mjs`, `render-em-escopo.mjs` (o
+prefixo que decide se o job de render roda, e o caso do autoteste), a bateria `testar-guards-ui.sh`
+(fixtures sintéticas), `frontend/fluxo-economico-series.test.ts` (lê `tokens.json` por caminho
+relativo), `validar-frontend.sh`, o nome/comentário do passo de guards de UI em
+`.github/workflows/pr-guards.yml`, a exceção do guard de endereços para o `LEIA.md` (caminho novo,
+motivo estendido) e os comentários de código em `frontend/` que citavam o espelho. `CLAUDE.md`: só o
+caminho na nota da Onda 1 da Rodada 9.
+
+**Verificação:** `validar-frontend.sh` verde nas 8 etapas (guards de UI leem o espelho no caminho
+novo; render em Chromium gera os stubs a partir dele), `testar-guards-ui.sh`,
+`testar-guard-enderecos-doc.sh` e `render-em-escopo.mjs --autoteste` verdes; `pnpm build && pnpm
+exec urbi-empacotar` seguido de `tar -tzf dist/*.tgz | grep '^docs/'` lista **só** os 9 `.md` do
+topo — o tarball deixa de carregar JSON. Sem migração, `versao` mantida.
+
+---
+
 ## Rodada 14, PR 1 — `docs/` passa a conter só a documentação servida (2026-09-25)
 
 Pedido direto do autor, com captura da página **Documentação** da instância: a barra lateral

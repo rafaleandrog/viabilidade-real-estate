@@ -103,7 +103,7 @@ regras as três planilhas do autor exigem que o app ainda não representa?**
 ### Rodada 9 — como está sendo executada
 
 Ondas de PRs, uma issue (ou um grupo coeso) por PR, em fila indiana, com merge ao fim de cada uma.
-**Onda 1** (infra de verificação de UI: espelho `docs/ui-urbiverso/`, três guards estáticos e o
+**Onda 1** (infra de verificação de UI: espelho `referencia/ui-urbiverso/`, três guards estáticos e o
 harness de render em Chromium) está concluída e mergeada. As ondas seguintes entregam o backlog na
 ordem de dependência, com a cadeia do denominador (#426 → #433 → #429 → #431 → {#432, #435} → #434
 → #428) **estritamente serial**, porque todos movem o mesmo denominador.

@@ -12,7 +12,7 @@
 //
 // ⚠️ `viab-num` é componente DESTE repositório, não um primitivo `urbi-*`
 // stubado: aqui o harness mede o markup real do shadow DOM (input + stepper +
-// os dois `.afixo`), então o caveat de `docs/ui-urbiverso/LEIA.md` — "o stub
+// os dois `.afixo`), então o caveat de `referencia/ui-urbiverso/LEIA.md` — "o stub
 // tem conteúdo genérico, não julgue o layout de DENTRO de um urbi-*" — não se
 // aplica a este caso.
 //

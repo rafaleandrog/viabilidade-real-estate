@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #633 — `--cor-primaria` é um GRADIENTE nas 4 variantes de tema
-// (docs/ui-urbiverso/tokens.json), inválido em contexto de cor
+// (referencia/ui-urbiverso/tokens.json), inválido em contexto de cor
 // (color/accent-color/border*/fill/stroke — invalid-at-computed-value-time).
 // `--cor-primaria-solida` é a variante SÓLIDA, pensada para isto.
 // ─────────────────────────────────────────────────────────────────────────────

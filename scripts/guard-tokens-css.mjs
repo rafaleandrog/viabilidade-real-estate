@@ -15,7 +15,7 @@
 //
 // FONTE, E O QUE ELA NAO GARANTE
 //
-// `docs/ui-urbiverso/tokens.json`, o espelho versionado gerado por
+// `referencia/ui-urbiverso/tokens.json`, o espelho versionado gerado por
 // `scripts/sincronizar-referencia-ui.mjs`. Ele sai da `main` do monorepo, que
 // esta A FRENTE do SDK publicado: um token pode existir aqui e ainda nao estar na
 // versao que a instancia roda. O guard fecha o eixo do RECORTE (o token existe?)
@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { superficies, lerTags, limparCss, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso');
+const ESPELHO = join(RAIZ, 'referencia', 'ui-urbiverso');
 
 function morrer(msg) {
   console.error(`ERRO: ${msg}`);
@@ -47,7 +47,7 @@ function morrer(msg) {
 
 if (!existsSync(join(ESPELHO, 'tokens.json'))) {
   morrer(
-    'docs/ui-urbiverso/tokens.json nao existe.\n' +
+    'referencia/ui-urbiverso/tokens.json nao existe.\n' +
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }

@@ -9,7 +9,7 @@
 //
 // O mecanismo, para não voltar pela quinta vez: o `:host` de `urbi-kpi` soma
 // `padding: 14px 16px` + `border: 1px` e NÃO declara `box-sizing: border-box`
-// (`docs/ui-urbiverso/primitivos.json`). Logo `width` vindo de fora é largura de
+// (`referencia/ui-urbiverso/primitivos.json`). Logo `width` vindo de fora é largura de
 // CONTEÚDO, e a caixa mede 34px a mais que a track — dos quais 22px caíam sobre
 // a coluna seguinte depois do `gap: 12px`. O conserto é não impor largura: item
 // de grid com `stretch` já dimensiona a border box, que é por que o Preliminar

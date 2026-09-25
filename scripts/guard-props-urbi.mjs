@@ -49,7 +49,7 @@ import { fileURLToPath } from 'node:url';
 import { superficies, lerTags, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
+const ESPELHO = join(RAIZ, 'referencia', 'ui-urbiverso', 'primitivos.json');
 
 function morrer(msg) {
   console.error(`ERRO: ${msg}`);
@@ -58,7 +58,7 @@ function morrer(msg) {
 
 if (!existsSync(ESPELHO)) {
   morrer(
-    'docs/ui-urbiverso/primitivos.json nao existe.\n' +
+    'referencia/ui-urbiverso/primitivos.json nao existe.\n' +
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }

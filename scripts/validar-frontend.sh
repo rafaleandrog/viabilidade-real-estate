@@ -21,7 +21,7 @@
 #      (quebra a instalação numa instância virgem, e só lá);
 #   2. autentica o SDK (scripts/lib/sdk-auth.sh) e roda `pnpm install`;
 #   3. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
-#   4. guards de UI contra o espelho `docs/ui-urbiverso/`: token que não existe,
+#   4. guards de UI contra o espelho `referencia/ui-urbiverso/`: token que não existe,
 #      atributo que o primitivo não declara, `width`/`height` de fora num
 #      primitivo sem `box-sizing` — as três são falhas 100% SILENCIOSAS, que
 #      atravessam typecheck, teste e build em verde. Depois do link porque o
@@ -116,7 +116,7 @@ node scripts/guard-schema-ciclos.mjs || exit 1
 
 echo "  ok: nenhuma aspa curva em atributo"
 
-# Os três guards de UI leem `docs/ui-urbiverso/` — o espelho versionado da
+# Os três guards de UI leem `referencia/ui-urbiverso/` — o espelho versionado da
 # referência do urbiverso — e por isso rodam com `node` puro, sem SDK, sem
 # credencial e sem rede. Ficam ANTES do `pnpm install` de propósito: são a etapa
 # mais barata do script e falham em menos de um segundo.

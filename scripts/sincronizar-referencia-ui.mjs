@@ -40,7 +40,7 @@ import { execFileSync } from 'node:child_process';
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const iMono = process.argv.indexOf('--monorepo');
 const MONO = iMono !== -1 ? process.argv[iMono + 1] : '/home/user/urbiverso';
-const SAIDA = join(RAIZ, 'docs', 'ui-urbiverso');
+const SAIDA = join(RAIZ, 'referencia', 'ui-urbiverso');
 
 if (!existsSync(join(MONO, 'ui', 'src'))) {
   console.error(`ERRO: não achei ${MONO}/ui/src.`);
@@ -347,7 +347,7 @@ if (existsSync(arqLeia)) {
   const i = texto.indexOf(INI);
   const f = texto.indexOf(FIM);
   if (i === -1 || f === -1) {
-    console.error('ERRO: marcadores CARIMBO:INICIO/FIM ausentes em docs/ui-urbiverso/LEIA.md.');
+    console.error('ERRO: marcadores CARIMBO:INICIO/FIM ausentes em referencia/ui-urbiverso/LEIA.md.');
     console.error('      Sem eles o carimbo envelhece em silêncio, que é o defeito que eles evitam.');
     process.exit(1);
   }

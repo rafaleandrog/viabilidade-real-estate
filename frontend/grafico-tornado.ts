@@ -1,7 +1,7 @@
 // Tornado de alavancas (Rodada 13, handoff §4.2 — issue #728). Barras
 // horizontais SIMÉTRICAS a partir de um eixo central (zero do Resultado),
 // ordenadas por amplitude — geometria que nenhum primitivo `urbi-*` desenha
-// (confirmado na Rodada 12 contra `docs/ui-urbiverso/primitivos.json`:
+// (confirmado na Rodada 12 contra `referencia/ui-urbiverso/primitivos.json`:
 // `urbi-grafico-colunas` só faz barra vertical, e nenhum deles é bidirecional
 // a partir de um zero central).
 //

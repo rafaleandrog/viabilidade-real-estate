@@ -33,7 +33,7 @@
 // casos, ou o wiring que os executa.
 const PREFIXOS = [
   'frontend/',                        // as telas medidas e os casos
-  'docs/ui-urbiverso/',               // o espelho que gera os stubs dos primitivos
+  'referencia/ui-urbiverso/',               // o espelho que gera os stubs dos primitivos
   'scripts/render-check',             // o harness (.mjs e .d.mts)
   'scripts/render-em-escopo',         // este arquivo
   'scripts/validar-frontend.sh',      // o wiring local
@@ -66,7 +66,7 @@ function autoteste() {
   checar('só backend fica fora de escopo',
     emEscopo('backend/rotas.ts\nmigracoes/001.js').casaram === 0);
   checar('um arquivo de frontend entra', emEscopo('frontend/tela-resumo.ts').casaram === 1);
-  checar('o espelho de UI entra', emEscopo('docs/ui-urbiverso/primitivos.json').casaram === 1);
+  checar('o espelho de UI entra', emEscopo('referencia/ui-urbiverso/primitivos.json').casaram === 1);
   checar('o próprio harness entra', emEscopo('scripts/render-check.mjs').casaram === 1);
   checar('o pin da toolchain entra', emEscopo('.github/render-deps/package.json').casaram === 1);
   checar('o lockfile da toolchain entra', emEscopo('.github/render-deps/package-lock.json').casaram === 1);

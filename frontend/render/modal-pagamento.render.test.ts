@@ -6,7 +6,7 @@
 //
 // ⚠️ O `urbi-modal` aqui é o stub do espelho — ele carrega as declarações
 // `:host` reais, mas não o overlay nem o posicionamento internos, que
-// `docs/ui-urbiverso/` não espelha. Logo: este teste julga o layout do
+// `referencia/ui-urbiverso/` não espelha. Logo: este teste julga o layout do
 // CONTEÚDO do modal, e NÃO o comportamento do primitivo por dentro.
 //
 // 🔴 E há um detalhe que quase tornou este caso inútil. O `:host` do

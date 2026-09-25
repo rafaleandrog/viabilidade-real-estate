@@ -2,7 +2,7 @@
 // "pizza só com quatro categorias ou menos; acima disso, barra horizontal
 // ranqueada". Componente genérico e customizado — nenhum primitivo `urbi-*`
 // desenha barra horizontal (`urbi-grafico-colunas` só faz barras verticais,
-// confirmado contra `docs/ui-urbiverso/primitivos.json`).
+// confirmado contra `referencia/ui-urbiverso/primitivos.json`).
 //
 // Reusado em dois lugares (Rodada 12): o detalhamento de "Custo direto" que
 // a cascata do resultado expande ao clicar, e qualquer pizza do Preliminar
