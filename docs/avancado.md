@@ -41,21 +41,21 @@ Acumulado** e os **Indicadores vs. benchmark** — a página de leitura do estud
 ### Custos
 
 Cinco sub-abas, uma por grupo: **Terreno**, **Obras**, **Diretos**, **Indiretos** e **Financeiro**.
-Cada linha de custo tem categoria e subcategoria — no Terreno, o preço (à vista ou parcelado), as
-permutas física e financeira e o registro; nas Obras, construção, outorga, decoração, gestão da obra
-e contingência; nos Diretos, marketing e publicidade, corretagem de vendas, projetos e licenças e
-aprovações; nos Indiretos, marketing global, stand de vendas e gestão; no Financeiro, juros de
-financiamento, taxas bancárias, estruturação de dívida e investidores; cada grupo aceita ainda a
-categoria **Outro**, e só no Terreno a subcategoria é digitada (**Descreva…**). O orçamento é
+Cada linha de custo tem uma **categoria** — no Terreno, o preço, as permutas física e financeira e o
+registro; nas Obras, construção, outorga, decoração, gestão da obra e contingência; nos Diretos,
+marketing e publicidade, corretagem de vendas, projetos e licenças e aprovações; nos Indiretos,
+marketing global, stand de vendas e gestão; no Financeiro, juros de financiamento, taxas bancárias,
+estruturação de dívida e investidores; e em todo grupo a categoria **Outro**. Só o Terreno tem a
+coluna **Subcategoria** (à vista ou parcelado para o preço; **Descreva…** para Outro). O orçamento é
 lançado na unidade escolhida (R$, R$/m² privativo, R$/m² de terreno, % do VGV, % da receita ou % da
 obra) e a **distribuição no tempo** diz o início (uma fase do cronograma, ou **Customizado** para um
 mês), a duração e a forma — **Linear** ou uma **curva** do catálogo do Painel (aba **Curvas**), que
-reparte o valor pelos meses. O preço do terreno pode, em vez disso, acompanhar a receita das vendas:
-**Unit Delivery** o distribui na proporção da receita que entra em caixa (sinal, parcelas e repasse)
-e **Sales Revenue** na proporção do VGV vendido pela curva de absorção; três linhas não escolhem — a
-corretagem sai no mês da venda, a permuta física na entrega das unidades e a permuta financeira
-conforme a receita entra. Cada sub-aba mostra o consolidado do seu grupo; o **Avanço da obra**
-aparece junto do custo de construção, no grupo Obras.
+reparte o valor pelos meses. O preço do terreno pode, em vez disso, acompanhar a receita das
+vendas: **Unit Delivery** o distribui na proporção da receita que entra em caixa (sinal, parcelas e
+repasse) e **Sales Revenue** na proporção do VGV vendido pela curva de absorção; três linhas não
+escolhem — a corretagem sai no mês da venda, a permuta física na entrega das unidades e a permuta
+financeira conforme a receita entra. Cada sub-aba mostra o consolidado do seu grupo; o **Avanço da
+obra** aparece junto do custo de construção, no grupo Obras.
 
 ### Viabilidade
 
@@ -67,10 +67,12 @@ aparece junto do custo de construção, no grupo Obras.
 ### Funding
 
 As operações que financiam o projeto, cada uma independente das outras: **Dívida** (ou capital de
-giro), **Equity** e **Financiamento à produção**. Para cada operação se informa nome, tipo, valor, o
-início (uma fase do cronograma ou um mês específico), a taxa ou o retorno, e se está ativa. Equity
-pode ser remunerado como percentual do resultado final ou como permuta financeira sobre a receita
-líquida. As regras de cada tipo estão em [Funding](funding).
+giro), **Equity** e **Financiamento à produção**. Dívida e Equity pedem nome, valor, o início (uma
+fase do cronograma ou um mês específico) e a taxa ou o retorno — o Equity pode ser remunerado como
+percentual do resultado final ou como permuta financeira sobre a receita líquida. O Financiamento à
+produção não tem valor nem início digitados: a janela vem do Cronograma e o principal, da base
+financiável; é a única operação com o interruptor **Ativo**. As regras de cada tipo estão em
+[Funding](funding).
 
 ### Resultados
 
@@ -96,8 +98,9 @@ IA, a partir dos documentos anexados (ver [Apelo Comercial (IA)](apelo-comercial
 
 ## Instruções para não humanos
 
-As rotas com `/estudos/:id/` exigem membro do estudo, e as de escrita seguem a alçada do estudo
-(ver [Permissões e ciclo de vida](permissoes)). O catálogo de curvas é global: `GET` para qualquer
+As rotas com `/estudos/:id/` exigem membro do estudo — ou `admin` do app; num estudo que ainda
+não tem membros, qualquer usuário com nível `escrita` ou superior é aceito — e as de escrita seguem
+a alçada do estudo (ver [Permissões e ciclo de vida](permissoes)). O catálogo de curvas é global: `GET` para qualquer
 usuário do app, escrita e `semear` só para o `admin` do app.
 
 | Recurso | Rotas |

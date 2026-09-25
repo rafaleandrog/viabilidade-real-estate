@@ -30,32 +30,36 @@ Quatro sub-abas, cada uma com os campos que valem para o tipo do estudo (Loteame
 
 | Sub-aba | O que se informa |
 |---|---|
-| **Terreno & Áreas** | A área do terreno vem do Núcleo ou do terreno manual, e a tabela de áreas é uma cascata. Em **Loteamento**: da **Área da Poligonal** saem APP, áreas verdes, sistema viário público, EPC e ELUP/EPU até a **Área Parcelável**; desta saem o sistema viário privado e as áreas comuns privadas até a **Área Líquida** e a **Área Líquida de Venda (ALV)** — cada linha em m², ha, % da poligonal e % do parcelável. Em **Incorporação**: os **Coeficiente mínimo** e **Coeficiente máximo** de aproveitamento, e a cascata da **Área do Terreno** à **Área Construída Total**, às áreas privativas residenciais e não residenciais (fechadas e abertas), à **Área Privativa Total**, à **Área Comum Total** e à ALV, com os KPIs de aproveitamento do coeficiente. |
+| **Terreno & Áreas** | A área do terreno vem do Núcleo ou do terreno manual, e a tabela de áreas é uma cascata. Em **Loteamento**: da **Área da Poligonal** menos a APP sai a **Área Parcelável**; dela saem ELUP/EPU, EPC e o sistema viário público até a **Área Líquida**; e desta saem o sistema viário privado, as áreas comuns privadas e as áreas verdes até a **Área Líquida de Venda (ALV)** — cada linha em m², ha, % da poligonal e % do parcelável. Em **Incorporação**: os **Coeficiente mínimo** e **Coeficiente máximo** de aproveitamento e a cascata que parte da **Área do Terreno**: as quatro áreas privativas (residencial e não residencial, fechada e aberta) somadas na **Área Privativa Total**, mais a **Área Comum Total**, até a **Área Construída Total**, com os KPIs de aproveitamento do coeficiente. |
 | **Custos** | Infraestrutura, Construção e Projetos têm um seletor de unidade (R$, R$/m² ou % do VGV) e o app converte para a base da Proforma; os demais custos têm unidade fixa. Loteamento: infraestrutura, projetos, stand de vendas. Incorporação: construção, decoração, gestão da construção, incorporação e registro, valor venal do terreno (outorga). Comuns: custo do terreno, manutenção pós-obra, contingências, marketing global, gestão e outros indiretos, corretagem, marketing e o imposto — com a opção **Sujeito a RET**, que troca o imposto pela alíquota fixa do regime. Os interruptores **Considerar…** ligam ou desligam um custo sem apagar o valor. |
 | **Permutas** | **Permuta física** (em m² ou em percentual da área de venda; residencial e não residencial na Incorporação) e **permuta financeira** (percentual do VGV ou valor). A física reduz a área que o incorporador vende; a financeira é dedução sobre a receita. |
 | **Produtos** | O catálogo de tipologias: nome, tipo, área média, preço de venda e unidades. O VGV de cada produto aparece na linha, e o total alimenta a Proforma quando o catálogo existe. |
 
-Na sub-aba Produtos, abaixo do catálogo, o card **Resumo** mostra as áreas, o VGV, o número de
-lotes ou de unidades, o preço médio por unidade, a **Margem sobre VGV** e o **Custo obras / VGV**
-comparados ao benchmark, e o preço sugerido por m² — o preço que faria o resultado bater o piso
-definido no benchmark `resultado_final`. Tudo recalculado a cada edição.
+Na sub-aba Produtos, abaixo do catálogo, o card **Resumo** mostra os KPIs do tipo. No Loteamento:
+**Área da gleba**, **Área vendável**, **Vendável / gleba** (contra o benchmark), **VGV**, **Nº de
+lotes** e **Margem sobre VGV**. Na Incorporação: **Área privativa total**, **Área construída**,
+**Nº de unidades**, **Preço médio/unid.**, **Custo obras / VGV** e **Margem sobre VGV** (os dois
+últimos contra o benchmark). Abaixo deles, o preço sugerido por m² — o preço que faria o resultado
+bater o piso definido no benchmark `resultado_final`. Tudo recalculado a cada edição.
 
 ### Resultado
 
 Duas sub-abas.
 
-**Proforma.** Acima da tabela, os cards **Área vendável**, **Nº de unidades**, **Vendável / gleba**,
-**Área permutada**, **Custo obras / VGV** e **Margem sobre VGV**. A tabela, linha a linha: VGV sem
-permuta física, Receita bruta (VGV), as deduções sobre o VGV (permuta financeira, corretagem,
-marketing, imposto) e **= Deduções sobre VGV**, **= Receita líquida**, os custos diretos e **= Custo
-direto total**, **= Receita operacional**, os custos indiretos e **= Custo indireto total**, e
-**= Resultado**. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
+**Proforma.** Acima da tabela, os cards **Área vendável**, **Nº de unidades**, **Custo obras / VGV**
+e **Margem sobre VGV** — mais **Vendável / gleba** no Loteamento e **Área permutada** quando há
+permuta física. A tabela, de cima para baixo: **Receita bruta (VGV)** (precedida de **VGV sem
+permuta física** e das permutas quando há permuta física); **= Deduções sobre VGV**, que abre
+imposto, corretagem, marketing e permuta financeira; **= Receita líquida**; **= Custo direto total**,
+que abre os custos diretos; **= Receita operacional**; **= Custo indireto total**, que abre os
+indiretos; e **= Resultado**. Os totais são cabeçalhos que mostram ou escondem as linhas do grupo;
+linha zerada não aparece. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
 **Unidades e preço médio por tipo** resume o catálogo. Botões **PDF** e **Excel** exportam a mesma
 tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [Fórmulas da Proforma](formulas).
 
 **Cenários.** Três blocos que respondem "o que derruba este resultado?":
 
-- **Alavancas do resultado** — o tornado: cada alavanca (**Preço de venda**, **Permuta física**,
+- **Alavancas do resultado** — o tornado: cada alavanca (**Preço de venda** — **Preço/m² de venda** no Loteamento —, **Permuta física**,
   **Permuta financeira**, **Custo de obra** ou **Custo de infraestrutura**, **Custo indireto**) é
   variada em ±5, ±10 ou ±15 % (o passo é escolhido no card) e ranqueada pela amplitude do impacto
   no resultado. A barra mais longa é a premissa que mais merece atenção. O custo do terreno não
