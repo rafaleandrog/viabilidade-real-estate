@@ -1,34 +1,55 @@
 ---
-titulo: Benchmarks e Sensibilidade
-descricao: Indicadores de referência, validação por benchmark e faixas de sensibilidade.
+titulo: Benchmarks
+descricao: Os valores de referência por tipo de empreendimento — indicadores de meta, faixas do medidor e variações de sensibilidade — e as três coisas que eles fazem nos estudos.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
-# Benchmarks e Sensibilidade
+# Benchmarks
 
-Benchmarks são registro geral do app (não do Núcleo), definidos pelo **administrador** e usados como base por todos os estudos. Cada tipo de empreendimento (Loteamento, Incorporação) tem o seu conjunto.
+> Um conjunto de referências por tipo de empreendimento, mantido pelo administrador e usado por todos os estudos: para colorir os indicadores, para dar as faixas dos cenários e para definir o piso do preço sugerido.
 
-## Configuração
+## O que é
 
-Tela **Config → Benchmarks** (`viabilidade-config-benchmarks`). Botão **“Criar indicadores padrão”** semeia o conjunto do MVP: `resultado_final`, `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv` e — só no Loteamento — `eficiencia_aproveitamento`. Edição restrita a administradores (aprovadores).
+Benchmarks são registro geral do app, um conjunto para Loteamento e outro para Incorporação. Cada
+registro é um indicador identificado por `campo`, e há três famílias:
 
-> ⚠️ **`margem_bruta` nasce sem indicador correspondente.** O app não calcula uma margem bruta de
-> verdade hoje — o campo que tinha esse nome media `receita líquida / VGV` (#453), que não é
-> margem. Nenhuma tela lê o benchmark `margem_bruta` até existir um indicador de margem bruta de
-> verdade, com a fórmula que o autor declarar.
+| Família | Indicadores | O que guardam |
+|---|---|---|
+| **Meta** | `margem_liquida`, `roi`, `custo_obras_vgv`, `resultado_final`, `margem_bruta` e, só no Loteamento, `eficiencia_aproveitamento` | **Valor** e **Regra** (*atingir ou superar* ou *não exceder*), mais os limites do medidor |
+| **Sensibilidade** | `preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras` | **Var + (%)** e **Var − (%)** |
 
-## Três funções
+O indicador `margem_bruta` existe no conjunto, mas nenhuma tela o lê hoje: o app não calcula uma
+margem bruta, e o medidor correspondente fica declaradamente sem fonte.
 
-1. **Validação de indicadores** — cada benchmark tem `valor` e `regra_comparacao`:
-   - `atingir_ou_superar` (ex.: Resultado final ≥ 25%) — KPI verde se atingido, vermelho se não.
-   - `nao_exceder` (ex.: Custo Obras / VGV ≤ 35%).
-2. **Faixas de sensibilidade** — `variacao_positiva_pct` / `variacao_negativa_pct` são o default para o Bear/Base/Bull. Podem ser sobrescritas por estudo (`sensibilidade_variacao_*_pct`).
-3. **Piso do Preço Sugerido/m²** — o benchmark `resultado_final` define o piso de retorno usado no cálculo do preço sugerido (ver [Fórmulas](formulas)).
+## Para usuários
 
-## Análise de sensibilidade
+Os benchmarks aparecem em três lugares dos estudos:
 
-Na aba Proforma, escolhe-se uma variável a estressar (preço/m², permuta física/financeira, custo de infraestrutura no Loteamento ou de obras na Incorporação). O app calcula **Bear** (base × (1 − var⁻)), **Base** e **Bull** (base × (1 + var⁺)) e exibe as linhas afetadas lado a lado. MVP é unidimensional.
+1. **Validação de indicadores.** Cada indicador de meta compara o valor calculado com o **Valor**
+   pela **Regra**: *atingir ou superar* (Resultado final ≥ 25 %, por exemplo) fica verde quando
+   atingido e vermelho quando não; *não exceder* (Custo obras / VGV ≤ 35 %) o inverso. É a cor dos
+   cards de KPI e dos medidores da aba Gráficos, cujas faixas vêm de **Mín**, **Faixa 1 até**,
+   **Faixa 2 até** e **Máx** — em branco, as faixas saem automaticamente da meta.
+2. **Variações dos cenários.** Na análise de sensibilidade de Cenários, **Var +** e **Var −** do
+   indicador de sensibilidade da variável escolhida são as variações de Bull e Bear (10 % quando
+   não há benchmark). Não há sobrescrita por estudo.
+3. **Piso do preço sugerido.** O **Valor** de `resultado_final` é o piso que o preço sugerido por
+   m² precisa atingir (ver [Fórmulas da Proforma](formulas)).
 
-## API
+## Para administradores
 
-`GET /benchmarks?tipo_empreendimento=…` (leitura livre); `POST`/`PATCH`/`DELETE /benchmarks` e `POST /benchmarks/semear` (admin).
+A tela fica na aba **Benchmark** do Painel e em *Admin → Apps → viabilidade → Benchmarks*, com as
+fichas **Loteamento** e **Incorporação** e três seções — **Indicador de Benchmark**, **Indicador de
+Sensibilidade** e **Faixas do medidor**. Na primeira abertura por quem pode escrever, os indicadores
+padrão que faltam são semeados nos dois tipos. Só o `admin` do app escreve. Detalhe em
+[Administração](administracao).
+
+## Instruções para não humanos
+
+`GET /benchmarks?tipo_empreendimento=…` (leitura para qualquer usuário do app; `400 TIPO_INVALIDO`
+para um tipo desconhecido); `POST /benchmarks`, `PATCH`/`DELETE /benchmarks/:id` e
+`POST /benchmarks/semear` (idempotente) só `admin`. Único por `[tipo_empreendimento, campo]`.
+
+## Veja também
+
+- [Administração](administracao) · [Fórmulas da Proforma](formulas) · [Estudo Preliminar](preliminar)

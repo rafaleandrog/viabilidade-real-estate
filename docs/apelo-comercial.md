@@ -1,69 +1,66 @@
 ---
 titulo: Apelo Comercial (IA)
-descricao: Análise qualitativa do imóvel por IA — 6 fatores, scoring e relatório.
+descricao: A avaliação qualitativa do imóvel por IA — seis fatores pontuados de 1 a 5 a partir dos documentos e do texto anexados ao estudo, um score geral e um relatório.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
-# Análise de Mercado do Imóvel (IA)
+# Apelo Comercial (IA)
 
-> BUG7-13: rótulo renomeado só no **Preliminar** (D2) — o Avançado mantém a aba
-> "Apelo Comercial", pois já tem uma aba homônima "Análise de mercado" (coleta
-> regional, `mercado_regioes`), e as duas juntas ficariam ambíguas. É a mesma
-> funcionalidade nos dois níveis: slug `apelo`, elemento `viab-tela-apelo`,
-> evento `apelo_comercial_concluido` e as tabelas `apelo_comercial*` continuam
-> intactos — só o texto do card muda por nível.
+> O que as fórmulas não capturam: localização, infraestrutura, vetor de crescimento, concorrência, demanda e segurança jurídica, avaliados pela IA sobre as fontes que você anexa.
 
-Usa o framework de IA do UrbiVerso (`req.ia`) para avaliar fatores qualitativos que as fórmulas financeiras não capturam.
+## O que é
 
-## Como funciona
+O Apelo Comercial usa o framework de IA do UrbiVerso para pontuar o ativo em seis fatores
+qualitativos, a partir de documentos e texto anexados ao estudo. É a mesma funcionalidade nos
+dois níveis, com nomes diferentes na tela: no Preliminar é a aba **Análise de Mercado**; no
+Avançado é a página **Apelo Comercial**, porque lá existe outra página chamada Análise de mercado,
+a comparação numérica com o mercado da região (ver [Análise de Mercado](analise-mercado)).
 
-1. Na aba **Análise de Mercado** (Preliminar) ou **Apelo Comercial** (Avançado), o editor anexa **documentos** (PDF, Word, Excel) e/ou **texto** (ex.: população do município/bairro), marcando o `tipo_dado` (anúncios, população, mercado…).
-2. Clica em **“Analisar com IA”**. O backend extrai o conteúdo dos arquivos (`req.ia.extrairConteudo`) e consulta o modelo (`req.ia.consultar`) com um schema JSON estruturado.
-3. O resultado é salvo em `apelo_comercial` e o evento `apelo_comercial_concluido` é publicado (editores e aprovadores são inscritos).
+## Para usuários
 
-## Contexto do empreendimento
+1. Na aba, anexe as fontes: um **Arquivo** (PDF, Word, Excel) com o **Tipo de fonte** (Anúncios,
+   População, Mercado ou Outro) e, se quiser, um **Texto adicional** (a população do município ou
+   do bairro, por exemplo).
+2. Clique em **Analisar com IA**. O servidor extrai o conteúdo dos arquivos, monta o prompt e
+   consulta o modelo com um esquema de resposta estruturado.
+3. O card **Resultado** mostra o **Score geral**, o score de cada fator e o relatório; o evento
+   `apelo_comercial_concluido` é publicado para os membros do estudo.
 
-Antes das fontes anexadas, o prompt inclui um bloco descritivo do empreendimento — localidade,
-tipo, unidades, área média por unidade e preço de venda praticado — para ajudar o modelo a
-dimensionar o que está avaliando. Não é cálculo de viabilidade, só contexto best-effort.
+**Contexto do empreendimento.** Antes das fontes, o prompt inclui um bloco com a localidade, o
+tipo de empreendimento, o número de unidades, a área média por unidade e o preço de venda
+praticado, para o modelo dimensionar o que avalia. A localidade é a região monitorada vinculada ao
+estudo, ou a UF quando não há vínculo. Unidades, área média e preço vêm do catálogo efetivo de
+Produtos, pela mesma agregação que a Proforma usa para o VGV (área média ponderada por unidades,
+preço por m² ponderado pela área); estudo sem catálogo efetivo omite as três linhas do prompt em
+vez de mandar zero.
 
-- **Localidade**: região monitorada (`mercado_regioes`) se o estudo tiver uma vinculada, senão a
-  UF do estudo (BUG7-15 — é a causa dominante do diagnóstico: os 6 fatores são todos geográficos).
-- **Unidades / área média / preço de venda**: derivados do catálogo **efetivo** de Produtos
-  (`preliminar_produtos`) — a mesma regra `produtoCompoeCatalogo`/`catalogoEfetivo` que
-  `calcularProforma` usa para o VGV (`frontend/proforma.ts`). Uma linha só entra se tiver área,
-  preço **e** unidades preenchidos; a agregação usa `resumoCatalogoProdutos` (mesmo arquivo):
-  unidades é soma simples, área média é ponderada por unidades, e preço/m² é ponderado pela área
-  total de cada linha — as duas ponderações são consistentes entre si (área média × preço × unidades
-  reproduz o VGV total do catálogo efetivo). Estudo sem catálogo efetivo (ou catálogo com só linhas
-  em branco) omite as três linhas do prompt — nunca mostra zero como se fosse um dado real.
-  > ⚠️ Até a #588 esses três campos vinham de colunas legadas de `estudos`
-  > (`area_media_lote_m2`, `num_unidades*`, `preco_venda_m2*`) — sem UI desde a #315 e que
-  > `calcularProforma` já não lê desde a #563. Um estudo novo herdava contexto `null` silencioso;
-  > um estudo antigo com o catálogo editado mandava para a IA um preço/área que não batia com a
-  > Proforma. `backend/rotas/apelo-comercial.ts` importa a agregação diretamente de
-  > `frontend/proforma.ts` (funções puras, sem DOM) em vez de espelhar a regra — fonte única entre
-  > o contexto da IA e a Proforma.
+**Os seis fatores**, cada um com quatro perguntas-guia: **Localização**, **Infraestrutura no
+Entorno**, **Vetor de Crescimento**, **Concorrência**, **Demanda Estrutural** e **Segurança
+Jurídica e Regulatória**. A IA dá nota de 1 a 5 por pergunta (5 é o mais favorável), com
+justificativa; sem dado suficiente a nota fica nula. A avaliação é comparativa e contextual, sem
+critério numérico rígido.
 
-## Fatores (MVP)
+**Scores.** O score de cada fator é a média das quatro notas; o **Score geral** é a média de todas
+as notas válidas. O relatório traz vantagens, desvantagens, ganhos e riscos de prosseguir.
 
-Seis fatores, cada um com 4 perguntas-guia: **Localização**, **Infraestrutura no Entorno**, **Vetor de Crescimento**, **Concorrência**, **Demanda Estrutural** e **Segurança Jurídica e Regulatória**.
+**Limites.** Só o que for anexado entra: a IA não navega na web nem abre URLs. O framework de IA
+precisa estar habilitado para o app na instância; caso contrário a análise responde
+`IA_INDISPONIVEL`.
 
-A IA atribui **nota de 1 a 5** por pergunta (5 = mais favorável), com justificativa. Dados insuficientes → nota nula. A avaliação é comparativa e contextual, sem critérios numéricos rígidos.
+## Instruções para não humanos
 
-## Scoring
+| Rota | O que faz |
+|---|---|
+| `GET /estudos/:id/apelo-comercial` | o resultado, os documentos anexados e a lista de fatores |
+| `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` | anexa e remove fontes |
+| `POST /estudos/:id/apelo-comercial` | dispara a IA; `422 IA_INDISPONIVEL` sem o framework |
 
-- **Score por fator** = média das 4 notas → colunas `score_localizacao`, `score_infraestrutura`, etc.
-- **Score geral** = média de todas as notas válidas → `score_geral`.
+Escrever exige a função de `editor` no estudo. O resultado fica em `apelo_comercial` (`resultado`
+JSON, `score_localizacao`, `score_infraestrutura`, `score_vetor_crescimento`, `score_concorrencia`,
+`score_demanda`, `score_seguranca_juridica`, `score_geral`); as fontes, em
+`apelo_comercial_documentos`.
 
-## Saída
+## Veja também
 
-Além das notas, um **relatório** com vantagens, desvantagens, ganhos e riscos de prosseguir.
-
-## Limites (MVP)
-
-Apenas uploads e texto — **sem busca na web** e **sem URLs** (v2). O framework de IA precisa estar habilitado para a app na instância; caso contrário a análise responde `IA_INDISPONIVEL`.
-
-## API
-
-`GET /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` · `POST /estudos/:id/apelo-comercial` (dispara a IA). Requerem função de editor no estudo.
+- [Análise de Mercado](analise-mercado) · [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado)
+- [Modelo de Dados](modelo-de-dados) · [Permissões e ciclo de vida](permissoes)

@@ -7,6 +7,36 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-25 — Rodada 14, PR 9: os cinco guias curtos limpos pela régua, e o `ideias.md` — fila fechada
+
+Nona e última PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). `analise-mercado`,
+`apelo-comercial`, `exportacao`, `permissoes` e `benchmarks` reescritos pela régua — e o que cada
+um dizia de errado sobre o app de hoje saiu: o botão "Criar indicadores padrão" (o semeio é
+automático), a "sobrescrita por estudo" das variações de sensibilidade (não existe), a "aba
+Proforma" da sensibilidade (é a sub-aba Cenários), a "evolução prevista" do Capital Stack na
+Exportação (modelo apagado), a dependência de issue para o valor canônico nas exportações, o H1
+"Análise de Mercado do Imóvel (IA)" num guia cujo título é "Apelo Comercial (IA)". O `ideias.md`
+nasce na raiz, no formato do framework, com as evoluções sem issue que os guias carregavam e com o
+que as PRs 7 e 8 mediram (quatro parâmetros sem consumidor, fonte externa da coleta, `margem_bruta`
+sem indicador, taxa e sinal no fluxo de pagamento), mais as duas ideias descartadas por decisão do
+autor.
+
+**O que a fila entregou, no todo.** A página Documentação da instância passa a listar treze guias
+por tema — Estudo de Viabilidade (o README), Administração, Análise de Mercado, Apelo Comercial
+(IA), Benchmarks, Estudo Avançado, Estudo Preliminar, Exportação, Fórmulas da Proforma, Funding,
+Modelo de Dados, Permissões e Ciclo de Vida —, todos no estilo dos apps do UrbiVerso e sem nenhum
+número de issue, rodada, data ou endereço `arquivo:linha`; o tarball leva só esses `.md`; o
+material consultivo mora em `referencia/` e o histórico em `historico/`. Nove PRs, cada uma
+revisada em rodadas até zero bloqueantes: o App do Codex nas PRs 1 a 5 (esgotou a cota na rodada 3
+do PR 763) e o Kimi em todas, com leitura integral quando o App faltou. A lição que atravessou a
+fila inteira, medida PR a PR: **rótulo existir no arquivo não prova que a tela o renderiza** — a
+conferência que vale é ler a função que desenha a sub-aba, não o `grep` que acha a constante.
+
+**O que fica para o autor:** a seção "Documentação da app" do `CLAUDE.md` (layout `docs/` ·
+`referencia/` · `historico/` · `ideias.md`, e a régua), com o texto pronto no anexo do plano — a
+sessão não edita conteúdo do `CLAUDE.md`; e a conferência na Pinguim, depois da release, de que a
+página Documentação abre no README e lista os guias por tema.
+
 ## 2026-09-25 — Rodada 14, PR 8: `docs/formulas.md` e `docs/modelo-de-dados.md` limpos pela régua
 
 Oitava PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). Os dois guias eram diário de

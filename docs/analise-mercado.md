@@ -1,187 +1,107 @@
 ---
-titulo: Análise de Mercado — projeto × mercado
-descricao: Como o app compara os números do estudo com os do mercado (preço/m², custo de obra/m², VSO e macros), de onde vem cada lado e por que o lado "projeto" não é digitado.
+titulo: Análise de Mercado
+descricao: Como a página Análise de mercado do estudo Avançado compara os números do projeto com os do mercado da região monitorada, de onde vem cada lado, o que a rotina diária coleta e o que a IA pode e não pode fazer.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
 # Análise de Mercado
 
-Aba do nível **Avançado** que confronta os números do estudo com os do mercado da região.
-Introduzida na issue **#199**.
+> Uma página do estudo Avançado que põe lado a lado o preço, o custo de obra e a velocidade de vendas do projeto e os do mercado da região monitorada — o lado projeto derivado do próprio estudo, o lado mercado gerado por IA sobre o que a rotina diária coletou.
 
----
+## O que é
 
-## 1. Os dois lados têm origens diferentes
-
-Esta é a ideia central da tela, e o que explica quase todas as decisões abaixo.
+A análise de mercado responde "como este projeto se posiciona em relação ao mercado da região?".
+Ela **não** é o [Apelo Comercial (IA)](apelo-comercial), que pontua o ativo em seis fatores
+qualitativos: aqui a comparação é numérica. Os dois lados têm origens diferentes, e isso explica
+quase tudo o que a página faz:
 
 | Lado | De onde vem | Persistido? |
 |---|---|---|
-| **Projeto** | Derivado do próprio estudo, em tempo de render (`frontend/analise-mercado.ts`) | **Não** |
-| **Mercado** | Snapshot na tabela `analise_mercado`, preenchido pela rota de IA (**#200**) | Sim |
+| **Projeto** | derivado do próprio estudo ao renderizar | não |
+| **Mercado** | um retrato por estudo, gerado pela IA sob demanda e guardado em `analise_mercado` | sim |
 
-**Por que o lado "projeto" não é digitado nem salvo:** todos esses números já existem no estudo —
-preço vem das tipologias, custo de obra vem das linhas de custo, velocidade vem da absorção. Pedir
-que o usuário os redigite aqui criaria uma segunda fonte de verdade que ficaria velha no instante
-em que ele editasse qualquer outra aba, e ninguém saberia qual das duas está certa. É a mesma razão
-pela qual o nº de parcelas "ao longo da obra" é derivado e não gravado (#190/#191).
+O lado projeto não é digitado nem salvo porque todos esses números já existem no estudo (preço nas
+tipologias e alocações, custo de obra nas linhas de custo, velocidade na absorção). Uma segunda
+cópia envelheceria no instante em que qualquer outra página fosse editada.
 
----
+## Para usuários
 
-## 2. Como cada número do projeto é derivado
+A página **Análise de mercado** do estudo Avançado mostra:
+
+- **Região monitorada** — o vínculo do estudo com uma das regiões cadastradas pelo administrador
+  (**Não vinculada** enquanto não houver); as regiões estão descritas em
+  [Administração](administracao).
+- **Projeto × mercado** — três indicadores, cada um com o valor do projeto, o do mercado e a
+  posição (acima, abaixo ou alinhado, com a magnitude): **Preço de venda (R$/m²)**, **Custo de
+  obra (R$/m²)** e **Velocidade de vendas (%/mês)**. A página não diz se estar acima é bom ou
+  ruim: preço acima pode ser produto premium ou preço irreal; quem interpreta é você.
+- **Sinais de risco** — os riscos que a IA apontou para a região, classificados nos mesmos seis
+  fatores do Apelo Comercial.
+- **Coletado sobre a região** — o material que a rotina diária guardou.
+- **Indicadores macro** — IPCA (12 meses), Selic, INCC (12 meses) e as projeções Focus para IPCA e
+  Selic, do retrato de mercado.
+
+**Analisar mercado** gera o retrato (e **Refazer análise** o substitui). A análise é sempre sob
+demanda, nunca ao abrir a página, porque custa IA. Um aviso fixo lembra que a página não é
+recomendação de investimento.
+
+Como o lado projeto é derivado:
 
 | Indicador | Fórmula | Observação |
 |---|---|---|
-| **Preço de venda (R$/m²)** | `VGV total ÷ área privativa total` | Média **ponderada pela área**, não a média aritmética dos `preco_m2` — senão um studio pesaria igual a uma cobertura |
-| **Custo de obra (R$/m²)** | `Σ linhas do grupo obra ÷ área privativa total` | Usa as linhas **já resolvidas pelo motor** (`FluxoCalc.linhasCusto`), não o `orcamento_valor` cru — a resolução de unidade (R$/m², % VGV, % Obra) mora num lugar só |
-| **Velocidade de vendas (%/mês)** | média de `100 ÷ meses com venda`, **ponderada pelo VGV** de cada fase | Lê a premissa de absorção como VSO. Uma fase que responde por 80% do VGV manda 80% do resultado |
+| **Preço de venda (R$/m²)** | `VGV total ÷ área privativa total` | média ponderada pela área, não a média aritmética dos preços por tipologia |
+| **Custo de obra (R$/m²)** | `Σ das linhas do grupo Obras ÷ área privativa total` | usa as linhas já resolvidas pelo motor do fluxo, na unidade certa |
+| **Velocidade de vendas (%/mês)** | média de `100 ÷ meses com venda`, ponderada pelo VGV de cada fase | lê a absorção como velocidade de vendas |
 
-Todas devolvem **`null`**, nunca `0`, quando não dá para derivar (sem tipologia, sem linha de obra,
-sem cronograma). Zero é um valor legítimo e diria ao usuário algo diferente de "sem dado".
+Sem dado para derivar (sem tipologia, sem linha de obra, sem cronograma) o indicador sai como `—`,
+nunca como zero — zero é um valor, e diria outra coisa.
 
-Cobertas por `frontend/analise-mercado.test.ts`.
+Três ausências são tratadas separadamente: **sem retrato de mercado**, a página mostra o lado
+projeto e avisa que a comparação aparece quando a análise for gerada; **sem série do município**,
+a coluna `abrangencia` do retrato (município, UF ou nacional) diz o alcance real do dado e a
+página avisa que a referência é mais ampla; **sem dado do projeto**, o indicador isolado sai como
+`—` sem derrubar os outros.
 
----
+## Para administradores
 
-## 3. Ausência de dado é estado de primeira classe
+As **Regiões monitoradas** (nome, UF, palavras-chave e o interruptor de coleta) ficam na aba do
+Painel e em *Admin → Apps → viabilidade → Regiões monitoradas*; o botão **Ver coletas** mostra o
+que a rotina guardou para cada uma. Ver [Administração](administracao).
 
-Três ausências diferentes, tratadas separadamente:
+**A rotina diária.** O manifesto declara a rotina **Coleta diária de mercado**, que o shell dispara
+uma vez por dia; o app não agenda nada por conta própria. Para cada região ativa ela monta os termos
+de busca (nome, UF e palavras-chave), consulta uma fonte externa de busca, manda o bruto para a IA
+no slot barato — que classifica cada item num dos seis fatores, resume e pontua a relevância — e
+grava o resultado em `mercado_coletas`, registrando o estado da última coleta na própria região.
 
-1. **Sem snapshot de mercado** — o estudo existe e nunca rodou a análise. O `GET` responde
-   `{ analise: null }` (**não** 404) e a tela mostra o lado projeto normalmente, com um banner
-   explicando que a comparação aparece quando a análise for gerada.
-2. **Sem série do município** — a coluna `abrangencia` (`municipio` \| `uf` \| `nacional`) diz o
-   alcance real do dado. Quando não é `municipio`, a tela avisa que a referência é mais ampla e
-   menos específica, em vez de fingir precisão local.
-3. **Sem dado do projeto** — um indicador isolado sai como `—` sem derrubar os outros.
+**O limite que define o desenho: a IA do UrbiVerso não navega na web.** Ela recebe texto e devolve
+JSON estruturado. Por isso, sem fonte externa configurada, a rotina **não** pergunta à IA o que ela
+sabe sobre a região: registra `sem_fonte_externa` e não grava item nenhum. Conteúdo vindo da
+memória do modelo entraria no app com aparência de notícia apurada. Hoje o manifesto não declara os
+parâmetros da fonte de busca, então a rotina roda nesse modo em toda instância.
 
----
+**A trava contra número inventado.** O prompt pede que a IA não invente valores; o que vincula é a
+normalização no servidor, que descarta o indicador — vira "sem dado" — quando o valor não é número
+finito ou é negativo, quando vem sem origem, ou quando vem com confiança "sem dado" e valor
+preenchido. Número sem procedência não chega à tela.
 
-## 4. Decisão de navegação: Análise de mercado ≠ Apelo Comercial
+## Instruções para não humanos
 
-Até o #199 a aba "Análise de mercado" renderizava o **Apelo Comercial**. São coisas diferentes:
+| Rota | O que faz |
+|---|---|
+| `GET /estudos/:id/analise-mercado` | devolve `{ analise, regiao, coletas }`; `analise` é `null` (não 404) enquanto o retrato não existir |
+| `PATCH /estudos/:id/analise-mercado/regiao` | vincula ou desvincula a região monitorada (função de `editor`) |
+| `POST /estudos/:id/analise-mercado` | gera o retrato pela IA (função de `editor`); `422 IA_INDISPONIVEL` quando o framework de IA não está habilitado para o app na instância |
+| `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` | as regiões monitoradas (escrita só `admin`) |
+| `GET /mercado/regioes/:rid/coletas` | o que a rotina guardou para a região |
 
-- **Apelo Comercial** pontua o **ativo** — localização, infraestrutura, vetor de crescimento,
-  concorrência, demanda, segurança jurídica. É um score qualitativo por IA.
-- **Análise de Mercado** compara os **números do projeto** com os do mercado.
-
-O #199 resolveu a ambiguidade **sem remover nada**: a aba "Análise de mercado" passou a ser a
-análise de verdade e o Apelo Comercial ganhou **página própria**, com o mesmo componente
-(`viab-tela-apelo`) e o mesmo backend de antes.
-
----
-
-## 5. Schema
-
-Tabela **`analise_mercado`** (`acesso_externo: restrito`), um snapshot por estudo:
-
-| Coluna | Tipo | Papel |
-|---|---|---|
-| `estudo_id` | referência → `estudos` (cascata) | dono do snapshot |
-| `abrangencia` | texto (`municipio`/`uf`/`nacional`) | alcance real do dado |
-| `localidade` | texto | nome do município/UF usado |
-| `preco_medio_m2`, `custo_obra_m2` | decimal(12,2) | R$/m² de mercado |
-| `vso_pct` | decimal(5,1) | VSO de mercado, %/mês |
-| `ipca_pct`, `selic_pct`, `incc_pct` | decimal(5,1) | macros observados |
-| `focus_ipca_pct`, `focus_selic_pct` | decimal(5,1) | projeções Focus |
-| `riscos` | json | sinais de risco (renderizados no **#201**) |
-| `resultado` | json | payload bruto da IA (mesmo padrão de `apelo_comercial`) |
-| `origem`, `data_referencia` | texto | procedência e data do dado |
-
-Migração `012_analise_mercado.js` — **aditiva**, sem transformação de dado (a entidade nasce aqui);
-`versao` `0.1.10` → `0.1.11`. Seed fica fora da migração por contrato: quem popula é a rota do #200,
-sob ação do usuário.
-
----
-
-## 6. Limites — o que esta tela não é
-
-- **Não é recomendação de investimento.** O banner de isenção é fixo e não pode ser removido.
-- **Não diz se estar acima do mercado é bom ou ruim.** Preço acima pode ser produto premium ou
-  preço irreal; custo acima pode ser padrão alto ou orçamento estourado. `compararProjetoMercado`
-  devolve posição (`acima`/`abaixo`/`alinhado`) e magnitude, deliberadamente sem juízo de valor —
-  quem interpreta é o usuário e, no **#201**, os sinais de risco.
-
----
-
-## 7. Coleta diária e IA (#200)
-
-### 7.1 Os dois frameworks do UrbiVerso em uso
-
-| Framework | Onde é declarado | O que faz aqui |
-|---|---|---|
-| **IA** | `manifesto.json` → `"ia": true` | `req.ia.consultar()` na análise sob demanda; `ctx.ia.consultar()` na coleta diária |
-| **Agenda (rotinas)** | `manifesto.json` → `rotinas.coleta_mercado_diaria`, `frequencia: "diaria"` | O shell chama `coletaMercadoDiaria` uma vez por dia. A app **não** agenda nada por conta própria |
-
-O handler é exportado de `backend/rotinas.ts` e reexportado por `backend/rotas.ts`
-(`export { rotinas }`), que é o módulo de entrada do backend.
-
-**Slot de IA.** A triagem diária roda no slot **`barato`** (`slot: 'barato'`) — é trabalho de
-volume, todo dia, para toda região. A análise do estudo roda no slot padrão, porque é pontual e
-precisa raciocinar sobre a comparação.
-
-### 7.2 O que a rotina faz, por região ativa
-
-1. monta os termos de busca: nome + UF + palavras-chave cadastradas (`termosBusca`);
-2. busca na **fonte externa** configurada em `parametros` (`mercado_busca_url`, `mercado_busca_chave`);
-3. manda o bruto para a IA barata, que classifica por um dos 6 eixos, resume e pontua relevância;
-4. grava em `mercado_coletas` e registra o status na própria região.
-
-### 7.3 ⚠️ O limite que define o desenho
-
-**O framework de IA do UrbiVerso não navega na web.** `ia.consultar()` recebe um texto e devolve
-JSON estruturado — não há tool-use, busca nem `fetch` para o modelo. Portanto:
-
-> **Sem fonte externa configurada, a rotina NÃO pergunta à IA "o que você sabe sobre a região".**
-> Ela registra `sem_fonte_externa` e não grava item nenhum.
-
-Isso é deliberado. Conteúdo vindo da memória do modelo entraria no app com aparência de notícia
-apurada e alimentaria a análise de viabilidade — a mesma classe de risco que a #200 chama de
-central. Não existe esse caminho no código, e há teste garantindo que a IA sequer é chamada
-(`backend/rotinas.test.ts`).
-
-A fonte é **agnóstica de provedor**: qualquer endpoint que aceite `?q=<termos>` e devolva texto ou
-JSON serve. A chave vai no header `Authorization` e nunca é lida pelo frontend.
-
-### 7.4 A trava anti-invenção
-
-O prompt pede que a IA não invente número. Isso é **conselho**. O que **vincula** é
-`normalizarIndicador` (`backend/mercado-ia.ts`), que descarta o valor — vira `null` /
-`confianca: 'sem_dado'` — quando ele:
-
-- não é número finito, ou é negativo;
-- vem **sem `origem`** — número sem procedência não chega à tela;
-- vem com `confianca: 'sem_dado'` e valor preenchido (contradição).
-
-> Um bug encontrado por teste durante a implementação mostra por que a trava mora em código:
-> `Number(null)` é `0`, e `0` é finito. A primeira versão aceitaria um indicador com `valor: null`
-> como **R$ 0,00/m²** na tela — exatamente o número inventado que a camada existe para barrar.
-
-### 7.5 Onde o usuário mexe
-
-- **Painel → Regiões monitoradas** (aba de topo, `/regioes`) — cadastra regiões
-  administrativas/bairros e palavras-chave; vê o status da última coleta e o material coletado.
-  **Visível a todos, mas edição E consulta às coletas são admin-only:** o botão "Ver coletas" está
-  dentro do mesmo portão de escrita que Editar e Remover
-  (`frontend/viabilidade-config-mercado.ts:141-144`), embora o `GET` das coletas não exija admin no
-  backend (`backend/rotas/analise-mercado.ts:243`). Agrupamento de UI, não política.
-- **Admin → Apps → viabilidade → Regiões monitoradas** — a **mesma** tela, pela segunda porta. A
-  dupla exposição é deliberada (#437), no padrão que a #314 deu às Curvas.
-- **Estudo → Análise de mercado** — vincula o estudo a uma região monitorada e roda a análise pelo
-  botão. A análise é **sob demanda**, nunca por carga de tela: ela custa IA.
-
-### 7.6 Eixos de avaliação — reuso deliberado
-
-A relevância da coleta e a classificação dos riscos usam os **mesmos 6 fatores do Apelo Comercial**
-(`backend/apelo-comercial.ts` → `FATORES`, reexportados como `EIXOS_RELEVANCIA`): localização,
-infraestrutura, vetor de crescimento, concorrência, demanda e segurança jurídica. O app já definiu
-por quais parâmetros uma região é avaliada; um segundo vocabulário criaria duas definições
-concorrentes de "região boa".
-
----
+O retrato (`analise_mercado`) guarda `abrangencia`, `localidade`, `preco_medio_m2`,
+`custo_obra_m2`, `vso_pct`, `ipca_pct`, `selic_pct`, `incc_pct`, `focus_ipca_pct`,
+`focus_selic_pct`, `riscos` (JSON), `resultado` (o payload bruto da IA), `origem` e
+`data_referencia`. A relevância das coletas e a classificação dos riscos usam os mesmos seis
+fatores do Apelo Comercial — um único vocabulário para "região boa".
 
 ## Veja também
 
-- `docs/apelo-comercial.md` — o score qualitativo do ativo, que **não** é isto
-- `docs/formulas.md` — demais fórmulas do app
-- `docs/modelo-de-dados.md` — schema completo
+- [Apelo Comercial (IA)](apelo-comercial) · [Administração](administracao) · [Estudo Avançado](avancado)
+- [Modelo de Dados](modelo-de-dados)
