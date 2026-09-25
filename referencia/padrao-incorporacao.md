@@ -2029,7 +2029,7 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > vinculante da epic #239 e das dez sub-issues #270–#279". A **#355 apagou esse modelo inteiro**: a
 > epic e as sub-issues não existem mais como caminho, e do documento **só a §4.3** (Financiamento à
 > produção) continua vigente — o resto é **ADR histórico**. A spec de `divida`/`equity` é
-> [Fluxo do Investidor](../docs/funding.md). Ver o bloco de comportamento vigente abaixo,
+> [Fluxo do Investidor](fluxo-investidor-formulas.md). Ver o bloco de comportamento vigente abaixo,
 > que é a fonte de verdade desta seção.
 >
 > ✅ **Comportamento vigente desde a #355 (2026-08-12).** O funding existe e roda: três operações
@@ -2037,7 +2037,7 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > waterfall, sem prioridades e sem competição por caixa**. Motor: `frontend/funding-motor.ts`;
 > tela: `frontend/tela-funding.ts` (aba "Funding"); rotas: `backend/rotas/funding.ts`; tabela
 > `avancado_funding_operacoes` (migração `029`). A spec de `divida`/`equity` é
-> [Fluxo do Investidor](../docs/funding.md); a de `financiamento_producao` continua sendo a
+> [Fluxo do Investidor](fluxo-investidor-formulas.md); a de `financiamento_producao` continua sendo a
 > §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack.md), preservada de
 > propósito. O resto daquele documento é **ADR histórico**.
 >

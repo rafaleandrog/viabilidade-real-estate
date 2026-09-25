@@ -34,18 +34,18 @@ varredura do caixa disponível.
 
 Na página **Funding**, a aba **Operações** lista as operações do estudo. Cada linha traz **Tipo**,
 **Nome**, **Valor** (no financiamento à produção, o percentual do custo financiável — o principal
-não é digitado), **Início** e **Taxa / retorno**. Para dívida e equity, o início (**Aporte em**) é
-uma **âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras — mais um
-deslocamento em meses, ou um **Mês específico**; assim a operação acompanha o cronograma quando ele
-muda. A janela do financiamento à produção vem sempre do Cronograma (a obra). Acima da lista há um
+não é digitado), **Início** e **Taxa / retorno**. Para dívida e equity, o **Mês do aporte** é
+uma **âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras, com o mês
+derivado mostrado ao lado, só para leitura — ou um **Mês específico** digitado; assim a operação
+acompanha o cronograma quando ele muda. A janela do financiamento à produção vem sempre do Cronograma (a obra). Acima da lista há um
 aviso permanente: o app simula contratos privados e não valida a legalidade da captação — uma
 oferta ao público pode ter obrigações regulatórias próprias.
 
 ### Dívida / Capital de giro
 
-Informe o **Valor do aporte**, o início (**Aporte em**), a **Taxa** anual, a **Amortização** (prazo
-em meses) e a **Carência**. Com **Distribuir aporte** ligado, o valor entra em tranches mensais
-iguais ao longo do número de meses informado, e a parcela é calculada sobre o valor futuro das
+Informe o **Valor**, o **Mês do aporte**, a **Taxa** anual, a **Amortização** (prazo em meses) e a
+**Carência**. Com **Distribuir aporte** ligado, o valor entra em tranches mensais iguais ao longo do
+número de meses informado em **Aporte em**, e a parcela é calculada sobre o valor futuro das
 tranches, com os juros do período de liberação capitalizados no saldo. Durante a carência paga-se só
 juros; depois, a parcela Price; no último mês, a quitação do saldo. Juros incidem sobre o saldo de
 abertura do mês. Opcionalmente, **Estruturação** (percentual do valor, cobrado uma vez na primeira
@@ -56,7 +56,7 @@ tipo no Orçamento, a página avisa: o custo estaria contado duas vezes.
 
 ### Equity
 
-Informe o **Valor do aporte**, o início (**Aporte em**) e o modo de retorno:
+Informe o **Valor do aporte**, o **Mês do aporte** e o modo de retorno:
 
 - **Permuta financeira (% da receita líquida, mês a mês)** — o investidor recebe o percentual sobre
   a receita líquida de cada mês, enquanto houver receita.
@@ -84,15 +84,19 @@ caixa** disponível, calculado sem a liberação do próprio mês.
 ### Onde o funding aparece
 
 - **Resultados → Fluxo de Caixa**: as liberações e aportes como receita, as parcelas e retornos
-  como custo, na mesma tabela; a linha **Fluxo de Caixa Livre (antes do funding)** preserva a leitura
-  desalavancada; o quadro **Retorno por parte** mostra, por operação, o que o investidor põe e recebe.
-- **Resultados → Análise Financeira**: TIR, VPL e payback continuam desalavancados.
+  como custo, na mesma tabela, e a linha **Fluxo de Caixa Livre (antes do funding)** preserva a
+  leitura desalavancada.
+- **Resultados → Análise Financeira**: TIR, VPL e payback do projeto continuam desalavancados; o
+  quadro **Retorno por parte** mostra, para cada dívida e cada equity, o que o investidor põe e
+  recebe — o financiamento à produção não entra ali, porque o banco não é investidor do projeto: o
+  custo dele é custo do projeto.
 - **Resultados → Proforma**: não recebe funding — é a proforma desalavancada.
 - **Cenários**: comparam o cenário simulado com o real já com o funding.
 
-Para cada operação o app calcula, na visão do investidor: investimento total, retorno total, juros
-pagos, lucro, VPL (à taxa de desconto do estudo), TIR mensal e anual, MOIC e payback (o primeiro mês
-em que o acumulado do investidor volta a zero ou mais, contado depois do primeiro desembolso).
+Para cada dívida e cada equity o app calcula, na visão do investidor: investimento total, retorno
+total, juros pagos, lucro, VPL (à taxa de desconto do estudo), TIR mensal e anual, MOIC e payback (o
+primeiro mês em que o acumulado do investidor fica em zero ou acima; numa operação que só desembolsa
+a partir de um mês posterior, os meses anteriores já satisfazem essa condição).
 
 ## Instruções para não humanos
 
