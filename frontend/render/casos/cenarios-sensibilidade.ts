@@ -69,7 +69,7 @@ export const caso = {
     { seletor: 'table.pf.sens colgroup col', minimo: 14 },
     { seletor: 'table.pf.sens th.delta', minimo: 4 },
     { seletor: 'table.pf.sens td.delta', minimo: 20 },
-    { seletor: 'table.pf.sens th.amplitude[role="button"]', minimo: 2 },
+    { seletor: 'table.pf.sens th.amplitude[aria-sort] button.ordenar', minimo: 1 },
     { seletor: 'table.pf.sens td.amplitude', minimo: 10 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a

@@ -72,8 +72,10 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
   o valor residual do terreno até a margem-alvo sobre a receita líquida.
 - **Análise de sensibilidade** — a variável escolhida em **Bear**, **Base** e **Bull**. O cabeçalho
   diz o estresse aplicado (por exemplo **Bear −10% Preço de venda**); cada linha traz o **Δ%** do Bear
-  e do Bull contra a Base, colorido por melhora ou piora conforme a linha seja receita ou despesa, e
-  a **Amplitude** — (Bull − Bear) ÷ Base —, cujo cabeçalho ordena a tabela ao clicar. As linhas que
+  e do Bull contra a Base — variação relativa, também nas duas linhas em % (uma margem de 20 % que
+  cai a 15 % mostra −25,0 %) —, colorido por melhora ou piora conforme a linha seja receita ou
+  despesa, e a **Amplitude** — (Bull − Bear) ÷ |Base|, com sinal: numa despesa estressada para cima
+  no Bear ela sai negativa —, cujo cabeçalho ordena a tabela monetária ao clicar. As linhas que
   não se movem com a variável ficam recolhidas num grupo **N linhas não afetadas por esta variável**,
   expansível. As variações para cima e para baixo vêm do indicador de sensibilidade do benchmark
   daquela variável; sem benchmark, 10 %.

@@ -126,6 +126,8 @@ test('#730 fiação: a aba Cenários monta a tabela pelo módulo — sete coluna
     '${celulaDelta(x.deltaBull)}',
     'fmtVariacao(x.amplitudePct)',
     'ordenarPorAmplitude(visiveis)',
+    '${cabecalho(true)}',  // só a tabela monetária ordena
+    '${cabecalho(false)}', // as invariantes e os indicadores têm cabeçalho, sem controle
   ]) {
     assert.ok(tela.includes(s), `tela-proforma.ts perdeu "${s}" — a tabela deixou de consumir o módulo`);
   }

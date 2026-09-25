@@ -418,8 +418,14 @@ export class ViabTelaProforma extends LitElement {
     .pf.sens th.delta, .pf.sens th.amplitude { font-size: 0.75rem; }
     .pf.sens td.delta.var-melhor { color: var(--cor-sucesso, #13A98D); }
     .pf.sens td.delta.var-pior { color: var(--cor-erro, #D45A3A); }
-    .pf.sens th.ordenavel { cursor: pointer; user-select: none; }
-    .pf.sens th.ordenavel:focus-visible { outline: 2px solid var(--cor-primaria-solida, #2aa9e0); outline-offset: -2px; }
+    .pf.sens th.amplitude button.ordenar {
+      all: unset;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      user-select: none;
+    }
+    .pf.sens th.amplitude button.ordenar:focus-visible { outline: 2px solid var(--cor-primaria-solida, #2aa9e0); outline-offset: 2px; }
     .sens-invariantes { margin-top: 8px; }
     .sens-invariantes summary {
       cursor: pointer;
@@ -945,7 +951,10 @@ export class ViabTelaProforma extends LitElement {
         <col style="width: 17%" />
       </colgroup>`;
     const thCenario = (c: typeof cenarios[0]) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`;
-    const cabecalho = html`
+    // O cabeçalho é uma função porque só a tabela MONETÁRIA ordena: o `th`
+    // continua `columnheader` (é onde `aria-sort` vale) e o controle é um
+    // `<button>` dentro dele; nas outras duas tabelas a coluna é só rótulo.
+    const cabecalho = (ordenavel: boolean) => html`
       <thead>
         <tr>
           <th></th>
@@ -954,12 +963,14 @@ export class ViabTelaProforma extends LitElement {
           ${thCenario(porId.base)}
           ${thCenario(porId.bull)}
           <th class="num delta" title="Variação do Bull contra a Base">Δ%</th>
-          <th class="num amplitude ordenavel" role="button" tabindex="0"
-            aria-sort=${this._sensPorAmplitude ? 'descending' : 'none'}
-            title="(Bull − Bear) ÷ Base — clique para ordenar pela amplitude"
-            @click=${() => { this._sensPorAmplitude = !this._sensPorAmplitude; }}
-            @keydown=${(ev: KeyboardEvent) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); this._sensPorAmplitude = !this._sensPorAmplitude; } }}
-          >Amplitude ${this._sensPorAmplitude ? '↓' : ''}</th>
+          <th class="num amplitude" aria-sort=${ordenavel ? (this._sensPorAmplitude ? 'descending' : 'none') : nothing}
+            title="(Bull − Bear) ÷ |Base|">
+            ${ordenavel
+              ? html`<button type="button" class="ordenar" title="Ordenar pela amplitude"
+                  @click=${() => { this._sensPorAmplitude = !this._sensPorAmplitude; }}
+                >Amplitude ${this._sensPorAmplitude ? '↓' : ''}</button>`
+              : html`Amplitude`}
+          </th>
         </tr>
       </thead>`;
     const celulaDelta = (d: LinhaCalculada['deltaBear']) =>
@@ -1021,7 +1032,7 @@ export class ViabTelaProforma extends LitElement {
         <div class="pf-wrap">
           <table class="pf sens">
             ${colgroup}
-            ${cabecalho}
+            ${cabecalho(true)}
             <tbody>${linhasMonetarias.map(renderLinha)}</tbody>
           </table>
         </div>
@@ -1031,6 +1042,7 @@ export class ViabTelaProforma extends LitElement {
             <div class="pf-wrap">
               <table class="pf sens">
                 ${colgroup}
+                ${cabecalho(false)}
                 <tbody>${invariantes.map(renderLinha)}</tbody>
               </table>
             </div>
@@ -1038,7 +1050,7 @@ export class ViabTelaProforma extends LitElement {
         <div class="pf-wrap sens-indicadores">
           <table class="pf sens">
             ${colgroup}
-            ${cabecalho}
+            ${cabecalho(false)}
             <tbody>${indicadores.map(renderLinha)}</tbody>
           </table>
         </div>
