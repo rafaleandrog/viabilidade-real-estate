@@ -31,7 +31,7 @@ Quatro sub-abas, cada uma com os campos que valem para o tipo do estudo (Loteame
 | Sub-aba | O que se informa |
 |---|---|
 | **Terreno & Áreas** | A área do terreno vem do Núcleo ou do terreno manual, e a tabela de áreas é uma cascata. Em **Loteamento**: da **Área da Poligonal** menos a APP sai a **Área Parcelável**; dela saem ELUP/EPU, EPC e o sistema viário público até a **Área Líquida**; e desta saem o sistema viário privado, as áreas comuns privadas e as áreas verdes até a **Área Líquida de Venda (ALV)** — cada linha em m², ha, % da poligonal e % do parcelável. Em **Incorporação**: os **Coeficiente mínimo** e **Coeficiente máximo** de aproveitamento e a cascata que parte da **Área do Terreno**: as quatro áreas privativas (residencial e não residencial, fechada e aberta) somadas na **Área Privativa Total**, mais a **Área Comum Total**, até a **Área Construída Total**, com os KPIs de aproveitamento do coeficiente. |
-| **Custos** | Infraestrutura, Construção e Projetos têm um seletor de unidade (R$, R$/m² ou % do VGV) e o app converte para a base da Proforma; os demais custos têm unidade fixa. Loteamento: infraestrutura, projetos, stand de vendas. Incorporação: construção, decoração, gestão da construção, incorporação e registro, valor venal do terreno (outorga). Comuns: custo do terreno, manutenção pós-obra, contingências, marketing global, gestão e outros indiretos, corretagem, marketing e o imposto — com a opção **Sujeito a RET**, que troca o imposto pela alíquota fixa do regime. Os interruptores **Considerar…** ligam ou desligam um custo sem apagar o valor. |
+| **Custos** | Três custos têm seletor de unidade — Infraestrutura em R$, R$/m² ou % do VGV; Construção em R$/m² ou R$ total; Projetos em % do VGV ou R$ fixo — e o app converte para a base da Proforma; os demais custos têm unidade fixa. Loteamento: infraestrutura, projetos, stand de vendas. Incorporação: construção, decoração, gestão da construção, incorporação e registro, valor venal do terreno (outorga). Comuns: custo do terreno, manutenção pós-obra, contingências, marketing global, gestão e outros indiretos, corretagem, marketing e o imposto — com a opção **Sujeito a RET**, que troca o imposto pela alíquota fixa do regime. Os interruptores **Considerar…** ligam ou desligam um custo sem apagar o valor. |
 | **Permutas** | **Permuta física** (em m² ou em percentual da área de venda; residencial e não residencial na Incorporação) e **permuta financeira** (percentual do VGV ou valor). A física reduz a área que o incorporador vende; a financeira é dedução sobre a receita. |
 | **Produtos** | O catálogo de tipologias: nome, tipo, área média, preço de venda e unidades. O VGV de cada produto aparece na linha, e o total alimenta a Proforma quando o catálogo existe. |
 
@@ -52,9 +52,10 @@ permuta física. A tabela, de cima para baixo: **Receita bruta (VGV)** (precedid
 permuta física** e das permutas quando há permuta física); **= Deduções sobre VGV**, que abre
 imposto, corretagem, marketing e permuta financeira; **= Receita líquida**; **= Custo direto total**,
 que abre os custos diretos; **= Receita operacional**; **= Custo indireto total**, que abre os
-indiretos; e **= Resultado**. Receita bruta e os três totais de grupo são cabeçalhos que mostram
-ou escondem as linhas do grupo, e linha de grupo zerada não aparece. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
-**Unidades e preço médio por tipo** resume o catálogo. Botões **PDF** e **Excel** exportam a mesma
+indiretos; e **= Resultado**. A primeira linha da receita (**VGV sem permuta física** quando há
+permuta, **Receita bruta (VGV)** quando não há) e os três totais de grupo são cabeçalhos que
+mostram ou escondem as linhas do grupo, e linha de grupo zerada não aparece. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
+**Unidades e preço médio por tipo** resume o catálogo. Os botões **Exportar Excel** e **Exportar PDF** geram a mesma
 tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [Fórmulas da Proforma](formulas).
 
 **Cenários.** Três blocos que respondem "o que derruba este resultado?":
