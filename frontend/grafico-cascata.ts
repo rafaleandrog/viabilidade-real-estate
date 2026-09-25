@@ -229,7 +229,7 @@ export class ViabGraficoCascata extends LitElement {
             >
               <span class="valor">${fmtR$Milhoes(e.valor)}</span>
               <div class="trilho" style="height: ${this.altura};">
-                ${this.zeroPct > 0 ? html`<div class="zero" style="bottom: ${this.zeroPct}%;"></div>` : nothing}
+                ${this.zeroPct > 0 ? html`<div class="zero" style="bottom: min(${this.zeroPct}%, calc(100% - 1px));"></div>` : nothing}
                 <div
                   class="barra ${e.tipo} ${e.negativo ? 'negativa' : ''}"
                   style="bottom: min(${e.inicioPct}%, calc(100% - ${FILETE_PX}px)); height: ${e.tamanhoPct}%;"
@@ -240,10 +240,10 @@ export class ViabGraficoCascata extends LitElement {
           `;
         })}
       </div>
-      ${base > 0
+      ${base > 0 || this.zeroPct > 0
         ? html`<div class="rodape">
             ${this.zeroPct > 0
-              ? html`Escala: do menor saldo (${fmtR$(this.eixoMin)}) ao VGV de tabela (${fmtR$(base)}); a
+              ? html`Escala: do menor saldo (${fmtR$(this.eixoMin)}) ${base > 0 ? html`ao VGV de tabela (${fmtR$(base)})` : html`ao zero`}; a
                 linha marca o zero, e o que fica abaixo dela é déficit.`
               : html`Escala: altura total = VGV de tabela (${fmtR$(base)}).`}
             Valores das barras em R$ milhões; o valor exato aparece ao passar o mouse.
