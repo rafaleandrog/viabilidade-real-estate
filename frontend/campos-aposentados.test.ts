@@ -16,10 +16,11 @@ import { dirname, join, resolve } from 'node:path';
 // do motor — a classe de erro "campo declarado sem leitor", que a #724 achou
 // de passagem. Este arquivo fecha o inventário nos DOIS sentidos:
 //
-//   · código versionado de frontend/, backend/ e scripts/ (enumerado por
-//     `git ls-files`, nunca varrendo o disco — armadilha 1 do CLAUDE.md) não
-//     cita `licenciamento_` em lugar nenhum: reintroduzir a declaração sem
-//     ligar o motor volta a ser o estado que a issue reprovou;
+//   · código versionado de frontend/, backend/ e scripts/ — todo arquivo de
+//     código dos três, recursivo, enumerado por `git ls-files`, nunca
+//     varrendo o disco (armadilha 1 do CLAUDE.md) — não cita `licenciamento_`
+//     em lugar nenhum: reintroduzir a declaração sem ligar o motor volta a
+//     ser o estado que a issue reprovou;
 //   · o `schema.json` AINDA declara as três, e `docs/modelo-de-dados.md` as
 //     registra como aposentadas: quem as remover do schema (migração +
 //     `versao`) tira a nota junto, e quem tirar a nota sem remover deixa a
@@ -28,9 +29,13 @@ import { dirname, join, resolve } from 'node:path';
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const COLUNAS = ['licenciamento_modo', 'licenciamento_pct', 'licenciamento_valor_fixo'];
 
+// Os TRÊS diretórios inteiros (recursivo, `scripts/lib/` incluído), filtrados
+// por extensão de código — `.ts`/`.mts`/`.cts`/`.tsx`/`.js`/`.mjs`/`.cjs`.
+// Artefato de build (`backend/rotas.js`, `frontend/index.js`) é ignorado pelo
+// git e por isso não entra: a enumeração é do versionado, não do disco.
 function versionados(): string[] {
-  return execFileSync('git', ['ls-files', 'frontend/*.ts', 'frontend/**/*.ts', 'backend/*.ts', 'backend/**/*.ts', 'scripts/*.ts', 'scripts/*.mjs'], { cwd: RAIZ, encoding: 'utf8' })
-    .split('\n').filter(Boolean);
+  return execFileSync('git', ['ls-files', 'frontend', 'backend', 'scripts'], { cwd: RAIZ, encoding: 'utf8' })
+    .split('\n').filter((f) => /\.[mc]?[jt]sx?$/.test(f));
 }
 
 test('#724: nenhum código versionado cita licenciamento_ — a declaração morta não voltou', () => {

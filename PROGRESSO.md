@@ -19,7 +19,9 @@ três colunas (`licenciamento_modo`, `_pct`, `_valor_fixo`) existem no `schema.j
 primeira versão e são coagidas pelo PATCH genérico, e o motor nunca as leu. A metade que não se
 sustenta: **nenhuma tela as oferece** — `grep licenciamento frontend/tela-premissas.ts` devolve
 zero, e `git log -S` mostra que nunca devolveu; só `ProformaInput` as declarava, o que as fazia
-parecer entrada viva do motor. Sem tela, o ramo (a) da issue (ligar como linha de custo) seria
+parecer entrada viva do motor — foi daí que o mapeamento da Rodada 13
+(`historico/rodada-13/planejamento.md`, "o usuário digita um custo de licenciamento") tirou a
+premissa da tela, sem conferir a tela. Sem tela, o ramo (a) da issue (ligar como linha de custo) seria
 inventar um produto — campo novo em Premissas, linha na Proforma, na cascata e na exportação —
 que o autor reservou para si; o ramo (b) é remover a declaração morta sem mudar número nenhum, e
 foi o escolhido. Mudanças: a linha some de `ProformaInput` (`frontend/proforma.ts`);
