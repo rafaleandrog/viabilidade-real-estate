@@ -346,10 +346,10 @@ export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Prom
 // Parcelamentos — usado só para descobrir quais parcelamentos ficam FORA do
 // seletor de lotes da Incorporação: os de regularização fundiária
 // (`regularizacao=true`) e os vinculados a setor habitacional
-// (`setor_habitacional_id` preenchido), #746
-// (#terreno-nucleo-filtro). Não há filtro server-side por essa coluna no
-// Núcleo hoje (camposFiltro de `lotes` não faz join até `parcelamentos`), daí
-// resolver o conjunto de ids aqui e filtrar no cliente.
+// (`setor_habitacional_id` preenchido) — os dois critérios da #746. Não há
+// filtro server-side por essas colunas no Núcleo hoje (camposFiltro de `lotes`
+// não faz join até `parcelamentos`), daí resolver o conjunto de ids aqui e
+// filtrar no cliente.
 export function listarParcelamentosNucleo(pagina = 1, porPagina = 200): Promise<any> {
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   return urbiVerso.nucleo(`/parcelamentos?${qs}`);
