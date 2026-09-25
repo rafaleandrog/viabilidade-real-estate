@@ -110,7 +110,7 @@ if (ciclos.size > 0) {
       '  [dry_run_schema] relation "<app>.<tabela>" does not exist\n' +
       'Instância que JÁ tem a app não acusa — lá as colunas chegaram por ALTER TABLE.\n\n' +
       'Saída: no lado FRACO do ciclo, troque a coluna de "referencia" para "inteiro"\n' +
-      '(referência lógica, sem FK) e documente a decisão em docs/viabilidade/modelo-de-dados.md.\n' +
+      '(referência lógica, sem FK) e documente a decisão em docs/modelo-de-dados.md.\n' +
       'O lado forte (obrigatório/cascata) fica como está.',
   );
   process.exit(1);

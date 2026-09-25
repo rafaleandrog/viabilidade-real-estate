@@ -23,7 +23,7 @@ import {
 // Apelo é um score qualitativo do ATIVO (localização, infraestrutura, vetor de
 // crescimento…), não a comparação do projeto com o mercado. Com esta issue a
 // aba passa a ser a análise de mercado de verdade e o Apelo ganha aba própria
-// (decisão registrada no §4 da issue e em docs/viabilidade/analise-mercado.md).
+// (decisão registrada no §4 da issue e em docs/analise-mercado.md).
 //
 // Dois lados, origens diferentes:
 //  · PROJETO — derivado do próprio estudo (`analise-mercado.ts`), nunca

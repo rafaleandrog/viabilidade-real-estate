@@ -3,7 +3,7 @@
 // Normaliza a `config` das camadas `financiamento_producao` para o modelo
 // contratual único do produto: liberação por medição de custo com catch-up
 // retroativo, gatilho de exposição mínima e cash sweep
-// (docs/viabilidade/funding-capital-stack.md §4.3, decodificado da aba
+// (referencia/funding-capital-stack.md §4.3, decodificado da aba
 // `Incorp Individual` da planilha de referência).
 //
 // DE → PARA

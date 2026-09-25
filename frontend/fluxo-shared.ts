@@ -657,7 +657,7 @@ export function areaPrivativaTotalLinhas(linhas: any[]): number {
  * sem a aberta. É irmã de `areaPrivativaTotalLinhas`, não substituta: aquela
  * inclui a aberta de propósito (Decisão 1 da #462, é a base do custo
  * `rs_m2_priv` e não muda). Esta existe porque a convenção C1
- * (`docs/viabilidade/padrao-incorporacao.md:3095`, "só a fechada é vendável")
+ * (`referencia/padrao-incorporacao.md:3095`, "só a fechada é vendável")
  * é a mesma que `proforma.ts` já aplica no Preliminar (`areaVendavel` da
  * Incorporação = `rFech + nrFech`) — sem este helper, a coluna "Área líquida
  * de venda" do Painel significaria "fechada" num nível e "fechada + aberta"
@@ -817,7 +817,7 @@ export function eConstrucao(custo: any): boolean {
 
 // ─────────────────────────────────────────────────────────────────
 // Base financiável do Financiamento à produção (§4.3 de
-// docs/viabilidade/funding-capital-stack.md)
+// referencia/funding-capital-stack.md)
 // ─────────────────────────────────────────────────────────────────
 
 /** Outorga onerosa — contrapartida do potencial construtivo, grupo Obra (#180). */
@@ -902,7 +902,7 @@ export function marcosObra(crono: EventoCrono[]): { inicioObra: number; fimObra:
  * contrário o equity em modo `resultado_final` passa a pagar um mês antes
  * (ou depois) do que deveria, e nenhum teste acusa sozinho, porque o golden
  * do equity usaria a `marcosObra` nova e se moveria junto. Nota completa em
- * `docs/viabilidade/fluxo-investidor-formulas.md` §4.2.
+ * `docs/funding.md` §4.2.
  */
 export function mesRepasse(crono: EventoCrono[]): number {
   const marcos = marcosObra(crono ?? []);

@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 // `frontend/tela-dashboard.ts` da lista — ele não chama mais
 // `fundingDoEstudo` nem remonta `fluxoAcumulado[...]` diretamente (só lê
 // `proformaAvancado`, que não recebe funding desde a #426). Ver
-// `docs/viabilidade/fluxo-investidor-formulas.md` §9.2.
+// `docs/funding.md` §9.2.
 //
 // A metodologia replica EXATAMENTE os dois greps do corpo da issue #474:
 //   1. `fundingDoEstudo(` em `frontend/` + `scripts/`, excluindo o motor
@@ -61,7 +61,7 @@ test('Passos 23-25: exatamente 5 consumidores chamam fundingDoEstudo( ou remonta
   assert.deepEqual(
     uniao, CONSUMIDORES_DECLARADOS,
     `inventário de consumidores dos Passos 23-25 mudou.\n` +
-    `esperado (docs/viabilidade/fluxo-investidor-formulas.md §9.2): ${CONSUMIDORES_DECLARADOS.join(', ')}\n` +
+    `esperado (docs/funding.md §9.2): ${CONSUMIDORES_DECLARADOS.join(', ')}\n` +
     `encontrado agora: ${uniao.join(', ')}\n` +
     'Se um arquivo NOVO apareceu: ele precisa do comentário "Passos 23" citando os outros e a §9.2 ' +
     'do doc precisa ser atualizada (é a sexta montagem que a #474 existe para não deixar passar em silêncio). ' +

@@ -29,7 +29,7 @@ trap 'rm -rf "$TMPRAIZ"' EXIT
 # classes de caminho que a `main` tem hoje) e ecoa a raiz.
 arvore() {
   local raiz="$TMPRAIZ/$1"
-  mkdir -p "$raiz"/{migracoes,docs,scripts,frontend,backend/rotas,.github/workflows}
+  mkdir -p "$raiz"/{migracoes,docs,referencia,historico,scripts,frontend,backend/rotas,.github/workflows}
   # ⚠️ Os nomes das migrações são os REAIS do registro OBSOLETAS, não inventados.
   # A autoconferência compara `consumidores` com quem de fato referencia a tabela
   # na árvore varrida, então uma fixture com nome próprio faria a base reprovar —
@@ -38,6 +38,8 @@ arvore() {
   printf 'await dados.atualizar("%s", id, {});\n' "$ALVO" > "$raiz/migracoes/028_financiamento_producao_retroativo.js"
   printf 'await dados.listar("%s", {});\n'        "$ALVO" > "$raiz/migracoes/029_funding_operacoes.js"
   printf 'A tabela `%s` foi aposentada pela #355.\n' "$ALVO" > "$raiz/docs/adr.md"
+  printf 'ADR: a tabela `%s` foi aposentada.\n'  "$ALVO" > "$raiz/referencia/adr.md"
+  printf 'Auditoria datada citando `%s`.\n' "$ALVO" > "$raiz/historico/auditoria.md"
   printf '  %s: [ { id: 1 } ],\n'                    "$ALVO" > "$raiz/scripts/migracoes-harness.mjs"
   printf '{ "tabelas": { "%s": {} } }\n'             "$ALVO" > "$raiz/schema.json"
   printf 'a tabela nova `%s`);\n'                    "$ALVO" > "$raiz/CLAUDE.md"
@@ -58,7 +60,7 @@ roda() { node "$GUARD" "$1" >/dev/null 2>&1; echo $?; }
 # É a réplica do critério de aceite "passa na main atual", só que sem depender
 # da main: as sete classes de caminho permitidas estão todas exercitadas.
 R="$(arvore base)"
-[ "$(roda "$R")" = "0" ] && ok "árvore só com menções legítimas passa (migracoes/ docs/ scripts/ schema.json CLAUDE.md PROGRESSO.md)" \
+[ "$(roda "$R")" = "0" ] && ok "árvore só com menções legítimas passa (migracoes/ docs/ referencia/ historico/ scripts/ schema.json CLAUDE.md PROGRESSO.md)" \
   || falha "falso positivo na base" "o guard reprovou uma árvore que só tem menções permitidas"
 
 # ── Sentido 2: FALSO NEGATIVO — consumidor novo tem que ser BARRADO ──────────

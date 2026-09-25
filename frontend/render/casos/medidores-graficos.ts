@@ -21,7 +21,7 @@
 // 11/18/22/29) porque o `roiPct` do fixture (58%) já as estoura por
 // construção, sem precisar inventar limite.
 //
-// ⚠️ Rodada 12 (achado 2.3 da auditoria, docs/rodada-12/auditoria.md):
+// ⚠️ Rodada 12 (achado 2.3 da auditoria, historico/rodada-12/auditoria.md):
 // `resultado_final` deixou de ser wireado em `_renderMedidores`
 // (tela-graficos.ts) — plotava o MESMO valor que `margem_liquida`, dois
 // rótulos para uma fórmula. Este fixture tinha uma entrada `resultado_final`

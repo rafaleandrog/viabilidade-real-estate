@@ -43,6 +43,12 @@
 
 export const EXCECOES = [
   {
+    arquivo: "docs/ui-urbiverso/LEIA.md",
+    endereco: "ui/src/urbi-primitivo.ts:34-40",
+    motivo:
+      "LIMITE DO GUARD — caminho do monorepo `urbiverso/urbiverso`, que NAO esta nesta arvore. O LEIA.md e GERADO por scripts/sincronizar-referencia-ui.mjs (nao se edita a mao) e entrou na varredura quando `docs/` inteiro virou raiz do guard (Rodada 14, PR 1); a citacao e legitima e continua valendo.",
+  },
+  {
     arquivo: "backend/rotas/funding.ts",
     endereco: "frontend/fluxo-shared.ts:349",
     motivo:
@@ -55,103 +61,103 @@ export const EXCECOES = [
       "VENCIDO DE VERDADE — nada em ±3 linhas de :66 — \"erroFormularioPagamento\" está em :364. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/fluxo-investidor-formulas.md",
+    arquivo: "docs/funding.md",
     endereco: "frontend/fluxo-shared.ts:502-509",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :502-509 — \"eCorretagem\" está em :643. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/formulas.md",
+    arquivo: "docs/formulas.md",
     endereco: "frontend/fluxo-caixa-motor.ts:605,617,624,633",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :591,603,610,619 — \"taxaMensal\" está em :691; \"sinalPct\" está em :688. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/funding-capital-stack.md",
+    arquivo: "referencia/funding-capital-stack.md",
     endereco: "shell/backend/src/dados/validador-schema.ts:45-58",
     motivo:
       "LIMITE DO GUARD — caminho do monorepo `urbiverso/urbiverso`, que NAO esta nesta arvore. Nao e verificavel daqui, e nunca sera: a citacao e legitima e continua valendo.",
   },
   {
-    arquivo: "docs/viabilidade/funding-capital-stack.md",
+    arquivo: "referencia/funding-capital-stack.md",
     endereco: "docs/shell/banco-de-dados.md:200-212",
     motivo:
       "LIMITE DO GUARD — caminho do monorepo `urbiverso/urbiverso`, que NAO esta nesta arvore. Nao e verificavel daqui, e nunca sera: a citacao e legitima e continua valendo.",
   },
   {
-    arquivo: "docs/viabilidade/funding-capital-stack.md",
+    arquivo: "referencia/funding-capital-stack.md",
     endereco: "schema.json:106-108",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :106-108 — \"estrutura_investidores_pct\" está em :141. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/funding-capital-stack.md",
+    arquivo: "referencia/funding-capital-stack.md",
     endereco: "schema.json:136",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :136 — \"pct_receita\" está em :169; \"pct_resultado\" está em :169. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/modelo-de-dados.md",
+    arquivo: "docs/modelo-de-dados.md",
     endereco: "frontend/exportar.ts:9",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :9 — \"maximumFractionDigits\" não aparece em frontend/exportar.ts; \"toFixed\" está em :20. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:237",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :237 — \"APOS_CHAVES_MESES\" está em :295. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:345-353",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :345-353 — \"erroFormularioAbsorcao\" está em :414. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "fluxo-caixa-motor.ts:605,617,624,633",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :591,603,610,619 — \"sinalPct\" está em :688. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "fluxo-caixa-motor.ts:533-564",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :519-550 — \"ComponentePagamento\" está em :678. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "fluxo-invariantes.ts:496",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :496 — \"validarComponentesSafra\" está em :524. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/tela-fluxo-custos.ts:704-716",
     motivo:
       "LIMITE DO GUARD — a frase afirma a AUSENCIA do simbolo no alvo (\"nao le X\", \"sem ler X\", \"nao ha campo\"). Exigir que ele apareca inverte o sentido do texto. Classe conhecida, sem deteccao automatica confiavel.",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/fluxo-caixa-motor.ts:88",
     motivo:
       "LIMITE DO GUARD — a frase afirma a AUSENCIA do simbolo no alvo (\"nao le X\", \"sem ler X\", \"nao ha campo\"). Exigir que ele apareca inverte o sentido do texto. Classe conhecida, sem deteccao automatica confiavel.",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/proforma.ts:245",
     motivo:
       "LIMITE DO GUARD — a frase afirma a AUSENCIA do simbolo no alvo (\"nao le X\", \"sem ler X\", \"nao ha campo\"). Exigir que ele apareca inverte o sentido do texto. Classe conhecida, sem deteccao automatica confiavel.",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "backend/rotas/avancado.ts:1134,1148",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :1134,1148 — \"inicio_mes\" está em :1084. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
+    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:601-603",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :601-603 — \"ePermutaFinanceira\" está em :670. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",

@@ -246,7 +246,7 @@ export function negativoContabil(v: number, ehCusto: boolean): boolean {
  * #449: célula do Fluxo de Caixa — FONTE ÚNICA para a tabela (tela) e para
  * CSV/PDF (exportação); antes desta issue cada uma tinha sua própria
  * expressão de formatação e divergiam em casas decimais, limiar de célula
- * vazia e representação do negativo (C7 — `docs/viabilidade/formulas.md`).
+ * vazia e representação do negativo (C7 — `docs/formulas.md`).
  *
  * Regras: 2 casas decimais monetárias (`fmtR$`, contrato C7), célula vazia
  * abaixo de R$ 0,005 (a menos que `sempreExibir`), thousand separator pt-BR.

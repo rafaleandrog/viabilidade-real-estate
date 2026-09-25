@@ -1,8 +1,6 @@
 ---
 titulo: Exportação
 descricao: Formatos e conteúdo dos relatórios exportáveis (PDF e Excel).
-tipo: app
-ordem: 7
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -72,7 +70,7 @@ na visão mensal ou anual selecionada. A exportação abre:
 
 A visão diagnóstica por safra permanece técnica e aparece quando uma
 divergência fornece safra/linha/mês. Ver
-[Padrão de Viabilidade — Incorporação](padrao-incorporacao) §22.4.
+Padrão de Viabilidade — Incorporação (`referencia/padrao-incorporacao.md`) §22.4.
 
 ## Evolução prevista — funding, permuta física e valor canônico
 
@@ -89,7 +87,7 @@ tabela de fluxo:
 
 Regra de ouro: **CSV, PDF e Cenários consomem exatamente os mesmos arrays do motor** — nada é
 recalculado na camada de apresentação. Ver
-[Funding, Capital Stack e Retorno do Capital](funding-capital-stack) §10.
+Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`) §10.
 
 ## Permuta física por tipologia — #269
 

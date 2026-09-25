@@ -9,7 +9,7 @@
 //
 // Este PR entrega só o MODELO e a UI (#266); o motor que consome estas
 // colunas para valorar a permuta (ADR: valor declarado pelo usuário, nunca
-// derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1) é o #268,
+// derivado — ver referencia/padrao-incorporacao.md §15.1) é o #268,
 // e a migração de dado que desliga `unidades_permutadas` é o #267→#253.
 //
 // Forward-only. Colunas aditivas, nulas por padrão — materializadas pelo

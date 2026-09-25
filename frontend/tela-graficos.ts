@@ -326,7 +326,7 @@ export class ViabTelaGraficos extends LitElement {
     const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
-      // Rodada 12 (achado 2.3 da auditoria, docs/rodada-12/auditoria.md):
+      // Rodada 12 (achado 2.3 da auditoria, historico/rodada-12/auditoria.md):
       // "Resultado final" plotava o MESMO valor de "Margem sobre VGV" — dois
       // rótulos, uma fórmula. Aposentado, não reescalado (decisão do autor):
       // a grandeza em R$ do resultado não cabe bem numa escala de 0–100%,

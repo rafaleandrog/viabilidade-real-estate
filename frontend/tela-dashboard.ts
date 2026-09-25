@@ -29,7 +29,7 @@ import './viabilidade-config-mercado.js';
  * da MESMA definição nos dois níveis, o que é o ponto: coluna que compara
  * Preliminar com Avançado precisa comparar a mesma conta.
  *   - `areaLiquidaVenda` (#677) = a área VENDÁVEL, convenção C1
- *     (`docs/viabilidade/padrao-incorporacao.md:3095`, "só a fechada é
+ *     (`referencia/padrao-incorporacao.md:3095`, "só a fechada é
  *     vendável"): no Loteamento, a ALV da cascata (`proforma.ts`); na
  *     Incorporação Preliminar, `area_pvt_r_fechada + area_pvt_nr_fechada`
  *     (exclui as parcelas abertas); no Avançado, o helper irmão
@@ -320,7 +320,7 @@ export class ViabTelaDashboard extends LitElement {
       // Avançado desalavancada) tiraram daqui a chamada a `fundingDoEstudo`
       // que existia na vistoria de pré-PR da issue. `proformaAvancado` nem
       // recebe funding (#426). Os cinco consumidores reais estão listados em
-      // `docs/viabilidade/fluxo-investidor-formulas.md` §9 — não adicione
+      // `docs/funding.md` §9 — não adicione
       // este arquivo de volta à lista sem reintroduzir a chamada.
       const area = areaPrivativaTotalLinhas(linhasReceita);
       const p = proformaAvancado(c, area);

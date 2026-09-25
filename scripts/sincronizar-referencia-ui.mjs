@@ -62,7 +62,7 @@ for (const arq of readdirSync(dirFrontend).filter((a) => a.endsWith('.ts'))) {
 // ── extração ────────────────────────────────────────────────────────────────
 // ⚠️ O Lit NAO usa kebab-case por default — ele MINUSCULIZA o nome da propriedade.
 // `maxWidth` vira `maxwidth`, nao `max-width`. Isso e contraintuitivo e ja esta
-// documentado em `docs/rodada-8/06-auditoria-ui.md:142-144`, com a instrucao
+// documentado em `historico/rodada-8/06-auditoria-ui.md:142-144`, com a instrucao
 // explicita de "não corrija para max-width".
 //
 // A versao anterior deste script convertia para kebab. Um guard sobre aquele
@@ -128,7 +128,7 @@ function propsDe(fonte) {
  * (`ui/src/urbi-primitivo.ts:34-40`) poe `expandir` sozinho e le `sem-expandir`,
  * e NAO tem regra `:host([expandir])` — o `flex: 1` dele e incondicional. Um
  * espelho que so olhasse o CSS faria um guard reprovar `<urbi-abas expandir>`,
- * que a auditoria classificou como inofensivo (`docs/rodada-8/06-auditoria-ui.md:139`).
+ * que a auditoria classificou como inofensivo (`historico/rodada-8/06-auditoria-ui.md:139`).
  *
  * O `this.` e obrigatorio no padrao: sem ele, um `botao.setAttribute('disabled','')`
  * sobre um elemento INTERNO viraria atributo aceito no host.

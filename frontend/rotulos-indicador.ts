@@ -87,7 +87,7 @@ export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
   //
   // "Eficiência" bare NÃO foi o escolhido de propósito: a especificação já usa
   // esse nome para a razão área privativa / área construída da Incorporação
-  // (`docs/spec/estudo-de-viabilidade-spec.md`), fórmula diferente. Adotá-lo
+  // (`historico/spec/estudo-de-viabilidade-spec.md`), fórmula diferente. Adotá-lo
   // aqui criaria a colisão que esta tabela existe para acusar.
   {
     rotulo: 'Vendável / gleba',

@@ -1839,7 +1839,7 @@ test('#615: Loteamento SEM catálogo — a permuta física não vale nada, mesmo
   // tirá-lo — antes ele saía do campo legado, que ninguém consegue ver.
   assert.equal(semCatalogo.valorPermutaFisica, 0);
   // E o cap é inalcançável por este caminho, por construção: a base é zero e a
-  // permuta pedida também. Declarado em `docs/viabilidade/formulas.md`
+  // permuta pedida também. Declarado em `docs/formulas.md`
   // (critério 3 da issue), que é a saída que a própria issue oferece.
   assert.equal(semCatalogo.permutaCapada, false);
 });

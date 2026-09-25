@@ -4,6 +4,56 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 14, PR 1 — `docs/` passa a conter só a documentação servida (2026-09-25)
+
+Pedido direto do autor, com captura da página **Documentação** da instância: a barra lateral
+listava "Inventario legado avancado 2026 08 01", "Triagem issues 2026 08 03" e mais quatro notas
+de trabalho, e nenhum dos guias do app. Diagnóstico medido no monorepo, não presumido: o shell
+lista só os `.md` do **topo** de `apps/<appId>/docs/` e ignora subpasta com aviso
+(`shell/backend/src/rotas/docs.ts:92-97`); `README.md` vem primeiro, com o nome do app como
+título; o resto ordena por `titulo`, e `ordem` é lido e ignorado (`:115-119`). Os 12 guias moravam
+em `docs/viabilidade/` — invisíveis — e o empacotador (`scripts/lib/empacotar-core.js:30,126-131`,
+o mesmo core do `urbi-empacotar`) copiava `docs/` inteiro: 48 arquivos e 2,2 MB de dossiês de
+rodada, spec e JSON do espelho de UI iam para toda instância.
+
+**O que mudou (só movimentação e fiação; nenhum guia foi reescrito):**
+
+- `docs/viabilidade/visao-geral.md` → `docs/README.md`; os outros 8 guias sobem para `docs/`
+  (`fluxo-investidor-formulas.md` vira `docs/funding.md`). Frontmatter só com `titulo` e
+  `descricao` (`tipo: app` e `ordem` fora — o framework os aposentou); "Análise de Mercado do
+  Imóvel (IA)" vira "Apelo Comercial (IA)" para não colidir com "Análise de Mercado — projeto ×
+  mercado" na lista.
+- `padrao-incorporacao.md`, `inteligencia-evi-incorporacao.md` e `funding-capital-stack.md` (ADR)
+  → `referencia/`: são consultivos (CLAUDE.md: não descrevem o app, não governam o runtime) e
+  somam 6.900 linhas. Links dos guias para eles viram menção em prosa com o caminho — o
+  visualizador só abre slug listado.
+- `docs/rodada-*`, `docs/spec/` e os 7 `.md` datados do topo → `historico/`.
+- Fiação: `guard-enderecos-doc.mjs` varre `docs/` + `referencia/` (não `historico/`); as 17
+  exceções de `enderecos-doc-excecoes.mjs` e a bateria `testar-guard-enderecos-doc.sh` seguem os
+  caminhos novos; `guard-tabelas-obsoletas.mjs` admite `referencia/` e `historico/` (fixture nova
+  na bateria); comentários de código com endereço para doc (`tela-resumo.ts`, `funding-motor.ts`,
+  `fluxo-shared.ts`, `tela-dashboard.ts`…) apontam para `referencia/…`; `README.md`,
+  `INSTRUCOES-CODE.md` e `CLAUDE.md` seguem os caminhos novos. `.claude/` **não** foi tocado (R1):
+  a linha da skill de revisão que cita `docs/viabilidade/*.md` sai na PR 3.
+- `CLAUDE.md`: **só os caminhos** foram atualizados. A § Documentação da app (layout, régua de
+  estilo, ferramentas que leem os caminhos) e a linha da Rodada 14 na tabela de rodadas **não
+  entraram**: a sessão de nuvem barrou a edição de conteúdo novo no `CLAUDE.md` (classificador de
+  permissão), e não se contorna bloqueio desses. O texto pronto está no Anexo de
+  `historico/rodada-14/planejamento.md`, para o autor colar — é a mesma obrigação da tabela de
+  rodadas que o próprio `CLAUDE.md` impõe a quem abre rodada.
+
+**Verificação:** `validar-frontend.sh`, `testar-guard-enderecos-doc.sh` e
+`testar-guard-tabelas-obsoletas.sh` verdes; `pnpm build && pnpm exec urbi-empacotar viabilidade
+--dir . --saida ./dist` seguido de `tar -tzf dist/*.tgz | grep '^docs/'` lista só os 9 `.md` do
+topo de `docs/` mais `docs/ui-urbiverso/` (o espelho sai na PR 2).
+
+**Fila que continua (serial, uma por assunto):** PR 2 espelho `docs/ui-urbiverso/` →
+`referencia/ui-urbiverso/`; PR 3 processo (uma linha em `.claude/`); PRs 4–9 reescrita guia a
+guia no estilo de `apps/fabrica/docs/` (README, `preliminar.md` e `avancado.md` novos, `funding`,
+`administracao.md` novo, limpeza dos demais).
+
+---
+
 ## #754 — coluna R$ da Proforma em inteiros: a TERCEIRA exceção de exibição ao C7 (2026-09-18)
 
 Pedido direto do autor, com print da Proforma de um estudo Avançado: "tira as duas casas decimais dos

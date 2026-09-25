@@ -65,7 +65,7 @@ export const ROTULOS_INDICADOR: Record<IndicadorSuportado, string> = {
   // Por que "Vendável / gleba" e não "Eficiência": o texto nomeia a fórmula, e
   // "Eficiência" sozinho já designa OUTRA razão na especificação (área
   // privativa / área construída, a eficiência de projeto da Incorporação —
-  // `docs/spec/estudo-de-viabilidade-spec.md`). Adotá-lo aqui plantaria a
+  // `historico/spec/estudo-de-viabilidade-spec.md`). Adotá-lo aqui plantaria a
   // colisão rótulo↔fórmula que `frontend/rotulos-indicador.ts` existe para
   // impedir, no dia em que a Incorporação ganhar a dela.
   eficiencia_aproveitamento: 'Vendável / gleba',

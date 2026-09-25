@@ -1,8 +1,6 @@
 ---
 titulo: Benchmarks e Sensibilidade
 descricao: Indicadores de referência, validação por benchmark e faixas de sensibilidade.
-tipo: app
-ordem: 4
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 

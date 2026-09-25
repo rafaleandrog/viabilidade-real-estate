@@ -2150,7 +2150,7 @@ export function permutaFinanceiraLiquidaMensal(
 /**
  * #465 — "Receita líquida de proforma": `Receita Bruta − imposto − corretagem
  * − marketing − permuta financeira`. É a composição da EVI
- * (`Premissas e Resultados!P19`, `docs/viabilidade/fluxo-investidor-formulas.md`
+ * (`Premissas e Resultados!P19`, `docs/funding.md`
  * §4.2), exposta aqui como grandeza NOMEADA e TESTÁVEL — sem substituir
  * nenhuma outra "líquida" que o app já tem:
  *

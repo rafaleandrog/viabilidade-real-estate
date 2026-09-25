@@ -1383,7 +1383,7 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
 // #266: permuta_tipologia_id/permuta_quantidade — referência de tipologia +
 // quantidade entregue na linha de Preço/Permuta física (modelo/UI). O valor
 // declarado que valora a permuta continua em orcamento_valor/orcamento_unidade
-// (ADR: nunca derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1).
+// (ADR: nunca derivado — ver referencia/padrao-incorporacao.md §15.1).
 // #459: `permuta_financeira_base` (enum bruta/liquida) deu lugar a dois
 // booleanos independentes — `permuta_financeira_deduzir_imposto` e
 // `permuta_financeira_deduzir_corretagem` — que escolhem, cada um por conta

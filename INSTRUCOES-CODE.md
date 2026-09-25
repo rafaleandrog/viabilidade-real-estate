@@ -154,7 +154,7 @@ component Lit) e `recrutamento/` (IA + exportação).
 
 ### Etapa 7 — Exportação (UI) + IA (UI) + Benchmarks (UI) + docs + empacotamento
 - Botões de exportação na Proforma, UI de disparo/exibição do apelo comercial, UI admin de benchmarks;
-  docs do app (`docs/viabilidade/*.md` seguindo `documentacao.md`); empacotamento final e release.
+  docs do app (`docs/*.md` seguindo `documentacao.md`); empacotamento final e release.
 - Done: `pnpm build && pnpm exec urbi-empacotar viabilidade` gera `.urbiapp.tgz` + `.sha256`; docs completas.
 
 ---

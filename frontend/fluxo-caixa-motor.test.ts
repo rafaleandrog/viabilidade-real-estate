@@ -377,7 +377,7 @@ test('#584: área aberta muda recebimentoBruto/imposto/líquido — não só o V
 });
 
 // #227 reconciliado contra o Anexo G.1 (Calliandra prazo fixo): à vista do mês 1
-// = 20% × (1 − 5%) × 2.860.111,52 = R$ 543.421,19 (docs/viabilidade/padrao-
+// = 20% × (1 − 5%) × 2.860.111,52 = R$ 543.421,19 (referencia/padrao-
 // incorporacao.md, Anexo G.1). Reproduz por construção, com a linha real do
 // motor (receitaMensalLinha), não com o oráculo isolado de calliandra-golden.
 test('#227: desconto de entrada reproduz o à vista do mês 1 do cenário G.1 (Calliandra)', () => {
@@ -2461,7 +2461,7 @@ test('#585 componentesDoLegado propaga a taxa do estudo nos QUATRO caminhos', ()
 });
 
 test('#428 golden EVI safra única: sinal de 15% e 36 parcelas de R$ 21.414,48 (cfINC!AY20)', () => {
-  // Mês 0 do cenário dourado (`docs/rodada-8/02-regras-evi.md` §3).
+  // Mês 0 do cenário dourado (`historico/rodada-8/02-regras-evi.md` §3).
   //
   // ⚠️ SAFRA ÚNICA, e só. `cfINC!AY` é um PMT rolante sobre um pool, não
   // amortização por safra: as "36 parcelas iguais" só existem quando há UMA
