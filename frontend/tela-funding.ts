@@ -125,6 +125,12 @@ export class ViabFunding extends LitElement {
   @state() private movendoId: number | null = null;
   @state() private removerId: number | null = null;
   @state() private criando = false;
+  // Sub-navegação DENTRO de uma aba de tipo (Dívida/Equity), quando há mais de
+  // uma operação do mesmo tipo — cada operação ganha sua própria sub-aba, em
+  // vez de todas empilhadas na mesma página. Chave é o `tipo`, valor é o `id`
+  // da operação ativa naquele tipo. Estado interno, mesma convenção de
+  // `abaAtiva` (não vai para a URL).
+  @state() private opAtivaPorTipo: Record<string, number> = {};
   // #587: guarda contra criar duas vezes o Financiamento à produção — a
   // criação é assíncrona, e `_carregar` pode ser chamado de novo (troca de
   // estudo) antes da primeira resposta voltar.
@@ -155,7 +161,6 @@ export class ViabFunding extends LitElement {
        (Sem crase neste comentário: ele mora dentro de um template literal, e
        uma crase aqui FECHA o css e quebra o arquivo — foi o que aconteceu.) */
     .acao-aba { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-    .ops { display: flex; flex-direction: column; gap: 14px; }
     .op-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .op-cab .espaco { flex: 1; }
     .op-cab urbi-input { min-width: 220px; }
@@ -409,6 +414,10 @@ export class ViabFunding extends LitElement {
       });
       if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível criar a operação.', 'erro'); return; }
       await this._carregar();
+      // A operação recém-criada vira a sub-aba ativa — sem isto, criar a
+      // segunda operação de um tipo deixaria a primeira em foco e a nova
+      // ficaria escondida atrás dela, sem nenhum indício.
+      if (r?.id != null) this.opAtivaPorTipo = { ...this.opAtivaPorTipo, [tipo]: r.id };
     } finally {
       this.criando = false;
     }
@@ -858,9 +867,18 @@ export class ViabFunding extends LitElement {
     ];
   }
 
-  /** #586, abas Dívida e Equity — o botão de criar do tipo e os cards DAQUELE
-   * tipo. Os `_renderCampos*` vêm inteiros, sem reescrita: a separação por
-   * tipo já existia na camada de campos, o que faltava era na navegação.
+  /** A operação ATIVA na sub-navegação daquele tipo — a do estado, se ainda
+   * existir na lista atual, senão a primeira. Derivado a cada render, nunca
+   * precisa de limpeza explícita quando uma operação é removida ou recriada. */
+  private _opAtiva(tipo: string, lista: any[]): any {
+    const id = this.opAtivaPorTipo[tipo];
+    return lista.find((o) => o.id === id) ?? lista[0];
+  }
+
+  /** #586, abas Dívida e Equity — o botão de criar do tipo e as operações
+   * DAQUELE tipo, cada uma na sua sub-aba quando há mais de uma. Os
+   * `_renderCampos*` vêm inteiros, sem reescrita: a separação por tipo já
+   * existia na camada de campos, o que faltava era na navegação.
    *
    * ⚠️ #587: `financiamento_producao` SAIU da assinatura — não é mais
    * "lista + botão adicionar", é operação única e fixa, com sua própria aba
@@ -884,7 +902,26 @@ export class ViabFunding extends LitElement {
       ${lista.length === 0
         ? html`<urbi-estado-vazio icone=${t.icone}
             mensagem=${`Nenhuma operação de ${t.rotulo}.`}></urbi-estado-vazio>`
-        : html`<div class="ops">${lista.map((o, i) => this._renderOperacao(o, i, lista))}</div>`}
+        // Uma operação só: card direto, sem chrome de navegação por cima dela.
+        : lista.length === 1
+          ? this._renderOperacao(lista[0], 0, lista)
+          // Mais de uma: cada operação ganha sua própria sub-aba, em vez de
+          // ficarem empilhadas na mesma página — pedido do autor. Todas as
+          // sub-abas são MONTADAS (mesmo padrão da navegação de topo em
+          // `render()`), e `urbi-abas` decide qual mostrar; a troca só move
+          // qual `id` está em `opAtivaPorTipo`, nunca desmonta a operação.
+          : html`
+            <urbi-abas
+              .abas=${lista.map((o) => ({ id: String(o.id), label: o.nome || t.rotulo, icone: t.icone }))}
+              .ativa=${String(this._opAtiva(tipo, lista).id)}
+              @urbi:aba-selecionar=${(e: CustomEvent) => {
+                const id = Number(e.detail?.id);
+                this.opAtivaPorTipo = { ...this.opAtivaPorTipo, [tipo]: Number.isFinite(id) ? id : lista[0].id };
+              }}
+            >
+              ${lista.map((o, i) => html`
+                <urbi-hospedeiro slot=${String(o.id)}>${this._renderOperacao(o, i, lista)}</urbi-hospedeiro>`)}
+            </urbi-abas>`}
     `;
   }
 
