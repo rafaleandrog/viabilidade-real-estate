@@ -42,26 +42,27 @@ Acumulado** e os **Indicadores vs. benchmark** — a página de leitura do estud
 
 Cinco sub-abas, uma por grupo: **Terreno**, **Obras**, **Diretos**, **Indiretos** e **Financeiro**.
 Cada linha de custo tem categoria e subcategoria — no Terreno, o preço (à vista ou parcelado), as
-permutas física e financeira e o registro; nas Obras, construção, outorga, decoração, gestão da
-obra e contingência; nos Diretos, marketing e publicidade, corretagem de vendas, projetos e
-licenças e aprovações; nos Indiretos, marketing global, stand de vendas e gestão; no Financeiro,
-juros de financiamento, taxas bancárias, estruturação de dívida e investidores; cada grupo aceita
-ainda **Outro**, com texto livre. O orçamento é lançado na unidade escolhida (R$, R$/m² privativo,
-R$/m² de terreno, % do VGV, % da receita ou % da obra) e a **distribuição no tempo** diz o início
-(uma fase do cronograma, ou **Customizado** para um mês), a duração e a forma — **Linear** ou uma
-**curva** do catálogo do Painel (aba **Curvas**), que reparte o valor pelos meses. O preço do
-terreno pode, em vez disso, ser atrelado à entrega das unidades (**Unit Delivery**) ou à receita de
-vendas (**Sales Revenue**); três linhas não escolhem — a corretagem sai no mês da venda, a permuta
-física na entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra
-o consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo
-Obras.
+permutas física e financeira e o registro; nas Obras, construção, outorga, decoração, gestão da obra
+e contingência; nos Diretos, marketing e publicidade, corretagem de vendas, projetos e licenças e
+aprovações; nos Indiretos, marketing global, stand de vendas e gestão; no Financeiro, juros de
+financiamento, taxas bancárias, estruturação de dívida e investidores; cada grupo aceita ainda a
+categoria **Outro**, e só no Terreno a subcategoria é digitada (**Descreva…**). O orçamento é
+lançado na unidade escolhida (R$, R$/m² privativo, R$/m² de terreno, % do VGV, % da receita ou % da
+obra) e a **distribuição no tempo** diz o início (uma fase do cronograma, ou **Customizado** para um
+mês), a duração e a forma — **Linear** ou uma **curva** do catálogo do Painel (aba **Curvas**), que
+reparte o valor pelos meses. O preço do terreno pode, em vez disso, acompanhar a receita das vendas:
+**Unit Delivery** o distribui na proporção da receita que entra em caixa (sinal, parcelas e repasse)
+e **Sales Revenue** na proporção do VGV vendido pela curva de absorção; três linhas não escolhem — a
+corretagem sai no mês da venda, a permuta física na entrega das unidades e a permuta financeira
+conforme a receita entra. Cada sub-aba mostra o consolidado do seu grupo; o **Avanço da obra**
+aparece junto do custo de construção, no grupo Obras.
 
 ### Viabilidade
 
 | Sub-aba | O que se informa |
 |---|---|
 | **Receitas** | A **absorção de vendas** — quanto do estoque se vende em cada mês, em percentual acumulado, a partir de uma curva que pode ser substituída — e o **fluxo de pagamento** de cada safra de vendas: **Sinal**, **Nº parcelas**, o que é pago **Ao longo da obra**, o **Desconto** e o **Resíduo sem prazo** (o saldo nas chaves: caixa imediato, o padrão, ou rolando para o repasse). |
-| **Financeiro** | Os parâmetros financeiros do estudo: a **taxa de desconto anual** (usada no VPL) e os **juros de tabela** padrão aplicados às parcelas. A alíquota de imposto aparece aqui só para leitura. |
+| **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota de imposto aparece aqui só para leitura. |
 
 ### Funding
 
@@ -75,9 +76,9 @@ líquida. As regras de cada tipo estão em [Funding](funding).
 
 | Sub-aba | O que mostra |
 |---|---|
-| **Fluxo de Caixa** | A tabela mensal ou anual de todas as entradas e saídas, o **Fluxo de Caixa Acumulado**, a tabela **Contratação, Receita Bruta, Carteira e Repasse** (as vendas contratadas contra o que entra em caixa), o gráfico **Fluxo de Caixa Livre × Fluxo de Caixa**, o **ROI do projeto** e o **Retorno por parte** (o que cabe a cada operação de funding). Exporta em CSV e PDF na visão escolhida. |
+| **Fluxo de Caixa** | Os KPIs do fluxo, a tabela mensal ou anual de todas as entradas e saídas (com as operações de funding dentro dela), a reconciliação com os avisos de consistência e a tabela da permuta física. Exporta em **CSV** e **PDF** na visão escolhida. |
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
-| **Análise Financeira** | **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding), mais o **MOIC** de cada parte. |
+| **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
 
 ### Cenários
 
@@ -95,8 +96,9 @@ IA, a partir dos documentos anexados (ver [Apelo Comercial (IA)](apelo-comercial
 
 ## Instruções para não humanos
 
-Todas as rotas exigem membro do estudo; as de escrita seguem a mesma alçada do estudo (ver
-[Permissões e ciclo de vida](permissoes)).
+As rotas com `/estudos/:id/` exigem membro do estudo, e as de escrita seguem a alçada do estudo
+(ver [Permissões e ciclo de vida](permissoes)). O catálogo de curvas é global: `GET` para qualquer
+usuário do app, escrita e `semear` só para o `admin` do app.
 
 | Recurso | Rotas |
 |---|---|

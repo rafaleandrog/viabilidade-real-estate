@@ -70,8 +70,8 @@ do imóvel por IA, a partir de documentos anexados. Ver [Estudo Preliminar](prel
 Páginas na lista lateral, nesta ordem: **Resumo**; **Empreendimento** (sub-abas Informações — dados
 do terreno, imagem e anexos —, Cronograma e Tipologias); **Custos** (Terreno, Obras, Diretos,
 Indiretos e Financeiro; a distribuição de cada custo no tempo é linear ou por uma curva do
-catálogo, o preço do terreno pode também ser atrelado à entrega das unidades ou à receita de
-vendas, e três linhas não escolhem: a corretagem sai no mês da venda, a permuta física na entrega
+catálogo, o preço do terreno pode também acompanhar a receita das vendas — a que entra em caixa
+ou o VGV vendido —, e três linhas não escolhem: a corretagem sai no mês da venda, a permuta física na entrega
 das unidades e a permuta financeira conforme a receita entra); **Viabilidade** (Receitas —
 absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity e financiamento
 à produção); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise

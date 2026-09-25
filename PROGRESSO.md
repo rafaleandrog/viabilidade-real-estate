@@ -27,6 +27,20 @@ Delivery* / *Sales Revenue*), `tela-fluxo-receitas.ts`, `tela-fluxo-ver.ts`, `te
 (rotas e a cópia do nível em Duplicar). Sem número de issue, rodada, data ou endereço
 `arquivo:linha` nos guias. Sem migração, sem `schema.json`, `versao` mantida.
 
+**O que a revisão achou, e por que vale registrar:** a conferência de saída não bastou. A rodada 1
+(App do Codex + três lentes Kimi) devolveu **catorze** afirmações falsas ou deslocadas nos dois
+guias — o Preliminar prometia edição ao `aprovador` em estudo Aprovado/Reprovado quando as quatro
+sub-abas de Premissas travam para todos; listava como linhas da Proforma o que são cards de KPI
+(Margem sobre VGV, Custo obras / VGV) ou cartões de Margem de segurança (Terreno máximo, Permuta
+física máxima); punha o custo do terreno no tornado, de onde ele foi excluído de propósito;
+descrevia a sub-aba Terreno & Áreas pela lista de campos do modelo (`AREAS_LOT`), que a tela não
+renderiza mais — ela é uma cascata de áreas; dizia que `GET /estudos/:id` devolve `produtos`
+(só a listagem anexa); e o Avançado atribuía à sub-aba Fluxo de Caixa os gráficos, o ROI e o
+Retorno por parte, que vivem em Análise Financeira, e descrevia **Unit Delivery** como "entrega das
+unidades" quando o motor o atrela à receita em caixa (sinal, parcelas e repasse). A lição é a
+mesma do PR 4, mais específica: **rótulo existir no arquivo não prova que a tela o renderiza** —
+`grep` acha a constante, não o `render()`. Conferir uma sub-aba é ler a função que a desenha.
+
 ## Rodada 14, PR 4 — `docs/README.md` reescrito no estilo da fabrica (2026-09-25)
 
 Primeira PR de conteúdo da rodada. A visão geral era diário de desenvolvimento: números de issue e

@@ -20,8 +20,9 @@ adiante, crie um estudo Avançado.
 ## Para usuários
 
 O estudo abre em quatro abas: **Premissas**, **Resultado**, **Gráficos** e **Análise de Mercado**.
-Tudo é editável em Rascunho e Em análise por `editor` e `aprovador`; depois de aprovado, reprovado ou
-arquivado, só o `aprovador` edita (ver [Permissões e ciclo de vida](permissoes)).
+As Premissas são editáveis em Rascunho e Em análise por `editor` e `aprovador`. Num estudo
+Aprovado ou Reprovado as quatro sub-abas de Premissas ficam em modo de leitura para todos; num
+Arquivado, só o `aprovador` edita (ver [Permissões e ciclo de vida](permissoes)).
 
 ### Premissas
 
@@ -29,35 +30,43 @@ Quatro sub-abas, cada uma com os campos que valem para o tipo do estudo (Loteame
 
 | Sub-aba | O que se informa |
 |---|---|
-| **Terreno & Áreas** | A área do terreno vem do Núcleo ou do terreno manual. Em **Loteamento**, os percentuais da gleba que não viram lote — APP, faixas não edificáveis, sistema viário, ELUP, EPC, EPU, privativas não vendáveis — mais a área média do lote e o preço de venda por m². Em **Incorporação**, os coeficientes de aproveitamento mínimo e máximo, as áreas privativas residenciais e não residenciais (fechadas e abertas), a área comum e o número de unidades de cada uso, com o preço por m² de cada um. |
-| **Custos** | Cada custo tem um **modo de entrada** (por m², percentual do VGV ou valor fixo) e o app converte para a base da Proforma. Loteamento: infraestrutura, projetos, stand de vendas. Incorporação: construção, decoração, gestão da construção, incorporação e registro, valor venal do terreno (outorga). Comuns: custo do terreno, manutenção pós-obra, contingências, marketing global, gestão e outros indiretos, corretagem, marketing e o imposto — com a opção **Sujeito a RET**, que troca o imposto pela alíquota fixa do regime. Os interruptores **Considerar…** ligam ou desligam um custo sem apagar o valor. |
+| **Terreno & Áreas** | A área do terreno vem do Núcleo ou do terreno manual, e a tabela de áreas é uma cascata. Em **Loteamento**: da **Área da Poligonal** saem APP, áreas verdes, sistema viário público, EPC e ELUP/EPU até a **Área Parcelável**; desta saem o sistema viário privado e as áreas comuns privadas até a **Área Líquida** e a **Área Líquida de Venda (ALV)** — cada linha em m², ha, % da poligonal e % do parcelável. Em **Incorporação**: os **Coeficiente mínimo** e **Coeficiente máximo** de aproveitamento, e a cascata da **Área do Terreno** à **Área Construída Total**, às áreas privativas residenciais e não residenciais (fechadas e abertas), à **Área Privativa Total**, à **Área Comum Total** e à ALV, com os KPIs de aproveitamento do coeficiente. |
+| **Custos** | Infraestrutura, Construção e Projetos têm um seletor de unidade (R$, R$/m² ou % do VGV) e o app converte para a base da Proforma; os demais custos têm unidade fixa. Loteamento: infraestrutura, projetos, stand de vendas. Incorporação: construção, decoração, gestão da construção, incorporação e registro, valor venal do terreno (outorga). Comuns: custo do terreno, manutenção pós-obra, contingências, marketing global, gestão e outros indiretos, corretagem, marketing e o imposto — com a opção **Sujeito a RET**, que troca o imposto pela alíquota fixa do regime. Os interruptores **Considerar…** ligam ou desligam um custo sem apagar o valor. |
 | **Permutas** | **Permuta física** (em m² ou em percentual da área de venda; residencial e não residencial na Incorporação) e **permuta financeira** (percentual do VGV ou valor). A física reduz a área que o incorporador vende; a financeira é dedução sobre a receita. |
 | **Produtos** | O catálogo de tipologias: nome, tipo, área média, preço de venda e unidades. O VGV de cada produto aparece na linha, e o total alimenta a Proforma quando o catálogo existe. |
 
-Acima dos campos, os **KPIs ao vivo** (VGV, resultado, margem) e o **Preço Sugerido por m²** — o preço
-que faria o resultado bater o piso de retorno definido no benchmark `resultado_final`.
+Na sub-aba Produtos, abaixo do catálogo, o card **Resumo** mostra as áreas, o VGV, o número de
+lotes ou de unidades, o preço médio por unidade, a **Margem sobre VGV** e o **Custo obras / VGV**
+comparados ao benchmark, e o preço sugerido por m² — o preço que faria o resultado bater o piso
+definido no benchmark `resultado_final`. Tudo recalculado a cada edição.
 
 ### Resultado
 
 Duas sub-abas.
 
-**Proforma.** A tabela linha a linha: Receita bruta (VGV), VGV sem permuta física, deduções sobre o
-VGV (permuta financeira, corretagem, marketing, imposto), Receita líquida, Custo direto total, Custo
-indireto total, Resultado, Margem sobre VGV, Custo obras / VGV, Terreno máximo e Permuta física
-máxima. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
+**Proforma.** Acima da tabela, os cards **Área vendável**, **Nº de unidades**, **Vendável / gleba**,
+**Área permutada**, **Custo obras / VGV** e **Margem sobre VGV**. A tabela, linha a linha: VGV sem
+permuta física, Receita bruta (VGV), as deduções sobre o VGV (permuta financeira, corretagem,
+marketing, imposto) e **= Deduções sobre VGV**, **= Receita líquida**, os custos diretos e **= Custo
+direto total**, **= Receita operacional**, os custos indiretos e **= Custo indireto total**, e
+**= Resultado**. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
 **Unidades e preço médio por tipo** resume o catálogo. Botões **PDF** e **Excel** exportam a mesma
 tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [Fórmulas da Proforma](formulas).
 
 **Cenários.** Três blocos que respondem "o que derruba este resultado?":
 
-- **Alavancas do resultado** — o tornado: cada alavanca (preço de venda, custo de obra ou de
-  infraestrutura, custo do terreno, custos indiretos, permutas) é variada em ±5, ±10 ou ±15 % (o
-  passo é escolhido no card) e ranqueada pela amplitude do impacto no resultado. A barra mais
-  longa é a premissa que mais merece atenção.
-- **Margem de segurança** — para cada alavanca, quanto a premissa pode errar até o resultado
-  zerar. É um percentual sobre o valor atual.
+- **Alavancas do resultado** — o tornado: cada alavanca (**Preço de venda**, **Permuta física**,
+  **Permuta financeira**, **Custo de obra** ou **Custo de infraestrutura**, **Custo indireto**) é
+  variada em ±5, ±10 ou ±15 % (o passo é escolhido no card) e ranqueada pela amplitude do impacto
+  no resultado. A barra mais longa é a premissa que mais merece atenção. O custo do terreno não
+  entra no tornado: ele tem o próprio cartão ao lado.
+- **Margem de segurança** — quatro cartões. **Queda máxima de preço**, **Estouro máximo de obra**
+  (**de infraestrutura**, no Loteamento) e **Permuta física máxima** dizem, em percentual sobre o
+  valor atual, quanto a premissa pode errar até o resultado zerar; **Terreno máximo** sai em R$ e é
+  o valor residual do terreno até a margem-alvo sobre a receita líquida.
 - **Análise de sensibilidade** — a variável escolhida em **Bear**, **Base** e **Bull**, com as linhas
-  afetadas lado a lado. As variações padrão vêm do benchmark e podem ser sobrescritas por estudo.
+  afetadas lado a lado. As variações para cima e para baixo vêm do indicador de sensibilidade do
+  benchmark daquela variável; sem benchmark, 10 %.
 
 ### Gráficos
 
@@ -79,7 +88,8 @@ dados de população, de mercado ou outros) e de um texto adicional: seis fatore
 O estudo Preliminar é um registro de `estudos` com `nivel_analise = 'preliminar'`; as premissas são
 colunas desse registro e o catálogo de produtos é lido junto. As rotas são as gerais do app (ver a
 seção correspondente em [Estudo de Viabilidade](readme)): `GET /estudos/:id` devolve o estudo com
-`produtos`; `PATCH /estudos/:id` grava premissas — campos exclusivos do Avançado são ignorados num
+`membros`, `imoveis` e `_permissao` (o catálogo vem por `GET /estudos/:id/preliminar/produtos`);
+`PATCH /estudos/:id` grava premissas — campos exclusivos do Avançado são ignorados num
 Preliminar, `tipo_empreendimento` só muda em Rascunho (`422 TIPO_TRAVADO`) e `nivel_analise` nunca
 muda (`422 NIVEL_IMUTAVEL`). A Proforma não é persistida: o cliente a calcula com o mesmo motor da
 tela, e o `GET /estudos` anexa `produtos` a cada estudo para a listagem calcular VGV, resultado e
