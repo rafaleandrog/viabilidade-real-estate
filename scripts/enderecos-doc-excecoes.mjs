@@ -61,7 +61,7 @@ export const EXCECOES = [
       "VENCIDO DE VERDADE — nada em ±3 linhas de :66 — \"erroFormularioPagamento\" está em :364. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/funding.md",
+    arquivo: "referencia/fluxo-investidor-formulas.md",
     endereco: "frontend/fluxo-shared.ts:502-509",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :502-509 — \"eCorretagem\" está em :643. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",

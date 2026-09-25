@@ -183,7 +183,7 @@ citada, só declaram a ordem.
 **O bloqueio D6 foi levantado.** A issue #355 (item 48, Funding/Capital Stack) esteve formalmente
 bloqueada porque o documento `fluxo_investidor_FORMULAS` não estava no repositório; o autor o anexou
 em **2026-08-11** e a Fase 11 foi entregue no dia seguinte pelo **PR #412**. A planilha está hoje
-transcrita em **`docs/funding.md`** — que é a **especificação vigente**
+transcrita em **`referencia/fluxo-investidor-formulas.md`** — que é a **especificação vigente**
 de `divida` e `equity`.
 
 O Capital Stack (4 instrumentos com waterfall) **deixou de existir**: saíram
@@ -203,7 +203,7 @@ esse produto de propósito — ele é o único que **não** segue a planilha nov
 > #355 apagou junto com `tela-capital-stack.ts`.
 >
 > **As quatro viraram #413, #414, #415 e #416, e todas fecharam com diff no commit `ba06add`
-> (PR #417, 2026-08-17).** Evidência hoje: `docs/funding.md` existe;
+> (PR #417, 2026-08-17).** Evidência hoje: `referencia/fluxo-investidor-formulas.md` existe;
 > D14 está em `frontend/fluxo-invariantes.ts:633-642`
 > (`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING`, severidade `alerta`); o aviso regulatório, em
 > `frontend/tela-funding.ts:822-828`.

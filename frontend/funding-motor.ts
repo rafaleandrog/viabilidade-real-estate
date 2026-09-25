@@ -6,7 +6,7 @@ import { vplFluxo } from './fluxo-caixa-motor.js';
 //
 // Substitui `capital-stack-motor.ts` (modelo de 4 instrumentos com waterfall
 // de 8 passos). O modelo novo, especificado pela planilha do autor e
-// transcrito em docs/funding.md, tem 3 tipos de
+// transcrito em referencia/fluxo-investidor-formulas.md, tem 3 tipos de
 // operação INDEPENDENTES — sem waterfall, sem prioridades, sem competição por
 // caixa:
 //
@@ -68,7 +68,7 @@ const n = (v: any): number => Number(v) || 0;
  * de quatro parcelas da planilha, e um teste afirma que as duas divergem
  * de propósito — se algum dia alinhá-las por engano, o teste fica vermelho.
  * Nota completa, com a fórmula lado a lado:
- * `docs/funding.md` §4.2.
+ * `referencia/fluxo-investidor-formulas.md` §4.2.
  */
 export function receitaLiquidaComCorretagemMensal(
   receitaMensal: number[],
@@ -564,7 +564,7 @@ export function simularEquity(
   // sinal é menor que a corretagem produz receita líquida negativa, e a fórmula
   // crua fazia o INVESTIDOR pagar ao projeto a título de "retorno".
   //
-  // Decisão do autor, 2026-08-22 (ver `docs/funding.md` §4.2):
+  // Decisão do autor, 2026-08-22 (ver `referencia/fluxo-investidor-formulas.md` §4.2):
   // o mês paga zero, o déficit fica registrado e abate os meses seguintes até se
   // extinguir. NÃO é o `Math.max(0, …)` seco que existia em `capital-stack-motor.ts`
   // antes da #355 — aquele não tinha memória e inflava o total pago.
@@ -938,7 +938,7 @@ export function fundingDoEstudo(
   // mesmo caixa`).
   //
   // O estado NÃO é impossível, só improvável: `financiamento_producao` é única
-  // por estudo (`docs/funding.md:27`), mas quem
+  // por estudo (`referencia/fluxo-investidor-formulas.md:27`), mas quem
   // garante isso é `conflitoFinanciamentoUnico` em `backend/rotas/funding.ts`,
   // que LÊ e depois GRAVA (dois POSTs concorrentes passam os dois), e o
   // `schema.json` não tem índice único para o par — só `[["estudo_id"]]`.

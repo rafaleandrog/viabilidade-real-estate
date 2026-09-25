@@ -277,7 +277,7 @@ export class ViabFunding extends LitElement {
   // única para essa sequência (`referencia/inteligencia-evi-incorporacao.md:1584-1594`)
   // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
   // foi CONSIDERADA E RECUSADA pelo autor; ver
-  // `docs/funding.md` §9. Os outros quatro
+  // `referencia/fluxo-investidor-formulas.md` §9. Os outros quatro
   // consumidores: frontend/tela-fluxo-ver.ts:179 · frontend/tela-cenarios.ts:240
   // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
   // fundingDoEstudo) · scripts/conferir-estudo.ts:153.

@@ -195,7 +195,7 @@ export class ViabTelaResumo extends LitElement {
   // descrita em
   // `referencia/inteligencia-evi-incorporacao.md:1584-1594`. Fonte
   // única foi CONSIDERADA E RECUSADA pelo autor — ver
-  // `docs/funding.md` §9. Os outros quatro:
+  // `referencia/fluxo-investidor-formulas.md` §9. Os outros quatro:
   // frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:239 ·
   // frontend/tela-cenarios.ts:240 · scripts/conferir-estudo.ts:153.
   private _kpisAvancado(c: FluxoCalc) {

@@ -902,7 +902,7 @@ export function marcosObra(crono: EventoCrono[]): { inicioObra: number; fimObra:
  * contrário o equity em modo `resultado_final` passa a pagar um mês antes
  * (ou depois) do que deveria, e nenhum teste acusa sozinho, porque o golden
  * do equity usaria a `marcosObra` nova e se moveria junto. Nota completa em
- * `docs/funding.md` §4.2.
+ * `referencia/fluxo-investidor-formulas.md` §4.2.
  */
 export function mesRepasse(crono: EventoCrono[]): number {
   const marcos = marcosObra(crono ?? []);

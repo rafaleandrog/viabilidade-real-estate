@@ -4,6 +4,32 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+
+## 2026-09-25 — Rodada 14, PR 6: `docs/funding.md` vira guia de usuário; a spec da planilha vai para `referencia/`
+
+Sexta PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). O `docs/funding.md` servido era
+a transcrição da planilha `fluxo_investidor_FORMULAS` (§1–§9, com rastreabilidade por issue,
+endereços `arquivo:linha` e o inventário executável dos consumidores dos Passos 23–25) — evidência
+valiosa, guia nenhum. Ela **não foi apagada**: mudou de nome e de pasta, `git mv` para
+`referencia/fluxo-investidor-formulas.md`, e continua sendo a especificação vigente de `divida` e
+`equity`. **Todas as citações no código foram repontadas** (`backend/rotas/funding.ts` e o teste,
+`frontend/funding-motor.ts` e o teste, `fluxo-caixa-motor.ts`, `fluxo-shared.ts`,
+`consumidores-passos-23-25.test.ts`, os cinco consumidores `tela-*.ts`/`conferir-estudo.ts`, a
+migração `029`, a exceção do `guard-enderecos-doc` e as duas menções do `CLAUDE.md`), então `§4.2`,
+`§9.2` etc. seguem resolvendo — no arquivo novo, que o guard continua varrendo porque `referencia/`
+é raiz dele.
+
+O `docs/funding.md` novo é o guia: as três operações, a regra de que dívida e equity não são
+limitadas pelo caixa do projeto (só o financiamento à produção olha o caixa), a aba **Operações** e
+as colunas, os campos de cada tipo com o rótulo da tela, a matemática mês a mês em prosa (tranches,
+carência, Price, quitação, tarifas; os dois modos de retorno; gatilho de exposição mínima, catch-up
+e varredura de caixa), onde o funding aparece nos Resultados e nos Cenários, os indicadores do
+investidor, e as rotas e campos por tipo. Fatos conferidos em `tela-funding.ts`,
+`funding-motor.ts`, `fluxo-shared.ts` (base financiável padrão), `proforma-avancado.ts`
+(desalavancada), `fluxo-invariantes.ts` (alerta de caixa negativo) e `backend/rotas/funding.ts`
+(campos, teto da soma de `pct_retorno`, `ativo` só no financiamento à produção, um por estudo).
+Sem migração, sem `schema.json`, `versao` mantida.
+
 ## 2026-09-25 — Rodada 14, PR 5: guias novos `docs/preliminar.md` e `docs/avancado.md`
 
 Quinta PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). Dois guias novos, tela a
