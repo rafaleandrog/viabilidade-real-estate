@@ -244,7 +244,9 @@ valor é de fato negativo.
 
 Onde a especificação original era ambígua, o app segue o protótipo e o bom senso: o custo do
 terreno incide sobre a área do terreno; "obras" é infraestrutura no Loteamento e construção,
-decoração e gestão na Incorporação; projetos e licenciamento em % incidem sobre o VGV.
+decoração e gestão na Incorporação; projetos em % incidem sobre o VGV. (A especificação previa
+uma linha de licenciamento ao lado de projetos; ela nunca foi construída — ver as colunas
+aposentadas em [Modelo de Dados](modelo-de-dados).)
 
 ## Veja também
 
