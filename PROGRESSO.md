@@ -8,6 +8,20 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #756: as seis leituras de "todas as linhas" de `avancado.ts` viram `varrerTudo`
+
+`backend/rotas/avancado.ts` lia alocações e linhas de custo com `listar(..., por_pagina: 1000)`
+em seis pontos (a rota de fases, a de receitas, o saldo de tipologia, as unidades permutadas e a
+guarda `PERMUTA_SALDO_EXCEDIDO`). Os seis passam a `req.dados.varrerTudo`, o verbo do SDK fixado
+(`57.0.0`), com os mesmos filtros e ordenação. O `DadosFake` de
+`backend/rotas/avancado-custos-rota.test.ts` passou a obedecer `pagina`/`por_pagina` como o banco
+real e ganhou `varrerTudo`; dois testes novos exercem o saldo com mais de uma página (1200
+alocações; 1100 linhas de custo reservando) — voltar qualquer das duas leituras da guarda ao
+`listar` paginado deixa o teste correspondente vermelho, medido. Ficam fora, por escopo, os dois
+`por_pagina` grandes de `estudos.ts` (`preliminar_produtos`) e de `manutencao.ts` (`estudos`), e o
+helper local `backend/rotas/varrer-tudo.ts`, que continua servindo a duplicação de estudo.
+
 ## 2026-09-25 — Rodada 14, fechamento: a seção "Documentação da app" entra no `CLAUDE.md`
 
 A única pendência que a fila deixou para o autor era o texto do `CLAUDE.md` (anexo do plano,

@@ -29,11 +29,31 @@ class DadosFake {
     return this.tabelas.get(tabela)?.get(Number(id)) ?? null;
   }
 
-  async listar(tabela: string, opts: { filtros?: Record<string, any>; por_pagina?: number } = {}) {
+  // Obedece `pagina`/`por_pagina` COMO ESCRITO, igual ao backend real — sem
+  // isso o fake não reproduz o defeito da #756: um `listar(..., por_pagina:
+  // 1000)` tem que devolver só 1000 das 1001+ linhas semeadas.
+  async listar(tabela: string, opts: {
+    filtros?: Record<string, any>; pagina?: number; por_pagina?: number;
+  } = {}) {
     const todas = [...(this.tabelas.get(tabela)?.values() ?? [])];
     const filtros = opts.filtros ?? {};
-    const dados = todas.filter((linha) => Object.entries(filtros).every(([k, v]) => linha[k] === v));
-    return { dados, total: dados.length };
+    const linhas = todas.filter((linha) => Object.entries(filtros).every(([k, v]) => linha[k] === v));
+    const pagina = opts.pagina ?? 1;
+    const porPagina = opts.por_pagina ?? 20;
+    const inicio = (pagina - 1) * porPagina;
+    return { dados: linhas.slice(inicio, inicio + porPagina), total: linhas.length };
+  }
+
+  // Laço genuíno de páginas sobre `listar`, o mesmo contrato do verbo da
+  // plataforma: devolve o ARRAY de todas as linhas, sem envelope.
+  async varrerTudo(tabela: string, opts: { filtros?: Record<string, any>; lote?: number } = {}) {
+    const lote = opts.lote ?? 500;
+    const todas: any[] = [];
+    for (let pagina = 1; ; pagina++) {
+      const r = await this.listar(tabela, { ...opts, pagina, por_pagina: lote });
+      todas.push(...r.dados);
+      if (todas.length >= r.total || r.dados.length === 0) return todas;
+    }
   }
 
   async atualizar(tabela: string, id: number, patch: Record<string, any>) {
@@ -298,5 +318,51 @@ test('#753 controle negativo: tipologia GRAVADA que já não existe (apagada dep
     const r = await patch(base, cid, { permuta_quantidade: 1 });
     assert.equal(r.status, 400, `esperava 400, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
     assert.equal(r.corpo.codigo, 'PERMUTA_TIPOLOGIA_INVALIDA');
+  });
+});
+
+// #756 — "todas as linhas" é `varrerTudo`, nunca `por_pagina: 1000`. O saldo de
+// permuta física lê TODAS as alocações da tipologia e TODAS as linhas de custo
+// do estudo; com mais de uma página, `listar` subcontava e a guarda 422 falhava
+// aberta. Mutação declarada: voltar qualquer das duas leituras a
+// `listar(..., por_pagina: 1000)` deixa o cenário correspondente vermelho,
+// porque o fake obedece `por_pagina` como o banco real.
+test('#756 saldo de permuta com 1200 alocações (mais de uma página): a guarda 422 continua fechada', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 1500, area_privativa_m2: 30, preco_m2: 10_000 });
+  for (let i = 0; i < 1200; i++) dados.semear('avancado_alocacoes', { tipologia_id: 11, unidades: 1 });
+  const cid = dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11 });
+
+  await comServidor(criarApp(dados), async (base) => {
+    // 1500 − 1200 alocadas = 300 disponíveis. Só a primeira página (1000)
+    // daria 500, e 400 passaria.
+    const r = await patch(base, cid, { permuta_quantidade: 400 });
+    assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    assert.equal(r.corpo.codigo, 'PERMUTA_SALDO_EXCEDIDO');
+    assert.match(r.corpo.mensagem, /300 unidade/);
+    const ok = await patch(base, cid, { permuta_quantidade: 300 });
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
+  });
+});
+
+test('#756 saldo de permuta com 1100 linhas de custo reservando (mais de uma página): a guarda 422 continua fechada', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 1200, area_privativa_m2: 30, preco_m2: 10_000 });
+  for (let i = 0; i < 1100; i++) {
+    dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11, permuta_quantidade: 1 });
+  }
+  const cid = dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11 });
+
+  await comServidor(criarApp(dados), async (base) => {
+    // 1200 − 1100 reservadas = 100 disponíveis. Só a primeira página (1000)
+    // daria 200, e 200 passaria.
+    const r = await patch(base, cid, { permuta_quantidade: 200 });
+    assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    assert.equal(r.corpo.codigo, 'PERMUTA_SALDO_EXCEDIDO');
+    assert.match(r.corpo.mensagem, /100 unidade/);
+    const ok = await patch(base, cid, { permuta_quantidade: 100 });
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
   });
 });
