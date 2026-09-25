@@ -41,6 +41,10 @@ acompanha o cronograma quando ele muda. A janela do financiamento à produção 
 aviso permanente: o app simula contratos privados e não valida a legalidade da captação — uma
 oferta ao público pode ter obrigações regulatórias próprias.
 
+As abas **Dívida** e **Equity** editam as operações daquele tipo. Havendo mais de uma, cada uma
+ganha sua própria sub-aba, identificada pelo nome — criar uma nova operação já abre nela; com uma
+só, o formulário aparece direto, sem sub-navegação.
+
 ### Dívida / Capital de giro
 
 Informe o **Valor**, o **Mês do aporte**, a **Taxa** anual, a **Amortização** (prazo em meses) e a

@@ -1,9 +1,9 @@
 // Caso de render: o "Painel do investidor" do Funding (`.ind-card`,
-// `frontend/tela-funding.ts:168`) com uma operação de 9 DÍGITOS (#579 —
+// `frontend/tela-funding.ts:185`) com uma operação de 9 DÍGITOS (#579 —
 // "o VALOR salta para fora do quadro do KPI"). Markup próprio (sem shadow
 // DOM), mesma família de defeito/defesa de `fluxo-tabela.ts` .kpi-card.
 //
-// `_renderIndicadores(o)` (frontend/tela-funding.ts:635) lê
+// `_renderIndicadores(o)` (frontend/tela-funding.ts:644) lê
 // `this.funding.operacoes` — não basta forçar `this.operacoes`, o `FundingCalc`
 // precisa ser real (`fundingDoEstudo`, a mesma função que a tela chama em
 // `_recalcular`). A dívida-exemplo é `DIVIDA_GOLDEN`
