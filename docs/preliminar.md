@@ -70,9 +70,13 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
   (**de infraestrutura**, no Loteamento) e **Permuta física máxima** dizem, em percentual sobre o
   valor atual, quanto a premissa pode errar até o resultado zerar; **Terreno máximo** sai em R$ e é
   o valor residual do terreno até a margem-alvo sobre a receita líquida.
-- **Análise de sensibilidade** — a variável escolhida em **Bear**, **Base** e **Bull**, com as linhas
-  afetadas lado a lado. As variações para cima e para baixo vêm do indicador de sensibilidade do
-  benchmark daquela variável; sem benchmark, 10 %.
+- **Análise de sensibilidade** — a variável escolhida em **Bear**, **Base** e **Bull**. O cabeçalho
+  diz o estresse aplicado (por exemplo **Bear −10% Preço de venda**); cada linha traz o **Δ%** do Bear
+  e do Bull contra a Base, colorido por melhora ou piora conforme a linha seja receita ou despesa, e
+  a **Amplitude** — (Bull − Bear) ÷ Base —, cujo cabeçalho ordena a tabela ao clicar. As linhas que
+  não se movem com a variável ficam recolhidas num grupo **N linhas não afetadas por esta variável**,
+  expansível. As variações para cima e para baixo vêm do indicador de sensibilidade do benchmark
+  daquela variável; sem benchmark, 10 %.
 
 ### Gráficos
 

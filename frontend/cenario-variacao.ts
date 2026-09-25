@@ -25,8 +25,10 @@ export interface Variacao {
   texto: string;
 }
 
-/** Abaixo disto a variação arredonda para 0,0% — nada a sinalizar. */
-const EPSILON_PCT = 0.05;
+/** Abaixo disto a variação arredonda para 0,0% — nada a sinalizar. Exportado
+ * porque a tabela de sensibilidade (#730) usa a MESMA tolerância para decidir
+ * que uma linha é invariante — uma cópia só do limiar. */
+export const EPSILON_PCT = 0.05;
 
 /**
  * Variação percentual de `novo` sobre `base`, normalizada pelo MÓDULO da base
