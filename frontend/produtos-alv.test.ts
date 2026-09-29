@@ -71,6 +71,9 @@ test('#781: os limites exatos da tolerância (99,99 e 100,01) contam como comple
   assert.equal(alocacaoAlv([{ pct_alv: 99.99 }], ALV).estado, 'completa');
   assert.equal(alocacaoAlv([{ pct_alv: 100.01 }], ALV).estado, 'completa');
   assert.equal(alocacaoAlv([{ pct_alv: 99.98 }], ALV).estado, 'falta');
+  // pct derivado de linha antiga tem mais de 4 casas: o desvio real conta, sem arredondar.
+  assert.equal(alocacaoAlv([{ pct_alv: 99.98996 }], ALV).estado, 'falta');
+  assert.equal(alocacaoAlv([{ pct_alv: 100.01004 }], ALV).estado, 'excesso');
   assert.equal(alocacaoAlv([{ pct_alv: 100.02 }], ALV).estado, 'excesso');
 });
 

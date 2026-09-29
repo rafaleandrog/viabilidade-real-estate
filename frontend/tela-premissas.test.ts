@@ -191,7 +191,7 @@ test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 
 });
 
 test('#781 fiação: a primeira edição de linha legada só grava pct_alv com ALV positiva', () => {
-  assert.ok(FONTE_TELA_ALV.includes('if (alv > 0 && efetivo <= 100) enviar = { ...dados, pct_alv:'),
+  assert.ok(FONTE_TELA_ALV.includes('if (alv > 0 && efetivo >= 0 && efetivo <= 100) enviar = { ...dados, pct_alv:'),
     'sem esta guarda, ALV ≤ 0 grava pct_alv = 0 e destrói a área legada da linha');
   assert.ok(FONTE_TELA_ALV.includes('pct_alv: e.detail.valor ?? 0'),
     'limpar o input grava 0, nunca null (null no banco = produto legado)');

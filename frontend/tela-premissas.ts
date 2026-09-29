@@ -1178,10 +1178,10 @@ export class ViabTelaPremissas extends LitElement {
       if (this._ehLoteamento && dados.pct_alv === undefined
         && (p.pct_alv === null || p.pct_alv === undefined || p.pct_alv === '')) {
         const alv = alvDoLoteamento(this._entradaProforma());
-        // Também só até 100%: uma linha antiga maior que a ALV não é expressível
-        // (a API recusa acima de 100) e a edição de outro campo não pode morrer por isso.
+        // Também só entre 0 e 100%: uma linha antiga fora disso (maior que a ALV, ou
+        // com área/unidades negativas) não é expressível (a API recusa fora da faixa) e a edição de outro campo não pode morrer por isso.
         const efetivo = pctAlvEfetivo(p, alv);
-        if (alv > 0 && efetivo <= 100) enviar = { ...dados, pct_alv: Math.round(efetivo * 10000) / 10000 };
+        if (alv > 0 && efetivo >= 0 && efetivo <= 100) enviar = { ...dados, pct_alv: Math.round(efetivo * 10000) / 10000 };
       }
       const res = await atualizarProdutoPreliminar(this.estudo.id, p.id, enviar);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar produto', 'erro'); return; }

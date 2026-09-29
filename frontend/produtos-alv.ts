@@ -91,10 +91,10 @@ export interface AlocacaoAlv {
 export function alocacaoAlv(produtos: ProdutoAlv[] | undefined, alvM2: number): AlocacaoAlv {
   const soma = somaPctAlv(produtos, alvM2);
   const restante = 100 - soma;
-  // Quantiza a 4 casas (a escala da coluna) antes de comparar: `100 - 99.99` dá
-  // 0.010000000000005116 em ponto flutuante e reprovaria o limite exato.
-  const restanteQ = Math.round(restante * 10000) / 10000;
-  const estado: EstadoAlocacaoAlv = Math.abs(restanteQ) <= TOLERANCIA_SOMA_PCT_ALV
+  // Compara o desvio SEM arredondar, com uma folga de ponto flutuante: `100 - 99.99`
+  // dá 0.010000000000005116 e reprovaria o limite exato, mas arredondar a 4 casas
+  // aceitaria 99.98996 (desvio real 0.01004) — linha antiga tem % com mais casas.
+  const estado: EstadoAlocacaoAlv = Math.abs(restante) <= TOLERANCIA_SOMA_PCT_ALV + 1e-9
     ? 'completa' : restante > 0 ? 'falta' : 'excesso';
   return { soma, restante, estado };
 }
