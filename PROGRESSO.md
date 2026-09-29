@@ -45,6 +45,8 @@ caráter informativo do aviso de área da #693.
   custo declarado da regra dura; sem ALV a regra não se aplica, para não travar o Terreno & Áreas.
 - Primeira edição de linha legada só grava `pct_alv` com ALV positiva (senão gravaria 0 e destruiria
   a área); limpar o input grava 0, e a API recusa `null`.
+- Trocar rascunho de Loteamento para Incorporação grava a área derivada em `area_media_m2` e limpa
+  `pct_alv` (senão o VGV zeraria na troca).
 - Docs: `docs/preliminar.md`, `formulas.md`, `modelo-de-dados.md`, `apelo-comercial.md`.
 - Fiação medida: com a derivação desligada no motor, 4 testes novos ficam vermelhos.
 ## 2026-09-29 — `identidade` no manifesto

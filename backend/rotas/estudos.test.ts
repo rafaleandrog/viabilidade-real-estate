@@ -1010,6 +1010,18 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
 // é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
 // servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
 // "a API não contorna a tela" passaria a valer só na tela.
+test('#781 fiação: PATCH que tira o rascunho do Loteamento leva a área derivada dos produtos', () => {
+  for (const parte of [
+    "estudo.tipo_empreendimento === 'loteamento'",
+    'areasParaSairDoLoteamento(produtos as any[], alv)',
+    "atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null })",
+  ]) assert.ok(FONTE_ROTA.includes(parte), `o PATCH deixou de ter: ${parte}`);
+  assert.ok(
+    FONTE_ROTA.indexOf('areasParaSairDoLoteamento(produtos as any[], alv)') < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)"),
+    'a área tem que ser gravada ANTES de o tipo mudar (a ALV vem do tipo antigo)',
+  );
+});
+
 test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento com soma ≠ 100% da ALV', () => {
   for (const parte of [
     "novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento'",

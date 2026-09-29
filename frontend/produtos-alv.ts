@@ -123,3 +123,24 @@ export function validarSomaPctAlv(produtos: ProdutoAlv[] | undefined, alvM2: num
       + ` (${estado === 'falta' ? `faltam ${fmt(100 - soma)}%` : `excedem ${fmt(soma - 100)}%`}).`,
   };
 }
+
+export interface AreaParaSairDoLoteamento { id: number; area_media_m2: number }
+
+/**
+ * Ao trocar um rascunho de Loteamento para Incorporação, o catálogo passa a ser
+ * lido pela área média digitada (`area_media_m2`) — e produto criado pela tela do
+ * Loteamento só tem `pct_alv`. Devolve, para cada produto com `pct_alv`, a área
+ * média DERIVADA da ALV atual (em 2 casas, a escala da coluna), que a rota grava
+ * junto com a limpeza de `pct_alv` para o VGV não zerar na troca.
+ */
+export function areasParaSairDoLoteamento(
+  produtos: (ProdutoAlv & { id?: number | string | null })[] | undefined,
+  alvM2: number,
+): AreaParaSairDoLoteamento[] {
+  const saida: AreaParaSairDoLoteamento[] = [];
+  for (const p of produtos ?? []) {
+    if (!temValor(p.pct_alv) || p.id === null || p.id === undefined) continue;
+    saida.push({ id: Number(p.id), area_media_m2: Math.round(areaMediaDaLinha(p, alvM2) * 100) / 100 });
+  }
+  return saida;
+}

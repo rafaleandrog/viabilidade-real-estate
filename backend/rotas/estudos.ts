@@ -22,7 +22,7 @@ import {
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { alvDoLoteamento, type ProformaInput } from '../../frontend/proforma.js';
-import { validarSomaPctAlv } from '../../frontend/produtos-alv.js';
+import { validarSomaPctAlv, areasParaSairDoLoteamento } from '../../frontend/produtos-alv.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
@@ -709,6 +709,18 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     });
     if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
     const dados = decisao.dados;
+
+    // #781: Loteamento → Incorporação (só em rascunho). O catálogo do Loteamento
+    // vive em `pct_alv` e a Incorporação lê `area_media_m2`: sem levar a área
+    // derivada junto, todo produto sairia do catálogo efetivo e o VGV zeraria.
+    if (estudo.tipo_empreendimento === 'loteamento'
+      && dados.tipo_empreendimento !== undefined && dados.tipo_empreendimento !== 'loteamento') {
+      const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
+      const alv = alvDoLoteamento(estudo as unknown as ProformaInput);
+      for (const a of areasParaSairDoLoteamento(produtos as any[], alv)) {
+        await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
+      }
+    }
 
     const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     res.json(atualizado);

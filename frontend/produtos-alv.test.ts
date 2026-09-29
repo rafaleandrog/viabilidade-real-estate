@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  pctAlvEfetivo, areaTotalDaLinha, areaMediaDaLinha, produtosComAreaDerivada,
+  areasParaSairDoLoteamento, pctAlvEfetivo, areaTotalDaLinha, areaMediaDaLinha, produtosComAreaDerivada,
   somaPctAlv, alocacaoAlv, validarSomaPctAlv,
 } from './produtos-alv.js';
 import { calcularProforma, produtosDoEstudo, alvDoLoteamento, type ProformaInput } from './proforma.js';
@@ -194,4 +194,22 @@ test('#781: produtosComAreaDerivada não muta a entrada', () => {
 test('#781: sem ALV (Terreno & Áreas ainda vazio) a regra da soma não se aplica', () => {
   assert.equal(validarSomaPctAlv([{ pct_alv: 10 }], 0).ok, true);
   assert.equal(validarSomaPctAlv([{ area_media_m2: 300, unidades: 250 }], 0).ok, true);
+});
+
+test('#781: trocar Loteamento → Incorporação leva a área derivada, sem zerar o VGV', () => {
+  const produtos = [
+    { id: 1, pct_alv: 60, unidades: 150 },   // 45.000 m² / 150 = 300
+    { id: 2, pct_alv: 40, unidades: 100 },   // 30.000 m² / 100 = 300
+    { id: 3, area_media_m2: 80, unidades: 5 }, // legado: sem pct_alv, já tem área
+  ];
+  const saida = areasParaSairDoLoteamento(produtos, ALV);
+  assert.deepEqual(saida, [{ id: 1, area_media_m2: 300 }, { id: 2, area_media_m2: 300 }]);
+  const inc = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: produtos.map((p) => {
+      const a = saida.find((s) => s.id === p.id);
+      return { ...p, area_media_m2: a ? a.area_media_m2 : p.area_media_m2, pct_alv: null, preco_venda_m2: 1000 };
+    }),
+  } as ProformaInput);
+  assert.ok(inc.vgv > 0 && !inc.semProdutos, `vgv=${inc.vgv}`);
 });
