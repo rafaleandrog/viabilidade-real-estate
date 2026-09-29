@@ -1193,11 +1193,13 @@ Git Bash — ver PROGRESSO).
     esconde token inexistente. A exceção do SDK é só token **mais novo que o `shell_min`** do app,
     como ponte de degradação; o espelho `referencia/ui-urbiverso` é mais antigo que o piso, então
     hoje não há caso. Tratar como ruído deixou o aviso na tela de Upgrades de toda instância, a cada
-    release, com 343 ocorrências. Foram removidos os 333 fallbacks e o total caiu para os **15**
-    literais de `frontend/exportar.ts`.
-    **Defesa:** `scripts/guard-tokens-css.mjs` reprova `var(--token-do-espelho, <cor literal>)`;
-    hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém fallback, e `var(--a, var(--b))`
-    também. Se o aviso voltar a crescer, o guard falha antes do empacotador — não "explique" o número.
+    release. O `urbi-empacotar` passou de 343 para **15** literais, todos de `frontend/exportar.ts`
+    (medido antes e depois; a contagem dele é a heurística do bin, que ignora hex só de dígitos, e
+    por isso não é a mesma métrica do número de fallbacks que o guard acusava na base).
+    **Defesa:** `scripts/guard-tokens-css.mjs` reprova **qualquer** fallback em token `--cor-*` do
+    espelho — `#hex`, `rgba()`, `transparent`, cor nomeada ou outro `var()`; enumerar formas de
+    literal não converge. Hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém fallback.
+    Se o aviso voltar a crescer, o guard falha antes do empacotador — não "explique" o número.
   - **Os 15 restantes são a exceção real e ficam:** o CSS e os SVG dos documentos de impressão/PDF em
     `frontend/exportar.ts` rodam numa janela própria, fora do escopo das variáveis do shell, sobre
     papel branco (exceção registrada no SDK). Injetar os tokens do tema ali pintaria texto claro

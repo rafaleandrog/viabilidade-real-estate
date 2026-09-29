@@ -507,11 +507,11 @@ export class ViabTelaDashboard extends LitElement {
         // do próprio conteúdo, e a sobra vai para colunas que precisam dela
         // (ex.: Nome do estudo). Script da medição no corpo do PR.
         //
-        // #475: o fallback do token abaixo (cinza médio) não é decoração — o
-        // token `--cor-superficie-sutil` não existe em nenhum lugar do
-        // monorepo, e o fallback é, portanto, a cor EFETIVA sempre. Já foi
-        // branco a 6% (invisível nos temas claros); `scripts/guard-tokens-css.mjs`
-        // impede a volta.
+        // #475: o token abaixo é consumido SEM fallback, como o SDK manda. O
+        // defeito original era um nome inventado (`--cor-superficie-2`) cujo
+        // fallback virava a cor efetiva — branco a 6%, invisível nos temas
+        // claros. `scripts/guard-tokens-css.mjs` reprova as duas formas de
+        // voltar: token que não existe, e fallback em token de cor que existe.
         id: 'imagem', label: '',
         render: (l: any) => l.imagem_principal_url
           ? html`<img class="miniatura" style="width:40px;height:28px;border-radius:6px;object-fit:cover;display:block;background:var(--cor-superficie-sutil)" src=${l.imagem_principal_url} alt="" loading="lazy">`

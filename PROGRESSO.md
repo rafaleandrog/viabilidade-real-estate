@@ -22,12 +22,15 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 O aviso do `urbi-empacotar` (`343 literais de cor fora de token no bundle`) aparecia em toda tela de
 Upgrades, e o `CLAUDE.md` mandava ignorá-lo como falso positivo. Estava errado: o SDK manda consumir
-token de tema sem fallback, e 333 dos 343 eram `var(--token, #hex)` em 33 arquivos de `frontend/`.
-Removidos todos (os 30 tokens em uso existem no espelho, que é anterior ao `shell_min`, então nenhum
-precisou de fallback como ponte). Sobram 15, todos do `exportar.ts` (papel de impressão, exceção do
-SDK). `guard-tokens-css.mjs` passou a reprovar o fallback de cor literal em token do espelho, com casos
-nos dois sentidos em `testar-guards-ui.sh`; o teste do dashboard que conferia o texto do fallback
-foi ajustado. Validado: `validar-frontend.sh` verde (1216 testes, 101 casos de render).
+token de tema sem fallback, e quase tudo que o aviso contava era `var(--token, #hex)` em 33 arquivos de
+`frontend/`. Removidos os fallbacks de todos os tokens `--cor-*` em uso (existem no espelho, que é
+anterior ao `shell_min`, então nenhum precisou de fallback como ponte), inclusive duas sobras
+`transparent` que a revisão achou. O empacotador passou de 343 para 15, medido antes e depois; os 15
+são todos do `exportar.ts` (papel de impressão, exceção do SDK). `guard-tokens-css.mjs` passou a
+reprovar qualquer fallback em token de cor do espelho — a primeira versão só reprovava `#hex` e
+`rgba()`, e deixou passar `transparent`; enumerar formas de literal não converge, então o predicado
+virou "tem fallback" —, com casos nos dois sentidos em `testar-guards-ui.sh`. Validação em
+`validar-frontend.sh`.
 
 ## 2026-09-25 — #736: fechamento da Rodada 13
 

@@ -136,7 +136,7 @@ Três guards estáticos, todos com `node` puro — sem SDK, sem credencial e sem
 
 | Guard | Lê | Barra |
 |---|---|---|
-| `scripts/guard-tokens-css.mjs` | `tokens.json` | `var(--token)` no `frontend/` para token que não existe |
+| `scripts/guard-tokens-css.mjs` | `tokens.json` | `var(--token)` no `frontend/` para token que não existe, e `var(--cor-*, <fallback>)` em token de cor que existe |
 | `scripts/guard-props-urbi.mjs` | `primitivos.json` → `props[]`, `atributos_convencao[]` | atributo escrito num `<urbi-*>` que o primitivo não declara |
 | `scripts/guard-box-model-urbi.mjs` | `primitivos.json` → `risco_box_model*` | `width`/`height` aplicado **de fora** a primitivo em risco |
 

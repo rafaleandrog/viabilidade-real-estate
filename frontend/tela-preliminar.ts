@@ -95,7 +95,7 @@ export class ViabTelaPreliminar extends LitElement {
     .nav-col {
       flex: 0 0 210px; max-width: 210px;
       border: 1px solid var(--cor-borda); border-radius: 8px;
-      background: var(--cor-superficie-sutil, transparent);
+      background: var(--cor-superficie-sutil);
       position: sticky; top: 0;
       /* #686 — sem isto, width:100% do breakpoint abaixo é largura de
          CONTEÚDO; a border de 1px soma 2px por fora e a caixa transborda

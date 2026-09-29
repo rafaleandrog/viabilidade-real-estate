@@ -262,15 +262,44 @@ caso guard-tokens-css 1 "token de tema EXISTENTE com fallback de cor literal (he
 const e = css`.x { border-color: var(--cor-borda, #111); }`;
 TS
 
-caso guard-tokens-css 1 "token de tema EXISTENTE com fallback rgba() em várias linhas" 'caso\.ts:2 +--cor-texto-sec' <<'TS'
+caso guard-tokens-css 1 "token de tema EXISTENTE com fallback rgba() em várias linhas (o token está na fixture)" 'caso\.ts:2 +--cor-texto' <<'TS'
 const e = css`.x { padding: 0;
-  color: var(--cor-texto-sec, rgba(255, 255, 255, 0.6)); }`;
+  color: var(--cor-texto, rgba(255, 255, 255, 0.6)); }`;
+TS
+
+caso guard-tokens-css 1 "fallback de cor NOMEADA em token existente (transparent)" 'caso\.ts:1 +--cor-superficie-sutil' <<'TS'
+const e = css`.x { background: var(--cor-superficie-sutil, transparent); }`;
+TS
+
+caso guard-tokens-css 1 "fallback de cor nomeada em token existente (red)" 'caso\.ts:1 +--cor-borda' <<'TS'
+const e = css`.x { border-color: var(--cor-borda, red); }`;
+TS
+
+caso guard-tokens-css 1 "fallback que é OUTRO token, em token existente (o SDK não concede)" 'caso\.ts:1 +--cor-borda' <<'TS'
+const e = css`.x { border-color: var(--cor-borda, var(--cor-texto)); }`;
+TS
+
+caso guard-tokens-css 1 "fallback em sintaxe de cor moderna (oklch)" 'caso\.ts:1 +--cor-texto' <<'TS'
+const e = css`.x { color: var(--cor-texto, oklch(0.7 0.1 200)); }`;
+TS
+
+caso guard-tokens-css 1 "fallback em sintaxe de cor moderna (color-mix e lab)" 'caso\.ts:2 +--cor-borda' <<'TS'
+const e = css`.x { background: var(--cor-texto);
+  border-color: var(--cor-borda, color-mix(in srgb, lab(50% 40 59) 10%, transparent)); }`;
+TS
+
+caso guard-tokens-css 1 "VAR() em maiúsculas com fallback não escapa" 'caso\.ts:1 +--cor-texto' <<'TS'
+const e = css`.x { color: VAR(--cor-texto, #fff); }`;
 TS
 
 secao "guard-tokens-css — NÃO acusa (falso positivo desliga a guarda):"
 
-caso guard-tokens-css 0 "tokens do espelho, sem fallback e com fallback que é outro token" <<'TS'
-const e = css`.x { color: var(--cor-texto); border-color: var(--cor-borda, var(--cor-texto)); }`;
+caso guard-tokens-css 0 "tokens do espelho, sem fallback" <<'TS'
+const e = css`.x { color: var(--cor-texto); border-color: var(--cor-borda); }`;
+TS
+
+caso guard-tokens-css 0 "hook próprio encadeando em token real (o fallback é do hook, não do token)" <<'TS'
+const e = css`.x { --chat-cor: red; color: var(--chat-cor, var(--cor-texto)); }`;
 TS
 
 caso guard-tokens-css 0 "hook próprio do app mantém fallback de cor" <<'TS'
