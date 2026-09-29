@@ -555,7 +555,7 @@ export class ViabTelaPremissas extends LitElement {
        nunca no documento. */
     .prod-rolagem { overflow-x: auto; }
     table.prod.lot { min-width: 980px; }
-    table.prod td.calc { color: var(--cor-texto-sec, rgba(255,255,255,0.7)); }
+    table.prod td.calc { color: var(--cor-texto-sec); }
     table.prod td.nome urbi-input { width: 100%; }
     table.prod td.tipo urbi-select { width: 100%; }
     table.prod td viab-num { width: 100%; }
