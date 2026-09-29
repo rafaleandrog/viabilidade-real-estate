@@ -49,18 +49,21 @@ test('#566: modoEfetivo preserva um modo válido em uso (não força o padrão)'
   assert.equal(modoEfetivo(PERMUTA_FIS_NR, 'area_m2'), 'area_m2');
 });
 
-// #570 / rodada 1 de revisão — a coluna "Tipo" do grid de Produtos não existe
+// #570 / #781 — colunas do grid de Produtos por tipo de empreendimento.
 // no Loteamento.
 //
 // ⚠️ A prova mora AQUI, e não no harness de render, porque o harness só sabe
 // exigir PRESENÇA (`exigir`/`minimo`): ele não conta células nem prova que algo
 // está ausente. É o mesmo recurso que a #566 usou para provar que a Permuta
 // física parou de oferecer "Unidade" — a lista é exportada e conferida direto.
-test('rev1: o grid de Produtos não tem a coluna "Tipo" no Loteamento', () => {
-  const chaves = colunasProduto(true).map((c) => c.chave);
-  assert.ok(!chaves.includes('tipo'),
-    `o Loteamento não edita categoria — o motor normaliza tudo para residencial: ${chaves.join(',')}`);
-  assert.deepEqual(chaves, ['nome', 'area', 'preco', 'unidades', 'vgv']);
+test('#781: o grid de Produtos do Loteamento cadastra por % da ALV e Unidades; áreas são calculadas', () => {
+  const cols = colunasProduto(true);
+  assert.deepEqual(cols.map((c) => c.chave),
+    ['nome', 'tipo', 'pct', 'unidades', 'areaTotal', 'area', 'preco', 'vgv']);
+  // Área total e área média NÃO têm input: a célula delas é texto calculado.
+  // A prova mora no array porque o harness de render só exige PRESENÇA.
+  assert.ok(cols.some((c) => c.chave === 'tipo'), 'o Loteamento classifica Residencial/Comercial');
+  assert.equal(cols.find((c) => c.chave === 'area')!.rotulo, 'Área média do lote');
 });
 
 test('rev1: na Incorporação a coluna "Tipo" continua entre Nome e Área média', () => {
@@ -72,11 +75,9 @@ test('rev1: na Incorporação a coluna "Tipo" continua entre Nome e Área média
   assert.equal(chaves.indexOf('area'), chaves.indexOf('tipo') + 1);
 });
 
-test('rev1: as duas configurações diferem em UMA coluna, e só nela', () => {
-  const lot = colunasProduto(true).map((c) => c.chave);
+test('#781: a Incorporação não ganha coluna de % da ALV nem de área calculada', () => {
   const inc = colunasProduto(false).map((c) => c.chave);
-  assert.equal(inc.length, lot.length + 1, 'a diferença tem que ser exatamente uma coluna');
-  assert.deepEqual(inc.filter((c) => c !== 'tipo'), lot);
+  assert.ok(!inc.includes('pct') && !inc.includes('areaTotal'));
 });
 
 // #698 — prova de FIAÇÃO: `linhasCascataIncorporacao` é a MESMA função que

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { numeroEstrito } from './coercao-numerica.js';
 
 // Catálogo de Produtos do Preliminar (#315 — item 3 da Rodada 7): tabela
 // dinâmica (add/remove) com Nome, Área média, Preço de venda e Unidades;
@@ -16,10 +17,25 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 }
 
 // #565: `tipo` (residencial/nao_residencial) entra ENTRE `nome` e `area_media_m2`
-// — mesma posição da coluna no `schema.json` e no grid da tela. O motor da
-// Proforma ainda não lê este campo (bucket único, `vgvNaoResidencial = 0`);
-// ligar `tipo` ao cálculo é a #570.
-export const CAMPOS = ['nome', 'tipo', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
+// — mesma posição da coluna no `schema.json` e no grid da tela.
+// #781: `pct_alv` (participação na ALV, só Loteamento) entra logo depois de `tipo`.
+export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
+
+/**
+ * #781 — `pct_alv` é percentual: número estrito entre 0 e 100, ou `null` para
+ * limpar. Parser único do repositório (`numeroEstrito`), fail-closed: `''`,
+ * `'1e3'`, `'0x10'`, negativo e acima de 100 são recusados, não coagidos.
+ * Devolve a mensagem do erro, ou `null` quando o corpo está válido. A SOMA dos
+ * percentuais NÃO é conferida aqui: a edição é linha a linha e passa por
+ * estados intermediários; o portão da soma é o salvamento da tela e a
+ * submissão (`POST /estudos/:id/status`).
+ */
+export function erroPctAlv(body: Record<string, any>): string | null {
+  if (body.pct_alv === undefined || body.pct_alv === null) return null;
+  const v = numeroEstrito(body.pct_alv);
+  if (v === null || v < 0 || v > 100) return 'pct_alv deve ser um número entre 0 e 100';
+  return null;
+}
 
 async function produtoDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
   const pid = parseInt(req.params.pid);
@@ -54,6 +70,9 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem adicionar produtos'); return; }
 
+    const msgPct = erroPctAlv(req.body);
+    if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
+
     const existentes = await req.dados!.listar('preliminar_produtos', { filtros: { estudo_id: estudoId }, por_pagina: 500 });
     const dados: Record<string, any> = { estudo_id: estudoId, nome: '', ordem: existentes.total };
     for (const campo of CAMPOS) {
@@ -74,6 +93,9 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
     if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem editar produtos'); return; }
     const p = await produtoDoEstudo(req, res, estudoId);
     if (!p) return;
+
+    const msgPct = erroPctAlv(req.body);
+    if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
 
     const dados: Record<string, any> = {};
     for (const campo of CAMPOS) {

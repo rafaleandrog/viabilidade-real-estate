@@ -42,6 +42,7 @@ A fonte única do VGV, nos dois tipos, é o catálogo de **Produtos**:
 
 ```text
 VGV bruto da categoria = Σ (área média × preço de venda/m² × unidades) das linhas daquele tipo
+Loteamento: área média da linha = ALV × % da ALV ÷ unidades   (a área não é digitada)
 VGV da categoria       = VGV bruto da categoria − permuta física efetiva da categoria
 VGV                    = VGV residencial + VGV não residencial
 ```
@@ -64,8 +65,9 @@ residencial). **A separação em categorias é da Incorporação**: VGV, área t
 ponderado (`Σ VGV ÷ Σ área`) saem por categoria, e é sobre o total da categoria que as duas
 permutas do tipo incidem — a física converte o `% área venda` sobre a área daquele tipo e valora
 os m² entregues pelo preço médio daquele tipo; a financeira em `% VGV` incide sobre o VGV daquele
-tipo. **No Loteamento não há categorias**: o catálogo inteiro é tratado como residencial, a tela de
-Permutas só expõe os controles residenciais, e a permuta física valora pelo preço médio do
+tipo. **No Loteamento as permutas não têm categorias**: o catálogo inteiro é tratado como residencial
+para elas (a tela de Permutas só expõe os controles residenciais) — o Tipo de cada produto
+separa só o número de unidades e o preço médio por unidade, este sobre o VGV bruto do tipo —, e a permuta física valora pelo preço médio do
 catálogo — mas a base do `% área venda` continua sendo a área vendável da cascata. No Loteamento
 sem catálogo efetivo a permuta física vale zero; a Incorporação sem catálogo ainda valora a
 permuta pelas premissas de preço por m² por uso.

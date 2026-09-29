@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
 import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js';
+import { produtosDoEstudo, type ProformaInput } from '../../frontend/proforma.js';
 import {
   FATORES, SCHEMA_RESPOSTA, instrucoesSistema, calcularScores,
   montarContextoApeloDoEstudo, normalizarRespostaApelo,
@@ -157,7 +158,9 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
     const contexto = montarContextoApeloDoEstudo({
       localidade,
       tipoEmpreendimento: String(estudo.tipo_empreendimento ?? ''),
-      produtos: produtosRes.dados,
+      // #781: no Loteamento a área média é derivada da ALV (`pct_alv`), não o
+      // campo legado — `produtosDoEstudo` resolve nos dois tipos.
+      produtos: produtosDoEstudo({ ...estudo, produtos: produtosRes.dados } as unknown as ProformaInput),
       partes,
     });
 

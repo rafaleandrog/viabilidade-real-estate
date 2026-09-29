@@ -721,11 +721,14 @@ test('sem catálogo: o detalhe por tipo não sai de num_unidades_* nem dos preç
   assert.equal(p.precoMedioUnidadeNaoResidencial, 0);
 });
 
-test('loteamento não separa R/NR (métricas por tipo zeradas) (#7)', () => {
+// #781: o Loteamento passou a classificar cada produto (Residencial/Comercial),
+// e a classificação governa nº de unidades e preço médio por tipo. Produto
+// legado, sem `tipo`, é Residencial — a mesma leitura do schema.
+test('loteamento: produto sem tipo é Residencial; unidades e preço médio por tipo saem do catálogo (#7, #781)', () => {
   const p = calcularProforma(LOT);
-  assert.equal(p.numUnidadesResidencial, 0);
+  assert.equal(p.numUnidadesResidencial, 250);
   assert.equal(p.numUnidadesNaoResidencial, 0);
-  assert.equal(p.precoMedioUnidadeResidencial, 0);
+  assert.ok(perto(p.precoMedioUnidadeResidencial, 75_000_000 / 250));
   assert.equal(p.precoMedioUnidadeNaoResidencial, 0);
 });
 

@@ -18,6 +18,31 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-29 — #781: Produtos do Loteamento por % da ALV
+
+Pedido direto do autor, só para o Preliminar de Loteamento. No cadastro de Produtos os campos
+preenchidos passam a ser **% da ALV**, **Unidades** e **Tipo** (Residencial | Comercial), além do
+preço R$/m²; **Área total** (ALV × %) e **Área média do lote** (÷ unidades) são calculadas e seguem
+para Resultado, Gráficos, Proforma, Cenários, exportação e Apelo Comercial. A soma dos percentuais
+tem que ser 100% da ALV: sem isso a tela recusa "Salvar premissas" e o backend recusa a submissão
+(`422 SOMA_ALV_INVALIDA`); catálogo vazio não bloqueia. Esta regra substitui, só no Loteamento, o
+caráter informativo do aviso de área da #693.
+
+- Cálculo puro em `frontend/produtos-alv.ts`; o motor lê o catálogo por `produtosDoEstudo`
+  (`frontend/proforma.ts`), que no Loteamento devolve a área média derivada.
+- Coluna nova `preliminar_produtos.pct_alv` (decimal 7,4), migração `040` (no-op documentado) e
+  `versao` 0.1.39. **Sem backfill:** produto legado (sem `pct_alv`) mantém a área que tinha — o
+  percentual dele é derivado na leitura (`área × unidades ÷ ALV`), o que reproduz VGV e nº de lotes
+  idênticos; a primeira edição da linha grava o `pct_alv`. Reimplementar a cascata de áreas dentro
+  da migração criaria uma segunda cópia de uma regra que muda.
+- O Tipo do Loteamento governa só unidades e preço médio por tipo; permutas seguem no bucket único
+  residencial (a tela de Permutas do Loteamento só tem controles residenciais).
+- Tabela de 8 colunas com largura mínima e rolagem no contêiner (não cabe em 600 px).
+- `PATCH` de produto valida `pct_alv` (0–100, parser estrito); a soma só é conferida no salvar e na
+  submissão, porque a edição é linha a linha.
+- Docs: `docs/preliminar.md`, `formulas.md`, `modelo-de-dados.md`, `apelo-comercial.md`.
+- Fiação medida: com a derivação desligada no motor, 4 testes novos ficam vermelhos.
+
 ## 2026-09-25 — #736: fechamento da Rodada 13
 
 Rodada 13 encerrada na mesma alteração que fecha a última issue: `historico/rodada-13/planejamento.md`

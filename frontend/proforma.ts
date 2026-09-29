@@ -12,6 +12,7 @@
 //   - Contingências e Manutenção incidem sobre o VGV (§6.2).
 
 import { calcularCascata, CASCATA_LOTEAMENTO, type EstadoLinha, type UnidadeMestre } from './areas-cascata.js';
+import { produtosComAreaDerivada } from './produtos-alv.js';
 
 export interface ProformaInput {
   tipo_empreendimento: string;
@@ -135,6 +136,10 @@ export function fatoresDe(s: FatorSensibilidade | undefined | null): Partial<Rec
 }
 
 export interface ProdutoPreliminar {
+  // #781 — só no Loteamento: participação do produto na ALV (%). No
+  // Loteamento `area_media_m2` deixa de ser entrada e passa a ser DERIVADA
+  // (`produtosComAreaDerivada`, `produtos-alv.ts`).
+  pct_alv?: number | string | null;
   area_media_m2?: number | string | null;
   preco_venda_m2?: number | string | null;
   unidades?: number | string | null;
@@ -453,15 +458,38 @@ function estadosCascataLoteamento(e: ProformaInput): Record<string, EstadoLinha>
   };
 }
 
-export function calcularProforma(e: ProformaInput): Proforma {
-  const lot = e.tipo_empreendimento === 'loteamento';
-  // Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
-  // origem é Núcleo; senão, a área informada manualmente no estudo. Pelo
-  // MESMO piso das demais áreas (#612, rodada 2 de revisão): a cascata mostra
-  // a âncora cortada em 0, e custoTerreno/outorga/teto leem o mesmo 0.
-  const areaTerreno = e.origem_terreno === 'nucleo'
+// Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
+// origem é Núcleo; senão, a área informada manualmente no estudo. Pelo MESMO
+// piso das demais áreas (#612, rodada 2 de revisão): a cascata mostra a âncora
+// cortada em 0, e custoTerreno/outorga/teto leem o mesmo 0.
+function areaTerrenoDe(e: ProformaInput): number {
+  return e.origem_terreno === 'nucleo'
     ? areaM2(e.area_terreno_nucleo)
     : areaM2(e.terreno_manual_area);
+}
+
+/** ALV da cascata do Loteamento — a área vendável que os produtos repartem (#781). */
+export function alvDoLoteamento(e: ProformaInput): number {
+  const cascata = calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamento(e), areaTerrenoDe(e));
+  return cascata.find((l) => l.id === 'alv')!.m2;
+}
+
+/**
+ * O catálogo do estudo como o cálculo o enxerga (#781): no Loteamento, com a
+ * área média DERIVADA de `pct_alv` × ALV ÷ unidades; na Incorporação, a lista
+ * crua. Consumidores que listam produtos fora de `calcularProforma` (linhas da
+ * Proforma, Apelo Comercial, tabela de Produtos) leem por aqui — ler
+ * `area_media_m2` cru no Loteamento é ler o campo legado.
+ */
+export function produtosDoEstudo(e: ProformaInput): ProdutoPreliminar[] {
+  return e.tipo_empreendimento === 'loteamento'
+    ? produtosComAreaDerivada(e.produtos, alvDoLoteamento(e))
+    : (e.produtos ?? []);
+}
+
+export function calcularProforma(e: ProformaInput): Proforma {
+  const lot = e.tipo_empreendimento === 'loteamento';
+  const areaTerreno = areaTerrenoDe(e);
 
   // BUG7-08: fator de sensibilidade — 1 quando a variável estressada não é a
   // que este cálculo está resolvendo, senão o fator do estudo (Bear/Bull).
@@ -510,8 +538,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
   if (lot) {
     // Tabela em cascata (2026-08-03, `frontend/areas-cascata.ts`) — a Área
     // Líquida de Venda (ALV) da cascata É a área vendável do Loteamento.
-    const cascata = calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamento(e), areaTerreno);
-    areaVendavel = cascata.find((l) => l.id === 'alv')!.m2;
+    areaVendavel = alvDoLoteamento(e);
     areaPrivativa = areaVendavel; // lotes vendáveis
   } else {
     const rFech = areaM2(e.area_pvt_r_fechada), nrFech = areaM2(e.area_pvt_nr_fechada);
@@ -526,7 +553,9 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // sem catálogo herdava receita — e toda despesa em % de VGV — de valores que
   // ninguém consegue ver nem corrigir. Linha em branco não conta (a tela cria o
   // produto vazio), então `semProdutos` é sobre catálogo EFETIVO.
-  const catalogo = catalogoEfetivo(e.produtos);
+  // #781: no Loteamento a área de cada linha é DERIVADA da ALV (`pct_alv`) —
+  // `produtosDoEstudo` é quem decide, e tudo abaixo lê o catálogo já derivado.
+  const catalogo = catalogoEfetivo(produtosDoEstudo(e));
   const semProdutos = catalogo.length === 0;
   // #568: o stress de "Preço/m²" tem que alcançar o CATÁLOGO — sem isso o VGV
   // ficava congelado entre Bear/Base/Bull, porque `fatorSens('preco')` só
@@ -561,9 +590,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // financeira), então um produto marcado `nao_residencial` no grid sairia da
   // única base que a tela sabe editar — permuta física ignorando o produto e %
   // financeiro incidindo só sobre o resto, deduções subestimadas em silêncio.
-  // A semântica R/NR é da Incorporação; aqui o catálogo é um bucket só, como a
-  // tela sempre expôs (e, desde este PR, como o grid de Produtos também mostra:
-  // a coluna "Tipo" não é desenhada no Loteamento).
+  // A semântica R/NR das PERMUTAS é da Incorporação; aqui a base delas é um
+  // bucket só. Desde a #781 o grid de Produtos do Loteamento TEM a coluna Tipo
+  // (Residencial/Comercial) — ela governa só o nº de unidades e o preço médio
+  // por tipo (`porTipoReal`, mais abaixo), nunca o dinheiro.
   const porTipo = totaisPorTipoProdutos(
     lot ? catalogoEstressado.map((x) => ({ ...x, tipo: 'residencial' })) : catalogoEstressado,
   );
@@ -780,12 +810,22 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // médio = VGV do tipo (já líquido de permuta física) ÷ nº de unidades do tipo.
   // A contagem por tipo vem do `tipo` de cada linha do catálogo (#570) — antes
   // caía inteira em Residencial, e o preço médio NR mostrava zero mesmo com VGV
-  // não residencial existindo. Loteamento não separa os dois tipos: lá as duas
-  // métricas ficam em zero, como sempre estiveram.
-  const numUnidadesResidencial = lot ? 0 : porTipo.residencial.unidades;
-  const numUnidadesNaoResidencial = lot ? 0 : porTipo.nao_residencial.unidades;
-  const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvResidencial / numUnidadesResidencial : 0;
-  const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvNaoResidencial / numUnidadesNaoResidencial : 0;
+  // não residencial existindo.
+  //
+  // #781 — o Loteamento passou a classificar cada produto (Residencial /
+  // Comercial), e é AQUI que a classificação tem efeito: nº de unidades e preço
+  // médio por unidade de cada tipo. Ela NÃO mexe no dinheiro do Loteamento —
+  // `porTipo` continua normalizado para o bucket residencial (as permutas do
+  // Loteamento só têm controle residencial na tela), então o preço médio por
+  // tipo do Loteamento é o VGV BRUTO do tipo ÷ suas unidades: a permuta física
+  // deduz do bucket único e não é atribuída a um tipo.
+  const porTipoReal = lot ? totaisPorTipoProdutos(catalogoEstressado) : porTipo;
+  const numUnidadesResidencial = porTipoReal.residencial.unidades;
+  const numUnidadesNaoResidencial = porTipoReal.nao_residencial.unidades;
+  const vgvUnidadeResidencial = lot ? porTipoReal.residencial.vgv : vgvResidencial;
+  const vgvUnidadeNaoResidencial = lot ? porTipoReal.nao_residencial.vgv : vgvNaoResidencial;
+  const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvUnidadeResidencial / numUnidadesResidencial : 0;
+  const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvUnidadeNaoResidencial / numUnidadesNaoResidencial : 0;
 
   // Aproveitamento do coeficiente máximo (#569): o teto só existe com
   // coeficiente > 0 — Loteamento nunca preenche o campo, então `coefMax` fica

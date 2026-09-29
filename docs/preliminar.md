@@ -34,7 +34,17 @@ Quatro sub-abas, cada uma com os campos que valem para o tipo do estudo (Loteame
 | **Terreno & Áreas** | A área do terreno vem do Núcleo ou do terreno manual, e a tabela de áreas é uma cascata. Na Incorporação, o seletor **Buscar lote** lista só os lotes elegíveis: os de parcelamento em regularização fundiária ou vinculado a um setor habitacional ficam de fora (se o Núcleo não responder por parcelamentos, um aviso diz que a lista não está filtrada). Em **Loteamento**: da **Área da Poligonal** menos a APP sai a **Área Parcelável**; dela saem ELUP/EPU, EPC e o sistema viário público até a **Área Líquida**; e desta saem o sistema viário privado, as áreas comuns privadas e as áreas verdes até a **Área Líquida de Venda (ALV)** — cada linha em m², ha, % da poligonal e % do parcelável. Em **Incorporação**: os **Coeficiente mínimo** e **Coeficiente máximo** de aproveitamento e a cascata que parte da **Área do Terreno**: as quatro áreas privativas (residencial e não residencial, fechada e aberta) somadas na **Área Privativa Total**, mais a **Área Comum Total**, até a **Área Construída Total**, com os KPIs de aproveitamento do coeficiente. |
 | **Custos** | Três custos têm seletor de unidade — Infraestrutura em R$, R$/m² ou % do VGV; Construção em R$/m² ou R$ total; Projetos em % do VGV ou R$ fixo — e o app converte para a base da Proforma; os demais custos têm unidade fixa. Loteamento: infraestrutura, projetos, stand de vendas. Incorporação: construção, decoração, gestão da construção, incorporação e registro, valor venal do terreno (outorga). Comuns: custo do terreno, manutenção pós-obra, contingências, marketing global, gestão e outros indiretos, corretagem, marketing e o imposto — com a opção **Sujeito a RET**, que troca o imposto pela alíquota fixa do regime. Os interruptores **Considerar…** ligam ou desligam um custo sem apagar o valor. |
 | **Permutas** | **Permuta física** (em m² ou em percentual da área de venda; residencial e não residencial na Incorporação) e **permuta financeira** (percentual do VGV ou valor). A física reduz a área que o incorporador vende; a financeira é dedução sobre a receita. |
-| **Produtos** | O catálogo de tipologias: nome, tipo, área média, preço de venda e unidades. O VGV de cada produto aparece na linha, e o total alimenta a Proforma quando o catálogo existe. |
+| **Produtos** | O catálogo de tipologias. Na Incorporação: nome, tipo, área média, preço de venda e unidades; o VGV de cada produto aparece na linha, e o total alimenta a Proforma quando o catálogo existe. No **Loteamento** o cadastro é por participação na ALV — veja abaixo. |
+
+**Produtos do Loteamento.** Cada linha tem **Nome**, **Tipo** (Residencial ou Comercial), **% da
+ALV**, **Unidades** e **Preço de venda** (R$/m²) — os campos que se preenchem. A **Área total** da
+linha (ALV × %) e a **Área média do lote** (área total ÷ unidades) são calculadas, e o **VGV** é a
+área total × o preço. Como a área vem da ALV, mudar a Terreno & Áreas recalcula área média e VGV
+sem tocar nos percentuais. A soma dos percentuais tem que ser **100% da ALV**: o indicador abaixo
+da tabela mostra quanto está alocado e quanto resta, o produto novo já nasce com o que falta, e
+com a soma diferente de 100% o app recusa **Salvar premissas** e **Submeter para análise**.
+Catálogo vazio não bloqueia. O Tipo separa, na Proforma, o número de unidades e o preço médio por
+tipo; ele não muda o VGV nem as permutas do Loteamento.
 
 Na sub-aba Produtos, abaixo do catálogo, o card **Resumo** mostra os KPIs do tipo. No Loteamento:
 **Área da gleba**, **Área vendável**, **Vendável / gleba** (contra o benchmark), **VGV**, **Nº de
@@ -106,7 +116,8 @@ ao resultado, barra a barra (os rótulos saem em R$ milhões, o valor exato fica
 barra; num projeto deficitário o resultado é desenhado abaixo de uma linha do zero, e o rodapé diz a
 escala); a **cadeia de áreas**, do terreno à área vendida, em barras proporcionais; e os indicadores
 contra benchmark. Um aviso aparece quando o catálogo de produtos não fecha com as áreas informadas —
-é informativo e não impede salvar.
+na Incorporação é informativo e não impede salvar; no Loteamento a mesma falta de fechamento é a
+soma dos percentuais diferente de 100% da ALV, que impede salvar as premissas.
 
 ### Análise de Mercado
 

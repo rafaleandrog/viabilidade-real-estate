@@ -21,6 +21,8 @@ import {
 } from '../../frontend/estudo-status.js';
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
+import { alvDoLoteamento, type ProformaInput } from '../../frontend/proforma.js';
+import { validarSomaPctAlv } from '../../frontend/produtos-alv.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
@@ -862,6 +864,17 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
       const quem = gate === 'aprovador' ? 'aprovadores' : 'editores';
       erro(res, 403, 'SEM_PERMISSAO', `Apenas ${quem} podem fazer esta transição`);
       return;
+    }
+
+    // #781: Loteamento só é submetido com os produtos somando 100% da ALV. A
+    // tela já barra o botão; este é o portão, para a API não contornar a regra.
+    // Catálogo vazio passa (estudo que ainda não chegou à aba Produtos).
+    if (novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento') {
+      const prod = await req.dados!.listar('preliminar_produtos', {
+        filtros: { estudo_id: estudoId }, por_pagina: 500,
+      });
+      const soma = validarSomaPctAlv(prod.dados, alvDoLoteamento(estudo as unknown as ProformaInput));
+      if (!soma.ok) { erro(res, 422, 'SOMA_ALV_INVALIDA', soma.mensagem ?? 'Os produtos devem somar 100% da ALV'); return; }
     }
 
     const atualizado = await req.dados!.atualizar('estudos', estudoId, { status: novoStatus });
