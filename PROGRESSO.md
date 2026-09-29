@@ -18,6 +18,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-29 — `identidade` no manifesto
+
+A instância (boot da app) acusava a obsolescência `manifesto-sem-identidade`: o `manifesto.json` não
+declarava `identidade`. A janela é curta — vira erro em 2026-10-13 e reprova o pacote em 2026-10-28.
+Declarado `"identidade": "rafaleandrog/viabilidade-real-estate::viabilidade"` (`{owner}/{repo}::{slug}`).
+Uma linha, sem mudar `versao` (a versão descreve o schema) e sem piso novo — um shell anterior ignora
+a chave. O `urbi-empacotar` aceita o manifesto. O aviso some da instância no próximo upgrade.
+
+Proveniência, porque nada disto está no SDK que o `package.json` fixa (`57.0.0`): a chave
+`manifesto-sem-identidade`, o formato e as duas datas vêm do catálogo de obsolescências de um SDK **mais
+novo** que o pin — o `57.0.0` não a traz, e por isso o `urbi-empacotar` local não avisa dela. O
+`owner/repo` é o do remote git deste repositório e o mesmo do vínculo de origem que a instância mostra
+no log do upgrade (`Vinculo de origem: rafaleandrog/viabilidade-real-estate`). O `slug` é o id com que a
+app é empacotada (`urbi-empacotar viabilidade`).
+
 ## 2026-09-29 — aviso "tokens de tema" (343 → 15)
 
 O aviso do `urbi-empacotar` (`343 literais de cor fora de token no bundle`) aparecia em toda tela de

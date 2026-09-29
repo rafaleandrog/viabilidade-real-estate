@@ -1,4 +1,5 @@
 {
+  "identidade": "rafaleandrog/viabilidade-real-estate::viabilidade",
   "nome": "Estudo de Viabilidade",
   "versao": "0.1.38",
   "shell_min": "0.53.20",
