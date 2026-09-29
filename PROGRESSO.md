@@ -18,6 +18,15 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-29 — `identidade` no manifesto
+
+A instância (boot da app) acusava a obsolescência `manifesto-sem-identidade`: o `manifesto.json` não
+declarava `identidade`. A janela é curta — vira erro em 2026-10-13 e reprova o pacote em 2026-10-28.
+Declarado `"identidade": "rafaleandrog/viabilidade-real-estate::viabilidade"` (`{owner}/{repo}::{slug}`;
+o `owner/repo` é o mesmo que o vínculo de origem já gravado na instância, e o `slug` é o id da app).
+Uma linha, sem mudar `versao` (a versão descreve o schema) e sem piso novo — um shell anterior ignora
+a chave. O `urbi-empacotar` aceita o manifesto. O aviso some da instância no próximo upgrade.
+
 ## 2026-09-25 — #736: fechamento da Rodada 13
 
 Rodada 13 encerrada na mesma alteração que fecha a última issue: `historico/rodada-13/planejamento.md`
