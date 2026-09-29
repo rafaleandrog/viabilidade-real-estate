@@ -62,10 +62,13 @@ rotasPreliminarProdutos.get('/estudos/:id/preliminar/produtos', async (req: Requ
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     if (!(await exigirMembro(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso'); return; }
 
-    const r = await req.dados!.listar('preliminar_produtos', {
-      filtros: { estudo_id: estudoId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
+    // #781: o catálogo INTEIRO — a tela confere a soma dos percentuais sobre esta
+    // lista, e uma página fixa (antes 200) faria a regra dos 100% valer sobre uma
+    // fatia enquanto a submissão (que varre tudo) valeria sobre o total.
+    const dados = await req.dados!.varrerTudo('preliminar_produtos', {
+      filtros: { estudo_id: estudoId }, ordenar: 'ordem', ordem: 'asc',
     });
-    res.json(r);
+    res.json({ dados, total: dados.length });
   } catch (e: any) {
     console.error('Erro em GET /preliminar/produtos:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);

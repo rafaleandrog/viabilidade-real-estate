@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   FATORES, montarContextoApelo, montarContextoApeloDoEstudo, normalizarRespostaApelo, calcularScores,
 } from './apelo-comercial.js';
@@ -34,7 +35,8 @@ test('BUG7-15 montarContextoApelo: localidade/área/preço ausentes não quebram
 // ── #588: contexto deriva do catálogo EFETIVO de Produtos, nunca dos campos
 // legados congelados de `estudos` (area_media_lote_m2, num_unidades*,
 // preco_venda_m2*) — `montarContextoApeloDoEstudo` é o único ponto que o
-// handler HTTP chama, e recebe a lista crua de `preliminar_produtos`.
+// handler HTTP chama. Ele recebe os produtos que o handler já passou por
+// `produtosDoEstudo` (no Loteamento, com a área média derivada da ALV — #781).
 
 test('#588 montarContextoApeloDoEstudo: estudo com catálogo editado — contexto reflete o catálogo, não campos legados', () => {
   const ctx = montarContextoApeloDoEstudo({
@@ -183,4 +185,14 @@ test('BUG7-15 normalizarRespostaApelo → calcularScores: score geral reflete s�
   const { porFator, geral } = calcularScores(norm.fatores);
   assert.equal(porFator.score_localizacao, 4); // média de 5 e 3
   assert.equal(geral, 4);
+});
+
+// #781 fiação: o handler do Apelo entrega ao contexto os produtos JÁ derivados da
+// ALV. `produtosDoEstudo` é testada em `frontend/produtos-alv.test.ts`; nada aqui
+// sobe servidor, então apagar a chamada deixaria o Loteamento sem área média no
+// contexto da IA (produto só com `pct_alv`) com a suíte verde.
+test('#781 fiação: o handler do Apelo lê o catálogo por produtosDoEstudo', () => {
+  const fonte = readFileSync(new URL('./rotas/apelo-comercial.ts', import.meta.url), 'utf8');
+  assert.ok(fonte.includes('produtos: produtosDoEstudo({ ...estudo, produtos: produtosRes.dados }'),
+    'o Apelo voltou a ler o catálogo cru');
 });

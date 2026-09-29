@@ -438,3 +438,14 @@ test('Cenários — FIAÇÃO: o catálogo `LINHAS_SENSIBILIDADE` tem "Deduções
     '"Deduções sobre VGV" deveria ser `natureza: \'despesa\'` (sempre entre parênteses, sem classe pos/neg) — igual a Custo direto/indireto total',
   );
 });
+
+// #781 fiação: as sub-linhas por produto da Proforma leem o catálogo por
+// `produtosDoEstudo` (no Loteamento, com a área derivada da ALV). Nenhum teste
+// monta a tela; apagar a chamada deixaria produto só com `pct_alv` com VGV zero
+// na linha, com a suíte verde.
+test('#781 fiação: montarLinhasProforma deriva o catálogo por produtosDoEstudo', async () => {
+  const { readFileSync } = await import('node:fs');
+  const fonte = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');
+  assert.ok(fonte.includes('produtosDoEstudo({ ...(ctx.estudo as any), produtos: ctx.produtos }'),
+    'as linhas por produto voltaram a ler o catálogo cru');
+});

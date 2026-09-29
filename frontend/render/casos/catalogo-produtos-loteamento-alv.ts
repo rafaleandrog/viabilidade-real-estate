@@ -39,6 +39,8 @@ export const caso = {
     { seletor: 'colgroup col.p-pct', minimo: 1 },
     { seletor: 'colgroup col.p-atotal', minimo: 1 },
     { seletor: 'colgroup col.p-amedia', minimo: 1 },
+    // Entradas por linha: % da ALV, Unidades e Preço — 3 × 2 linhas de `viab-num`.
+    { seletor: 'table.prod.lot tbody td.num viab-num', minimo: 6 },
     // Área total e área média são CALCULADAS: 2 linhas × 2 colunas de texto.
     { seletor: 'table.prod td.calc', minimo: 4 },
     // Indicador da ALV: 3 KPIs e o aviso de "falta" (90% < 100%).

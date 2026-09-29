@@ -1286,7 +1286,11 @@ export class ViabTelaPremissas extends LitElement {
     const alv = alvDoLoteamento(this._entradaProforma());
     if (alv <= 0 && this.produtos.length === 0) return html``;
     const a = alocacaoAlv(this.produtos, alv);
-    const variante = this.produtos.length > 0 && a.estado !== 'completa' ? 'erro' : '';
+    // O estado de erro e os avisos de bloqueio espelham `validarSomaPctAlv`: só
+    // valem com produto cadastrado E ALV positiva. Sem ALV a regra não se aplica,
+    // e anunciar um bloqueio que não existe é o inverso do defeito de falhar aberto.
+    const aplica = this.produtos.length > 0 && alv > 0;
+    const variante = aplica && a.estado !== 'completa' ? 'erro' : '';
     const m2 = (pct: number) => fmtM2(alv * pct / 100);
     return html`
       <div class="kpis area-alocada">
@@ -1294,12 +1298,12 @@ export class ViabTelaPremissas extends LitElement {
         <urbi-kpi rotulo="Área Líquida de Venda (ALV)" .valor=${fmtM2(alv)}></urbi-kpi>
         <urbi-kpi rotulo="Restante" .valor=${`${fmtPctAlv(a.restante)} (${m2(a.restante)})`} variante=${variante}></urbi-kpi>
       </div>
-      ${this.produtos.length > 0 && a.estado === 'falta' ? html`
+      ${aplica && a.estado === 'falta' ? html`
         <urbi-banner class="aviso-area-alocada" variante="erro">
           Faltam ${fmtPctAlv(a.restante)} da ALV (${m2(a.restante)}) para alocar. Os produtos precisam
           somar 100% da ALV para salvar as premissas e submeter o estudo.
         </urbi-banner>` : nothing}
-      ${this.produtos.length > 0 && a.estado === 'excesso' ? html`
+      ${aplica && a.estado === 'excesso' ? html`
         <urbi-banner class="aviso-area-alocada" variante="erro">
           Os produtos somam ${fmtPctAlv(a.soma)} da ALV — ${fmtPctAlv(Math.abs(a.restante))}
           (${m2(Math.abs(a.restante))}) acima do disponível. Os produtos precisam somar 100% da ALV

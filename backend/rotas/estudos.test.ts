@@ -1019,6 +1019,10 @@ test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento co
   ]) {
     assert.ok(FONTE_ROTA.includes(parte), `o handler de status deixou de ter: ${parte}`);
   }
+  // O predicado é `!soma.ok` E a recusa RETORNA: invertê-lo ou perder o `return;`
+  // manteria as quatro strings acima e desligaria o portão.
+  assert.match(FONTE_ROTA, /if \(!soma\.ok\) \{ erro\(res, 422, 'SOMA_ALV_INVALIDA'[^\n]*\); return; \}/,
+    'o portão deixou de recusar (predicado invertido ou return perdido)');
   // A recusa vem ANTES de gravar o status.
   assert.ok(
     FONTE_ROTA.indexOf("erro(res, 422, 'SOMA_ALV_INVALIDA'") < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, { status: novoStatus })"),

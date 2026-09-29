@@ -45,6 +45,11 @@ const FONTE = readFileSync(new URL('./preliminar-produtos.ts', import.meta.url),
   .split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); })
   .join('\n');
 
+test('#781 fiação: o GET devolve o catálogo INTEIRO (varrerTudo), não uma página', () => {
+  assert.ok(FONTE.includes("varrerTudo('preliminar_produtos'"), 'o GET voltou a paginar — a soma dos % é conferida sobre uma fatia');
+  assert.ok(!FONTE.includes('por_pagina: 200'));
+});
+
 test('#781 fiação: POST e PATCH chamam erroPctAlv e gravam pct_alv como número', () => {
   assert.equal(FONTE.split('erroPctAlv(req.body)').length - 1, 2, 'POST e PATCH validam pct_alv');
   assert.ok(FONTE.includes("criar('preliminar_produtos', comPctAlvNumerico(dados))"));

@@ -182,6 +182,9 @@ test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 
   const iCatalogo = FONTE_TELA_ALV.indexOf('if (!this._catalogoCarregado) {\n        this.erroGeral = \'Aguarde o carregamento dos produtos');
   const iSoma = FONTE_TELA_ALV.indexOf('validarSomaPctAlv(this.produtos, alvDoLoteamento(this._entradaProforma()))');
   const iGrava = FONTE_TELA_ALV.indexOf('this.salvando = true;');
+  // ...e cada portão RETORNA (sem o `return;` ele só avisa e o salvamento segue).
+  assert.match(FONTE_TELA_ALV, /if \(!this\._catalogoCarregado\) \{[\s\S]{0,300}?return;\s*\}/, 'a espera pelo catálogo perdeu o return');
+  assert.match(FONTE_TELA_ALV, /if \(!soma\.ok\) \{[\s\S]{0,300}?return;\s*\}/, 'a recusa da soma perdeu o return (ou o predicado foi invertido)');
   assert.ok(iCatalogo > 0, 'a espera pelo catálogo saiu do _salvar');
   assert.ok(iSoma > iCatalogo, 'a soma é conferida depois da espera pelo catálogo');
   assert.ok(iGrava > iSoma, 'ambos os portões precedem a gravação');
