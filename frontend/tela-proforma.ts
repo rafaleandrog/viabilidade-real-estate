@@ -285,9 +285,9 @@ export class ViabTelaProforma extends LitElement {
     .sens-var {
       margin-bottom: 12px;
       font-size: 13px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
     }
-    .sens-var strong { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); }
+    .sens-var strong { color: var(--cor-texto-forte); }
     /* Rodada 13 (#729/#733) — os dois cartões novos da aba Cenários, lado a
        lado quando a viewport permitir e empilhados abaixo de ~600px (o mesmo
        piso de teste do restante do app). */
@@ -300,23 +300,23 @@ export class ViabTelaProforma extends LitElement {
     .cenarios-subtitulo {
       margin: -4px 0 12px;
       font-size: 12px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
     }
     .sens-passo { max-width: 200px; margin-top: 12px; }
     /* #734 — a leitura decisória da variável selecionada, abaixo do tornado. */
     .colchao {
       margin-top: 14px;
       padding-top: 12px;
-      border-top: 1px solid var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      border-top: 1px solid var(--cor-borda-sutil);
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
-    .colchao-var { margin: 0; font-size: 12px; color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5)); }
-    .colchao-var strong { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); }
+    .colchao-var { margin: 0; font-size: 12px; color: var(--cor-texto-sec); }
+    .colchao-var strong { color: var(--cor-texto-forte); }
     .colchao-texto { margin: 0; font-size: 0.85rem; line-height: 1.4; }
-    .colchao-baixa { color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5)); font-style: italic; }
-    .colchao-circular { color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4)); font-size: 0.78rem; }
+    .colchao-baixa { color: var(--cor-texto-sec); font-style: italic; }
+    .colchao-circular { color: var(--cor-texto-fraco); font-size: 0.78rem; }
     .margem-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -331,41 +331,41 @@ export class ViabTelaProforma extends LitElement {
       /* Mesmo padrão de superfície + borda de .kpi-card (fluxo-tabela.ts:82-84)
          — achado da lente S3 (PR #757): um token de borda como preenchimento,
          sem borda, divergia do padrão caseiro do app. */
-      background: var(--cor-superficie, rgba(255, 255, 255, 0.04));
-      border: 1px solid var(--cor-borda, rgba(255, 255, 255, 0.08));
+      background: var(--cor-superficie);
+      border: 1px solid var(--cor-borda);
       min-width: 0;
     }
     .margem-rotulo {
       font-size: 11px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
     }
     .margem-valor {
       font-size: 18px;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
       overflow-wrap: anywhere;
     }
     .margem-rodape {
       margin: 12px 0 0;
       font-size: 11px;
-      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+      color: var(--cor-texto-fraco);
     }
     urbi-card + urbi-card { margin-top: 16px; }
-    strong.total { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
+    strong.total { color: var(--cor-texto-forte); }
 
     /* #3: tabela da Proforma com 4 tipos de linha, só cores do design system. */
     .pf-wrap { overflow-x: auto; }
     table.pf { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
-    .pf th, .pf td { padding: 8px 10px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
+    .pf th, .pf td { padding: 8px 10px; border-bottom: 1px solid var(--cor-borda-sutil); }
     /* Cabeçalhos maiores e centralizados; a coluna Descrição fica à esquerda. */
     .pf th {
       text-align: center; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
     .pf th.desc { text-align: left; }
     .pf th.num { text-align: center; }
-    .pf td { text-align: left; color: var(--cor-texto, rgba(255,255,255,0.85)); }
+    .pf td { text-align: left; color: var(--cor-texto); }
     .pf .num { text-align: right; white-space: nowrap; }
     .toggle {
       background: none; border: none; color: inherit; cursor: pointer;
@@ -382,8 +382,8 @@ export class ViabTelaProforma extends LitElement {
     }
     /* Tipo 2 — Consolidado (bold + fundo de destaque). */
     .pf tr.consolidado td {
-      font-weight: 700; background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
-      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+      font-weight: 700; background: var(--cor-superficie-hover);
+      color: var(--cor-texto-forte);
     }
     /* #74 — Receita líquida e operacional: fundo verde (consolidado de receita). */
     .pf tr.consolidado.nat-receita td {
@@ -401,21 +401,21 @@ export class ViabTelaProforma extends LitElement {
     /* Tipo 3 — Resultado final (bold + grande + highlight forte). #13: espaço extra
        acima, separando o Resultado da última linha de custos (onde saiu o memo). */
     .pf tr.resultado td {
-      font-weight: 800; font-size: 1.05rem; background: var(--cor-primaria-fundo, rgba(42,169,224,0.12));
-      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
-      padding-top: 14px; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.12));
+      font-weight: 800; font-size: 1.05rem; background: var(--cor-primaria-fundo);
+      color: var(--cor-texto-forte);
+      padding-top: 14px; border-top: 2px solid var(--cor-borda);
     }
-    .pf tr.resultado td.pos { color: var(--cor-sucesso, #13A98D); }
-    .pf tr.resultado td.neg { color: var(--cor-erro, #D45A3A); }
+    .pf tr.resultado td.pos { color: var(--cor-sucesso); }
+    .pf tr.resultado td.neg { color: var(--cor-erro); }
     /* Tipo 4 — Itens/sub-linhas (discreto/neutro). */
-    .pf tr.item td { color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
+    .pf tr.item td { color: var(--cor-texto-sec); }
     /* #8/#73 — "VGV sem permuta": itálico + fundo neutro diferenciado. */
-    .pf tr.italico td { font-style: italic; background: var(--cor-superficie, rgba(255,255,255,0.04)); }
+    .pf tr.italico td { font-style: italic; background: var(--cor-superficie); }
     /* #8 — 2ª coluna de descrição da conta: texto menor e itálico, cinza; o
        padding da célula garante o respiro (não cola no título). */
     .pf td.desc {
       font-style: italic; font-size: 0.72rem; max-width: 340px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
     /* #34: indicadores da sensibilidade numa tabela separada com espaçamento. */
     .sens-indicadores { margin-top: 20px; }
@@ -440,8 +440,8 @@ export class ViabTelaProforma extends LitElement {
        (melhor/pior), rótulo do cabeçalho ordenável. */
     .pf.sens td.delta, .pf.sens td.amplitude { font-size: 0.78rem; font-weight: 500; }
     .pf.sens th.delta, .pf.sens th.amplitude { font-size: 0.75rem; }
-    .pf.sens td.delta.var-melhor { color: var(--cor-sucesso, #13A98D); }
-    .pf.sens td.delta.var-pior { color: var(--cor-erro, #D45A3A); }
+    .pf.sens td.delta.var-melhor { color: var(--cor-sucesso); }
+    .pf.sens td.delta.var-pior { color: var(--cor-erro); }
     .pf.sens th.amplitude button.ordenar {
       all: unset;
       cursor: pointer;
@@ -449,15 +449,15 @@ export class ViabTelaProforma extends LitElement {
       color: inherit;
       user-select: none;
     }
-    .pf.sens th.amplitude button.ordenar:focus-visible { outline: 2px solid var(--cor-primaria-solida, #2aa9e0); outline-offset: 2px; }
+    .pf.sens th.amplitude button.ordenar:focus-visible { outline: 2px solid var(--cor-primaria-solida); outline-offset: 2px; }
     .sens-invariantes { margin-top: 8px; }
     .sens-invariantes summary {
       cursor: pointer;
       padding: 8px 10px;
       font-size: 0.8rem;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
     }
-    .sens-invariantes summary:focus-visible { outline: 2px solid var(--cor-primaria-solida, #2aa9e0); outline-offset: -2px; }
+    .sens-invariantes summary:focus-visible { outline: 2px solid var(--cor-primaria-solida); outline-offset: -2px; }
     /* BUG7-12 — cabeçalho (badge via .sens-cab, acima) e valores alinhados à
        direita, como o resto do app; sobrepõe o '.pf th.num { text-align: center }'
        genérico (usado pela tabela principal do Proforma) só dentro de '.pf.sens'. */
@@ -468,22 +468,22 @@ export class ViabTelaProforma extends LitElement {
        atributo style inline: declaração inline vence qualquer seletor, e a
        marca de negativo abaixo precisa poder sobrepô-la. (Sem crase neste
        bloco: ele mora dentro do template literal do css.) */
-    .pf.sens td.num.cen-bear { color: var(--cor-erro, #D45A3A); }
-    .pf.sens td.num.cen-base { color: var(--cor-sucesso, #13A98D); }
-    .pf.sens td.num.cen-bull { color: var(--cor-info, #2AA9E0); }
+    .pf.sens td.num.cen-bear { color: var(--cor-erro); }
+    .pf.sens td.num.cen-base { color: var(--cor-sucesso); }
+    .pf.sens td.num.cen-bull { color: var(--cor-info); }
     /* #568/#567 — receita ou resultado REALMENTE negativo: vermelho, sobrepondo
        a cor do cenário (o verde do Base mentiria "receita boa" num cenário
        deficitário — a mesma decisão que a #567 tomou na tabela principal).
        Mesma especificidade das três regras acima: vence por vir DEPOIS. */
-    .pf.sens td.num.neg { color: var(--cor-erro, #D45A3A); }
+    .pf.sens td.num.neg { color: var(--cor-erro); }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
     .ut-rot {
       font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
-    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
+    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte); font-variant-numeric: tabular-nums; }
   `];
 
   private _idCarregado: number | null = null;

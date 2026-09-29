@@ -56,11 +56,11 @@ export class ViabImagemPrincipal extends LitElement {
     .previa {
       display: block; max-width: 320px; max-height: 220px; width: auto; height: auto;
       border-radius: 8px; object-fit: cover;
-      border: 1px solid var(--cor-borda, rgba(255,255,255,0.08));
+      border: 1px solid var(--cor-borda);
     }
     p.vazio {
       margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem);
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
     .acoes { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   `];

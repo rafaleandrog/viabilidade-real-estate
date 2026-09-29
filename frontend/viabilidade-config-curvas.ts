@@ -38,11 +38,11 @@ export class ViabConfigCurvas extends LitElement {
     table.curva { width: 100%; border-collapse: collapse; }
     table.curva th, table.curva td {
       padding: 5px 8px; text-align: left; font-size: var(--texto-corpo, 0.8125rem);
-      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+      border-bottom: 1px solid var(--cor-borda-sutil);
     }
     table.curva viab-num { width: 120px; }
     .soma { margin-top: 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .soma.invalida { color: var(--cor-erro, #d45a3a); }
+    .soma.invalida { color: var(--cor-erro); }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
     .valores-scroll { max-height: 340px; overflow-y: auto; }
   `];

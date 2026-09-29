@@ -79,13 +79,13 @@ export class ViabFluxoCronograma extends LitElement {
     table.crono { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     table.crono th {
       text-align: left; font-weight: 600; padding: 8px 10px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
       font-size: var(--texto-rotulo, 0.75rem);
-      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      border-bottom: 1px solid var(--cor-borda);
     }
     table.crono td {
       padding: 6px 10px;
-      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+      border-bottom: 1px solid var(--cor-borda-sutil);
       font-size: var(--texto-corpo, 0.8125rem);
     }
     table.crono td.evento { white-space: nowrap; }
@@ -127,12 +127,12 @@ export class ViabFluxoCronograma extends LitElement {
        junto seria mexer no que não se mede. */
     .campo-mes viab-num { width: auto; min-width: 10ch; max-width: 24ch; }
     .cadeado { opacity: 0.7; font-size: 0.75rem; }
-    td.periodo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); white-space: nowrap; }
+    td.periodo { color: var(--cor-texto-sec); white-space: nowrap; }
 
     .secao-titulo {
       font-size: var(--texto-rotulo, 0.75rem); font-weight: 700; letter-spacing: 0.06em;
-      text-transform: uppercase; color: var(--cor-texto-sec, rgba(255,255,255,0.5));
-      padding: 14px 10px 6px; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      text-transform: uppercase; color: var(--cor-texto-sec);
+      padding: 14px 10px 6px; border-bottom: 1px solid var(--cor-borda);
     }
     .acoes-fase { margin-top: 12px; }
     .acoes-cronograma { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -564,8 +564,8 @@ export class ViabFluxoCronograma extends LitElement {
     const ticks: number[] = [];
     for (let m = 0; m <= fim; m += passo) ticks.push(m);
 
-    const corTexto = 'var(--cor-texto-sec, #8a8f98)';
-    const corGrade = 'var(--cor-borda-sutil, rgba(128,128,128,0.25))';
+    const corTexto = 'var(--cor-texto-sec)';
+    const corGrade = 'var(--cor-borda-sutil)';
 
     return html`
       <div class="gantt-wrap" role="img" aria-label="Gantt do cronograma">

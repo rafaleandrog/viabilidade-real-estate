@@ -319,14 +319,14 @@ export class ViabFluxoCustos extends LitElement {
     .rodape-custo {
       display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
       margin-top: 10px; padding: 10px 12px 4px;
-      border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2));
-      background: var(--cor-superficie-hover, rgba(255,255,255,0.04));
+      border-top: 2px solid var(--cor-borda);
+      background: var(--cor-superficie-hover);
       border-radius: 0 0 8px 8px;
     }
     .rodape-custo .espaco { flex: 1; }
     /* #346: RET, único controle global exibido dentro do grupo Financeiro. */
     .ret-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-    .total-rotulo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .total-rotulo { color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
     .total-valor { font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
     .orc { display: inline-flex; flex-direction: column; gap: 6px; align-items: flex-start; }
     .orc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -342,8 +342,8 @@ export class ViabFluxoCustos extends LitElement {
     .orc-permuta-fisica { display: flex; align-items: center; gap: 6px; }
     .orc-permuta-fisica urbi-select { width: 130px; }
     .orc-permuta-fisica viab-num { width: 90px; }
-    .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 0.85rem; }
-    .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec); font-size: 0.85rem; }
+    .mes-calc { white-space: nowrap; color: var(--cor-texto-sec); }
     /* #261: só nas colunas Início/Duração, mesma largura reservada de
        .campo-mes — sem isso, a coluna "pulava" de largura entre linhas
        travadas (.mes-calc, sem largura própria) e editáveis (.campo-mes,
@@ -369,17 +369,17 @@ export class ViabFluxoCustos extends LitElement {
     .graf-bloco h4 {
       margin: 0 0 6px; font-size: var(--texto-rotulo, 0.75rem); font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
     .avanco-tabela-wrap { overflow-x: auto; margin-top: 16px; }
     .avanco-tabela { border-collapse: collapse; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
     .avanco-tabela th, .avanco-tabela td {
       padding: 5px 8px; font-size: 0.75rem; white-space: nowrap; text-align: right;
-      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+      border-bottom: 1px solid var(--cor-borda-sutil);
     }
     .avanco-tabela th {
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600;
-      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      color: var(--cor-texto-sec); font-weight: 600;
+      border-bottom: 1px solid var(--cor-borda);
     }
     .avanco-tabela th:first-child, .avanco-tabela td:first-child { text-align: left; font-weight: 600; }
   `];
@@ -643,8 +643,8 @@ export class ViabFluxoCustos extends LitElement {
     }
 
     const series = [
-      { rotulo: CATEGORIA_CONSTRUCAO, valores: mensalConstrucao, cor: 'var(--cor-primaria-solida, #2AA9E0)' },
-      ...(mensalGestao ? [{ rotulo: CATEGORIA_GESTAO_OBRA, valores: mensalGestao, cor: 'var(--cor-alerta, #e0a82a)' }] : []),
+      { rotulo: CATEGORIA_CONSTRUCAO, valores: mensalConstrucao, cor: 'var(--cor-primaria-solida)' },
+      ...(mensalGestao ? [{ rotulo: CATEGORIA_GESTAO_OBRA, valores: mensalGestao, cor: 'var(--cor-alerta)' }] : []),
     ];
     const totalExibido = acumulado[acumulado.length - 1] ?? 0;
 
@@ -678,7 +678,7 @@ export class ViabFluxoCustos extends LitElement {
             formato="moeda"
             legenda="sempre"
             .categorias=${c.meses}
-            .series=${[{ rotulo: 'Acumulado', valores: acumulado, cor: 'var(--cor-primaria-solida, #2AA9E0)' }]}
+            .series=${[{ rotulo: 'Acumulado', valores: acumulado, cor: 'var(--cor-primaria-solida)' }]}
           ></urbi-grafico-area>
         </div>
 

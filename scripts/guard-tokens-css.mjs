@@ -121,6 +121,7 @@ const arquivos = arquivosTs(join(RAIZ, 'frontend'));
 
 const doApp = new Map();     // --nome -> primeiro local de declaracao
 const achados = [];
+const fallbacks = [];
 const usados = new Set();
 let usos = 0;
 
@@ -189,6 +190,26 @@ for (const s of superficiesPorArquivo) {
     if (conhecidos.has(token) || doApp.has(token) || doPrimitivo.has(token)) continue;
     achados.push({ onde: `${s.rel}:${s.linhaDe(m.index)}`, token });
   }
+
+  // QUALQUER fallback num token de COR do tema. O SDK manda consumir token sem
+  // fallback (`docs/ui.md` § Tokens e temas): com o `tokens.css` sempre carregado
+  // o fallback e peso morto, ancora o consumidor no valor do tema escuro e esconde
+  // token inexistente. Fail-closed de proposito: a primeira versao so reprovava
+  // `#hex`/`rgb()`/`hsl()` e deixava passar `transparent`, cor nomeada e
+  // `var(--a, var(--b))` — a mesma classe por outra porta (havia dois
+  // `var(--cor-superficie-sutil, transparent)` vivos). Enumerar formas de literal
+  // nao converge; o predicado e "tem fallback", nao "que tipo de valor".
+  // So tokens `--cor-*` do ESPELHO entram — hook de customizacao proprio
+  // (`--urbi-*`, `--x` declarado pelo app) mantem fallback por contrato, e os
+  // demais tokens (`--texto-*`, `--raio-*`) seguem a regra propria do SDK. A unica
+  // excecao do SDK para cor e token mais NOVO que o `shell_min` do app, e o espelho
+  // e mais antigo que o piso, entao nao ha caso hoje. Nunca le comentario
+  // (`s.texto` ja o exclui).
+  for (const m of s.texto.matchAll(/var\(\s*(--cor-[A-Za-z0-9_-]+)\s*,/gi)) {
+    if (conhecidos.has(m[1]) && !doApp.has(m[1]) && !doPrimitivo.has(m[1])) {
+      fallbacks.push({ onde: `${s.rel}:${s.linhaDe(m.index)}`, token: m[1] });
+    }
+  }
 }
 
 // ── relatorio ───────────────────────────────────────────────────────────────
@@ -197,8 +218,18 @@ console.log(
   `  espelho: ${c.sha?.slice(0, 8) ?? '?'} · monorepo ${c.versao_monorepo ?? '?'} · ${c.data_do_commit ?? '?'} · ${conhecidos.size} tokens`,
 );
 
+if (fallbacks.length) {
+  console.error('');
+  console.error('FALHOU: var() de token de cor do tema com fallback.');
+  console.error('        O SDK manda consumir token sem fallback: escreva var(--cor-x), nao var(--cor-x, #hex).');
+  console.error('        O empacotador conta cada um desses como "literal de cor fora de token" e avisa a cada upgrade.');
+  console.error('');
+  for (const f of fallbacks) console.error(`  ${f.onde}  ${f.token}`);
+  if (achados.length === 0) process.exit(1);
+}
+
 if (achados.length === 0) {
-  console.log(`  ok: ${usos} usos de var() em ${usados.size} tokens distintos, todos existem`);
+  console.log(`  ok: ${usos} usos de var() em ${usados.size} tokens distintos, todos existem, nenhum token de cor com fallback`);
   process.exit(0);
 }
 

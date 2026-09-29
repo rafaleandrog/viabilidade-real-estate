@@ -404,7 +404,7 @@ export class ViabTelaPremissas extends LitElement {
     .secao h4 {
       margin: 0 0 12px; font-size: var(--texto-rotulo, 0.75rem);
       text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
     /* #6: três larguras fixas de campo. flex-wrap distribui da esquerda pra
        direita e quebra conforme couber; max-width:100% evita overflow em telas
@@ -427,9 +427,9 @@ export class ViabTelaPremissas extends LitElement {
     .subgrid { margin-top: 12px; }
     /* #10: cada grupo é uma faixa delimitada por uma linha horizontal no topo,
        com duas cores do design system intercaladas (A/B). Tokens theme-aware. */
-    .grupo { margin-bottom: 0; padding: 16px 14px; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.08)); }
-    .grupo-a { background: var(--cor-superficie-sutil, rgba(255,255,255,0.02)); }
-    .grupo-b { background: var(--cor-superficie, rgba(255,255,255,0.04)); }
+    .grupo { margin-bottom: 0; padding: 16px 14px; border-top: 1px solid var(--cor-borda); }
+    .grupo-a { background: var(--cor-superficie-sutil); }
+    .grupo-b { background: var(--cor-superficie); }
     /* #579: track alargada de 180 para 230px — mesma folga, mesmo motivo de
        tela-resumo.ts: um KPI de 9 dígitos (VGV, Preço médio/unid.) não
        cabe em 180px, e urbi-kpi (shadow DOM) não declara prop de quebra.
@@ -446,9 +446,9 @@ export class ViabTelaPremissas extends LitElement {
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
     .ut-rot {
       font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
-    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
+    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte); font-variant-numeric: tabular-nums; }
     .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .form-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
     urbi-card + urbi-card { margin-top: 16px; }
@@ -459,12 +459,12 @@ export class ViabTelaPremissas extends LitElement {
        composto alinhar com os vizinhos da fileira. */
     .cu-rotulo {
       font-size: 0.75rem; text-transform: uppercase;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
       font-weight: 700; letter-spacing: 0.4px;
       display: flex; align-items: flex-end;
       min-height: 2.4em; line-height: 1.2;
     }
-    .cu-req { color: var(--cor-erro, #d45a3a); margin-left: 2px; }
+    .cu-req { color: var(--cor-erro); margin-left: 2px; }
     .cu-linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     /* #5: badges de unidade (seleção mútua) à esquerda do valor. */
     .cu-badges { display: flex; gap: 4px; flex: 0 0 auto; }
@@ -489,17 +489,17 @@ export class ViabTelaPremissas extends LitElement {
        partir de 874px (600px de viewport); 900px é esse piso com folga, mesma
        margem que cronograma-sufixo-mes.render.test.ts usa para 18ch→21ch. */
     table.areas { width: 100%; min-width: 900px; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
-    table.areas th, table.areas td { padding: 6px 10px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); text-align: left; }
-    table.areas th { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+    table.areas th, table.areas td { padding: 6px 10px; border-bottom: 1px solid var(--cor-borda-sutil); text-align: left; }
+    table.areas th { color: var(--cor-texto-sec); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
     table.areas td.num, table.areas th.num { text-align: right; }
-    table.areas tr.computada td { font-weight: 700; background: var(--cor-superficie-sutil, rgba(255,255,255,0.03)); }
+    table.areas tr.computada td { font-weight: 700; background: var(--cor-superficie-sutil); }
     /* #612 — a linha que o piso em zero cortou. O 0,00 m² dela é resultado de
        um corte, não de um cadastro em branco, e sem marca as duas leituras
        ficam idênticas na tabela. A cor é a de erro do design system (a mesma
        do banner logo abaixo), e o texto continua sobre o fundo normal da
        linha — o par cor-de-texto × fundo-da-tabela é o que as lentes de
        contraste do harness medem. */
-    table.areas tr.deficit td { color: var(--cor-erro, #d45a3a); }
+    table.areas tr.deficit td { color: var(--cor-erro); }
     urbi-banner.aviso-area-negativa { display: block; margin-top: 12px; }
     .area-seletor { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
     .area-seletor urbi-badge { cursor: pointer; flex: 0 0 auto; }
@@ -519,18 +519,18 @@ export class ViabTelaPremissas extends LitElement {
     table.prod { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
     table.prod th {
       text-align: left; font-weight: 600; padding: 8px; font-size: var(--texto-rotulo, 0.75rem);
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
-      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      color: var(--cor-texto-sec);
+      border-bottom: 1px solid var(--cor-borda);
     }
     table.prod th.num, table.prod td.num { text-align: right; }
-    table.prod td { padding: 6px 8px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); font-size: var(--texto-corpo, 0.8125rem); }
+    table.prod td { padding: 6px 8px; border-bottom: 1px solid var(--cor-borda-sutil); font-size: var(--texto-corpo, 0.8125rem); }
     col.p-nome { width: 12%; } col.p-tipo { width: 14%; } col.p-area { width: 20%; } col.p-preco { width: 20%; }
     col.p-un { width: 12%; } col.p-vgv { width: 16%; } col.p-acao { width: 60px; }
     table.prod td.nome urbi-input { width: 100%; }
     table.prod td.tipo urbi-select { width: 100%; }
     table.prod td viab-num { width: 100%; }
-    table.prod td.vgv-calc { font-weight: 600; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
-    table.prod tr.total td { font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); border-bottom: none; padding-top: 10px; }
+    table.prod td.vgv-calc { font-weight: 600; color: var(--cor-texto-forte); }
+    table.prod tr.total td { font-weight: 700; border-top: 2px solid var(--cor-borda); border-bottom: none; padding-top: 10px; }
     .prod-vazio { padding: 8px 0; }
     .acoes-topo { margin-top: 16px; }
   `];

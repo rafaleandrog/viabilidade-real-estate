@@ -199,7 +199,7 @@ export class ViabTelaAvancado extends LitElement {
       max-width: 210px;
       border: 1px solid var(--cor-borda);
       border-radius: 8px;
-      background: var(--cor-superficie-sutil, transparent);
+      background: var(--cor-superficie-sutil);
       position: sticky;
       top: 0;
     }

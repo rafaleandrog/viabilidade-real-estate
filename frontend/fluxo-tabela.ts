@@ -51,8 +51,8 @@ export const estiloFluxoTabela = css`
   .reconciliacao { margin-top: 16px; }
   .reconciliacao-resumo { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .reconciliacao-lista { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
-  .reconciliacao-lista li { color: var(--cor-texto-sec, rgba(255,255,255,0.68)); }
-  .reconciliacao-lista li.erro { color: var(--cor-erro, #d45a3a); }
+  .reconciliacao-lista li { color: var(--cor-texto-sec); }
+  .reconciliacao-lista li.erro { color: var(--cor-erro); }
   .reconciliacao-lista strong { color: inherit; }
 
   /* #579: track alargada de 180 para 210px. Os 9 .kpi-card são markup
@@ -80,19 +80,19 @@ export const estiloFluxoTabela = css`
      tela-analise-mercado.ts — para rótulo, valor e variação conviverem na
      mesma caixa, sem depender de slot inexistente. */
   .kpi-card {
-    background: var(--cor-superficie, rgba(255,255,255,0.04));
-    border: 1px solid var(--cor-borda, rgba(255,255,255,0.08));
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
     border-radius: 8px;
     padding: 14px 16px;
     min-width: 0;
   }
   .kpi-card .rotulo {
     font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
-    color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+    color: var(--cor-texto-sec); font-weight: 700;
   }
   .kpi-card .valor {
     font-size: 1.4rem; font-weight: 700;
-    color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+    color: var(--cor-texto-forte);
     margin-top: 4px;
     /* #579: fmtR$ intercala R$ e o número com um ESPAÇO NÃO-QUEBRÁVEL
        (Intl.NumberFormat pt-BR/BRL — U+00A0), então "R$ 171.448.400,00" é UM
@@ -103,46 +103,46 @@ export const estiloFluxoTabela = css`
     overflow-wrap: anywhere;
     word-break: break-word;
   }
-  .kpi-card.erro .valor { color: var(--cor-erro, #D45A3A); }
-  .kpi-card.alerta .valor { color: var(--cor-alerta, #F7A111); }
-  .kpi-card.sucesso .valor { color: var(--cor-sucesso, #13A98D); }
+  .kpi-card.erro .valor { color: var(--cor-erro); }
+  .kpi-card.alerta .valor { color: var(--cor-alerta); }
+  .kpi-card.sucesso .valor { color: var(--cor-sucesso); }
   .kpi-var {
     margin-top: 6px;
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
     pointer-events: none;
   }
-  .kpi-var.melhor { color: var(--cor-sucesso, #13a98d); }
-  .kpi-var.pior { color: var(--cor-erro, #d45a3a); }
+  .kpi-var.melhor { color: var(--cor-sucesso); }
+  .kpi-var.pior { color: var(--cor-erro); }
   /* #456: linha de detalhe (% + mês) dos três KPIs derivados — neutra, ao
      contrário de .kpi-var, que carrega semântica de melhor/pior. */
   .kpi-info {
     margin-top: 6px;
     font-size: 0.72rem;
-    color: var(--cor-texto-sec, rgba(255,255,255,0.6));
+    color: var(--cor-texto-sec);
   }
 
-  .fx-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12)); border-radius: 8px; }
+  .fx-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--cor-borda); border-radius: 8px; }
   table.fx { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
   table.fx th, table.fx td {
     padding: 5px 8px; font-size: 0.75rem; white-space: nowrap;
-    border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+    border-bottom: 1px solid var(--cor-borda-sutil);
     /* #122: fundo OPACO em todas as celulas — --cor-superficie e translucida (~4% alpha)
        e deixava o conteudo dos meses vazar por cima das colunas fixas ao rolar. */
-    background: var(--cor-superficie-elevada, #16243A);
+    background: var(--cor-superficie-elevada);
   }
   table.fx thead th {
     position: sticky; top: 0; z-index: 3; font-weight: 600; text-align: right;
-    color: var(--cor-texto-sec, rgba(255,255,255,0.5));
-    border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
-    background: var(--cor-superficie-elevada, #16243A);
+    color: var(--cor-texto-sec);
+    border-bottom: 1px solid var(--cor-borda);
+    background: var(--cor-superficie-elevada);
   }
   table.fx td.num { text-align: right; }
   /* Colunas fixas a esquerda — largura TRAVADA (width = min = max, border-box) para
      que o "left" de cada sticky bata exatamente com a largura real da coluna anterior.
      #124: c2 (Inicio) e c3 (Duracao) ocultadas — apenas exibicao, nao afetam calculo.
      Cumulativo com c2/c3 ocultos: 0 · 220 · 340 (fim em 460). */
-  .c1, .c4, .c5, .c6 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie-elevada, #16243A); }
+  .c1, .c4, .c5, .c6 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie-elevada); }
   .c1 { position: sticky; left: 0;    z-index: 2; width: 220px; min-width: 220px; max-width: 220px; text-overflow: ellipsis; text-align: left; }
   .c2 { display: none; }
   .c3 { display: none; }
@@ -151,7 +151,7 @@ export const estiloFluxoTabela = css`
   /* #189: coluna % sobre VGV — última coluna fixa (sticky), a borda que fechava
      o bloco congelado passa dela para o c5. */
   .c6 { position: sticky; left: 460px; z-index: 2; width: 76px; min-width: 76px; max-width: 76px; text-align: right;
-    border-right: 2px solid var(--cor-borda, rgba(255,255,255,0.12)); }
+    border-right: 2px solid var(--cor-borda); }
   table.fx thead .c1, table.fx thead .c4, table.fx thead .c5, table.fx thead .c6 { z-index: 4; }
   table.fx thead .c1 { text-align: left; }
 
@@ -160,30 +160,30 @@ export const estiloFluxoTabela = css`
   table.tabela-permuta { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
   table.tabela-permuta th, table.tabela-permuta td {
     padding: 6px 10px; font-size: 0.8rem; text-align: left;
-    border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+    border-bottom: 1px solid var(--cor-borda-sutil);
   }
   table.tabela-permuta th.num, table.tabela-permuta td.num { text-align: right; }
 
   tr.grupo td { font-weight: 700; }
   tr.subgrupo td { font-weight: 600; }
-  tr.item td.c1 { padding-left: 28px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
-  tr.subitem td.c1 { padding-left: 44px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
-  tr.divisoria td { border-bottom: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); padding: 0; height: 2px; }
+  tr.item td.c1 { padding-left: 28px; color: var(--cor-texto-sec); }
+  tr.subitem td.c1 { padding-left: 44px; color: var(--cor-texto-sec); }
+  tr.divisoria td { border-bottom: 2px solid var(--cor-borda); padding: 0; height: 2px; }
   tr.resultado td { font-weight: 700; }
-  td.pos { color: var(--cor-sucesso, #13a98d); }
-  td.neg { color: var(--cor-erro, #d45a3a); }
+  td.pos { color: var(--cor-sucesso); }
+  td.neg { color: var(--cor-erro); }
   .toggle { cursor: pointer; user-select: none; background: none; border: none; color: inherit; font: inherit; padding: 0; }
   .toggle .seta { display: inline-block; width: 14px; }
 
   /* #123: cores de fundo por tipo de linha — color-mix produz cor opaca (base opaca),
      especificidade [0,2,1] supera a regra de sticky .c1/.c4/.c5 [0,1,0], entao
      o fundo colorido tambem aparece nas colunas fixas da linha. */
-  tr.grupo.receita td   { background: color-mix(in srgb, var(--cor-sucesso, #13a98d) 15%, var(--cor-superficie-elevada, #16243A)); }
-  tr.subgrupo.receita td { background: color-mix(in srgb, var(--cor-sucesso, #13a98d)  8%, var(--cor-superficie-elevada, #16243A)); }
-  tr.subitem.receita td  { background: color-mix(in srgb, var(--cor-sucesso, #13a98d)  4%, var(--cor-superficie-elevada, #16243A)); }
-  tr.grupo.custo td     { background: color-mix(in srgb, var(--cor-erro, #d45a3a) 15%, var(--cor-superficie-elevada, #16243A)); }
-  tr.subgrupo.custo td  { background: color-mix(in srgb, var(--cor-erro, #d45a3a)  8%, var(--cor-superficie-elevada, #16243A)); }
-  tr.item.custo td      { background: color-mix(in srgb, var(--cor-erro, #d45a3a)  4%, var(--cor-superficie-elevada, #16243A)); }
+  tr.grupo.receita td   { background: color-mix(in srgb, var(--cor-sucesso) 15%, var(--cor-superficie-elevada)); }
+  tr.subgrupo.receita td { background: color-mix(in srgb, var(--cor-sucesso)  8%, var(--cor-superficie-elevada)); }
+  tr.subitem.receita td  { background: color-mix(in srgb, var(--cor-sucesso)  4%, var(--cor-superficie-elevada)); }
+  tr.grupo.custo td     { background: color-mix(in srgb, var(--cor-erro) 15%, var(--cor-superficie-elevada)); }
+  tr.subgrupo.custo td  { background: color-mix(in srgb, var(--cor-erro)  8%, var(--cor-superficie-elevada)); }
+  tr.item.custo td      { background: color-mix(in srgb, var(--cor-erro)  4%, var(--cor-superficie-elevada)); }
 `;
 
 /** Relatório visível da #240. Divergência vazia também é informação: mostra
