@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
-import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
+import { calcularProforma, vgvProduto, vgvBrutoDeProforma, produtosDoEstudo, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { rankearAlavancas, ehCustoLike, ehCircular, type Alavanca } from './tornado-alavancas.js';
 import { margemDeSeguranca, terrenoMaximo, type MargemDeSeguranca } from './margem-seguranca.js';
 import { fmtVariacao } from './cenario-variacao.js';
@@ -166,7 +166,10 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   // impressão de "VGV duplicado" (issue do autor, 2026-09-14): o mesmo VGV
   // bruto aparecia como linha fixa E, incorretamente, como soma dos filhos
   // de um header líquido.
-  const linhasProduto: Linha[] = ctx.produtos.map((produto) => ({
+  // #781: no Loteamento a área do produto é derivada da ALV — ler `ctx.produtos`
+  // cru daria o VGV do campo legado, diferente do que o motor somou.
+  const produtosCalculo = produtosDoEstudo({ ...(ctx.estudo as any), produtos: ctx.produtos } as ProformaInput);
+  const linhasProduto: Linha[] = produtosCalculo.map((produto: any) => ({
     l: produto.nome || `Produto ${produto.id}`, v: vgvProduto(produto),
     grupo: 'receita', natureza: 'receita', ocultarSeZero: true,
   }));
@@ -559,7 +562,7 @@ export class ViabTelaProforma extends LitElement {
       ${this.secao === 'proforma'
         ? (p.semProdutos ? this._renderSemProdutos('Proforma') : html`
         ${this._renderKpis(p, lot)}
-        ${!lot ? this._renderUnidadesTipo(p) : nothing}
+        ${this._renderUnidadesTipo(p, lot)}
         <urbi-card titulo="Proforma">
           ${this._renderAvisoPermuta(p)}
           ${this._renderTabela(p, lot, vgvBruto)}
@@ -737,7 +740,7 @@ export class ViabTelaProforma extends LitElement {
 
   // #7/#11: unidades e preço médio por tipo (Residencial / Não residencial),
   // direto do motor (fonte única, também usada na Premissas).
-  private _renderUnidadesTipo(p: Proforma): TemplateResult {
+  private _renderUnidadesTipo(p: Proforma, lot: boolean): TemplateResult {
     const qR = p.numUnidadesResidencial;
     const qNR = p.numUnidadesNaoResidencial;
     if (qR === 0 && qNR === 0) return html``;
@@ -746,7 +749,7 @@ export class ViabTelaProforma extends LitElement {
     return html`<urbi-card titulo="Unidades e preço médio por tipo">
       <div class="unid-tipo">
         <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(qR)} un · ${pmR}</span></div>
-        <div class="ut-item"><span class="ut-rot">Não residencial</span><span class="ut-val">${fmtNum(qNR)} un · ${pmNR}</span></div>
+        <div class="ut-item"><span class="ut-rot">${lot ? 'Comercial' : 'Não residencial'}</span><span class="ut-val">${fmtNum(qNR)} un · ${pmNR}</span></div>
       </div>
     </urbi-card>`;
   }

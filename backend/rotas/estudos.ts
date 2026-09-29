@@ -21,6 +21,8 @@ import {
 } from '../../frontend/estudo-status.js';
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
+import { alvDoLoteamento, type ProformaInput } from '../../frontend/proforma.js';
+import { validarSomaPctAlv, areasParaSairDoLoteamento } from '../../frontend/produtos-alv.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
@@ -708,7 +710,42 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
     const dados = decisao.dados;
 
+    // #781: Loteamento → Incorporação (só em rascunho). O catálogo do Loteamento
+    // vive em `pct_alv` e a Incorporação lê `area_media_m2`: sem levar a área
+    // derivada junto, todo produto sairia do catálogo efetivo e o VGV zeraria.
+    //
+    // A ORDEM é a do estudo primeiro, produtos depois: o `atualizar` do estudo é
+    // quem valida o patch inteiro contra o schema, então um patch recusado não
+    // deixa produto convertido para trás. E se a conversão falhar no meio, o tipo
+    // volta a `loteamento` — os produtos já convertidos seguem legítimos (área
+    // preenchida, `pct_alv` limpo é o estado legado), e a ALV usada é a do estudo
+    // ANTES da troca, lida acima.
+    const saiDoLoteamento = estudo.tipo_empreendimento === 'loteamento'
+      && dados.tipo_empreendimento === 'incorporacao';
     const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
+    if (saiDoLoteamento) {
+      // Cada produto convertido guarda o estado ANTERIOR para a compensação: se um
+      // update falhar no meio, os já convertidos voltam ao que eram (com o `pct_alv`
+      // e a área originais) e o tipo volta a `loteamento` — a falha não deixa o
+      // Loteamento parcialmente mutado.
+      const convertidos: { id: number; antes: Record<string, unknown> }[] = [];
+      try {
+        const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
+        const alv = alvDoLoteamento(estudo as unknown as ProformaInput);
+        for (const a of areasParaSairDoLoteamento(produtos as any[], alv)) {
+          const orig = (produtos as any[]).find((p) => Number(p.id) === a.id);
+          await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
+          convertidos.push({ id: a.id, antes: { area_media_m2: orig?.area_media_m2 ?? null, pct_alv: orig?.pct_alv ?? null } });
+        }
+      } catch (e) {
+        for (const c of convertidos) {
+          try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
+          catch (e2) { console.error('Falha ao desfazer a conversão do produto', c.id, e2); }
+        }
+        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' });
+        throw e;
+      }
+    }
     res.json(atualizado);
   } catch (e: any) {
     console.error('Erro em PATCH /estudos/:id:', e);
@@ -862,6 +899,17 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
       const quem = gate === 'aprovador' ? 'aprovadores' : 'editores';
       erro(res, 403, 'SEM_PERMISSAO', `Apenas ${quem} podem fazer esta transição`);
       return;
+    }
+
+    // #781: Loteamento só é submetido com os produtos somando 100% da ALV. A
+    // tela já barra o botão; este é o portão, para a API não contornar a regra.
+    // Catálogo vazio passa (estudo que ainda não chegou à aba Produtos).
+    if (novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento') {
+      // `varrerTudo`, e não `listar` com página fixa: a soma precisa do catálogo
+      // INTEIRO, e uma página de 500 truncaria um estudo maior em silêncio.
+      const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
+      const soma = validarSomaPctAlv(produtos, alvDoLoteamento(estudo as unknown as ProformaInput));
+      if (!soma.ok) { erro(res, 422, 'SOMA_ALV_INVALIDA', soma.mensagem ?? 'Os produtos devem somar 100% da ALV'); return; }
     }
 
     const atualizado = await req.dados!.atualizar('estudos', estudoId, { status: novoStatus });

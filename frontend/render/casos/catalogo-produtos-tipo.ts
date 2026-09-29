@@ -8,14 +8,10 @@
 // o `exigir` abaixo é a única prova de que o `urbi-select` está entre Nome e
 // Área média, na tela de verdade.
 //
-// ⚠️ O estudo é **Incorporação**, e desde a rodada 1 de revisão do #570 isso
-// deixou de ser detalhe: no Loteamento a coluna "Tipo" não é desenhada (o motor
-// normaliza o catálogo para um bucket só, porque a tela de Permutas de lá só
-// tem controles residenciais). O tipo entra explícito abaixo para o caso não
-// mudar de veredito por uma edição em `ESTUDO`. A ausência da coluna no
-// Loteamento NÃO é provável aqui — o harness só sabe exigir presença —, e por
-// isso ela é provada em `frontend/tela-premissas.test.ts`, sobre a lista
-// `colunasProduto`.
+// ⚠️ O estudo é **Incorporação**: o grid do Loteamento tem colunas próprias
+// (% da ALV, áreas calculadas — #781) e é medido em
+// `catalogo-produtos-loteamento-alv.ts`. O tipo entra explícito abaixo para o
+// caso não mudar de veredito por uma edição em `ESTUDO`.
 //
 // Duas linhas de propósito: a primeira tem `tipo: 'nao_residencial'`
 // EXPLÍCITO (prova que o valor persistido chega ao `.valor` do select); a

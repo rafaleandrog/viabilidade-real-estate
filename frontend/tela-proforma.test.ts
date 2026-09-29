@@ -352,7 +352,7 @@ test('#613: _renderKpis recebe `lot` como parâmetro OBRIGATÓRIO (a mutação v
 // variável "Permuta financeira" da análise de sensibilidade (`imposto`,
 // `corretagem` e `marketing` são % fixo do VGV; `permutaFinResidencial`/
 // `permutaFinNaoResidencial` são os únicos termos que `calcularProforma`
-// escala por `fatorSens('permuta_financeira')`, `frontend/proforma.ts:670,674`).
+// escala por `fatorSens('permuta_financeira')`, `frontend/proforma.ts:706,710`).
 //
 // A linha do array `linhas` de `_renderSensibilidade` é PRIVADA (nenhum
 // teste deste repositório monta `viab-tela-proforma` fora do harness de
@@ -437,4 +437,15 @@ test('Cenários — FIAÇÃO: o catálogo `LINHAS_SENSIBILIDADE` tem "Deduções
     /l:\s*'Deduções sobre VGV'.*natureza:\s*'despesa'/.test(FONTE_SENSIBILIDADE),
     '"Deduções sobre VGV" deveria ser `natureza: \'despesa\'` (sempre entre parênteses, sem classe pos/neg) — igual a Custo direto/indireto total',
   );
+});
+
+// #781 fiação: as sub-linhas por produto da Proforma leem o catálogo por
+// `produtosDoEstudo` (no Loteamento, com a área derivada da ALV). Nenhum caso do
+// harness de render monta a Proforma com um Loteamento só de `pct_alv`; apagar a
+// chamada deixaria produto só com `pct_alv` com VGV zero na linha, com a suíte verde.
+test('#781 fiação: montarLinhasProforma deriva o catálogo por produtosDoEstudo', async () => {
+  const { readFileSync } = await import('node:fs');
+  const fonte = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');
+  assert.ok(fonte.includes('produtosDoEstudo({ ...(ctx.estudo as any), produtos: ctx.produtos }'),
+    'as linhas por produto voltaram a ler o catálogo cru');
 });

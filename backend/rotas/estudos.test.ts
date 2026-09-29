@@ -1005,3 +1005,44 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
       `o campo aposentado atravessou o PATCH de um estudo ${estudo.nivel_analise}`);
   }
 });
+
+// #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarSomaPctAlv`
+// é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
+// servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
+// "a API não contorna a tela" passaria a valer só na tela.
+test('#781 fiação: PATCH que tira o rascunho do Loteamento leva a área derivada dos produtos', () => {
+  for (const parte of [
+    "estudo.tipo_empreendimento === 'loteamento'",
+    "dados.tipo_empreendimento === 'incorporacao'", // só o destino validado: typo não converte nada
+    'areasParaSairDoLoteamento(produtos as any[], alv)',
+    "atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null })",
+  ]) assert.ok(FONTE_ROTA.includes(parte), `o PATCH deixou de ter: ${parte}`);
+  assert.ok(
+    FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)") < FONTE_ROTA.indexOf('areasParaSairDoLoteamento(produtos as any[], alv)'),
+    'o estudo é atualizado (e o patch validado) ANTES de qualquer produto ser convertido',
+  );
+  assert.ok(FONTE_ROTA.includes("atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' })"),
+    'falha na conversão tem que devolver o tipo a loteamento');
+  assert.ok(FONTE_ROTA.includes('convertidos.push(') && FONTE_ROTA.includes('for (const c of convertidos)'),
+    'falha na conversão tem que desfazer os produtos JÁ convertidos');
+});
+
+test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento com soma ≠ 100% da ALV', () => {
+  for (const parte of [
+    "novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento'",
+    "varrerTudo('preliminar_produtos'",
+    'validarSomaPctAlv(produtos, alvDoLoteamento(',
+    "erro(res, 422, 'SOMA_ALV_INVALIDA'",
+  ]) {
+    assert.ok(FONTE_ROTA.includes(parte), `o handler de status deixou de ter: ${parte}`);
+  }
+  // O predicado é `!soma.ok` E a recusa RETORNA: invertê-lo ou perder o `return;`
+  // manteria as quatro strings acima e desligaria o portão.
+  assert.match(FONTE_ROTA, /if \(!soma\.ok\) \{ erro\(res, 422, 'SOMA_ALV_INVALIDA'[^\n]*\); return; \}/,
+    'o portão deixou de recusar (predicado invertido ou return perdido)');
+  // A recusa vem ANTES de gravar o status.
+  assert.ok(
+    FONTE_ROTA.indexOf("erro(res, 422, 'SOMA_ALV_INVALIDA'") < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, { status: novoStatus })"),
+    'a checagem tem que preceder a escrita do status',
+  );
+});
