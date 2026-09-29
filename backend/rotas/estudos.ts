@@ -870,10 +870,10 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
     // tela já barra o botão; este é o portão, para a API não contornar a regra.
     // Catálogo vazio passa (estudo que ainda não chegou à aba Produtos).
     if (novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento') {
-      const prod = await req.dados!.listar('preliminar_produtos', {
-        filtros: { estudo_id: estudoId }, por_pagina: 500,
-      });
-      const soma = validarSomaPctAlv(prod.dados, alvDoLoteamento(estudo as unknown as ProformaInput));
+      // `varrerTudo`, e não `listar` com página fixa: a soma precisa do catálogo
+      // INTEIRO, e uma página de 500 truncaria um estudo maior em silêncio.
+      const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
+      const soma = validarSomaPctAlv(produtos, alvDoLoteamento(estudo as unknown as ProformaInput));
       if (!soma.ok) { erro(res, 422, 'SOMA_ALV_INVALIDA', soma.mensagem ?? 'Os produtos devem somar 100% da ALV'); return; }
     }
 

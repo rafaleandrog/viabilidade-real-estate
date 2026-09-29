@@ -169,3 +169,27 @@ test('fiação: `_salvar` pula o campo que não mudou, e usa o MESMO predicado d
   assert.match(fonte, /if \(CHAVES_NAO_ENVIADAS\.has\(k\)\) continue;/,
     '`_salvar` deixou de usar a lista compartilhada — duas listas iguais divergem');
 });
+
+// #781 fiação — os dois portões do componente. `validarSomaPctAlv` é pura e testada
+// em `produtos-alv.test.ts`; nenhum teste monta o componente, então apagar a chamada
+// deixaria a suíte verde e o usuário voltaria a salvar com a soma aberta.
+const FONTE_TELA_ALV = readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); })
+  .join('\n');
+
+test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 100% ANTES de gravar', () => {
+  const iCatalogo = FONTE_TELA_ALV.indexOf('if (!this._catalogoCarregado) {\n        this.erroGeral = \'Aguarde o carregamento dos produtos');
+  const iSoma = FONTE_TELA_ALV.indexOf('validarSomaPctAlv(this.produtos, alvDoLoteamento(this._entradaProforma()))');
+  const iGrava = FONTE_TELA_ALV.indexOf('this.salvando = true;');
+  assert.ok(iCatalogo > 0, 'a espera pelo catálogo saiu do _salvar');
+  assert.ok(iSoma > iCatalogo, 'a soma é conferida depois da espera pelo catálogo');
+  assert.ok(iGrava > iSoma, 'ambos os portões precedem a gravação');
+});
+
+test('#781 fiação: a primeira edição de linha legada só grava pct_alv com ALV positiva', () => {
+  assert.ok(FONTE_TELA_ALV.includes('if (alv > 0) enviar = { ...dados, pct_alv:'),
+    'sem esta guarda, ALV ≤ 0 grava pct_alv = 0 e destrói a área legada da linha');
+  assert.ok(FONTE_TELA_ALV.includes('pct_alv: e.detail.valor ?? 0'),
+    'limpar o input grava 0, nunca null (null no banco = produto legado)');
+});

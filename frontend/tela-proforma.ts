@@ -562,7 +562,7 @@ export class ViabTelaProforma extends LitElement {
       ${this.secao === 'proforma'
         ? (p.semProdutos ? this._renderSemProdutos('Proforma') : html`
         ${this._renderKpis(p, lot)}
-        ${!lot ? this._renderUnidadesTipo(p) : nothing}
+        ${this._renderUnidadesTipo(p, lot)}
         <urbi-card titulo="Proforma">
           ${this._renderAvisoPermuta(p)}
           ${this._renderTabela(p, lot, vgvBruto)}
@@ -740,7 +740,7 @@ export class ViabTelaProforma extends LitElement {
 
   // #7/#11: unidades e preço médio por tipo (Residencial / Não residencial),
   // direto do motor (fonte única, também usada na Premissas).
-  private _renderUnidadesTipo(p: Proforma): TemplateResult {
+  private _renderUnidadesTipo(p: Proforma, lot: boolean): TemplateResult {
     const qR = p.numUnidadesResidencial;
     const qNR = p.numUnidadesNaoResidencial;
     if (qR === 0 && qNR === 0) return html``;
@@ -749,7 +749,7 @@ export class ViabTelaProforma extends LitElement {
     return html`<urbi-card titulo="Unidades e preço médio por tipo">
       <div class="unid-tipo">
         <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(qR)} un · ${pmR}</span></div>
-        <div class="ut-item"><span class="ut-rot">Não residencial</span><span class="ut-val">${fmtNum(qNR)} un · ${pmNR}</span></div>
+        <div class="ut-item"><span class="ut-rot">${lot ? 'Comercial' : 'Não residencial'}</span><span class="ut-val">${fmtNum(qNR)} un · ${pmNR}</span></div>
       </div>
     </urbi-card>`;
   }

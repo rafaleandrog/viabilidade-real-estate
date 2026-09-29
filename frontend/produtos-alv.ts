@@ -100,12 +100,17 @@ export interface ResultadoSomaAlv { ok: boolean; mensagem: string | null }
 
 /**
  * A regra dura do Loteamento: com produtos cadastrados, a soma tem que ser
- * 100% da ALV. Catálogo VAZIO é válido — é o estado de um estudo que ainda não
+ * 100% da ALV. Sem ALV positiva a regra não se aplica (não há base para o %).
+ * Catálogo VAZIO é válido — é o estado de um estudo que ainda não
  * chegou à aba Produtos, e barrar aí travaria o salvamento de todas as outras
  * premissas (mesma decisão de `premissas-validacao.ts` sobre catálogo vazio).
  */
 export function validarSomaPctAlv(produtos: ProdutoAlv[] | undefined, alvM2: number): ResultadoSomaAlv {
   if (!produtos || produtos.length === 0) return { ok: true, mensagem: null };
+  // Sem ALV (Terreno & Áreas ainda não preenchido) a participação não tem base:
+  // barrar aí travaria o salvamento do próprio Terreno & Áreas, que é o que cria
+  // a ALV. A regra volta a valer assim que a ALV existir.
+  if (alvM2 <= 0) return { ok: true, mensagem: null };
   const { soma, estado } = alocacaoAlv(produtos, alvM2);
   if (estado === 'completa') return { ok: true, mensagem: null };
   const fmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });

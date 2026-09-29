@@ -1019,7 +1019,8 @@ export class ViabTelaPremissas extends LitElement {
         case 'pct': return html`<td class="num">${fmtPctAlv(somaPct)}</td>`;
         case 'unidades': return html`<td class="num">${fmtNum(unidades, 0)}</td>`;
         case 'areaTotal': return html`<td class="num">${fmtM2(areaTotal)}</td>`;
-        case 'area': return html`<td class="num">${unidades > 0 ? fmtM2(areaTotal / unidades) : '—'}</td>`;
+        // Só o Loteamento tem área média calculada; na Incorporação a célula do total segue vazia.
+        case 'area': return lot ? html`<td class="num">${unidades > 0 ? fmtM2(areaTotal / unidades) : '—'}</td>` : html`<td></td>`;
         case 'vgv': return html`<td class="num">${fmtR$(vgv)}</td>`;
         default: return html`<td></td>`;
       }
@@ -1088,7 +1089,7 @@ export class ViabTelaPremissas extends LitElement {
           <td class="num">
             <viab-num sufixo="%" casas-decimais="4" ?desabilitado=${dis}
               .valor=${pctAlvEfetivo(p, alv)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { pct_alv: e.detail.valor })}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { pct_alv: e.detail.valor ?? 0 })}
             ></viab-num>
           </td>`;
         case 'areaTotal': return html`<td class="num calc">${fmtM2(areaTotalDaLinha(p, alv))}</td>`;
@@ -1158,10 +1159,15 @@ export class ViabTelaPremissas extends LitElement {
       // deixaria o % derivado se mover junto (ex.: mais unidades → % maior, e a
       // área média fixa). Grava o efetivo agora, na primeira edição da linha.
       let enviar = dados;
+      //
+      // Só com ALV positiva: sem ela o percentual "não é expressível" e o
+      // `pctAlvEfetivo` devolve 0 — gravar esse 0 destruiria a área legada da
+      // linha para sempre (a linha deixa de ser legada e passa a valer 0% da
+      // ALV, mesmo depois de a cascata ser preenchida).
       if (this._ehLoteamento && dados.pct_alv === undefined
         && (p.pct_alv === null || p.pct_alv === undefined || p.pct_alv === '')) {
         const alv = alvDoLoteamento(this._entradaProforma());
-        enviar = { ...dados, pct_alv: Math.round(pctAlvEfetivo(p, alv) * 10000) / 10000 };
+        if (alv > 0) enviar = { ...dados, pct_alv: Math.round(pctAlvEfetivo(p, alv) * 10000) / 10000 };
       }
       const res = await atualizarProdutoPreliminar(this.estudo.id, p.id, enviar);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar produto', 'erro'); return; }
@@ -1553,15 +1559,16 @@ export class ViabTelaPremissas extends LitElement {
   private _benchmark(campo: string): any { return this.benchmarks.find((b) => b.campo === campo); }
 
   // #7: detalhe de nº e preço médio por unidade, Residencial / Não residencial
-  // (Incorporação). Mesmas métricas do motor exibidas na Proforma.
-  private _unidadesTipo(p: Proforma): TemplateResult {
+  // (no Loteamento, Residencial / Comercial — #781). Mesmas métricas do motor
+  // exibidas na Proforma.
+  private _unidadesTipo(p: Proforma, lot: boolean): TemplateResult {
     if (p.numUnidadesResidencial === 0 && p.numUnidadesNaoResidencial === 0) return html``;
     const pmR = p.numUnidadesResidencial > 0 ? `${fmtR$(p.precoMedioUnidadeResidencial)}/un` : '—';
     const pmNR = p.numUnidadesNaoResidencial > 0 ? `${fmtR$(p.precoMedioUnidadeNaoResidencial)}/un` : '—';
     return html`
       <div class="unid-tipo">
         <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(p.numUnidadesResidencial)} un · ${pmR}</span></div>
-        <div class="ut-item"><span class="ut-rot">Não residencial</span><span class="ut-val">${fmtNum(p.numUnidadesNaoResidencial)} un · ${pmNR}</span></div>
+        <div class="ut-item"><span class="ut-rot">${lot ? 'Comercial' : 'Não residencial'}</span><span class="ut-val">${fmtNum(p.numUnidadesNaoResidencial)} un · ${pmNR}</span></div>
       </div>`;
   }
 
@@ -1611,7 +1618,7 @@ export class ViabTelaPremissas extends LitElement {
             <urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>
           `)}
         </div>
-        ${!lot ? this._unidadesTipo(p) : nothing}
+        ${this._unidadesTipo(p, lot)}
         ${piso
           ? html`<urbi-banner variante="info">
               Preço sugerido/m² para atingir o piso de resultado final (${fmtPctEntrada(Number(piso.valor))}):
@@ -1635,6 +1642,14 @@ export class ViabTelaPremissas extends LitElement {
     // fica DEPOIS dos obrigatórios (o erro de campo tem prioridade) e vale em
     // qualquer sub-aba — o botão é o mesmo em todas.
     if (this._ehLoteamento) {
+      // Catálogo ainda a caminho (ou a carga falhou): `produtos` é `[]`, e o
+      // catálogo vazio é VÁLIDO para a soma — salvar agora deixaria passar uma
+      // premissa que muda a ALV sem conferir os percentuais que já existem.
+      if (!this._catalogoCarregado) {
+        this.erroGeral = 'Aguarde o carregamento dos produtos para salvar as premissas.';
+        urbiVerso.notificar(this.erroGeral, 'erro');
+        return;
+      }
       const soma = validarSomaPctAlv(this.produtos, alvDoLoteamento(this._entradaProforma()));
       if (!soma.ok) {
         this.erroGeral = `${soma.mensagem} Ajuste na sub-aba Produtos.`;

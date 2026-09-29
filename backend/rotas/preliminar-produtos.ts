@@ -22,19 +22,27 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
 
 /**
- * #781 — `pct_alv` é percentual: número estrito entre 0 e 100, ou `null` para
- * limpar. Parser único do repositório (`numeroEstrito`), fail-closed: `''`,
- * `'1e3'`, `'0x10'`, negativo e acima de 100 são recusados, não coagidos.
- * Devolve a mensagem do erro, ou `null` quando o corpo está válido. A SOMA dos
- * percentuais NÃO é conferida aqui: a edição é linha a linha e passa por
- * estados intermediários; o portão da soma é o salvamento da tela e a
- * submissão (`POST /estudos/:id/status`).
+ * #781 — `pct_alv` é percentual: número estrito entre 0 e 100. Parser único do
+ * repositório (`numeroEstrito`), fail-closed: `''`, `'1e3'`, `'0x10'`, negativo
+ * e acima de 100 são recusados, não coagidos. **`null` também é recusado**:
+ * `pct_alv` ausente (NULL no banco) significa "produto legado, ainda com a área
+ * antiga", e um PATCH que gravasse `null` faria a linha voltar a esse estado —
+ * limpar o campo na tela grava 0. Devolve a mensagem do erro, ou `null` quando o
+ * corpo está válido. A SOMA dos percentuais NÃO é conferida aqui: a edição é
+ * linha a linha e passa por estados intermediários; o portão da soma é o
+ * salvamento da tela e a submissão (`POST /estudos/:id/status`).
  */
 export function erroPctAlv(body: Record<string, any>): string | null {
-  if (body.pct_alv === undefined || body.pct_alv === null) return null;
+  if (body.pct_alv === undefined) return null;
   const v = numeroEstrito(body.pct_alv);
   if (v === null || v < 0 || v > 100) return 'pct_alv deve ser um número entre 0 e 100';
   return null;
+}
+
+/** O valor JÁ VALIDADO por `erroPctAlv`, como número — o shell recusa string em coluna decimal. */
+function comPctAlvNumerico(dados: Record<string, any>): Record<string, any> {
+  if (dados.pct_alv !== undefined) dados.pct_alv = numeroEstrito(dados.pct_alv);
+  return dados;
 }
 
 async function produtoDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
@@ -78,7 +86,7 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
     for (const campo of CAMPOS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
-    const criado = await req.dados!.criar('preliminar_produtos', dados);
+    const criado = await req.dados!.criar('preliminar_produtos', comPctAlvNumerico(dados));
     res.status(201).json(criado);
   } catch (e: any) {
     console.error('Erro em POST /preliminar/produtos:', e);
@@ -102,7 +110,7 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
-    const atualizado = await req.dados!.atualizar('preliminar_produtos', p.id, dados);
+    const atualizado = await req.dados!.atualizar('preliminar_produtos', p.id, comPctAlvNumerico(dados));
     res.json(atualizado);
   } catch (e: any) {
     console.error('Erro em PATCH /preliminar/produtos/:pid:', e);

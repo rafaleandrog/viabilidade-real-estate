@@ -180,3 +180,8 @@ test('#781: produtosComAreaDerivada não muta a entrada', () => {
   assert.equal(entrada[0].area_media_m2, 999);
   assert.ok(perto(saida[0].area_media_m2, 3750));
 });
+
+test('#781: sem ALV (Terreno & Áreas ainda vazio) a regra da soma não se aplica', () => {
+  assert.equal(validarSomaPctAlv([{ pct_alv: 10 }], 0).ok, true);
+  assert.equal(validarSomaPctAlv([{ area_media_m2: 300, unidades: 250 }], 0).ok, true);
+});

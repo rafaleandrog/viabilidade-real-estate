@@ -1005,3 +1005,23 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
       `o campo aposentado atravessou o PATCH de um estudo ${estudo.nivel_analise}`);
   }
 });
+
+// #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarSomaPctAlv`
+// é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
+// servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
+// "a API não contorna a tela" passaria a valer só na tela.
+test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento com soma ≠ 100% da ALV', () => {
+  for (const parte of [
+    "novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento'",
+    "varrerTudo('preliminar_produtos'",
+    'validarSomaPctAlv(produtos, alvDoLoteamento(',
+    "erro(res, 422, 'SOMA_ALV_INVALIDA'",
+  ]) {
+    assert.ok(FONTE_ROTA.includes(parte), `o handler de status deixou de ter: ${parte}`);
+  }
+  // A recusa vem ANTES de gravar o status.
+  assert.ok(
+    FONTE_ROTA.indexOf("erro(res, 422, 'SOMA_ALV_INVALIDA'") < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, { status: novoStatus })"),
+    'a checagem tem que preceder a escrita do status',
+  );
+});

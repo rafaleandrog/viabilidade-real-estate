@@ -40,6 +40,11 @@ caráter informativo do aviso de área da #693.
 - Tabela de 8 colunas com largura mínima e rolagem no contêiner (não cabe em 600 px).
 - `PATCH` de produto valida `pct_alv` (0–100, parser estrito); a soma só é conferida no salvar e na
   submissão, porque a edição é linha a linha.
+- Estudo legado de Loteamento cuja soma de áreas não é a ALV abre com o mesmo VGV, mas só salva
+  premissas depois de os percentuais somarem 100% — o que muda a área de ao menos um produto. É o
+  custo declarado da regra dura; sem ALV a regra não se aplica, para não travar o Terreno & Áreas.
+- Primeira edição de linha legada só grava `pct_alv` com ALV positiva (senão gravaria 0 e destruiria
+  a área); limpar o input grava 0, e a API recusa `null`.
 - Docs: `docs/preliminar.md`, `formulas.md`, `modelo-de-dados.md`, `apelo-comercial.md`.
 - Fiação medida: com a derivação desligada no motor, 4 testes novos ficam vermelhos.
 
