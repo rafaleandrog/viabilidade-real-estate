@@ -63,19 +63,19 @@ export class ViabTelaGraficos extends LitElement {
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.02em;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
     }
     .kpi-valor {
       font-size: 20px;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
     }
     .kpi-rodape {
       font-size: 11px;
-      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+      color: var(--cor-texto-fraco);
     }
-    .detalhamento-custo { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--cor-borda, rgba(255, 255, 255, 0.12)); }
+    .detalhamento-custo { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--cor-borda); }
     .detalhamento-custo urbi-checkbox { display: block; margin-bottom: 8px; }
     urbi-banner.aviso-consistencia { display: block; margin-bottom: 16px; }
   `];

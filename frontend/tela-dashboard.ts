@@ -196,9 +196,9 @@ export class ViabTelaDashboard extends LitElement {
     .cel-criador { display: inline-flex; align-items: center; }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .filtros-bar urbi-select { min-width: 200px; }
-    .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-bottom: 6px; }
+    .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); margin-bottom: 6px; }
     .nivel-badges { display: flex; gap: 6px; }
-    .nivel-apoio { margin-top: 6px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .nivel-apoio { margin-top: 6px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); }
   `];
 
   private readonly _abas = [
@@ -514,8 +514,8 @@ export class ViabTelaDashboard extends LitElement {
         // impede a volta.
         id: 'imagem', label: '',
         render: (l: any) => l.imagem_principal_url
-          ? html`<img class="miniatura" style="width:40px;height:28px;border-radius:6px;object-fit:cover;display:block;background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" src=${l.imagem_principal_url} alt="" loading="lazy">`
-          : html`<span class="miniatura-vazia" style="width:40px;height:28px;border-radius:6px;display:block;background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" aria-hidden="true"></span>`,
+          ? html`<img class="miniatura" style="width:40px;height:28px;border-radius:6px;object-fit:cover;display:block;background:var(--cor-superficie-sutil)" src=${l.imagem_principal_url} alt="" loading="lazy">`
+          : html`<span class="miniatura-vazia" style="width:40px;height:28px;border-radius:6px;display:block;background:var(--cor-superficie-sutil)" aria-hidden="true"></span>`,
       },
       {
         id: 'nome', label: 'Nome do estudo',

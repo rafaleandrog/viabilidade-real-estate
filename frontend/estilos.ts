@@ -36,15 +36,15 @@ export const estiloPrimitivo = css`
 // Espaçamento/estrutura são responsabilidade dos primitivos, não daqui.
 export const estiloConteudo = css`
   h2, h3 {
-    color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+    color: var(--cor-texto-forte);
     font-weight: 600;
   }
   .sec {
-    color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    color: var(--cor-texto-sec);
     font-size: var(--texto-corpo, 0.8125rem);
   }
   .erro {
-    color: var(--cor-erro, #d45a3a);
+    color: var(--cor-erro);
     font-size: var(--texto-corpo, 0.8125rem);
   }
 `;

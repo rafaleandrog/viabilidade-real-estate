@@ -258,10 +258,32 @@ caso guard-tokens-css 1 "token inexistente ANINHADO dentro de um var() válido" 
 const e = css`.x { color: var(--cor-texto, var(--cor-inventada, #fff)); }`;
 TS
 
+caso guard-tokens-css 1 "token de tema EXISTENTE com fallback de cor literal (hex)" 'caso\.ts:1 +--cor-borda' <<'TS'
+const e = css`.x { border-color: var(--cor-borda, #111); }`;
+TS
+
+caso guard-tokens-css 1 "token de tema EXISTENTE com fallback rgba() em várias linhas" 'caso\.ts:2 +--cor-texto-sec' <<'TS'
+const e = css`.x { padding: 0;
+  color: var(--cor-texto-sec, rgba(255, 255, 255, 0.6)); }`;
+TS
+
 secao "guard-tokens-css — NÃO acusa (falso positivo desliga a guarda):"
 
-caso guard-tokens-css 0 "tokens do espelho, com e sem fallback" <<'TS'
-const e = css`.x { color: var(--cor-texto); border-color: var(--cor-borda, #111); }`;
+caso guard-tokens-css 0 "tokens do espelho, sem fallback e com fallback que é outro token" <<'TS'
+const e = css`.x { color: var(--cor-texto); border-color: var(--cor-borda, var(--cor-texto)); }`;
+TS
+
+caso guard-tokens-css 0 "hook próprio do app mantém fallback de cor" <<'TS'
+const e = css`.x { --meu-fundo: red; background: var(--meu-fundo, #fff); }`;
+TS
+
+caso guard-tokens-css 0 "hook de primitivo mantém fallback de cor" <<'TS'
+const e = css`urbi-conv { border-color: var(--urbi-conv-borda, #111); }`;
+TS
+
+caso guard-tokens-css 0 "fallback literal citado só em comentário" <<'TS'
+// antigamente era var(--cor-borda, #111)
+const e = css`.x { border-color: var(--cor-borda); }`;
 TS
 
 caso guard-tokens-css 0 "custom property declarada pelo próprio app" <<'TS'

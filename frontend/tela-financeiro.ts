@@ -165,15 +165,15 @@ export class ViabTelaFinanceiro extends LitElement {
     .secao h4 {
       margin: 0 0 4px; font-size: var(--texto-rotulo, 0.75rem);
       text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
-    .dica { margin: 0 0 12px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .dica { margin: 0 0 12px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); }
     .grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
     .grid > * { width: 210px; max-width: 100%; box-sizing: border-box; }
     .grid > .p1 { width: 165px; }
     .grid > .p3 { width: 330px; }
-    .soma { margin: 10px 0 0; font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
-    .soma strong { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
+    .soma { margin: 10px 0 0; font-size: 0.78rem; color: var(--cor-texto-sec); }
+    .soma strong { color: var(--cor-texto-forte); font-variant-numeric: tabular-nums; }
     urbi-card + urbi-card { margin-top: 16px; }
     urbi-banner { margin-top: 12px; }
     .form-acoes { display: flex; justify-content: flex-end; margin-top: 16px; }

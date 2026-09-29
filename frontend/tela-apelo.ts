@@ -22,7 +22,7 @@ export class ViabTelaApelo extends LitElement {
 
   static styles = [estiloConteudo, css`
     .docs { display: flex; flex-direction: column; margin: 8px 0; }
-    .doc { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
+    .doc { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--cor-borda-sutil); }
     .upload-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
     .upload-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
     /* #579: 170 -> 210px. Este card usa urbi-kpi (shadow DOM) igual ao
@@ -37,7 +37,7 @@ export class ViabTelaApelo extends LitElement {
     .perg { font-size: var(--texto-corpo, 0.8125rem); margin: 8px 0; }
     .perg-nota { margin-right: 6px; }
     .rel { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
-    h4 { margin: 12px 0 8px; font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.05em; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    h4 { margin: 12px 0 8px; font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.05em; color: var(--cor-texto-sec); }
     urbi-card + urbi-card { margin-top: 16px; }
   `];
 

@@ -59,7 +59,7 @@ export class ViabTelaEstudo extends LitElement {
     .add-membro urbi-select { min-width: 180px; }
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-    .apoio-nome { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .apoio-nome { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); }
   `];
 
   connectedCallback() {

@@ -121,6 +121,7 @@ const arquivos = arquivosTs(join(RAIZ, 'frontend'));
 
 const doApp = new Map();     // --nome -> primeiro local de declaracao
 const achados = [];
+const fallbacks = [];
 const usados = new Set();
 let usos = 0;
 
@@ -189,6 +190,20 @@ for (const s of superficiesPorArquivo) {
     if (conhecidos.has(token) || doApp.has(token) || doPrimitivo.has(token)) continue;
     achados.push({ onde: `${s.rel}:${s.linhaDe(m.index)}`, token });
   }
+
+  // Fallback de COR LITERAL num token de tema. O SDK manda consumir token sem
+  // fallback (`docs/ui.md` § Tokens e temas): com o `tokens.css` sempre carregado
+  // o fallback e peso morto, ancora o consumidor no valor do tema escuro e esconde
+  // token inexistente. So tokens do ESPELHO entram — hook de customizacao proprio
+  // (`--urbi-*`, `--x` declarado pelo app) mantem fallback por contrato. A unica
+  // excecao do SDK e token mais NOVO que o `shell_min` do app, e o espelho e mais
+  // antigo que o piso, entao nao ha caso hoje. Aparece na ordem do arquivo; nunca
+  // le comentario (`s.texto` ja o exclui).
+  for (const m of s.texto.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*,\s*(?:#[0-9a-fA-F]{3,8}\b|(?:rgba?|hsla?)\()/gi)) {
+    if (conhecidos.has(m[1]) && !doApp.has(m[1]) && !doPrimitivo.has(m[1])) {
+      fallbacks.push({ onde: `${s.rel}:${s.linhaDe(m.index)}`, token: m[1] });
+    }
+  }
 }
 
 // ── relatorio ───────────────────────────────────────────────────────────────
@@ -197,8 +212,18 @@ console.log(
   `  espelho: ${c.sha?.slice(0, 8) ?? '?'} · monorepo ${c.versao_monorepo ?? '?'} · ${c.data_do_commit ?? '?'} · ${conhecidos.size} tokens`,
 );
 
+if (fallbacks.length) {
+  console.error('');
+  console.error('FALHOU: var() de token de tema com fallback de cor literal.');
+  console.error('        O SDK manda consumir token sem fallback: escreva var(--cor-x), nao var(--cor-x, #hex).');
+  console.error('        O empacotador conta cada um desses como "literal de cor fora de token" e avisa a cada upgrade.');
+  console.error('');
+  for (const f of fallbacks) console.error(`  ${f.onde}  ${f.token}`);
+  if (achados.length === 0) process.exit(1);
+}
+
 if (achados.length === 0) {
-  console.log(`  ok: ${usos} usos de var() em ${usados.size} tokens distintos, todos existem`);
+  console.log(`  ok: ${usos} usos de var() em ${usados.size} tokens distintos, todos existem, nenhum com fallback de cor literal`);
   process.exit(0);
 }
 

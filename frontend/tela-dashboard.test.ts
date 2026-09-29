@@ -502,7 +502,7 @@ test('#679: os dois ramos da miniatura (com e sem capa) têm o MESMO tamanho, vi
   assert.ok(
     FONTE_DASHBOARD.includes(
       `<img class="miniatura" style="${ESTILO}object-fit:cover;display:block;` +
-        'background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" src=${l.imagem_principal_url}',
+        'background:var(--cor-superficie-sutil)" src=${l.imagem_principal_url}',
     ),
     'o <img> precisa do estilo inline completo — classe sozinha não chega ao nó real (fica no shadow ' +
       'root de urbi-tabela, não no de viab-tela-dashboard)',
@@ -510,7 +510,7 @@ test('#679: os dois ramos da miniatura (com e sem capa) têm o MESMO tamanho, vi
   assert.ok(
     FONTE_DASHBOARD.includes(
       `<span class="miniatura-vazia" style="${ESTILO}display:block;` +
-        'background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" aria-hidden="true">',
+        'background:var(--cor-superficie-sutil)" aria-hidden="true">',
     ),
     'o placeholder vazio também precisa do MESMO estilo inline, com o MESMO tamanho do <img> — senão ' +
       'a coluna muda de largura conforme o estudo tem capa ou não',

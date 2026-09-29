@@ -18,6 +18,17 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-29 — aviso "tokens de tema" (343 → 15)
+
+O aviso do `urbi-empacotar` (`343 literais de cor fora de token no bundle`) aparecia em toda tela de
+Upgrades, e o `CLAUDE.md` mandava ignorá-lo como falso positivo. Estava errado: o SDK manda consumir
+token de tema sem fallback, e 333 dos 343 eram `var(--token, #hex)` em 33 arquivos de `frontend/`.
+Removidos todos (os 30 tokens em uso existem no espelho, que é anterior ao `shell_min`, então nenhum
+precisou de fallback como ponte). Sobram 15, todos do `exportar.ts` (papel de impressão, exceção do
+SDK). `guard-tokens-css.mjs` passou a reprovar o fallback de cor literal em token do espelho, com casos
+nos dois sentidos em `testar-guards-ui.sh`; o teste do dashboard que conferia o texto do fallback
+foi ajustado. Validado: `validar-frontend.sh` verde (1216 testes, 101 casos de render).
+
 ## 2026-09-25 — #736: fechamento da Rodada 13
 
 Rodada 13 encerrada na mesma alteração que fecha a última issue: `historico/rodada-13/planejamento.md`
