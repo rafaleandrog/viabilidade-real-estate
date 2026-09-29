@@ -190,6 +190,11 @@ test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 
   assert.ok(iGrava > iSoma, 'ambos os portões precedem a gravação');
 });
 
+test('#781 fiação: adicionar produto no Loteamento espera o catálogo ser lido', () => {
+  assert.match(FONTE_TELA_ALV, /_adicionarProduto = async \(\) => \{\s*if \(this\._ehLoteamento && !this\._produtosLidos\) \{[\s\S]{0,200}?return;/,
+    'o restante do produto novo seria calculado sobre o catálogo placeholder');
+});
+
 test('#781 fiação: a primeira edição de linha legada deriva o % da ALV PERSISTIDA (snapshot)', () => {
   assert.ok(FONTE_TELA_ALV.includes('alvDoLoteamento({ ...this._snapshot,') && FONTE_TELA_ALV.includes('const alv = this._alvPersistida();') && FONTE_TELA_ALV.includes('alocacaoAlv(this.produtos, this._alvPersistida())'),
     'com o formulário, uma premissa de área não salva gravaria um % sobre ALV que o estudo não tem');

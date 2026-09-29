@@ -204,6 +204,8 @@ test('#781: trocar Loteamento → Incorporação leva a área derivada, sem zera
   ];
   const saida = areasParaSairDoLoteamento(produtos, ALV);
   assert.deepEqual(saida, [{ id: 1, area_media_m2: 300 }, { id: 2, area_media_m2: 300 }]);
+  // Linha recém-criada (sem unidades) não tem área derivável: fica como está, com o %.
+  assert.deepEqual(areasParaSairDoLoteamento([{ id: 9, pct_alv: 50, unidades: 0 }], ALV), []);
   const inc = calcularProforma({
     tipo_empreendimento: 'incorporacao',
     produtos: produtos.map((p) => {

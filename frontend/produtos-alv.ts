@@ -140,7 +140,11 @@ export function areasParaSairDoLoteamento(
   const saida: AreaParaSairDoLoteamento[] = [];
   for (const p of produtos ?? []) {
     if (!temValor(p.pct_alv) || p.id === null || p.id === undefined) continue;
-    saida.push({ id: Number(p.id), area_media_m2: Math.round(areaMediaDaLinha(p, alvM2) * 100) / 100 });
+    const area = Math.round(areaMediaDaLinha(p, alvM2) * 100) / 100;
+    // Linha sem área derivável (sem unidades, sem ALV, ou 0%): NÃO se converte. Ela
+    // fica como está — com o `pct_alv` que o usuário digitou — em vez de ter a única
+    // informação que tem apagada e voltar como 0% se o estudo for revertido.
+    if (area > 0) saida.push({ id: Number(p.id), area_media_m2: area });
   }
   return saida;
 }

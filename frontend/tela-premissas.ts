@@ -1153,6 +1153,12 @@ export class ViabTelaPremissas extends LitElement {
   }
 
   private _adicionarProduto = async () => {
+    // No Loteamento o produto novo nasce com o restante do catálogo: enquanto ele
+    // não foi LIDO, `produtos` é o placeholder `[]` e o restante sairia 100%.
+    if (this._ehLoteamento && !this._produtosLidos) {
+      urbiVerso.notificar('Aguarde o carregamento dos produtos para adicionar.', 'alerta');
+      return;
+    }
     try {
       const dados: Record<string, any> = { ordem: this.produtos.length };
       if (this._ehLoteamento) {
