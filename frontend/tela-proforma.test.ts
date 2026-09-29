@@ -440,9 +440,9 @@ test('Cenários — FIAÇÃO: o catálogo `LINHAS_SENSIBILIDADE` tem "Deduções
 });
 
 // #781 fiação: as sub-linhas por produto da Proforma leem o catálogo por
-// `produtosDoEstudo` (no Loteamento, com a área derivada da ALV). Nenhum teste
-// monta a tela; apagar a chamada deixaria produto só com `pct_alv` com VGV zero
-// na linha, com a suíte verde.
+// `produtosDoEstudo` (no Loteamento, com a área derivada da ALV). Nenhum caso do
+// harness de render monta a Proforma com um Loteamento só de `pct_alv`; apagar a
+// chamada deixaria produto só com `pct_alv` com VGV zero na linha, com a suíte verde.
 test('#781 fiação: montarLinhasProforma deriva o catálogo por produtosDoEstudo', async () => {
   const { readFileSync } = await import('node:fs');
   const fonte = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');

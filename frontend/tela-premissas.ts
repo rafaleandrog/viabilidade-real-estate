@@ -406,6 +406,11 @@ export class ViabTelaPremissas extends LitElement {
   // 1-3, agora na camada de carregamento. Só vira `true` depois que
   // `listarProdutosPreliminar` resolve com sucesso; nunca no `catch`.
   @state() private _catalogoCarregado = false;
+  // #781: o catálogo de Produtos foi LIDO com sucesso — independente dos benchmarks
+  // e da config, que compartilham o `Promise.all` de `_init` e derrubam
+  // `_catalogoCarregado` quando falham. O portão do salvar só precisa disto: com
+  // `produtos = []` por falta de leitura, o catálogo "vazio" passaria a soma.
+  @state() private _produtosLidos = false;
   @state() private confirmRemoverProduto: any | null = null;
   // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
   @state() private erros: Record<string, string> = {};
@@ -601,10 +606,16 @@ export class ViabTelaPremissas extends LitElement {
     this.erroGeral = '';
     this.produtos = [];
     this._catalogoCarregado = false;
+    this._produtosLidos = false;
     try {
+      // A ordem das chamadas (benchmarks, config, produtos) é a que os testes de
+      // corrida (#597) enumeram — não a reordene.
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
-        listarProdutosPreliminar(this.estudo.id),
+        listarProdutosPreliminar(this.estudo.id).then((r) => {
+          if (respostaAindaVale(id, this.estudo?.id)) { this.produtos = r?.dados || []; this._produtosLidos = true; }
+          return r;
+        }),
       ]);
       if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
@@ -1167,7 +1178,10 @@ export class ViabTelaPremissas extends LitElement {
       if (this._ehLoteamento && dados.pct_alv === undefined
         && (p.pct_alv === null || p.pct_alv === undefined || p.pct_alv === '')) {
         const alv = alvDoLoteamento(this._entradaProforma());
-        if (alv > 0) enviar = { ...dados, pct_alv: Math.round(pctAlvEfetivo(p, alv) * 10000) / 10000 };
+        // Também só até 100%: uma linha antiga maior que a ALV não é expressível
+        // (a API recusa acima de 100) e a edição de outro campo não pode morrer por isso.
+        const efetivo = pctAlvEfetivo(p, alv);
+        if (alv > 0 && efetivo <= 100) enviar = { ...dados, pct_alv: Math.round(efetivo * 10000) / 10000 };
       }
       const res = await atualizarProdutoPreliminar(this.estudo.id, p.id, enviar);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar produto', 'erro'); return; }
@@ -1649,7 +1663,7 @@ export class ViabTelaPremissas extends LitElement {
       // Catálogo ainda a caminho (ou a carga falhou): `produtos` é `[]`, e o
       // catálogo vazio é VÁLIDO para a soma — salvar agora deixaria passar uma
       // premissa que muda a ALV sem conferir os percentuais que já existem.
-      if (!this._catalogoCarregado) {
+      if (!this._produtosLidos) {
         this.erroGeral = 'Aguarde o carregamento dos produtos para salvar as premissas.';
         urbiVerso.notificar(this.erroGeral, 'erro');
         return;

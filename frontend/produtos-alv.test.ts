@@ -67,6 +67,13 @@ test('#781: soma e alocação — completa, falta, excesso, com tolerância', ()
   assert.equal(alocacaoAlv(tercos, ALV).estado, 'completa');
 });
 
+test('#781: os limites exatos da tolerância (99,99 e 100,01) contam como completos', () => {
+  assert.equal(alocacaoAlv([{ pct_alv: 99.99 }], ALV).estado, 'completa');
+  assert.equal(alocacaoAlv([{ pct_alv: 100.01 }], ALV).estado, 'completa');
+  assert.equal(alocacaoAlv([{ pct_alv: 99.98 }], ALV).estado, 'falta');
+  assert.equal(alocacaoAlv([{ pct_alv: 100.02 }], ALV).estado, 'excesso');
+});
+
 test('#781: validarSomaPctAlv — catálogo vazio passa; soma ≠ 100 barra com mensagem', () => {
   assert.equal(validarSomaPctAlv([], ALV).ok, true);
   assert.equal(validarSomaPctAlv(undefined, ALV).ok, true);
