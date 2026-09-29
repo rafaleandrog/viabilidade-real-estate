@@ -713,16 +713,28 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     // #781: Loteamento → Incorporação (só em rascunho). O catálogo do Loteamento
     // vive em `pct_alv` e a Incorporação lê `area_media_m2`: sem levar a área
     // derivada junto, todo produto sairia do catálogo efetivo e o VGV zeraria.
-    if (estudo.tipo_empreendimento === 'loteamento'
-      && dados.tipo_empreendimento === 'incorporacao') {
-      const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
-      const alv = alvDoLoteamento(estudo as unknown as ProformaInput);
-      for (const a of areasParaSairDoLoteamento(produtos as any[], alv)) {
-        await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
+    //
+    // A ORDEM é a do estudo primeiro, produtos depois: o `atualizar` do estudo é
+    // quem valida o patch inteiro contra o schema, então um patch recusado não
+    // deixa produto convertido para trás. E se a conversão falhar no meio, o tipo
+    // volta a `loteamento` — os produtos já convertidos seguem legítimos (área
+    // preenchida, `pct_alv` limpo é o estado legado), e a ALV usada é a do estudo
+    // ANTES da troca, lida acima.
+    const saiDoLoteamento = estudo.tipo_empreendimento === 'loteamento'
+      && dados.tipo_empreendimento === 'incorporacao';
+    const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
+    if (saiDoLoteamento) {
+      try {
+        const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
+        const alv = alvDoLoteamento(estudo as unknown as ProformaInput);
+        for (const a of areasParaSairDoLoteamento(produtos as any[], alv)) {
+          await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
+        }
+      } catch (e) {
+        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' });
+        throw e;
       }
     }
-
-    const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     res.json(atualizado);
   } catch (e: any) {
     console.error('Erro em PATCH /estudos/:id:', e);

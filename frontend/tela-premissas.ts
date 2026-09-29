@@ -1147,12 +1147,19 @@ export class ViabTelaPremissas extends LitElement {
     return this.estudo?.tipo_empreendimento === 'loteamento';
   }
 
+  /** A ALV do estudo como está SALVO (`_snapshot`), não a do formulário em edição. */
+  private _alvPersistida(): number {
+    return alvDoLoteamento({ ...this._snapshot, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
+  }
+
   private _adicionarProduto = async () => {
     try {
       const dados: Record<string, any> = { ordem: this.produtos.length };
       if (this._ehLoteamento) {
         // #781: o produto novo já nasce com o que falta para fechar 100% da ALV.
-        const restante = alocacaoAlv(this.produtos, alvDoLoteamento(this._entradaProforma())).restante;
+        // Sobre a ALV PERSISTIDA: o produto é gravado na hora, e uma premissa de área
+        // ainda não salva não pode decidir quanto do catálogo já está alocado.
+        const restante = alocacaoAlv(this.produtos, this._alvPersistida()).restante;
         dados.pct_alv = Math.max(0, Math.round(restante * 10000) / 10000);
       }
       const res = await criarProdutoPreliminar(this.estudo.id, dados);
@@ -1180,7 +1187,7 @@ export class ViabTelaPremissas extends LitElement {
         // A ALV PERSISTIDA (`_snapshot`), não a do formulário: o percentual é gravado
         // na hora, e uma premissa de área ainda não salva (ou barrada) deixaria o
         // produto com um % calculado sobre uma ALV que o estudo não tem.
-        const alv = alvDoLoteamento({ ...this._snapshot, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
+        const alv = this._alvPersistida();
         // Também só entre 0 e 100%: uma linha antiga fora disso (maior que a ALV, ou
         // com área/unidades negativas) não é expressível (a API recusa fora da faixa) e a edição de outro campo não pode morrer por isso.
         const efetivo = pctAlvEfetivo(p, alv);

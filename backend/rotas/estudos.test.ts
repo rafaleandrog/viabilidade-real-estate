@@ -1018,9 +1018,11 @@ test('#781 fiação: PATCH que tira o rascunho do Loteamento leva a área deriva
     "atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null })",
   ]) assert.ok(FONTE_ROTA.includes(parte), `o PATCH deixou de ter: ${parte}`);
   assert.ok(
-    FONTE_ROTA.indexOf('areasParaSairDoLoteamento(produtos as any[], alv)') < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)"),
-    'a área tem que ser gravada ANTES de o tipo mudar (a ALV vem do tipo antigo)',
+    FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)") < FONTE_ROTA.indexOf('areasParaSairDoLoteamento(produtos as any[], alv)'),
+    'o estudo é atualizado (e o patch validado) ANTES de qualquer produto ser convertido',
   );
+  assert.ok(FONTE_ROTA.includes("atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' })"),
+    'falha na conversão tem que devolver o tipo a loteamento');
 });
 
 test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento com soma ≠ 100% da ALV', () => {
