@@ -724,13 +724,24 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
       && dados.tipo_empreendimento === 'incorporacao';
     const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     if (saiDoLoteamento) {
+      // Cada produto convertido guarda o estado ANTERIOR para a compensação: se um
+      // update falhar no meio, os já convertidos voltam ao que eram (com o `pct_alv`
+      // e a área originais) e o tipo volta a `loteamento` — a falha não deixa o
+      // Loteamento parcialmente mutado.
+      const convertidos: { id: number; antes: Record<string, unknown> }[] = [];
       try {
         const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
         const alv = alvDoLoteamento(estudo as unknown as ProformaInput);
         for (const a of areasParaSairDoLoteamento(produtos as any[], alv)) {
+          const orig = (produtos as any[]).find((p) => Number(p.id) === a.id);
           await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
+          convertidos.push({ id: a.id, antes: { area_media_m2: orig?.area_media_m2 ?? null, pct_alv: orig?.pct_alv ?? null } });
         }
       } catch (e) {
+        for (const c of convertidos) {
+          try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
+          catch (e2) { console.error('Falha ao desfazer a conversão do produto', c.id, e2); }
+        }
         await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' });
         throw e;
       }

@@ -1023,6 +1023,8 @@ test('#781 fiação: PATCH que tira o rascunho do Loteamento leva a área deriva
   );
   assert.ok(FONTE_ROTA.includes("atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' })"),
     'falha na conversão tem que devolver o tipo a loteamento');
+  assert.ok(FONTE_ROTA.includes('convertidos.push(') && FONTE_ROTA.includes('for (const c of convertidos)'),
+    'falha na conversão tem que desfazer os produtos JÁ convertidos');
 });
 
 test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento com soma ≠ 100% da ALV', () => {
