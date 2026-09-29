@@ -107,7 +107,7 @@ export class ViabGraficoCascata extends LitElement {
       text-align: center;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
     }
     /* A altura vem INLINE, da prop altura, e nao de uma custom property
        propria: o harness de render exige que todo var() citado pelo CSS
@@ -116,7 +116,7 @@ export class ViabGraficoCascata extends LitElement {
     .trilho {
       position: relative;
       width: 100%;
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      background: var(--cor-borda-sutil);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -142,13 +142,13 @@ export class ViabGraficoCascata extends LitElement {
       left: 0;
       right: 0;
       height: 1px;
-      background: var(--cor-borda-forte, rgba(255, 255, 255, 0.45));
+      background: var(--cor-borda-forte);
       pointer-events: none;
       z-index: 1;
     }
-    .barra.subtotal { background: var(--cor-sucesso, #13a98d); }
-    .barra.deducao { background: var(--cor-erro, #d45a3a); }
-    .barra.total { background: var(--cor-primaria-solida, #2aa9e0); }
+    .barra.subtotal { background: var(--cor-sucesso); }
+    .barra.deducao { background: var(--cor-erro); }
+    .barra.total { background: var(--cor-primaria-solida); }
     /* Rotulo na HORIZONTAL: com a coluna dividindo a largura toda e um gap de
        18px, o titulo cabe em ate tres linhas, que le muito melhor que texto
        girado. Altura fixa para as colunas alinharem a base entre si;
@@ -159,7 +159,7 @@ export class ViabGraficoCascata extends LitElement {
       text-align: center;
       font-size: 11px;
       line-height: 1.25;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
       overflow-wrap: anywhere;
       display: -webkit-box;
       -webkit-line-clamp: 3;
@@ -169,14 +169,14 @@ export class ViabGraficoCascata extends LitElement {
     .rotulo.clicavel, .coluna.clicavel .trilho { cursor: pointer; }
     .rotulo.clicavel { text-decoration: underline dotted; }
     .coluna.clicavel:focus-visible {
-      outline: 2px solid var(--cor-primaria-solida, #2aa9e0);
+      outline: 2px solid var(--cor-primaria-solida);
       outline-offset: 2px;
       border-radius: 4px;
     }
     .rodape {
       margin-top: 8px;
       font-size: 11px;
-      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+      color: var(--cor-texto-fraco);
     }
   `;
 

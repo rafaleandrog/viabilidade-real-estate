@@ -236,10 +236,10 @@ export class ViabFluxoVer extends LitElement {
        colide com --cor-sucesso/--cor-info/--cor-alerta em NENHUMA variante —
        ver o teste de distinção em frontend/fluxo-economico-series.test.ts. */
     .graf urbi-grafico-linha {
-      --urbi-grafico-cor-1: var(--cor-categoria-1, #6ca1ff);
-      --urbi-grafico-cor-2: var(--cor-sucesso, #13a98d);
-      --urbi-grafico-cor-3: var(--cor-info, #3b82f6);
-      --urbi-grafico-cor-4: var(--cor-alerta, #d59b2d);
+      --urbi-grafico-cor-1: var(--cor-categoria-1);
+      --urbi-grafico-cor-2: var(--cor-sucesso);
+      --urbi-grafico-cor-3: var(--cor-info);
+      --urbi-grafico-cor-4: var(--cor-alerta);
     }
 
     /* #351: tabela da Proforma e do quadro Livre × real — poucas linhas, sem
@@ -247,17 +247,17 @@ export class ViabFluxoVer extends LitElement {
     table.proforma { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     table.proforma th, table.proforma td {
       padding: 6px 10px; font-size: 0.82rem; text-align: left;
-      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+      border-bottom: 1px solid var(--cor-borda-sutil);
     }
     table.proforma th.num, table.proforma td.num { text-align: right; }
-    table.proforma th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
-    table.proforma tr.n1 td:first-child { padding-left: 26px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
-    table.proforma tr.n0 td { font-weight: 700; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); }
+    table.proforma th { color: var(--cor-texto-sec); font-weight: 600; }
+    table.proforma tr.n1 td:first-child { padding-left: 26px; color: var(--cor-texto-sec); }
+    table.proforma tr.n0 td { font-weight: 700; border-top: 1px solid var(--cor-borda); }
     /* Proforma itemizada — mesma convenção subgrupo vs. item simples que
        fluxo-tabela.ts (linha 168) já usa na aba Fluxo de Caixa: sem isto, o
        subtotal de um grupo de custo (nivel 1, igual aos itens que ele soma)
        ficava indistinguível deles na tela — achado da revisão do PR 713. */
-    table.proforma tr.n1.subgrupo td { font-weight: 600; border-top: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.1)); }
+    table.proforma tr.n1.subgrupo td { font-weight: 600; border-top: 1px solid var(--cor-borda-sutil); }
 
     /* #593 — cor por natureza de linha, o mesmo princípio que o Preliminar já
        usa. As classes (receita / custo / resultado / informativo, mais n0/n1)
@@ -275,8 +275,8 @@ export class ViabFluxoVer extends LitElement {
        mesma especificidade, então quem decide é a ordem do arquivo. */
     table.proforma tr.n1.custo { background: color-mix(in srgb, var(--cor-erro) 8%, transparent); }
     table.proforma tr.n0.custo td {
-      font-weight: 700; background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
-      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+      font-weight: 700; background: var(--cor-superficie-hover);
+      color: var(--cor-texto-forte);
     }
     table.proforma tr.receita td {
       background: color-mix(in srgb, var(--cor-sucesso) 14%, transparent);
@@ -289,22 +289,22 @@ export class ViabFluxoVer extends LitElement {
       color: var(--cor-erro);
     }
     table.proforma tr.resultado td {
-      font-weight: 800; font-size: 1.05rem; background: var(--cor-primaria-fundo, rgba(42,169,224,0.12));
-      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
-      padding-top: 14px; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.12));
+      font-weight: 800; font-size: 1.05rem; background: var(--cor-primaria-fundo);
+      color: var(--cor-texto-forte);
+      padding-top: 14px; border-top: 2px solid var(--cor-borda);
     }
-    table.proforma tr.resultado td.pos { color: var(--cor-sucesso, #13A98D); }
-    table.proforma tr.resultado td.neg { color: var(--cor-erro, #D45A3A); }
+    table.proforma tr.resultado td.pos { color: var(--cor-sucesso); }
+    table.proforma tr.resultado td.neg { color: var(--cor-erro); }
     /* #447: linha informativa do funding — nunca somada, por isso o itálico
        e a borda tracejada (não é uma linha da hierarquia de totais acima). */
     table.proforma tr.informativo td {
-      font-style: italic; color: var(--cor-texto-sec, rgba(255,255,255,0.55));
-      border-top: 1px dashed var(--cor-borda-sutil, rgba(255,255,255,0.14));
+      font-style: italic; color: var(--cor-texto-sec);
+      border-top: 1px dashed var(--cor-borda-sutil);
     }
     /* #427 — nota do denominador do fecho "= Resultado + Permutas", só
        exibida quando a base difere do VGV (molde de Premissas e
        Resultados K36 da EVI: a nota é gerada e some quando não se aplica). */
-    table.proforma .nota-base { font-size: 0.72rem; font-weight: 400; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+    table.proforma .nota-base { font-size: 0.72rem; font-weight: 400; color: var(--cor-texto-sec); }
     /* #742 — espaçamento visual entre os blocos da Proforma (dedução de
        receita / custo direto / custo indireto / rodapé de resultado), no
        molde da planilha de referência do autor: uma linha em branco entre
@@ -314,7 +314,7 @@ export class ViabFluxoVer extends LitElement {
        apoio que o rodapé (".sec") já usa, para não competir com o título do
        card. */
     p.permuta-fisica-resumo {
-      margin: 0 0 12px; font-size: 0.82rem; color: var(--cor-texto-sec, rgba(255,255,255,0.7));
+      margin: 0 0 12px; font-size: 0.82rem; color: var(--cor-texto-sec);
     }
 
     /* #594 — a abertura por parte tem 8 colunas, contra as 2 das tabelas
@@ -333,9 +333,9 @@ export class ViabFluxoVer extends LitElement {
     .tabela-wrap { overflow-x: auto; }
     .tabela-wrap table.partes { min-width: 720px; }
     table.proforma tr.parte-incorporador td { font-weight: 700; }
-    table.proforma td.vazio { color: var(--cor-texto-sec, rgba(255,255,255,0.45)); }
-    table.proforma td.pos { color: var(--cor-sucesso, #13A98D); }
-    table.proforma td.neg { color: var(--cor-erro, #D45A3A); }
+    table.proforma td.vazio { color: var(--cor-texto-sec); }
+    table.proforma td.pos { color: var(--cor-sucesso); }
+    table.proforma td.neg { color: var(--cor-erro); }
   `];
 
   updated() {

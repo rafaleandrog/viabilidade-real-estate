@@ -46,22 +46,22 @@ export class ViabGraficoTornado extends LitElement {
       cursor: pointer;
     }
     .linha + .linha { margin-top: 2px; }
-    .linha:hover { background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08)); }
+    .linha:hover { background: var(--cor-borda-sutil); }
     .linha:focus-visible {
-      outline: 2px solid var(--cor-primaria-solida, #2aa9e0);
+      outline: 2px solid var(--cor-primaria-solida);
       outline-offset: 1px;
     }
     .linha.ativa {
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
-      box-shadow: inset 2px 0 0 var(--cor-primaria-solida, #2aa9e0);
+      background: var(--cor-borda-sutil);
+      box-shadow: inset 2px 0 0 var(--cor-primaria-solida);
     }
     .linha.circular { opacity: 0.55; }
     /* #735: o composto, no topo, separado das alavancas individuais. */
-    .linha.composto { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--cor-borda-sutil, rgba(255, 255, 255, 0.08)); }
-    .linha.composto .rotulo { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); font-weight: 600; }
+    .linha.composto { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--cor-borda-sutil); }
+    .linha.composto .rotulo { color: var(--cor-texto-forte); font-weight: 600; }
     .rotulo {
       font-size: 12px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -69,7 +69,7 @@ export class ViabGraficoTornado extends LitElement {
     .trilho {
       position: relative;
       height: 14px;
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      background: var(--cor-borda-sutil);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -79,7 +79,7 @@ export class ViabGraficoTornado extends LitElement {
       top: 0;
       bottom: 0;
       width: 0;
-      border-left: 1px dashed var(--cor-texto-fraco, rgba(255, 255, 255, 0.3));
+      border-left: 1px dashed var(--cor-texto-fraco);
     }
     .barra {
       position: absolute;
@@ -89,13 +89,13 @@ export class ViabGraficoTornado extends LitElement {
     }
     .barra.esquerda { right: 50%; border-top-right-radius: 0; border-bottom-right-radius: 0; }
     .barra.direita { left: 50%; border-top-left-radius: 0; border-bottom-left-radius: 0; }
-    .barra.destaque { background: var(--cor-primaria-solida, #2aa9e0); }
-    .barra.neutra { background: var(--cor-texto-fraco, rgba(255, 255, 255, 0.35)); }
+    .barra.destaque { background: var(--cor-primaria-solida); }
+    .barra.neutra { background: var(--cor-texto-fraco); }
     .valor {
       font-size: 12px;
       text-align: right;
       font-variant-numeric: tabular-nums;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
     }
   `;
 

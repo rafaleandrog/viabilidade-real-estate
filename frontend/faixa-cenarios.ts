@@ -38,7 +38,7 @@ export class ViabFaixaCenarios extends LitElement {
     .rotulo {
       font-size: 12px;
       font-weight: 600;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -48,7 +48,7 @@ export class ViabFaixaCenarios extends LitElement {
       height: 14px;
       border-radius: 3px;
       overflow: visible;
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      background: var(--cor-borda-sutil);
     }
     .segmento { position: absolute; top: 0; bottom: 0; opacity: 0.55; }
     .segmento.primeiro { border-radius: 3px 0 0 3px; }
@@ -59,12 +59,12 @@ export class ViabFaixaCenarios extends LitElement {
       position: absolute;
       top: 5px;
       height: 4px;
-      background: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      background: var(--cor-texto-forte);
       opacity: 0.6;
     }
     .marcador { position: absolute; top: -3px; bottom: -3px; width: 2px; transform: translateX(-50%); }
-    .marcador.bear { background: var(--cor-erro, #D45A3A); }
-    .marcador.bull { background: var(--cor-info, #2AA9E0); }
+    .marcador.bear { background: var(--cor-erro); }
+    .marcador.bull { background: var(--cor-info); }
     /* A base e o marcador CHEIO: mais largo, cor forte, borda para se
        destacar sobre qualquer faixa. */
     .marcador.base {
@@ -72,8 +72,8 @@ export class ViabFaixaCenarios extends LitElement {
       top: -5px;
       bottom: -5px;
       border-radius: 2px;
-      background: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
-      box-shadow: 0 0 0 1px var(--cor-borda-forte, rgba(255, 255, 255, 0.3));
+      background: var(--cor-texto-forte);
+      box-shadow: 0 0 0 1px var(--cor-borda-forte);
     }
     .valores {
       display: flex;
@@ -82,15 +82,15 @@ export class ViabFaixaCenarios extends LitElement {
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
-    .valores .bear { color: var(--cor-erro, #D45A3A); }
-    .valores .base { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); font-weight: 700; }
-    .valores .bull { color: var(--cor-info, #2AA9E0); }
+    .valores .bear { color: var(--cor-erro); }
+    .valores .base { color: var(--cor-texto-forte); font-weight: 700; }
+    .valores .bull { color: var(--cor-info); }
     .extremos {
       grid-column: 2;
       display: flex;
       justify-content: space-between;
       font-size: 10px;
-      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+      color: var(--cor-texto-fraco);
       margin-top: -2px;
     }
   `;

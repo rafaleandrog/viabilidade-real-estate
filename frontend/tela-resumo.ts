@@ -101,7 +101,7 @@ export class ViabTelaResumo extends LitElement {
     .pizza-ctrl urbi-select { flex: 1; min-width: 180px; }
     .pizza-rot {
       font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
   `];
 

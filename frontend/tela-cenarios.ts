@@ -113,12 +113,12 @@ export class ViabTelaCenarios extends LitElement {
        literal marcado, e uma crase encerraria o template ali mesmo — erro que
        o typecheck acusa longe daqui, na linha do "static styles".) */
     .graf urbi-grafico-linha {
-      --urbi-grafico-cor-1: var(--cor-texto-forte, #e8e8ea);
+      --urbi-grafico-cor-1: var(--cor-texto-forte);
       /* --cor-primaria e um GRADIENTE nas 4 variantes de tema do espelho —
          gradiente e invalido em contexto de cor de serie (IACVT / atributo
          descartado), a mesma falha silenciosa que esta issue diagnostica.
          A variante solida existe exatamente para contexto de cor. */
-      --urbi-grafico-cor-2: var(--cor-primaria-solida, #7c5cff);
+      --urbi-grafico-cor-2: var(--cor-primaria-solida);
     }
     /* #185: marcos do cronograma + Payback/Exposicao em texto — a migracao para
        urbi-grafico-linha abriu mao da linha tracejada e dos marcadores verticais
@@ -141,8 +141,8 @@ export class ViabTelaCenarios extends LitElement {
        continua VERDADE, e basta para a decisao da #185, e que o primitivo nao
        declara prop de dasharray nem de anotacao. Quem for mexer aqui le o
        dist/index.d.ts do SDK, nao este paragrafo. */
-    .marcos-lista { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
-    .marcos-lista strong { color: var(--cor-texto, rgba(255,255,255,0.85)); font-weight: 600; }
+    .marcos-lista { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 0.78rem; color: var(--cor-texto-sec); }
+    .marcos-lista strong { color: var(--cor-texto); font-weight: 600; }
 
     .slider { margin: 14px 0; }
     .slider-topo { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
@@ -151,9 +151,9 @@ export class ViabTelaCenarios extends LitElement {
     /* --cor-primaria é um GRADIENTE nas 4 variantes de tema, inválido em */
     /* contexto de cor (color/accent-color) — invalid-at-computed-value-time. */
     /* --cor-primaria-solida é a variante pensada para isto. */
-    .slider-topo .val { font-variant-numeric: tabular-nums; color: var(--cor-primaria-solida, #7c5cff); font-weight: 700; }
-    .slider input[type="range"] { width: 100%; accent-color: var(--cor-primaria-solida, #7c5cff); }
-    .slider-lim { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-top: 2px; }
+    .slider-topo .val { font-variant-numeric: tabular-nums; color: var(--cor-primaria-solida); font-weight: 700; }
+    .slider input[type="range"] { width: 100%; accent-color: var(--cor-primaria-solida); }
+    .slider-lim { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--cor-texto-sec); margin-top: 2px; }
     .salvar { display: flex; gap: 8px; align-items: flex-end; margin-top: 18px; flex-wrap: wrap; }
     .salvar urbi-input { flex: 1; min-width: 140px; }
     .reset { margin-top: 8px; }
@@ -170,14 +170,14 @@ export class ViabTelaCenarios extends LitElement {
        numéricas seguem no seu min-content e as estreitas/var no tamanho fixo,
        então nada se espalha. */
     table.cen { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-    table.cen th, table.cen td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); font-size: 0.82rem; white-space: nowrap; }
-    table.cen th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
+    table.cen th, table.cen td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--cor-borda-sutil); font-size: 0.82rem; white-space: nowrap; }
+    table.cen th { color: var(--cor-texto-sec); font-weight: 600; }
     /* Coluna do nome do cenário absorve a folga da largura total. */
     table.cen th:first-child, table.cen td:first-child { text-align: left; width: 100%; }
-    table.cen td.pos { color: var(--cor-sucesso, #13a98d); }
-    table.cen td.neg { color: var(--cor-erro, #d45a3a); }
-    table.cen tr.linha-real td { font-weight: 700; background: var(--cor-primaria-fundo, rgba(124,92,255,0.12)); }
-    table.cen tr.linha-real td:first-child urbi-icone { margin-right: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+    table.cen td.pos { color: var(--cor-sucesso); }
+    table.cen td.neg { color: var(--cor-erro); }
+    table.cen tr.linha-real td { font-weight: 700; background: var(--cor-primaria-fundo); }
+    table.cen tr.linha-real td:first-child urbi-icone { margin-right: 6px; color: var(--cor-texto-sec); }
     /* #187/#265: Preço venda/Custo obra estreitas (só "±NN%") — largura fixa. */
     table.cen th.cen-estreita, table.cen td.cen-estreita { width: 84px; }
     /* #187: coluna própria para a variação (badge) de VPL/TIR/Exposição máx.,

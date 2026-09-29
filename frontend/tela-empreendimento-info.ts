@@ -67,15 +67,15 @@ export class ViabEmpreendimentoInfo extends LitElement {
        fica, sem ela esse campo perde a largura fixa e destoa de .matricula. */
     .campo.nome urbi-input { width: 280px; }
     .campo.matricula urbi-input { width: 220px; }
-    .rotulo { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .rotulo { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); }
     .valor-ro { font-weight: 600; font-variant-numeric: tabular-nums; padding: 8px 0; }
     .descricao { margin-top: 16px; }
     .acoes { margin-top: 14px; }
     .cat { margin-top: 8px; }
     .cat h4 { margin: 0 0 2px; font-size: var(--texto-corpo, 0.8125rem); }
-    .cat p.dica { margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .cat p.dica { margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); }
     .docs { display: flex; flex-direction: column; }
-    .doc { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
+    .doc { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--cor-borda-sutil); }
     urbi-card + urbi-card { margin-top: 16px; }
   `];
 

@@ -104,13 +104,13 @@ export class ViabFluxoReceitas extends LitElement {
     }
     table.aloc th {
       text-align: left; font-weight: 600; padding: 7px 8px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem);
-      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.75rem);
+      border-bottom: 1px solid var(--cor-borda);
       overflow: hidden;
     }
     table.aloc th.num, table.aloc td.num { text-align: right; }
     table.aloc td {
-      padding: 5px 8px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+      padding: 5px 8px; border-bottom: 1px solid var(--cor-borda-sutil);
       font-size: var(--texto-corpo, 0.8125rem); overflow: hidden;
     }
     /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
@@ -135,14 +135,14 @@ export class ViabFluxoReceitas extends LitElement {
     .stat {
       display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       margin-right: 6px; vertical-align: middle;
-      background: var(--cor-erro, #d45a3a);
+      background: var(--cor-erro);
     }
-    .stat.ok { background: var(--cor-sucesso, #13a98d); }
-    .saldo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.7rem); }
-    .saldo.zero { color: var(--cor-erro, #d45a3a); }
+    .stat.ok { background: var(--cor-sucesso); }
+    .saldo { color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.7rem); }
+    .saldo.zero { color: var(--cor-erro); }
     .rodape-tip { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
     .rodape-tip .espaco { flex: 1; }
-    .total-rotulo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; }
+    .total-rotulo { color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; }
     .total-valor { font-weight: 600; font-variant-numeric: tabular-nums; }
     .add-linha { margin-top: 16px; }
     .nota-regime-comercial { display: block; margin-top: 6px; font-size: var(--texto-rotulo, 0.75rem); max-width: 60ch; }
@@ -156,7 +156,7 @@ export class ViabFluxoReceitas extends LitElement {
     table.abs { width: 100%; border-collapse: collapse; }
     table.abs td, table.abs th {
       padding: 6px; font-size: var(--texto-corpo, 0.8125rem);
-      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); text-align: left;
+      border-bottom: 1px solid var(--cor-borda-sutil); text-align: left;
     }
     table.abs viab-num { width: 110px; }
     .derivado { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -174,7 +174,7 @@ export class ViabFluxoReceitas extends LitElement {
     /* #585 rodada 5: aviso de linha que ainda nao passou pelo motor canonico.
        (Sem crase neste bloco, pelo mesmo motivo declarado logo abaixo.) */
     .plano-legado {
-      border-left: 2px solid var(--cor-alerta, #e0a82a);
+      border-left: 2px solid var(--cor-alerta);
       padding-left: 10px; max-width: 70ch;
     }
     /* #585: a regra .aviso-juros FOI REMOVIDA junto com o aviso de "N taxas
@@ -185,13 +185,13 @@ export class ViabFluxoReceitas extends LitElement {
        CSS FECHA o template, e o guard acusa o erro na linha errada.) */
     .pag-secao h4 {
       margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem); letter-spacing: 0.04em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase;
+      color: var(--cor-texto-sec); text-transform: uppercase;
     }
     .pag-linha { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
     .pag-linha viab-num { width: 92px; }
     .repasse-box {
-      padding: 10px 12px; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12)); border-radius: 8px;
-      background: var(--cor-superficie-hover, rgba(255,255,255,0.03));
+      padding: 10px 12px; border: 1px solid var(--cor-borda); border-radius: 8px;
+      background: var(--cor-superficie-hover);
     }
     .repasse-box .derivado { font-size: 1.05rem; }
   `];
@@ -718,8 +718,8 @@ export class ViabFluxoReceitas extends LitElement {
     const y = (v: number) => padT + (1 - v / 100) * gh;
     const linha = acum.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
     const area = `${linha} L${x(nPts - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
-    const corLinha = 'var(--cor-primaria-solida, #7a5af8)';
-    const corTexto = 'var(--cor-texto-sec, #8a8f98)';
+    const corLinha = 'var(--cor-primaria-solida)';
+    const corTexto = 'var(--cor-texto-sec)';
     const ticksY = [0, 25, 50, 75, 100];
     const passoX = Math.max(1, Math.round(nPts / 6));
     const ticksX: number[] = [];
@@ -727,7 +727,7 @@ export class ViabFluxoReceitas extends LitElement {
     return html`
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Absorção acumulada">
         ${ticksY.map((t) => svg`
-          <line x1=${padL} y1=${y(t)} x2=${W - padR} y2=${y(t)} stroke="var(--cor-borda-sutil, rgba(128,128,128,0.2))" stroke-width="1" />
+          <line x1=${padL} y1=${y(t)} x2=${W - padR} y2=${y(t)} stroke="var(--cor-borda-sutil)" stroke-width="1" />
           <text x=${padL - 6} y=${y(t) + 3} font-size="9" fill=${corTexto} text-anchor="end">${t}%</text>`)}
         ${ticksX.map((i) => svg`
           <text x=${x(i)} y=${H - 6} font-size="9" fill=${corTexto} text-anchor="middle">

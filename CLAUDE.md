@@ -1185,25 +1185,26 @@ Git Bash — ver PROGRESSO).
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa
     janela própria, fora do escopo das variáveis do shell — lá `var(--cor-*)` não resolve e cor
     literal é a única opção. Não "corrija" isso.
-  - ⚠️ **`urbi-empacotar` (SDK `57.0.0`) avisa "N literais de cor fora de token no bundle" — e isto
-    NÃO é o app violando o contrato.** O aviso é novo nesta versão do bin (não existia no pin
-    `0.50.3`) e a heurística (`auditoria-tokens.js`, embutida no SDK) conta **todo** `#hex`/
-    `rgba()`/`hsla()` no bundle por regex — inclusive o literal de **fallback** dentro de
-    `var(--token-que-existe, #fallback)`, que é exatamente o padrão correto de uso de token
-    (defesa contra token ainda não publicado na versão do shell instalada). Medido em 2026-09-06,
-    contando os 279 no bundle contra a fonte: 264 eram fallback de `var()` de token real
-    (confirmado pelo `guard-tokens-css.mjs`, que passa limpo — todo `var()` do app referencia
-    token existente) e os 15 restantes eram, sem exceção, os literais de `frontend/exportar.ts`
-    já documentados na exceção acima. **Reconferido em 2026-09-15, reproduzindo a heurística exata
-    do `auditoria-tokens.js` (`RE_HEX` + `RE_FUNCAO_COR`) contra o bundle do commit `c53c382`: o
-    total subiu para 299, todo o crescimento (264→284) é fallback de `var()` novo, adicionado pelos
-    componentes da Rodada 12 (`viab-grafico-cascata`, `-barra-ranqueada`, `-cadeia-areas`) — e os
-    15 literais soltos continuam sendo, sem exceção, os mesmos de `frontend/exportar.ts`.** Não há
-    literal "solto" em nenhum outro arquivo de `frontend/`. **Não** persiga este número tirando o
-    fallback de cada `var()` — isso troca uma defesa real (token indisponível numa instância com
-    shell mais velho) por nenhuma, para calar um aviso que já está explicado. Se o número mudar
-    numa sessão futura, reconte pela mesma metodologia (fallback vs. literal solto) antes de tratar
-    como regressão.
+  - ⚠️ **`urbi-empacotar` avisa "N literais de cor fora de token no bundle" — e o aviso é ACIONÁVEL,
+    não ruído.** Esta nota já disse o contrário ("não é o app violando o contrato… não persiga o
+    número"), e estava errada: o SDK (`docs/ui.md` § Tokens e temas) manda consumir token de tema
+    **sem fallback** — `var(--cor-texto)`, nunca `var(--cor-texto, #hex)` —, porque com o
+    `tokens.css` sempre carregado o fallback é peso morto, ancora o consumidor no tema escuro e
+    esconde token inexistente. A exceção do SDK é só token **mais novo que o `shell_min`** do app,
+    como ponte de degradação; o espelho `referencia/ui-urbiverso` é mais antigo que o piso, então
+    hoje não há caso. Tratar como ruído deixou o aviso na tela de Upgrades de toda instância, a cada
+    release. O `urbi-empacotar` passou de 343 para **15** literais, todos de `frontend/exportar.ts`
+    (medido antes e depois; a contagem dele é a heurística do bin, que ignora hex só de dígitos, e
+    por isso não é a mesma métrica do número de fallbacks que o guard acusava na base).
+    **Defesa:** `scripts/guard-tokens-css.mjs` reprova **qualquer** fallback em token `--cor-*` do
+    espelho — `#hex`, `rgba()`, `transparent`, cor nomeada ou outro `var()`; enumerar formas de
+    literal não converge. Hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém fallback.
+    Se o aviso voltar a crescer, o guard falha antes do empacotador — não "explique" o número.
+  - **Os 15 restantes são a exceção real e ficam:** o CSS e os SVG dos documentos de impressão/PDF em
+    `frontend/exportar.ts` rodam numa janela própria, fora do escopo das variáveis do shell, sobre
+    papel branco (exceção registrada no SDK). Injetar os tokens do tema ali pintaria texto claro
+    sobre papel no tema escuro. Não "corrija" isso; se o número mudar, reconte por
+    `urbi-empacotar` e confira que o que sobra é só o `exportar.ts`.
 - Só usar primitivos `urbi-*` disponíveis no `ui.md` do shell — e **só as props que eles declaram**:
   atributo inexistente num primitivo não dá erro, ele simplesmente **não faz nada** (falha
   silenciosa). Na dúvida, leia `ui/src/urbi-<nome>.ts` no monorepo, não presuma a prop.
