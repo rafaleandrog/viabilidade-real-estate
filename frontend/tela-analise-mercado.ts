@@ -73,7 +73,7 @@ export class ViabTelaAnaliseMercado extends LitElement {
     .secao h3 {
       margin: 0 0 10px; font-size: var(--texto-rotulo, 0.75rem); font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 
@@ -81,14 +81,14 @@ export class ViabTelaAnaliseMercado extends LitElement {
        sem slot para o par projeto×mercado — então o card é markup próprio,
        usando os mesmos tokens do design system. */
     .comp {
-      border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      border: 1px solid var(--cor-borda);
       border-radius: 10px; padding: 12px 14px;
-      background: var(--cor-superficie-elevada, rgba(255,255,255,0.03));
+      background: var(--cor-superficie-elevada);
       min-width: 0;
     }
     .comp-rot {
       font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
     /* #579: min-width:0 (o item flex do .comp-linha por padrão recusa
        encolher abaixo do conteúdo) + overflow-wrap (a defesa que funciona de
@@ -104,18 +104,18 @@ export class ViabTelaAnaliseMercado extends LitElement {
        nota está aqui para não virar defesa fantasma citada como prova do
        que ela não prova (classe de defeito nº 1 do CLAUDE.md). */
     .comp-linha { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 8px; }
-    .comp-linha .lado { font-size: 0.72rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase; letter-spacing: 0.04em; }
+    .comp-linha .lado { font-size: 0.72rem; color: var(--cor-texto-sec); text-transform: uppercase; letter-spacing: 0.04em; }
     .comp-linha .val {
       font-variant-numeric: tabular-nums; font-weight: 700;
       min-width: 0; overflow-wrap: anywhere; word-break: break-word;
     }
     .comp-linha .val.projeto { font-size: 1.15rem; }
-    .comp-delta { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-    .comp-delta.acima { color: var(--cor-alerta, #e0a82a); }
-    .comp-delta.abaixo { color: var(--cor-info, #2aa9e0); }
-    .comp-delta.alinhado { color: var(--cor-sucesso, #13a98d); }
-    .sem-dado { color: var(--cor-texto-fraco, rgba(255,255,255,0.4)); font-style: italic; }
-    .nota { font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-top: 8px; }
+    .comp-delta { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--cor-borda-sutil); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+    .comp-delta.acima { color: var(--cor-alerta); }
+    .comp-delta.abaixo { color: var(--cor-info); }
+    .comp-delta.alinhado { color: var(--cor-sucesso); }
+    .sem-dado { color: var(--cor-texto-fraco); font-style: italic; }
+    .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin-top: 8px; }
 
     /* #200 — barra de ações, riscos e material coletado. */
     .acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
@@ -123,23 +123,23 @@ export class ViabTelaAnaliseMercado extends LitElement {
     .acoes urbi-select { min-width: 200px; }
     .acoes-rot {
       font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
     .riscos, .coletas { display: flex; flex-direction: column; gap: 10px; }
     .risco, .coleta {
-      border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      border: 1px solid var(--cor-borda);
       border-left-width: 3px; border-radius: 8px; padding: 10px 12px;
-      background: var(--cor-superficie-elevada, rgba(255,255,255,0.03));
+      background: var(--cor-superficie-elevada);
     }
-    .risco.sev-alta { border-left-color: var(--cor-erro, #d45a3a); }
-    .risco.sev-media { border-left-color: var(--cor-alerta, #e0a82a); }
-    .risco.sev-baixa { border-left-color: var(--cor-info, #2aa9e0); }
+    .risco.sev-alta { border-left-color: var(--cor-erro); }
+    .risco.sev-media { border-left-color: var(--cor-alerta); }
+    .risco.sev-baixa { border-left-color: var(--cor-info); }
     .risco-cab, .coleta-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
     .risco p, .coleta p { margin: 4px 0 0; font-size: 0.85rem; }
     /* #633 — --cor-primaria é um GRADIENTE nas 4 variantes de tema do */
     /* espelho, inválido em contexto de cor (invalid-at-computed-value-time). */
     /* --cor-primaria-solida é a variante pensada para isto. */
-    .coleta a { color: var(--cor-primaria-solida, #2aa9e0); }
+    .coleta a { color: var(--cor-primaria-solida); }
 
     /* #201 — cabeçalho com a localidade, procedência por indicador e insight. */
     .cabecalho { margin-bottom: 10px; }
@@ -148,13 +148,13 @@ export class ViabTelaAnaliseMercado extends LitElement {
     .comp-proc {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       margin-top: 8px; font-size: 0.74rem;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
     }
     .comp-insight {
       display: flex; gap: 6px; align-items: flex-start;
       margin-top: 8px; padding-top: 8px;
-      border-top: 1px dashed var(--cor-borda-sutil, rgba(255,255,255,0.08));
-      font-size: 0.8rem; color: var(--cor-texto-sec, rgba(255,255,255,0.65));
+      border-top: 1px dashed var(--cor-borda-sutil);
+      font-size: 0.8rem; color: var(--cor-texto-sec);
     }
   `];
 

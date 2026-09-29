@@ -51,25 +51,25 @@ export class ViabNum extends LitElement {
        rótulo→campo constante em toda a fileira. */
     label {
       font-size: 0.75rem; text-transform: uppercase;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
       font-weight: 700; letter-spacing: 0.4px;
       display: flex; align-items: flex-end;
       min-height: 2.4em; line-height: 1.2;
     }
     .input-wrap {
       display: flex; align-items: center; gap: 6px;
-      background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
-      border: 1px solid var(--cor-borda-forte, rgba(255,255,255,0.15));
+      background: var(--cor-superficie-hover);
+      border: 1px solid var(--cor-borda-forte);
       border-radius: 8px; padding: 0 10px; transition: border-color 0.15s, opacity 0.15s;
     }
-    .input-wrap:focus-within { border-color: var(--cor-primaria-solida, #2AA9E0); }
+    .input-wrap:focus-within { border-color: var(--cor-primaria-solida); }
     /* #245: o afixo é INFORMAÇÃO SECUNDÁRIA — a unidade ("meses") e o mês
        correspondente ("dez/30") acompanham o número, não competem com ele.
        Antes dividia o mesmo 0.875rem do input e disputava o olho em pé de
        igualdade. Menor corpo também devolve espaço horizontal ao número, que
        é a causa raiz do truncamento. */
     .afixo {
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
       font-size: 0.78rem; font-variant-numeric: tabular-nums;
       flex-shrink: 0; user-select: none;
     }
@@ -80,27 +80,27 @@ export class ViabNum extends LitElement {
        espaço passa a ser o container, não o dado. */
     input {
       flex: 1; min-width: 4ch; background: none; border: none; outline: none;
-      color: var(--cor-texto, rgba(255,255,255,0.85));
+      color: var(--cor-texto);
       font-family: inherit; font-size: 0.875rem; padding: 8px 0;
       font-variant-numeric: tabular-nums;
     }
-    input::placeholder { color: var(--cor-texto-fraco, rgba(255,255,255,0.4)); }
+    input::placeholder { color: var(--cor-texto-fraco); }
     input:disabled { opacity: 0.5; }
     .stepper { display: flex; flex-direction: column; flex-shrink: 0; }
     .stepper button {
       all: unset; cursor: pointer; line-height: 1; font-size: 0.55rem;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); padding: 1px 3px;
+      color: var(--cor-texto-sec); padding: 1px 3px;
     }
-    .stepper button:hover:not(:disabled) { color: var(--cor-texto, rgba(255,255,255,0.85)); }
+    .stepper button:hover:not(:disabled) { color: var(--cor-texto); }
     .stepper button:disabled { cursor: default; opacity: 0.35; }
     .afixo-mes { font-variant-numeric: normal; }
     /* #15: dado não utilizado no cálculo → cinza/atenuado. */
     :host([atenuado]) .input-wrap { opacity: 0.45; }
     :host([atenuado]) label { opacity: 0.6; }
     /* Campo obrigatório: asterisco no label; estado de erro: borda + mensagem. */
-    .req { color: var(--cor-erro, #d45a3a); margin-left: 2px; }
-    .input-wrap.tem-erro { border-color: var(--cor-erro, #d45a3a); }
-    .erro-msg { color: var(--cor-erro, #d45a3a); font-size: 0.72rem; margin-top: 2px; }
+    .req { color: var(--cor-erro); margin-left: 2px; }
+    .input-wrap.tem-erro { border-color: var(--cor-erro); }
+    .erro-msg { color: var(--cor-erro); font-size: 0.72rem; margin-top: 2px; }
   `;
 
   private _fmtAgrupado(v: number | null): string {

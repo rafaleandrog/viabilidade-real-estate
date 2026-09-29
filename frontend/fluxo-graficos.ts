@@ -340,7 +340,7 @@ export function graficoFluxoMensal(
   const bw = Math.max(1.5, gw / c.prazo - 1);
   const y = (v: number) => padT + (1 - (v + maxAbs) / (2 * maxAbs)) * gh;
   const y0 = y(0);
-  const corTexto = 'var(--cor-texto-sec, #8a8f98)';
+  const corTexto = 'var(--cor-texto-sec)';
   const passo = Math.max(3, Math.ceil(c.prazo / 10 / 3) * 3);
   const ticks: number[] = [];
   for (let m = 0; m < c.prazo; m += passo) ticks.push(m);
@@ -354,13 +354,13 @@ export function graficoFluxoMensal(
   return html`
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fluxo de caixa mensal">
       ${[-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs].map((v) => svg`
-        <line x1=${padL} y1=${y(v)} x2=${W - padR} y2=${y(v)} stroke="var(--cor-borda-sutil, rgba(128,128,128,0.15))" />
+        <line x1=${padL} y1=${y(v)} x2=${W - padR} y2=${y(v)} stroke="var(--cor-borda-sutil)" />
         <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
       ${ticks.map((i) => svg`
         <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${c.meses[i]}</text>`)}
       ${c.fluxoMensal.map((v, i) => svg`
         <rect x=${x(i)} y=${Math.min(y(v), y0)} width=${bw} height=${Math.max(Math.abs(y(v) - y0), 0.5)}
-          fill=${v >= 0 ? 'var(--cor-sucesso, #13a98d)' : 'var(--cor-erro, #d45a3a)'} opacity="0.9" />`)}
+          fill=${v >= 0 ? 'var(--cor-sucesso)' : 'var(--cor-erro)'} opacity="0.9" />`)}
       ${marcosGrafico.map((m) => svg`
         <line x1=${x(col(m.mes))} y1=${padT - 4} x2=${x(col(m.mes))} y2=${H - padB}
           stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.7" />`)}
@@ -391,7 +391,7 @@ export function graficoFluxoAcumulado(
   const y0 = y(0);
   const linha = c.fluxoAcumulado.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const area = `${linha} L${x(c.prazo - 1).toFixed(1)},${y0.toFixed(1)} L${x(0).toFixed(1)},${y0.toFixed(1)} Z`;
-  const corTexto = 'var(--cor-texto-sec, #8a8f98)';
+  const corTexto = 'var(--cor-texto-sec)';
   // Exposição máxima é o pior saldo de um MÊS: na view agregada (#127) a curva
   // só passa pelos fins de período, então o marcador só aparece quando o pior
   // saldo cai exatamente no fim de um deles — nunca em cima de um ponto errado.
@@ -410,12 +410,12 @@ export function graficoFluxoAcumulado(
     ...(c.paybackMes !== null ? [{
       x: x(col(c.paybackMes)) + 3, y: padT + 20,
       texto: `Payback: ${c.paybackData} · M+${c.paybackMes}`,
-      cor: 'var(--cor-sucesso, #13a98d)',
+      cor: 'var(--cor-sucesso)',
     }] : []),
     ...(iExp >= 0 ? [{
       x: x(iExp) + 6, y: y(c.exposicaoMaxima) - 4,
       texto: `Exposição Máx.: ${abrevR$(c.exposicaoMaxima)}`,
-      cor: 'var(--cor-erro, #d45a3a)',
+      cor: 'var(--cor-erro)',
     }] : []),
   ]);
   return html`
@@ -428,18 +428,18 @@ export function graficoFluxoAcumulado(
         <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${c.meses[i]}</text>`)}
       ${[min, 0, max].map((v) => svg`
         <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
-      <path d=${area} fill="var(--cor-sucesso, #13a98d)" opacity="0.15" clip-path="url(#acima)" />
-      <path d=${area} fill="var(--cor-erro, #d45a3a)" opacity="0.15" clip-path="url(#abaixo)" />
+      <path d=${area} fill="var(--cor-sucesso)" opacity="0.15" clip-path="url(#acima)" />
+      <path d=${area} fill="var(--cor-erro)" opacity="0.15" clip-path="url(#abaixo)" />
       <line x1=${padL} y1=${y0} x2=${W - padR} y2=${y0} stroke=${corTexto} stroke-dasharray="4,3" opacity="0.6" />
-      <path d=${linha} fill="none" stroke="var(--cor-texto-forte, #e8e8ea)" stroke-width="2" />
+      <path d=${linha} fill="none" stroke="var(--cor-texto-forte)" stroke-width="2" />
       ${marcosGrafico.map((m) => svg`
         <line x1=${x(col(m.mes))} y1=${padT - 4} x2=${x(col(m.mes))} y2=${H - padB}
           stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />`)}
       ${c.paybackMes !== null ? svg`
         <line x1=${x(col(c.paybackMes))} y1=${padT} x2=${x(col(c.paybackMes))} y2=${H - padB}
-          stroke="var(--cor-sucesso, #13a98d)" stroke-width="1.5" stroke-dasharray="2,2" />` : nothing}
+          stroke="var(--cor-sucesso)" stroke-width="1.5" stroke-dasharray="2,2" />` : nothing}
       ${iExp >= 0 ? svg`
-        <circle cx=${x(iExp)} cy=${y(c.exposicaoMaxima)} r="4" fill="var(--cor-erro, #d45a3a)" />` : nothing}
+        <circle cx=${x(iExp)} cy=${y(c.exposicaoMaxima)} r="4" fill="var(--cor-erro)" />` : nothing}
       ${rotulosTopo.map((r) => svg`
         <text x=${r.x} y=${r.y} font-size="9" fill=${r.cor}>${r.texto}</text>`)}
     </svg>

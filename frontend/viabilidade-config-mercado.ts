@@ -43,18 +43,18 @@ export class ViabConfigMercado extends LitElement {
     .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     .topo h2 { margin: 0; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); font-size: 0.85rem; }
-    th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--cor-borda-sutil); font-size: 0.85rem; }
+    th { color: var(--cor-texto-sec); font-weight: 600; }
     td.acoes { text-align: right; white-space: nowrap; }
-    .chaves { color: var(--cor-texto-sec, rgba(255,255,255,0.6)); font-size: 0.8rem; }
-    .status-ok { color: var(--cor-sucesso, #13a98d); }
-    .status-alerta { color: var(--cor-alerta, #e0a82a); }
-    .status-erro { color: var(--cor-erro, #d45a3a); }
+    .chaves { color: var(--cor-texto-sec); font-size: 0.8rem; }
+    .status-ok { color: var(--cor-sucesso); }
+    .status-alerta { color: var(--cor-alerta); }
+    .status-erro { color: var(--cor-erro); }
     .form-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
-    .coleta { border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); padding: 8px 0; }
+    .coleta { border-bottom: 1px solid var(--cor-borda-sutil); padding: 8px 0; }
     .coleta p { margin: 2px 0 0; font-size: 0.82rem; }
-    .nota { font-size: 0.8rem; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+    .nota { font-size: 0.8rem; color: var(--cor-texto-sec); }
   `];
 
   connectedCallback() {

@@ -79,16 +79,16 @@ export class ViabEmpreendimentoTipologias extends LitElement {
        crase para citar propriedade CSS neste bloco — use aspas. */
     table.tip th {
       text-align: left; font-weight: 600; padding: 8px 8px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      color: var(--cor-texto-sec);
       font-size: var(--texto-rotulo, 0.75rem);
-      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      border-bottom: 1px solid var(--cor-borda);
       white-space: normal; overflow-wrap: anywhere;
       vertical-align: bottom;
     }
     table.tip th.num, table.tip td.num { text-align: right; }
     table.tip td {
       padding: 6px 8px;
-      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+      border-bottom: 1px solid var(--cor-borda-sutil);
       font-size: var(--texto-corpo, 0.8125rem);
       overflow: hidden;
     }
@@ -146,7 +146,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     table.tip td.acoes .acoes-grupo { display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
 
     tr.total td {
-      font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2));
+      font-weight: 700; border-top: 2px solid var(--cor-borda);
       border-bottom: none; padding-top: 10px; font-size: 0.9rem;
     }
     .acoes-topo { margin-top: 16px; }

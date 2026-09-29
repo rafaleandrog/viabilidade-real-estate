@@ -31,7 +31,7 @@ export class ViabGraficoBarraRanqueada extends LitElement {
     .linha + .linha { margin-top: 2px; }
     .rotulo {
       font-size: 12px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -39,7 +39,7 @@ export class ViabGraficoBarraRanqueada extends LitElement {
     .trilho {
       position: relative;
       height: 12px;
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      background: var(--cor-borda-sutil);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -48,7 +48,7 @@ export class ViabGraficoBarraRanqueada extends LitElement {
       font-size: 12px;
       text-align: right;
       font-variant-numeric: tabular-nums;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
     }
   `;
 

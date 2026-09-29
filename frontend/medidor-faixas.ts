@@ -15,9 +15,9 @@ export interface ConfigMedidor {
 }
 
 const COR = {
-  erro: 'var(--cor-erro, #D45A3A)',
-  alerta: 'var(--cor-alerta, #E0AA2A)',
-  sucesso: 'var(--cor-sucesso, #13A98D)',
+  erro: 'var(--cor-erro)',
+  alerta: 'var(--cor-alerta)',
+  sucesso: 'var(--cor-sucesso)',
 } as const;
 
 // #571: `val` aceita `null` — indicador com denominador inválido (ex.: VGV ≤

@@ -129,20 +129,20 @@ export const EVENTO_LABEL: Record<string, string> = {
 };
 
 export const EVENTO_COR: Record<string, string> = {
-  planejamento: 'var(--cor-info, #2aa9e0)',
-  pre_lancamento: 'var(--cor-alerta, #e0a82a)',
-  lancamento: 'var(--cor-sucesso, #13a98d)',
-  obra: 'var(--cor-primaria-solida, #7a5af8)',
-  pos_obra: 'var(--cor-erro, #e05757)',
+  planejamento: 'var(--cor-info)',
+  pre_lancamento: 'var(--cor-alerta)',
+  lancamento: 'var(--cor-sucesso)',
+  obra: 'var(--cor-primaria-solida)',
+  pos_obra: 'var(--cor-erro)',
 };
 
 // Paleta de tokens para fases extras (índice cíclico).
 const FASE_PALETA = [
-  'var(--cor-info, #2aa9e0)',
-  'var(--cor-alerta, #e0a82a)',
-  'var(--cor-sucesso, #13a98d)',
-  'var(--cor-primaria-solida, #7a5af8)',
-  'var(--cor-erro, #e05757)',
+  'var(--cor-info)',
+  'var(--cor-alerta)',
+  'var(--cor-sucesso)',
+  'var(--cor-primaria-solida)',
+  'var(--cor-erro)',
 ];
 export function corFaseExtra(idx: number): string {
   return FASE_PALETA[idx % FASE_PALETA.length];

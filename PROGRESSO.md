@@ -47,6 +47,34 @@ caráter informativo do aviso de área da #693.
   a área); limpar o input grava 0, e a API recusa `null`.
 - Docs: `docs/preliminar.md`, `formulas.md`, `modelo-de-dados.md`, `apelo-comercial.md`.
 - Fiação medida: com a derivação desligada no motor, 4 testes novos ficam vermelhos.
+## 2026-09-29 — `identidade` no manifesto
+
+A instância (boot da app) acusava a obsolescência `manifesto-sem-identidade`: o `manifesto.json` não
+declarava `identidade`. A janela é curta — vira erro em 2026-10-13 e reprova o pacote em 2026-10-28.
+Declarado `"identidade": "rafaleandrog/viabilidade-real-estate::viabilidade"` (`{owner}/{repo}::{slug}`).
+Uma linha, sem mudar `versao` (a versão descreve o schema) e sem piso novo — um shell anterior ignora
+a chave. O `urbi-empacotar` aceita o manifesto. O aviso some da instância no próximo upgrade.
+
+Proveniência, porque nada disto está no SDK que o `package.json` fixa (`57.0.0`): a chave
+`manifesto-sem-identidade`, o formato e as duas datas vêm do catálogo de obsolescências de um SDK **mais
+novo** que o pin — o `57.0.0` não a traz, e por isso o `urbi-empacotar` local não avisa dela. O
+`owner/repo` é o do remote git deste repositório e o mesmo do vínculo de origem que a instância mostra
+no log do upgrade (`Vinculo de origem: rafaleandrog/viabilidade-real-estate`). O `slug` é o id com que a
+app é empacotada (`urbi-empacotar viabilidade`).
+
+## 2026-09-29 — aviso "tokens de tema" (343 → 15)
+
+O aviso do `urbi-empacotar` (`343 literais de cor fora de token no bundle`) aparecia em toda tela de
+Upgrades, e o `CLAUDE.md` mandava ignorá-lo como falso positivo. Estava errado: o SDK manda consumir
+token de tema sem fallback, e quase tudo que o aviso contava era `var(--token, #hex)` em 33 arquivos de
+`frontend/`. Removidos os fallbacks de todos os tokens `--cor-*` em uso (existem no espelho, que é
+anterior ao `shell_min`, então nenhum precisou de fallback como ponte), inclusive duas sobras
+`transparent` que a revisão achou. O empacotador passou de 343 para 15, medido antes e depois; os 15
+são todos do `exportar.ts` (papel de impressão, exceção do SDK). `guard-tokens-css.mjs` passou a
+reprovar qualquer fallback em token de cor do espelho — a primeira versão só reprovava `#hex` e
+`rgba()`, e deixou passar `transparent`; enumerar formas de literal não converge, então o predicado
+virou "tem fallback" —, com casos nos dois sentidos em `testar-guards-ui.sh`. Validação em
+`validar-frontend.sh`.
 
 ## 2026-09-25 — #736: fechamento da Rodada 13
 

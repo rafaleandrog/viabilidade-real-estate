@@ -41,7 +41,7 @@ export class ViabGraficoCadeiaAreas extends LitElement {
     .linha + .linha { margin-top: 4px; }
     .rotulo {
       font-size: 12px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -49,7 +49,7 @@ export class ViabGraficoCadeiaAreas extends LitElement {
     .trilho {
       position: relative;
       height: 16px;
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      background: var(--cor-borda-sutil);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -58,15 +58,15 @@ export class ViabGraficoCadeiaAreas extends LitElement {
       font-size: 12px;
       text-align: right;
       font-variant-numeric: tabular-nums;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
     }
     .eficiencia {
       margin-top: 10px;
       font-size: 12px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      color: var(--cor-texto-sec);
     }
     .eficiencia strong {
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      color: var(--cor-texto-forte);
       font-variant-numeric: tabular-nums;
     }
   `;

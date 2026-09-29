@@ -85,13 +85,13 @@ export class ViabTerrenoNucleo extends LitElement {
     .lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .item { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .item .nome { font-size: var(--texto-corpo, 0.8125rem); }
-    .item .area { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-variant-numeric: tabular-nums; }
+    .item .area { color: var(--cor-texto-sec); font-variant-numeric: tabular-nums; }
     .total { display: flex; justify-content: space-between; margin-top: 8px; font-weight: 600; }
     .add { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
     .add urbi-select { flex: 1; min-width: 180px; }
     .busca { display: block; width: 100%; min-height: 32px; box-sizing: border-box; margin-top: 12px; }
     urbi-banner { margin-bottom: 12px; }
-    .pag-info { display: block; margin-top: 8px; font-size: 0.75rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .pag-info { display: block; margin-top: 8px; font-size: 0.75rem; color: var(--cor-texto-sec); }
     .pag-btns { display: flex; gap: 8px; margin-top: 8px; }
   `];
 

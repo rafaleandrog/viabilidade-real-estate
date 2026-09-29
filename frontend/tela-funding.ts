@@ -167,14 +167,14 @@ export class ViabFunding extends LitElement {
     .secao { margin-top: 12px; }
     .secao h4 {
       margin: 0 0 6px; font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase;
-      letter-spacing: 0.05em; color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      letter-spacing: 0.05em; color: var(--cor-texto-sec);
     }
     .grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
     .grid > * { width: 190px; max-width: 100%; box-sizing: border-box; }
     .grid > .p2 { width: 300px; }
     .sel-campo { display: flex; flex-direction: column; gap: 4px; width: 190px; }
     .sel-campo.p2 { width: 300px; }
-    .sel-rotulo { font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700; }
+    .sel-rotulo { font-size: 0.75rem; text-transform: uppercase; color: var(--cor-texto-sec); font-weight: 700; }
     .form-acoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
     .custo-lista { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow: auto; }
 
@@ -183,13 +183,13 @@ export class ViabFunding extends LitElement {
        uma legenda de contexto na mesma moldura. */
     .ind { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 6px; }
     .ind-card {
-      background: var(--cor-superficie, rgba(255,255,255,0.04));
-      border: 1px solid var(--cor-borda, rgba(255,255,255,0.08));
+      background: var(--cor-superficie);
+      border: 1px solid var(--cor-borda);
       border-radius: 8px; padding: 10px 12px; min-width: 0;
     }
     .ind-card .rot {
       font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+      color: var(--cor-texto-sec); font-weight: 700;
     }
     .ind-card .val {
       font-size: 1.05rem; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums;
@@ -200,19 +200,19 @@ export class ViabFunding extends LitElement {
       overflow-wrap: anywhere;
       word-break: break-word;
     }
-    .ind-card.pos .val { color: var(--cor-sucesso, #13A98D); }
-    .ind-card.neg .val { color: var(--cor-erro, #D45A3A); }
-    .nota { font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-top: 8px; }
+    .ind-card.pos .val { color: var(--cor-sucesso); }
+    .ind-card.neg .val { color: var(--cor-erro); }
+    .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin-top: 8px; }
 
     /* §39 — mesmo padrão de gráfico SVG inline da antiga tela-capital-stack.ts. */
     .grafico-card { margin-top: 12px; }
     svg.grafico { width: 100%; height: auto; overflow: visible; font-variant-numeric: tabular-nums; }
-    .linha-entradas { stroke: var(--cor-sucesso, #13a98d); fill: none; stroke-width: 2; }
-    .linha-saidas { stroke: var(--cor-erro, #d45a3a); fill: none; stroke-width: 2; }
-    .linha-custo-elegivel { stroke: var(--cor-texto-sec, rgba(255,255,255,0.45)); fill: none; stroke-width: 1.5; stroke-dasharray: 4 3; }
-    .linha-saldo-devedor { stroke: var(--cor-alerta, #e0a33e); fill: none; stroke-width: 2.5; }
-    .eixo-mes { fill: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 9px; }
-    .grafico-legenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; margin-top: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.7)); }
+    .linha-entradas { stroke: var(--cor-sucesso); fill: none; stroke-width: 2; }
+    .linha-saidas { stroke: var(--cor-erro); fill: none; stroke-width: 2; }
+    .linha-custo-elegivel { stroke: var(--cor-texto-sec); fill: none; stroke-width: 1.5; stroke-dasharray: 4 3; }
+    .linha-saldo-devedor { stroke: var(--cor-alerta); fill: none; stroke-width: 2.5; }
+    .eixo-mes { fill: var(--cor-texto-sec); font-size: 9px; }
+    .grafico-legenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; margin-top: 6px; color: var(--cor-texto-sec); }
     .grafico-legenda .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
   `];
 
@@ -730,10 +730,10 @@ export class ViabFunding extends LitElement {
           <text x=${largura} y=${altura} text-anchor="end" class="eixo-mes">mês ${meses}</text>
         </svg>
         <div class="grafico-legenda">
-          <span><i class="ponto" style="background:var(--cor-texto-sec, rgba(255,255,255,0.45))"></i>Custo financiável acumulado</span>
-          <span><i class="ponto" style="background:var(--cor-sucesso, #13a98d)"></i>Principal liberado acumulado</span>
-          <span><i class="ponto" style="background:var(--cor-alerta, #e0a33e)"></i>Saldo devedor</span>
-          <span><i class="ponto" style="background:var(--cor-erro, #d45a3a)"></i>Amortizações</span>
+          <span><i class="ponto" style="background:var(--cor-texto-sec)"></i>Custo financiável acumulado</span>
+          <span><i class="ponto" style="background:var(--cor-sucesso)"></i>Principal liberado acumulado</span>
+          <span><i class="ponto" style="background:var(--cor-alerta)"></i>Saldo devedor</span>
+          <span><i class="ponto" style="background:var(--cor-erro)"></i>Amortizações</span>
         </div>
       </div>
     `;
