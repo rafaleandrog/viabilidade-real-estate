@@ -1013,6 +1013,7 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
 test('#781 fiação: PATCH que tira o rascunho do Loteamento leva a área derivada dos produtos', () => {
   for (const parte of [
     "estudo.tipo_empreendimento === 'loteamento'",
+    "dados.tipo_empreendimento === 'incorporacao'", // só o destino validado: typo não converte nada
     'areasParaSairDoLoteamento(produtos as any[], alv)',
     "atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null })",
   ]) assert.ok(FONTE_ROTA.includes(parte), `o PATCH deixou de ter: ${parte}`);

@@ -1177,7 +1177,10 @@ export class ViabTelaPremissas extends LitElement {
       // ALV, mesmo depois de a cascata ser preenchida).
       if (this._ehLoteamento && dados.pct_alv === undefined
         && (p.pct_alv === null || p.pct_alv === undefined || p.pct_alv === '')) {
-        const alv = alvDoLoteamento(this._entradaProforma());
+        // A ALV PERSISTIDA (`_snapshot`), não a do formulário: o percentual é gravado
+        // na hora, e uma premissa de área ainda não salva (ou barrada) deixaria o
+        // produto com um % calculado sobre uma ALV que o estudo não tem.
+        const alv = alvDoLoteamento({ ...this._snapshot, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
         // Também só entre 0 e 100%: uma linha antiga fora disso (maior que a ALV, ou
         // com área/unidades negativas) não é expressível (a API recusa fora da faixa) e a edição de outro campo não pode morrer por isso.
         const efetivo = pctAlvEfetivo(p, alv);

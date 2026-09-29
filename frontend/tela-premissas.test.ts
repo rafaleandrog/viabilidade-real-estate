@@ -190,6 +190,11 @@ test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 
   assert.ok(iGrava > iSoma, 'ambos os portões precedem a gravação');
 });
 
+test('#781 fiação: a primeira edição de linha legada deriva o % da ALV PERSISTIDA (snapshot)', () => {
+  assert.ok(FONTE_TELA_ALV.includes('alvDoLoteamento({ ...this._snapshot,'),
+    'com o formulário, uma premissa de área não salva gravaria um % sobre ALV que o estudo não tem');
+});
+
 test('#781 fiação: a primeira edição de linha legada só grava pct_alv com ALV positiva', () => {
   assert.ok(FONTE_TELA_ALV.includes('if (alv > 0 && efetivo >= 0 && efetivo <= 100) enviar = { ...dados, pct_alv:'),
     'sem esta guarda, ALV ≤ 0 grava pct_alv = 0 e destrói a área legada da linha');

@@ -714,7 +714,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     // vive em `pct_alv` e a Incorporação lê `area_media_m2`: sem levar a área
     // derivada junto, todo produto sairia do catálogo efetivo e o VGV zeraria.
     if (estudo.tipo_empreendimento === 'loteamento'
-      && dados.tipo_empreendimento !== undefined && dados.tipo_empreendimento !== 'loteamento') {
+      && dados.tipo_empreendimento === 'incorporacao') {
       const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
       const alv = alvDoLoteamento(estudo as unknown as ProformaInput);
       for (const a of areasParaSairDoLoteamento(produtos as any[], alv)) {
