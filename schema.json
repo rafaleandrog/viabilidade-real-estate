@@ -80,7 +80,6 @@
 
         "considerar_custo_terreno": { "tipo": "booleano", "padrao": true },
         "custo_terreno_m2":         { "tipo": "decimal", "precisao": 12, "escala": 2 },
-        "valor_venal_terreno_m2":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
         "projetos_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_fixo", "pct_vgv"], "padrao": "pct_vgv" },
         "projetos_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1.6 },
@@ -109,8 +108,6 @@
         "contingencias_pct":         { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "stand_vendas_valor":        { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
-        "considerar_marketing_global": { "tipo": "booleano", "padrao": true },
-        "marketing_global_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
         "considerar_gestao_indiretos": { "tipo": "booleano", "padrao": true },
         "gestao_indiretos_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1.25 },
 

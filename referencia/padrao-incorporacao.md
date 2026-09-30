@@ -3110,13 +3110,13 @@ são **digitados como número inteiro/decimal** (ex.: `7` = 7%), não como fraç
 
 **Produto:** `area_terreno_nucleo`, `terreno_manual_area`, `coef_aproveitamento_basico`, `coef_aproveitamento_maximo`, `gabarito_maximo`, `area_pvt_r_fechada`, `area_pvt_r_aberta`, `area_pvt_nr_fechada`, `area_pvt_nr_aberta`, `area_comum_total`, `num_unidades`, `num_unidades_residencial`, `num_unidades_nao_residencial`.
 
-**Preços:** `preco_venda_m2_residencial`, `preco_venda_m2_nao_residencial`, `valor_venal_terreno_m2`.
+**Preços:** `preco_venda_m2_residencial`, `preco_venda_m2_nao_residencial`.
 
 **Deduções:** `sujeito_ret`, `imposto_percentual`, `corretagem_percentual`, `marketing_percentual`, `permuta_financeira_residencial_pct`/`_modo`/`_valor`, `permuta_financeira_nao_residencial_pct`/`_modo`/`_valor`.
 
 **Custos diretos:** `considerar_custo_terreno`, `custo_terreno_m2`, `projetos_modo`/`_pct`/`_valor_fixo`, `licenciamento_modo`/`_pct`/`_valor_fixo` (aposentados — nunca oferecidos por tela nem lidos pelo motor; ver `docs/modelo-de-dados.md`), `construcao_modo`/`custo_construcao_m2`/`construcao_valor_total`, `taxa_gestao_pct`, `custo_decoracao_m2`, `incorporacao_registro_pct`, `manutencao_pct`, `contingencias_pct`.
 
-**Custos indiretos:** `marketing_global_pct`, `gestao_indiretos_pct`, `stand_vendas_valor` (Loteamento).
+**Custos indiretos:** `gestao_indiretos_pct`, `stand_vendas_valor` (Loteamento).
 
 **Permuta física:** `permuta_fisica_modo`/`_area_m2`/`_pct` e `permuta_fisica_nr_modo`/`_nr_area_m2`/`_nr_pct`.
 

@@ -61,7 +61,6 @@ const ESTUDO_LOTEAMENTO: Record<string, any> = {
   manutencao_pct: 1,
   contingencias_pct: 2,
   stand_vendas_valor: 450_000,
-  marketing_global_pct: 1,
   gestao_indiretos_pct: 1.25,
 };
 

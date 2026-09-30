@@ -24,7 +24,6 @@ const BASE: ProformaInput = {
   custo_terreno_m2: 2_000,
   construcao_modo: 'valor_total',
   construcao_valor_total: 30_000_000,
-  marketing_global_pct: 2,
   gestao_indiretos_pct: 1,
 };
 

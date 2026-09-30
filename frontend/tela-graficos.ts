@@ -193,11 +193,10 @@ export class ViabTelaGraficos extends LitElement {
       { l: 'Decoração', v: p.decoracao },
       { l: 'Gestão da construção', v: p.gestaoConstrucao },
       { l: 'Projetos', v: p.projetos },
-      { l: 'Outorga', v: p.outorga },
       { l: 'Incorporação e registro', v: p.incorporacaoRegistro },
       { l: 'Manutenção', v: p.manutencao },
       { l: 'Contingências', v: p.contingencias },
-      { l: 'Marketing global', v: p.marketingGlobal },
+      { l: 'Stand de vendas', v: p.standVendas },
       { l: 'Gestão e indiretos', v: p.gestaoIndiretos },
     ];
     return itens.filter((i) => i.v > 0.005 && !(i.terreno && excluirTerreno));

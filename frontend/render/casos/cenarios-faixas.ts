@@ -34,7 +34,7 @@ export const caso = {
     'urbi-select.label',
     'urbi-select.opcoes',
     // #734: o alerta de cenário inviável (o preço deste fixture suporta cair
-    // ~7% e o Bear aplica −10%) — a variante do banner não é reproduzida.
+    // ~9% e o Bear aplica −10%) — a variante do banner não é reproduzida.
     'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {

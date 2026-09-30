@@ -1,6 +1,6 @@
 // Caso de render: o bloco de CONSUMO DO COLCHÃO abaixo do tornado (#734), no
 // estado de ALERTA — que é o que ninguém olha até acontecer. No fixture da
-// sub-aba Cenários o preço suporta cair só ~7,1% até o resultado zerar, e o
+// sub-aba Cenários o preço suporta cair só ~9,3% até o resultado zerar, e o
 // Bear aplica −10%: o consumo passa de 100% e a tela tem de DIZER, em
 // palavras, que o cenário Bear já é inviável.
 //

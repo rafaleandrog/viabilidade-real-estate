@@ -82,6 +82,5 @@ export const ESTUDO_SENSIBILIDADE: ProformaInput & { id: number; nome: string } 
   custo_construcao_m2: 6_000,
   taxa_gestao_pct: 3,
   // Indiretos: 3,25% do VGV.
-  marketing_global_pct: 2,
   gestao_indiretos_pct: 1.25,
 };

@@ -101,8 +101,8 @@ test('coagirNumericosOuLancar devolve os dados ou lança nomeando o campo', () =
 // quatro listas nomeadas anteriores tinham — entrada a menos passa calada.
 // Os números saíram de rodar a contagem sobre o `schema.json`, não de conta
 // mental (armadilha 13 do CLAUDE.md).
-test('inventário: `estudos` tem exatamente 104 colunas numéricas cobertas', () => {
-  assert.equal(colunasNumericas('estudos').size, 104);
+test('inventário: `estudos` tem exatamente 102 colunas numéricas cobertas', () => {
+  assert.equal(colunasNumericas('estudos').size, 102);
 });
 
 test('IIFE tolera schema sem `tabelas` — o import não pode derrubar o bundle', () => {

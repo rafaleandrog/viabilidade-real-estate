@@ -43,11 +43,9 @@ const CUSTOS: (Campo & { so?: string })[] = [
   { k: 'custo_decoracao_m2', label: 'Decoração', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
   { k: 'taxa_gestao_pct', label: 'Gestão da construção', t: 'num', sufixo: '%', so: 'incorporacao' },
   { k: 'incorporacao_registro_pct', label: 'Incorporação e registro', t: 'num', sufixo: '% VGV', so: 'incorporacao' },
-  { k: 'valor_venal_terreno_m2', label: 'Valor venal do terreno (outorga)', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
   { k: 'manutencao_pct', label: 'Manutenção pós-obra', t: 'num', sufixo: '% VGV' },
   { k: 'contingencias_pct', label: 'Contingências', t: 'num', sufixo: '% VGV' },
   { k: 'stand_vendas_valor', label: 'Stand de vendas', t: 'num', sufixo: 'R$', so: 'loteamento' },
-  { k: 'marketing_global_pct', label: 'Marketing global / estrutura', t: 'num', sufixo: '% VGV' },
   { k: 'gestao_indiretos_pct', label: 'Gestão e outros custos indiretos', t: 'num', sufixo: '% VGV' },
 ];
 
@@ -55,14 +53,12 @@ const CUSTOS: (Campo & { so?: string })[] = [
 // motor (mesmo padrão de `considerar_custo_terreno`, já existente).
 const CHECKS_CUSTO: { k: string; label: string }[] = [
   { k: 'considerar_custo_terreno', label: 'Considerar custo de aquisição do terreno' },
-  { k: 'considerar_marketing_global', label: 'Considerar Marketing global / estrutura' },
   { k: 'considerar_gestao_indiretos', label: 'Considerar Gestão e outros custos indiretos' },
   { k: 'considerar_contingencias', label: 'Considerar Contingências' },
 ];
 // Campo de CUSTOS → checkbox que o atenua (usado por `_input(c, dis, aten)`).
 const CAMPO_PARA_CONSIDERAR: Record<string, string> = {
   custo_terreno_m2: 'considerar_custo_terreno',
-  marketing_global_pct: 'considerar_marketing_global',
   gestao_indiretos_pct: 'considerar_gestao_indiretos',
   contingencias_pct: 'considerar_contingencias',
 };

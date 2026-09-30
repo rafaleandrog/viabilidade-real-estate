@@ -90,16 +90,15 @@ manutenção pós-obra e contingências (% do VGV) e, por tipo:
 
 - **Loteamento** — infraestrutura, em uma de três unidades: % do VGV, R$ fixo ou
   `R$/m² × área vendável bruta` (antes da permuta física).
-- **Incorporação** — construção, decoração, gestão da construção, outorga, incorporação e registro.
+- **Incorporação** — construção, decoração, gestão da construção, incorporação e registro.
 
-No Loteamento a gestão da construção não incide, e construção, decoração, outorga e incorporação e
+No Loteamento a gestão da construção não incide, e construção, decoração e incorporação e
 registro saem zerados: o produto de obra ali é a infraestrutura, que é sozinha o **custo de obras**
 (o numerador de **Custo obras / VGV**).
 
 ## Custos indiretos
 
-Marketing global e estrutura (mais o stand de vendas no Loteamento) e gestão e outros custos
-indiretos, em % do VGV.
+Stand de vendas (só no Loteamento, em R$) e gestão e outros custos indiretos (em % do VGV).
 
 ## Resultado
 

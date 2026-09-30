@@ -24,11 +24,11 @@ test('#734: o Bear que consome mais de 100% do colchão é declarado inviável e
     depois: { texto: string; temBanner: boolean; temBaixa: boolean };
   } | undefined;
   assert.ok(g, 'o caso não devolveu a medida extra — medir() não rodou' + relato(a));
-  // Preço: folga ≈ −7,1%, Bear −10% ⇒ consumo ≈ 140% ⇒ inviável, em palavras.
+  // Preço: folga ≈ −9,3%, Bear −10% ⇒ consumo ≈ 108% ⇒ inviável, em palavras.
   assert.equal(g!.temBanner, true, 'o alerta de cenário inviável não apareceu' + relato(a));
   assert.match(g!.alerta, /já é inviável/, 'o alerta não diz, em palavras, que o Bear é inviável' + relato(a));
   assert.match(g!.alerta, /consome 1\d\d,\d%/, 'o consumo do colchão não está publicado no alerta' + relato(a));
-  assert.match(g!.equilibrio, /pode errar -7,\d% até o resultado zerar/, 'o ponto de equilíbrio do preço não bate com a margem de segurança' + relato(a));
+  assert.match(g!.equilibrio, /pode errar -9,\d% até o resultado zerar/, 'o ponto de equilíbrio do preço não bate com a margem de segurança' + relato(a));
   assert.equal(g!.temBaixa, false, 'preço não é baixa alavanca neste fixture' + relato(a));
   // Permuta financeira: amplitude zero ⇒ baixa alavanca, sem alerta.
   assert.equal(g!.depois.temBanner, false, 'a troca de variável não apagou o alerta' + relato(a));
