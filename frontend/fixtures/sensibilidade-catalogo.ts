@@ -47,7 +47,7 @@ export const PRODUTOS_SENSIBILIDADE: (ProdutoPreliminar & { id: number; nome: st
 /**
  * Incorporação de MARGEM FINA — e a margem é fina de propósito.
  *
- * No cenário Base o Resultado fecha positivo por pouco (≈ R$ 1,48 milhão, ~6%
+ * No cenário Base o Resultado fecha positivo por pouco (≈ R$ 1,97 milhão, ~8%
  * do VGV); no Bear, com o preço 10% abaixo, ele vira NEGATIVO. É exatamente
  * para isso que a análise de sensibilidade existe — e é o que dá ao caso de
  * render uma marca observável no DOM (`td.num.neg`) que só aparece quando o
@@ -81,6 +81,6 @@ export const ESTUDO_SENSIBILIDADE: ProformaInput & { id: number; nome: string } 
   construcao_modo: 'valor_m2',
   custo_construcao_m2: 6_000,
   taxa_gestao_pct: 3,
-  // Indiretos: 3,25% do VGV.
+  // Indiretos: 1,25% do VGV.
   gestao_indiretos_pct: 1.25,
 };

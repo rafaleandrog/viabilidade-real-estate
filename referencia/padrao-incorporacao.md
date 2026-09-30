@@ -374,10 +374,10 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 >
 > - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:544`;
 > - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:204`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
-> quando `novo.nivel_analise === 'avancado'` (`:842-844`). Nenhuma rota promove.
+> quando `novo.nivel_analise === 'avancado'` (`:848-850`). Nenhuma rota promove.
 >
 > Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:336-340`) **não** listar
-> `nivel_analise`, mais `montarCopiaEstudo` (`:351-359`). O `if` de `:842` apenas **consome** o nível
+> `nivel_analise`, mais `montarCopiaEstudo` (`:351-359`). O `if` de `:848` apenas **consome** o nível
 > já preservado, para decidir se copia as tabelas do Avançado.
 >
 > Isso responde a pergunta que a #486 fazia sobre a permuta física dos estudos de Pinguim, e a

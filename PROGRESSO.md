@@ -41,6 +41,7 @@ Pedido direto do autor, sem issue: retirar os dois campos de **todos** os estudo
 ⚠️ **Os números dos estudos existentes mudam, de propósito:** quem tinha marketing global (1 % do VGV
 por padrão) ou valor venal preenchido deixa de carregar esse custo, e o Resultado sobe na mesma
 medida. Não há migração de valor para outro campo.
+
 ## 2026-09-30 — #784: Produtos da Incorporação por % da área privativa fechada
 
 Continuação da #781, pedida pelo autor para o Preliminar de **Incorporação**. Base do percentual,

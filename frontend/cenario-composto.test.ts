@@ -10,7 +10,7 @@ import { ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE } from './fixtures/sensibi
 // #735 — cenário composto: as três maiores alavancas estressadas juntas
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Fixture com custo percentual sobre o VGV (projetos, marketing global,
+// Fixture com custo percentual sobre o VGV (projetos,
 // gestão de indiretos): é o que faz os efeitos INTERAGIREM, e o composto
 // diferir da soma dos deltas isolados.
 const ENTRADA: ProformaInput = { ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE, permuta_financeira_residencial_pct: 5 };
