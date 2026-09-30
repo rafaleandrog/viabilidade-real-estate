@@ -1010,28 +1010,32 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
 // é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
 // servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
 // "a API não contorna a tela" passaria a valer só na tela.
-test('#781 fiação: PATCH que tira o rascunho do Loteamento leva a área derivada dos produtos', () => {
+test('#781/#784 fiação: PATCH que troca o tipo do rascunho leva a área derivada dos produtos', () => {
   for (const parte of [
-    "estudo.tipo_empreendimento === 'loteamento'",
-    "dados.tipo_empreendimento === 'incorporacao'", // só o destino validado: typo não converte nada
-    'areasParaSairDoLoteamento(produtos as any[], alv)',
+    "estudo.nivel_analise !== 'avancado'\n      && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')", // o Avançado não converte produtos na troca de tipo
+    "(dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao')", // só o destino validado: typo não converte nada
+    'dados.tipo_empreendimento !== tipoOrigem',
+    'areasParaTrocarDeTipo(produtos as any[], base)',
     "atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null })",
   ]) assert.ok(FONTE_ROTA.includes(parte), `o PATCH deixou de ter: ${parte}`);
   assert.ok(
-    FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)") < FONTE_ROTA.indexOf('areasParaSairDoLoteamento(produtos as any[], alv)'),
+    FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)") < FONTE_ROTA.indexOf('areasParaTrocarDeTipo(produtos as any[], base)'),
     'o estudo é atualizado (e o patch validado) ANTES de qualquer produto ser convertido',
   );
-  assert.ok(FONTE_ROTA.includes("atualizar('estudos', estudoId, { tipo_empreendimento: 'loteamento' })"),
-    'falha na conversão tem que devolver o tipo a loteamento');
+  assert.ok(FONTE_ROTA.includes("atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem })"),
+    'falha na conversão tem que devolver o tipo de origem');
   assert.ok(FONTE_ROTA.includes('convertidos.push(') && FONTE_ROTA.includes('for (const c of convertidos)'),
     'falha na conversão tem que desfazer os produtos JÁ convertidos');
 });
 
-test('#781 fiação: POST /estudos/:id/status recusa em_analise de Loteamento com soma ≠ 100% da ALV', () => {
+test('#781/#784 fiação: POST /estudos/:id/status recusa em_analise (Loteamento e Incorporação) com soma ≠ 100% da base', () => {
   for (const parte of [
-    "novoStatus === 'em_analise' && estudo.tipo_empreendimento === 'loteamento'",
+    "novoStatus === 'em_analise'",
+    "estudo.nivel_analise !== 'avancado'", // o Avançado não tem tela para corrigir o catálogo obsoleto; linha antiga sem nível segue barrada
+    "(estudo.tipo_empreendimento === 'loteamento' || estudo.tipo_empreendimento === 'incorporacao')",
     "varrerTudo('preliminar_produtos'",
-    'validarSomaPctAlv(produtos, alvDoLoteamento(',
+    'validarSomaPctAlv(produtos, baseProdutosM2(',
+    "rotuloBaseProdutos(estudo.tipo_empreendimento as string)",
     "erro(res, 422, 'SOMA_ALV_INVALIDA'",
   ]) {
     assert.ok(FONTE_ROTA.includes(parte), `o handler de status deixou de ter: ${parte}`);

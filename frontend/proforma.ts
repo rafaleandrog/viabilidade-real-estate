@@ -16,6 +16,8 @@ import { produtosComAreaDerivada } from './produtos-alv.js';
 
 export interface ProformaInput {
   tipo_empreendimento: string;
+  // Só `produtosDoEstudo` lê: o Avançado lê `area_media_m2` como entrada e não deriva por `pct_alv`.
+  nivel_analise?: string | null;
   // terreno
   origem_terreno?: string;                          // 'nucleo' | 'manual'
   terreno_manual_area?: number | string | null;     // usado quando origem = manual
@@ -136,8 +138,9 @@ export function fatoresDe(s: FatorSensibilidade | undefined | null): Partial<Rec
 }
 
 export interface ProdutoPreliminar {
-  // #781 — só no Loteamento: participação do produto na ALV (%). No
-  // Loteamento `area_media_m2` deixa de ser entrada e passa a ser DERIVADA
+  // #781/#784 — participação do produto na BASE de área (%): a ALV no Loteamento,
+  // as áreas privativas fechadas na Incorporação (`baseProdutosM2`). No Preliminar
+  // `area_media_m2` deixa de ser entrada e passa a ser DERIVADA
   // (`produtosComAreaDerivada`, `produtos-alv.ts`).
   pct_alv?: number | string | null;
   area_media_m2?: number | string | null;
@@ -399,30 +402,23 @@ export interface Proforma {
   // `null` por construção, sempre.
   tetoAproveitamentoM2: number | null; pctAproveitamentoCoef: number | null;
   aproveitamentoExcedido: boolean;
-  // Área privativa alocada nos produtos (#573, Produtos): compara o que o
-  // catálogo aloca (Residencial + Não Residencial somados — `areaTotalProdutos`
-  // do catálogo EFETIVO, a mesma soma que `resumoCatalogoProdutos` usa) contra
-  // a área privativa de venda REGISTRADA em Terreno & Áreas (`areaPrivativa`,
-  // acima — a mesma grandeza que o teto de aproveitamento #569 usa como
-  // "usada"). É uma comparação por SUBTRAÇÃO, não por razão, então
-  // `areaProdutosAlocada` e `diferencaAreaAlocada` estão SEMPRE definidos —
-  // catálogo vazio aloca 0 m², e 0 m² registrados menos 0 m² alocados ainda é
-  // uma diferença válida (zero). `pctAreaAlocada` é a exceção: fica `null`
-  // sem área registrada (`areaPrivativa` ≤ 0) — mesmo padrão null-safe de
+  // Área alocada nos produtos (#573, Produtos): compara o que o catálogo aloca
+  // (Residencial + Não Residencial somados — `areaTotalProdutos` do catálogo
+  // EFETIVO, a mesma soma que `resumoCatalogoProdutos` usa) contra a BASE dos
+  // produtos (`areaVendavel`: a ALV no Loteamento; as áreas privativas FECHADAS
+  // na Incorporação — #784, decisão do autor). É uma comparação por SUBTRAÇÃO,
+  // não por razão, então `areaProdutosAlocada` e `diferencaAreaAlocada` estão
+  // SEMPRE definidos — catálogo vazio aloca 0 m², e 0 m² de base menos 0 m²
+  // alocados ainda é uma diferença válida (zero). `pctAreaAlocada` é a exceção:
+  // fica `null` sem base (≤ 0) — mesmo padrão null-safe de
   // `pctAproveitamentoCoef`, "indefinido" em vez de "0%" falso quando a razão
   // não tem denominador.
   //
-  // `diferencaAreaAlocada` é `alocada − registrada`: positivo = excesso
-  // alocado (o catálogo pede mais m² do que o terreno declara vender),
-  // negativo = sobra por alocar (falta produto para a área toda), zero =
-  // tudo alocado — os três estados do critério 2 da #573.
-  //
-  // Vale para os DOIS tipos de empreendimento sem ramo `lot` explícito: no
-  // Loteamento `areaPrivativa` é a ALV da cascata (não há parcelas PVT), e o
-  // catálogo — normalizado para o bucket residencial único (comentário acima,
-  // em `porTipo`) — soma do mesmo jeito, R+NR sendo sempre só R ali. A soma é
-  // agnóstica ao bucket por construção: não precisa saber quantas categorias
-  // existem para somar todas.
+  // `diferencaAreaAlocada` é `alocada − base`: positivo = excesso alocado,
+  // negativo = sobra por alocar, zero = tudo alocado — os três estados da #573.
+  // Com o catálogo cadastrado por % (`pct_alv`) a área é derivada da própria
+  // base, então a diferença só sai de zero em produto legado, com Σ% ≠ 100, ou com linha que
+  // não compõe catálogo (sem preço ou sem unidades: `produtoCompoeCatalogo`).
   areaProdutosAlocada: number; pctAreaAlocada: number | null; diferencaAreaAlocada: number;
 }
 
@@ -475,16 +471,42 @@ export function alvDoLoteamento(e: ProformaInput): number {
 }
 
 /**
- * O catálogo do estudo como o cálculo o enxerga (#781): no Loteamento, com a
- * área média DERIVADA de `pct_alv` × ALV ÷ unidades; na Incorporação, a lista
- * crua. Consumidores que listam produtos fora de `calcularProforma` (linhas da
- * Proforma, Apelo Comercial, tabela de Produtos) leem por aqui — ler
- * `area_media_m2` cru no Loteamento é ler o campo legado.
+ * Área privativa FECHADA da Incorporação (residencial + não residencial) — a
+ * base que os produtos repartem por % (#784). É a `areaVendavel` do motor: as
+ * áreas abertas não entram, decisão do autor. Mesmo piso `areaM2` das demais
+ * áreas digitadas.
+ */
+export function areaPrivativaFechadaIncorporacao(e: ProformaInput): number {
+  return areaM2(e.area_pvt_r_fechada) + areaM2(e.area_pvt_nr_fechada);
+}
+
+/**
+ * A base em m² que o catálogo de Produtos reparte por `pct_alv` (#781, #784):
+ * a ALV no Loteamento, a área privativa fechada na Incorporação. Ponto único —
+ * motor, tela e backend leem a base por aqui.
+ */
+export function baseProdutosM2(e: ProformaInput): number {
+  return e.tipo_empreendimento === 'loteamento'
+    ? alvDoLoteamento(e)
+    : areaPrivativaFechadaIncorporacao(e);
+}
+
+/**
+ * O catálogo do estudo como o cálculo o enxerga (#781, #784): nos dois tipos
+ * de Preliminar, com a área média DERIVADA de `pct_alv` × base ÷ unidades (produto legado,
+ * sem `pct_alv`, segue com a área que já tinha). Consumidores que listam
+ * produtos fora de `calcularProforma` (linhas da Proforma, Apelo Comercial,
+ * tabela de Produtos) leem por aqui — ler `area_media_m2` cru é ler o campo
+ * legado.
  */
 export function produtosDoEstudo(e: ProformaInput): ProdutoPreliminar[] {
-  return e.tipo_empreendimento === 'loteamento'
-    ? produtosComAreaDerivada(e.produtos, alvDoLoteamento(e))
-    : (e.produtos ?? []);
+  // O Avançado não cadastra por % (não tem tela para isso) e lê `area_media_m2`
+  // como entrada: linha com `pct_alv` numa Avançado só chega pela API ou por
+  // duplicação, e derivá-la da área do Preliminar (estática, talvez zerada)
+  // trocaria a área guardada por outra. `!== 'avancado'`, a convenção do
+  // repositório: estudo antigo sem `nivel_analise` lê como Preliminar.
+  if (e.nivel_analise === 'avancado') return e.produtos ?? [];
+  return produtosComAreaDerivada(e.produtos, baseProdutosM2(e));
 }
 
 export function calcularProforma(e: ProformaInput): Proforma {
@@ -545,7 +567,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     const rAb = areaM2(e.area_pvt_r_aberta), nrAb = areaM2(e.area_pvt_nr_aberta);
     areaPrivativa = rFech + nrFech + rAb + nrAb;
     areaConstruida = areaPrivativa + areaM2(e.area_comum_total);
-    areaVendavel = rFech + nrFech; // área privativa vendável (áreas fechadas)
+    areaVendavel = areaPrivativaFechadaIncorporacao(e); // área privativa vendável (áreas fechadas)
   }
 
   // O catálogo de Produtos é a única fonte do VGV bruto. Os pares legados de
@@ -847,8 +869,12 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // igual decisão de `resumoCatalogoProdutos`, que descreve o CADASTRO, não
   // um cenário.
   const areaProdutosAlocada = areaTotalProdutos(catalogo);
-  const pctAreaAlocada = areaPrivativa > 0 ? (areaProdutosAlocada / areaPrivativa) * 100 : null;
-  const diferencaAreaAlocada = moeda(areaProdutosAlocada - areaPrivativa);
+  // #784: a base é a `areaVendavel` (ALV no Loteamento, áreas privativas FECHADAS
+  // na Incorporação) — a mesma que `baseProdutosM2` entrega ao cadastro por %. Com
+  // a Área Privativa Total (com as abertas) a comparação acusaria sempre "falta
+  // alocar" mesmo com os produtos somando 100% da base.
+  const pctAreaAlocada = areaVendavel > 0 ? (areaProdutosAlocada / areaVendavel) * 100 : null;
+  const diferencaAreaAlocada = moeda(areaProdutosAlocada - areaVendavel);
 
   const resultadoProforma: Proforma = {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,

@@ -31,7 +31,7 @@ a comparação numérica com o mercado da região (ver [Análise de Mercado](ana
 tipo de empreendimento, o número de unidades, a área média por unidade e o preço de venda
 praticado, para o modelo dimensionar o que avalia. A localidade é a região monitorada vinculada ao
 estudo, ou a UF quando não há vínculo. Unidades, área média e preço vêm do catálogo efetivo de
-Produtos (no Loteamento, com a área média derivada da ALV), pela mesma agregação que a Proforma usa para o VGV (área média ponderada por unidades,
+Produtos (com a área média derivada da base do %: a ALV no Loteamento, as áreas privativas fechadas na Incorporação), pela mesma agregação que a Proforma usa para o VGV (área média ponderada por unidades,
 preço por m² ponderado pela área); estudo sem catálogo efetivo omite as três linhas do prompt em
 vez de mandar zero.
 

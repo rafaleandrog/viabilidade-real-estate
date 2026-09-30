@@ -18,7 +18,8 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 
 // #565: `tipo` (residencial/nao_residencial) entra ENTRE `nome` e `area_media_m2`
 // — mesma posição da coluna no `schema.json` e no grid da tela.
-// #781: `pct_alv` (participação na ALV, só Loteamento) entra logo depois de `tipo`.
+// #781/#784: `pct_alv` (participação na base do estudo: ALV no Loteamento, áreas
+// privativas fechadas na Incorporação) entra logo depois de `tipo`.
 export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
 
 /**
