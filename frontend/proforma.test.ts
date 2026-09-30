@@ -241,8 +241,8 @@ test('custo do terreno desconsiderado zera a linha', () => {
   assert.equal(p.custoTerreno, 0);
 });
 
-// item 5 — checkbox por custo: Marketing global/estrutura, Gestão indiretos,
-// Contingências, mesmo padrão de considerar_custo_terreno.
+// item 5 — checkbox por custo: Gestão indiretos, Contingências, mesmo padrão
+// de considerar_custo_terreno.
 test('contingências desconsideradas zera a linha (custo direto)', () => {
   const p = calcularProforma({ ...LOT, considerar_contingencias: false, contingencias_pct: 5 });
   assert.equal(p.contingencias, 0);

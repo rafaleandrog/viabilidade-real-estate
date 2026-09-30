@@ -1006,6 +1006,19 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
   }
 });
 
+test('campos aposentados pela `041` (marketing global e valor venal) de cliente em voo são descartados nos DOIS níveis', () => {
+  // Mesma classe do teste acima: a coluna saiu do `schema.json`, mas a aba aberta
+  // através do deploy (ou um cliente externo desatualizado) ainda a reenvia, e
+  // `req.dados.atualizar` recusaria o PATCH inteiro contra um schema que não a declara.
+  for (const estudo of [PRELIMINAR, AVANCADO]) {
+    const r = montarPatchEstudo({
+      nome: 'x', marketing_global_pct: 2, considerar_marketing_global: false, valor_venal_terreno_m2: 900,
+    }, estudo);
+    assert.deepEqual(r, { dados: { nome: 'x' } },
+      `campo aposentado atravessou o PATCH de um estudo ${estudo.nivel_analise}`);
+  }
+});
+
 // #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarSomaPctAlv`
 // é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
 // servidor, então apagar o bloco do handler deixaria a suíte verde — a regra

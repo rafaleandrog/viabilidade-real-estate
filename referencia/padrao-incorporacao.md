@@ -306,9 +306,9 @@ Ele não precisa reproduzir toda a dinâmica mensal de recebíveis, carteira e f
 > 2. VGV            → área_pvt_r_fechada × preço R + área_pvt_nr_fechada × preço NR
 > 3. Deduções       → imposto (RET/percentual) + corretagem + marketing + permutas financeiras
 >                     Receita líquida = VGV − deduções
-> 4. Custos diretos → terreno + projetos + construção + gestão + decoração + outorga
+> 4. Custos diretos → terreno + projetos + construção + gestão + decoração
 >                     + incorporação/registro + manutenção + contingências
-> 5. Custos indiretos → marketing global + gestão/indiretos
+> 5. Custos indiretos → gestão/indiretos (mais o stand de vendas no Loteamento)
 > 6. Resultado      → Receita líquida − Custo direto total − Custo indireto total (+ permutas)
 > 7. KPIs           → Receita líquida/VGV, Margem líquida, ROI, Custo obras/VGV, Investimento total,
 >                     Resultado por unidade (e por tipo R/NR)
@@ -372,8 +372,8 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > **Comportamento vigente — NÃO EXISTE promoção de nível (#486).** Um estudo nasce Preliminar ou
 > Avançado e **continua o que nasceu**. Duas metades, cada uma no seu lugar:
 >
-> - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:537`;
-> - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:197`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
+> - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:544`;
+> - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:204`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
 > quando `novo.nivel_analise === 'avancado'` (`:420-422`). Nenhuma rota promove.
 >
 > Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:46-50`) **não** listar
@@ -3240,8 +3240,8 @@ Toda correção de flag precisa valer **na leitura**, não só na criação. →
 
 **A14 — Não existe promoção Preliminar → Avançado, e o conserto dela tem grandeza diferente por
 tipo (#486).** Duas metades, cada uma no seu lugar:
-a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:537`;
-e `NIVEL_IMUTAVEL` recusa a alteração no `PATCH` com 422 — `backend/rotas/estudos.ts:197`. Quem
+a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:544`;
+e `NIVEL_IMUTAVEL` recusa a alteração no `PATCH` com 422 — `backend/rotas/estudos.ts:204`. Quem
 supuser que existe promoção vai procurar um bug de conversão que não existe — o estado
 `permuta_fisica_modo: 'area_m2'` com nulos é **indistinguível do padrão de criação**
 (`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai

@@ -133,8 +133,9 @@ a tela pede que ele seja definido. Ver [Benchmarks](benchmarks).
 
 O Avançado não roda as fórmulas acima. A sua Proforma relê as séries mensais já calculadas pelo
 fluxo de caixa — a contratação por safra, os componentes de pagamento, a carteira e o repasse, os
-custos distribuídos no tempo — e as achata na hierarquia de linhas do Preliminar, para que os dois
-níveis se comparem na mesma coluna.
+custos distribuídos no tempo — e as achata em linhas de Proforma comparáveis às do Preliminar, para
+que os dois níveis se comparem na mesma coluna. As linhas Outorga e Marketing global existem só no
+Avançado, onde são categorias de custo.
 
 As fórmulas do fluxo por safras — contratação bruta, desconto e líquido, os componentes de
 pagamento (imediato, prazo fixo, até marco, concentrado), a parcela, o primeiro vencimento, a

@@ -28,7 +28,13 @@ const SEED = {
     // #642: `deflator_area_aberta_pct` PREENCHIDO. Sem isto a asserção da `038`
     // passaria mesmo se o `limparColuna` sumisse — a etapa 4 só tem dente sobre
     // coluna que a fixture semeia com valor.
-    { id: 1, nome: 'Estudo A', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao', deflator_area_aberta_pct: 15 },
+    // A `041` esvazia `marketing_global_pct`, `considerar_marketing_global` e
+    // `valor_venal_terreno_m2` — mesma razão: preenchidas aqui, senão a asserção
+    // da `041` passa de graça com ou sem os `limparColuna`.
+    {
+      id: 1, nome: 'Estudo A', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao', deflator_area_aberta_pct: 15,
+      marketing_global_pct: 2, considerar_marketing_global: false, valor_venal_terreno_m2: 900,
+    },
     // #566: Preliminar com o modo aposentado 'unidade' nos dois pares
     // (R e NR) — exercita o caminho de TRANSFORMAÇÃO da `036`, não só o
     // early-return de banco vazio. Sem área/preço/unidades legados
@@ -484,6 +490,31 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
       );
     } else {
       ok('estudos.deflator_area_aberta_pct ficou vazia (poda derruba a estrutura no boot)');
+    }
+
+    // A `041` esvazia as três colunas de Marketing global / Valor venal, que
+    // saíram do `schema.json`. Mesma mecânica da `038` acima, com a mesma guarda:
+    // a fixture é conferida ANTES, porque o dente da asserção depende dela.
+    for (const coluna of ['marketing_global_pct', 'considerar_marketing_global', 'valor_venal_terreno_m2']) {
+      const semeadas = (SEED.estudos ?? []).filter((e) => e[coluna] !== null && e[coluna] !== undefined);
+      if (semeadas.length === 0) {
+        erro(
+          `o SEED não semeia mais \`estudos.${coluna}\` — sem valor semeado a asserção da \`041\` passa de graça, `
+            + 'com ou sem o `limparColuna`',
+          new Error('fixture vazia torna a asserção vácua'),
+        );
+        continue;
+      }
+      const restantes = (banco.db.get('estudos') ?? []).filter((e) => e[coluna] !== null && e[coluna] !== undefined);
+      if (restantes.length > 0) {
+        erro(
+          `estudos.${coluna} continua preenchida em ${restantes.length} linha(s) depois da cadeia — `
+            + 'a coluna saiu do schema.json e precisa ser esvaziada pela 041',
+          new Error('coluna órfã com dado deixa a app !saudavel no boot'),
+        );
+      } else {
+        ok(`estudos.${coluna} ficou vazia (SEED semeia ${semeadas.length} estudo(s) — a asserção tem dente)`);
+      }
     }
 
     // #585: a `037` faz o backfill de `estudos.juros_tabela_aa_padrao` a partir

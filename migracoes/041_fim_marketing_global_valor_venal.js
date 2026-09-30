@@ -12,7 +12,8 @@
 // As três colunas saem do `schema.json` no mesmo commit; aqui só cai o DADO, com
 // `dados.limparColuna` — caminho canônico do retorno declarativo (o mesmo de
 // `038_fim_deflator_area_aberta.js`). A poda do reconciliador derruba a estrutura
-// vazia no mesmo boot.
+// vazia no mesmo boot. O PATCH de estudo descarta as três chaves de cliente em voo
+// (`CAMPOS_APOSENTADOS`, `backend/rotas/estudos.ts`), como fez com a da `038`.
 //
 // ── OS NÚMEROS DOS ESTUDOS EXISTENTES MUDAM, DE PROPÓSITO ──
 // Diferente da `038`, estas colunas NÃO estavam inertes: um estudo que tinha
@@ -23,8 +24,9 @@
 // PERMANECE e continua entrando no custo indireto.
 //
 // ── IDEMPOTÊNCIA (o harness reexecuta toda migração sobre o próprio resultado) ──
-// `limparColuna` zera as células não-nulas e devolve quantas zerou; na 2ª execução
-// não há mais célula não-nula e cada chamada vira no-op com log.
+// `limparColuna` deixa a coluna nula; na 2ª execução já não há célula preenchida e
+// cada chamada não muda mais nada. O harness semeia as três colunas com valor e
+// confere que saem vazias — sem a semente a asserção passaria de graça.
 //
 // ⚠️ Instalação VIRGEM não executa esta função: o `schema.json` é o genesis, nasce
 // já sem as colunas, e as migrações são registradas sem rodar.

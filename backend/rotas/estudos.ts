@@ -88,6 +88,11 @@ const CAMPOS_APOSENTADOS = new Set([
   // #584 retirou o deflator do app (caminho A); #642 tirou a coluna do schema
   // e esvaziou o dado com a migração `038` (caminho B).
   'deflator_area_aberta_pct',
+  // Marketing global / estrutura e Valor venal do terreno (outorga) saíram do
+  // Preliminar; as três colunas saíram do `schema.json` e a migração `041`
+  // esvaziou o dado. Mesmo motivo do deflator: a aba aberta através do deploy
+  // ainda reenvia o que montou do registro inteiro.
+  'marketing_global_pct', 'considerar_marketing_global', 'valor_venal_terreno_m2',
 ]);
 
 // ⚠️ **Aqui morava `CAMPOS_OMITIR_SE_NULO` (#694), e a lista foi removida porque

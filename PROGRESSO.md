@@ -32,7 +32,11 @@ Pedido direto do autor, sem issue: retirar os dois campos de **todos** os estudo
 - **Schema/dados:** `estudos.marketing_global_pct`, `considerar_marketing_global` e
   `valor_venal_terreno_m2` saem do `schema.json`; a migração `041` esvazia o dado
   (`limparColuna`) e a `versao` sobe para `0.1.40`.
-- **Coeficientes de aproveitamento** (mínimo/máximo) **ficam** — alimentam o teto de aproveitamento.
+- **Coeficientes de aproveitamento** (mínimo/máximo) **ficam** como campos de Terreno & Áreas. O
+  máximo alimenta o teto de aproveitamento; o **mínimo** era lido só pelo custo de outorga e passa a
+  ser dado cadastral sem efeito na Proforma — se ele deve sair também, é decisão à parte.
+- **PATCH de estudo:** as três chaves entraram em `CAMPOS_APOSENTADOS` (aba aberta através do
+  deploy não pode quebrar o Salvar).
 
 ⚠️ **Os números dos estudos existentes mudam, de propósito:** quem tinha marketing global (1 % do VGV
 por padrão) ou valor venal preenchido deixa de carregar esse custo, e o Resultado sobe na mesma
