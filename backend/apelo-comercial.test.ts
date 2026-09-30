@@ -36,7 +36,7 @@ test('BUG7-15 montarContextoApelo: localidade/área/preço ausentes não quebram
 // legados congelados de `estudos` (area_media_lote_m2, num_unidades*,
 // preco_venda_m2*) — `montarContextoApeloDoEstudo` é o único ponto que o
 // handler HTTP chama. Ele recebe os produtos que o handler já passou por
-// `produtosDoEstudo` (no Loteamento, com a área média derivada da ALV — #781).
+// `produtosDoEstudo` (com a área média derivada da base do % — a ALV no Loteamento, #781; as áreas privativas fechadas na Incorporação, #784).
 
 test('#588 montarContextoApeloDoEstudo: estudo com catálogo editado — contexto reflete o catálogo, não campos legados', () => {
   const ctx = montarContextoApeloDoEstudo({

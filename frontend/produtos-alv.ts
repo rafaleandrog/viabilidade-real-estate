@@ -1,20 +1,27 @@
-// Produtos do Loteamento Preliminar por % da ALV (#781).
+// Produtos do Preliminar por % da base de área (#781 Loteamento, #784 Incorporação).
 //
-// No Loteamento o usuário não digita a área do lote: digita a PARTICIPAÇÃO de
-// cada produto na Área Líquida de Venda (`pct_alv`) e o nº de unidades. Daí
-// saem, calculadas, a área total vendável da linha e a área média do lote —
-// e é essa área derivada que o motor (`calcularProforma`), a tela e o Apelo
+// O usuário não digita a área do lote: digita a PARTICIPAÇÃO de cada produto na
+// BASE (`pct_alv`) e o nº de unidades. A base é a Área Líquida de Venda no
+// Loteamento e a soma das áreas privativas FECHADAS na Incorporação
+// (`baseProdutosM2`, `proforma.ts` — as funções daqui só recebem o número).
+// Daí saem, calculadas, a área total vendável da linha e a área média — e é
+// essa área derivada que o motor (`calcularProforma`), a tela e o Apelo
 // Comercial consomem. Funções puras, sem DOM e sem `lit`: o backend importa
 // este arquivo (mesmo desenho de `estudo-status.ts`).
 //
-// ⚠️ Só vale no Loteamento. Incorporação e Avançado seguem lendo
-// `area_media_m2` como entrada; nada aqui é chamado por eles.
+// ⚠️ Só o PRELIMINAR. O Avançado segue lendo `area_media_m2` como entrada; nada
+// aqui é chamado por ele.
 //
-// `area_media_m2` continua existindo na coluna, mas no Loteamento deixa de ser
+// `area_media_m2` continua existindo na coluna, mas no Preliminar deixa de ser
 // entrada: é LEGADO. Produto gravado antes da #781 não tem `pct_alv`; nele o
 // percentual é derivado da área antiga (`pctAlvEfetivo`), o que reproduz
 // exatamente a mesma área total — nenhum estudo muda de número por causa da
 // migração, e o primeiro salvamento da linha passa a gravar `pct_alv`.
+
+/** Nome da base nas mensagens: a ALV no Loteamento, as áreas privativas fechadas na Incorporação. */
+export function rotuloBaseProdutos(tipoEmpreendimento: string | null | undefined): string {
+  return tipoEmpreendimento === 'loteamento' ? 'ALV' : 'área privativa fechada';
+}
 
 /** Tolerância da soma dos percentuais, em pontos percentuais (a coluna guarda 4 casas). */
 export const TOLERANCIA_SOMA_PCT_ALV = 0.01;
@@ -102,46 +109,50 @@ export function alocacaoAlv(produtos: ProdutoAlv[] | undefined, alvM2: number): 
 export interface ResultadoSomaAlv { ok: boolean; mensagem: string | null }
 
 /**
- * A regra dura do Loteamento: com produtos cadastrados, a soma tem que ser
- * 100% da ALV. Sem ALV positiva a regra não se aplica (não há base para o %).
+ * A regra dura do Preliminar: com produtos cadastrados, a soma tem que ser
+ * 100% da base (`rotuloBase`: ver `rotuloBaseProdutos`). Sem base positiva a
+ * regra não se aplica (não há base para o %).
  * Catálogo VAZIO é válido — é o estado de um estudo que ainda não
  * chegou à aba Produtos, e barrar aí travaria o salvamento de todas as outras
  * premissas (mesma decisão de `premissas-validacao.ts` sobre catálogo vazio).
  */
-export function validarSomaPctAlv(produtos: ProdutoAlv[] | undefined, alvM2: number): ResultadoSomaAlv {
+export function validarSomaPctAlv(
+  produtos: ProdutoAlv[] | undefined, alvM2: number, rotuloBase: string,
+): ResultadoSomaAlv {
   if (!produtos || produtos.length === 0) return { ok: true, mensagem: null };
-  // Sem ALV (Terreno & Áreas ainda não preenchido) a participação não tem base:
-  // barrar aí travaria o salvamento do próprio Terreno & Áreas, que é o que cria
-  // a ALV. A regra volta a valer assim que a ALV existir.
+  // Sem base (Terreno & Áreas ainda não preenchido) a participação não tem
+  // referência: barrar aí travaria o salvamento do próprio Terreno & Áreas, que é
+  // o que cria a base. A regra volta a valer assim que a base existir.
   if (alvM2 <= 0) return { ok: true, mensagem: null };
   const { soma, estado } = alocacaoAlv(produtos, alvM2);
   if (estado === 'completa') return { ok: true, mensagem: null };
   const fmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   return {
     ok: false,
-    mensagem: `A soma dos produtos é ${fmt(soma)}% da ALV e precisa ser 100%`
+    mensagem: `A soma dos produtos é ${fmt(soma)}% da ${rotuloBase} e precisa ser 100%`
       + ` (${estado === 'falta' ? `faltam ${fmt(100 - soma)}%` : `excedem ${fmt(soma - 100)}%`}).`,
   };
 }
 
-export interface AreaParaSairDoLoteamento { id: number; area_media_m2: number }
+export interface AreaParaTrocarDeTipo { id: number; area_media_m2: number }
 
 /**
- * Ao trocar um rascunho de Loteamento para Incorporação, o catálogo passa a ser
- * lido pela área média digitada (`area_media_m2`) — e produto criado pela tela do
- * Loteamento só tem `pct_alv`. Devolve, para cada produto com `pct_alv`, a área
- * média DERIVADA da ALV atual (em 2 casas, a escala da coluna), que a rota grava
- * junto com a limpeza de `pct_alv` para o VGV não zerar na troca.
+ * Ao trocar o tipo de um rascunho (Loteamento ↔ Incorporação) a BASE do % muda
+ * (ALV ↔ áreas privativas fechadas): o `pct_alv` gravado seria relido contra
+ * outra base e o VGV mudaria sozinho. Devolve, para cada produto com `pct_alv`,
+ * a área média DERIVADA da base de ORIGEM (em 2 casas, a escala da coluna), que
+ * a rota grava junto com a limpeza de `pct_alv` — o produto vira legado e o VGV
+ * não muda na troca.
  */
-export function areasParaSairDoLoteamento(
+export function areasParaTrocarDeTipo(
   produtos: (ProdutoAlv & { id?: number | string | null })[] | undefined,
   alvM2: number,
-): AreaParaSairDoLoteamento[] {
-  const saida: AreaParaSairDoLoteamento[] = [];
+): AreaParaTrocarDeTipo[] {
+  const saida: AreaParaTrocarDeTipo[] = [];
   for (const p of produtos ?? []) {
     if (!temValor(p.pct_alv) || p.id === null || p.id === undefined) continue;
     const area = Math.round(areaMediaDaLinha(p, alvM2) * 100) / 100;
-    // Linha sem área derivável (sem unidades, sem ALV, ou 0%): NÃO se converte. Ela
+    // Linha sem área derivável (sem unidades, sem base, ou 0%): NÃO se converte. Ela
     // fica como está — com o `pct_alv` que o usuário digitou — em vez de ter a única
     // informação que tem apagada e voltar como 0% se o estudo for revertido.
     if (area > 0) saida.push({ id: Number(p.id), area_media_m2: area });

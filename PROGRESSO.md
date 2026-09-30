@@ -18,6 +18,31 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-30 — #784: Produtos da Incorporação por % da área privativa fechada
+
+Continuação da #781, pedida pelo autor para o Preliminar de **Incorporação**. Base do percentual,
+por decisão do autor: **as áreas privativas fechadas** de Terreno & Áreas (residencial + não
+residencial); as abertas ficam fora. Cadastro por **%**, **Unidades**, **Tipo** e preço; **Área
+total** e **Área média** calculadas; Σ% = 100% com o mesmo bloqueio do Loteamento (tela e
+`422 SOMA_ALV_INVALIDA` na submissão).
+
+- Ponto único da base: `baseProdutosM2` (`frontend/proforma.ts`) — ALV no Loteamento, área privativa
+  fechada na Incorporação. `produtosDoEstudo` passa a derivar a área nos dois tipos; Resultado,
+  Gráficos, Proforma, Cenários, exportação e Apelo Comercial herdam sem edição própria.
+- Sem mudança de `schema.json` nem de `versao`: reaproveita a coluna `pct_alv` da migração 040.
+  Produto legado (sem `pct_alv`) mantém a área que tinha.
+- Grid de 8 colunas nos dois tipos (`colunasProduto`); o indicador "Área alocada / Registrada /
+  Diferença" da #573/#693 sai e dá lugar ao "Alocado / Área privativa fechada / Restante".
+- `diferencaAreaAlocada` do motor agora compara com `areaVendavel` (a mesma base do cadastro); com
+  a Área Privativa Total (com as abertas) o banner de Gráficos acusaria "falta alocar" sempre.
+- Trocar o tipo do rascunho converte a área derivada da base de ORIGEM nas duas direções e limpa
+  `pct_alv` (`areasParaTrocarDeTipo`); antes só Loteamento → Incorporação.
+- Mudança de número declarada: a permuta física da Incorporação lê a área do catálogo por tipo, então
+  estudo cujo catálogo não fechava com a base muda de permuta ao repartir os percentuais.
+- Docs: `docs/preliminar.md`, `formulas.md`, `modelo-de-dados.md`, `apelo-comercial.md`.
+- Fiação medida: com a derivação limitada ao Loteamento, 5 testes ficam vermelhos; sem o indicador no
+  template, o caso de render `catalogo-produtos-incorporacao-pct` fica vermelho.
+
 ## 2026-09-29 — #781: Produtos do Loteamento por % da ALV
 
 Pedido direto do autor, só para o Preliminar de Loteamento. No cadastro de Produtos os campos
