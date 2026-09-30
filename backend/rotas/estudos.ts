@@ -722,7 +722,10 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     // preenchida, `pct_alv` limpo é o estado legado), e a base usada é a do estudo
     // ANTES da troca, lida acima.
     const tipoOrigem = estudo.tipo_empreendimento as string | undefined;
-    const trocaDeTipo = (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')
+    // Só no Preliminar (`!== 'avancado'`): o Avançado lê `area_media_m2` como entrada, e
+    // reescrevê-la a partir das áreas estáticas do Preliminar corromperia a linha guardada.
+    const trocaDeTipo = estudo.nivel_analise !== 'avancado'
+      && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')
       && (dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao') // só o destino validado: typo não converte nada
       && dados.tipo_empreendimento !== tipoOrigem;
     const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);

@@ -1012,7 +1012,7 @@ test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS n
 // "a API não contorna a tela" passaria a valer só na tela.
 test('#781/#784 fiação: PATCH que troca o tipo do rascunho leva a área derivada dos produtos', () => {
   for (const parte of [
-    "(tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')",
+    "estudo.nivel_analise !== 'avancado'\n      && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')", // o Avançado não converte produtos na troca de tipo
     "(dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao')", // só o destino validado: typo não converte nada
     'dados.tipo_empreendimento !== tipoOrigem',
     'areasParaTrocarDeTipo(produtos as any[], base)',
