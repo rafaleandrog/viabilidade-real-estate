@@ -415,7 +415,8 @@ export interface Proforma {
   // `diferencaAreaAlocada` é `alocada − base`: positivo = excesso alocado,
   // negativo = sobra por alocar, zero = tudo alocado — os três estados da #573.
   // Com o catálogo cadastrado por % (`pct_alv`) a área é derivada da própria
-  // base, então a diferença só sai de zero em produto legado ou com Σ% ≠ 100.
+  // base, então a diferença só sai de zero em produto legado, com Σ% ≠ 100, ou com linha que
+  // não compõe catálogo (sem preço ou sem unidades: `produtoCompoeCatalogo`).
   areaProdutosAlocada: number; pctAreaAlocada: number | null; diferencaAreaAlocada: number;
 }
 

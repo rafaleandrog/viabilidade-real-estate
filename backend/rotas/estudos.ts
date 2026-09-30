@@ -908,7 +908,13 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
     // (ALV no Loteamento, áreas privativas fechadas na Incorporação). A tela já
     // barra o botão; este é o portão, para a API não contornar a regra. Catálogo
     // vazio passa (estudo que ainda não chegou à aba Produtos).
+    //
+    // Só no PRELIMINAR: o Avançado deriva os produtos das tipologias e não expõe
+    // este catálogo para correção, mas a API aceita linhas em `preliminar_produtos`
+    // em qualquer nível e a duplicação as copia — um catálogo obsoleto que não
+    // fecha 100% barraria a submissão de um estudo Avançado sem saída na tela.
     if (novoStatus === 'em_analise'
+      && estudo.nivel_analise === 'preliminar'
       && (estudo.tipo_empreendimento === 'loteamento' || estudo.tipo_empreendimento === 'incorporacao')) {
       // `varrerTudo`, e não `listar` com página fixa: a soma precisa do catálogo
       // INTEIRO, e uma página de 500 truncaria um estudo maior em silêncio.

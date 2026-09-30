@@ -184,6 +184,9 @@ test('#781/#784 fiação: _salvar (os dois tipos) espera o catálogo e recusa so
   assert.ok(iCatalogo > 0, 'a espera pelo catálogo saiu do _salvar');
   assert.ok(iSoma > iCatalogo, 'a soma é conferida depois da espera pelo catálogo');
   assert.ok(iGrava > iSoma, 'ambos os portões precedem a gravação');
+  // Vale para os DOIS tipos: o portão não pode voltar a morar dentro de um ramo do Loteamento.
+  const corpoSalvar = FONTE_TELA_ALV.slice(FONTE_TELA_ALV.indexOf('_salvar = async () => {'), iGrava);
+  assert.ok(!corpoSalvar.includes('_ehLoteamento'), 'o portão da soma do _salvar voltou a ser condicional ao Loteamento');
 });
 
 test('#781/#784 fiação: adicionar produto espera o catálogo ser lido', () => {

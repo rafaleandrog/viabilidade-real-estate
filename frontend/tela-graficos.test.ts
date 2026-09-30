@@ -147,3 +147,16 @@ test('#613: a aba Gráficos PASSA eficiencia_aproveitamento ao resolvedor de ben
     'medidor desenha o ponteiro na banda vermelha do benchmark — o falso alarme que a #611 removeu.',
   );
 });
+
+// #784 — a faixa de consistência compara com a BASE dos produtos (`areaVendavel`: ALV no
+// Loteamento, áreas privativas FECHADAS na Incorporação), com o rótulo do tipo. Nenhum caso de
+// render exige a faixa, então reverter a chamada (sem `lot`) ou voltar a `areaPrivativa` deixaria
+// a suíte verde e a Incorporação acusaria "falta alocar" sempre que houvesse área aberta.
+test('#784 fiação: _renderConsistencia recebe o tipo e compara com a base dos produtos', () => {
+  assert.ok(FONTE.includes('this._renderConsistencia(p, lot)'), 'a chamada deixou de passar o tipo');
+  assert.ok(FONTE.includes('_renderConsistencia(p: Proforma, lot: boolean)'), 'a assinatura perdeu o tipo');
+  const ini = FONTE.indexOf('_renderConsistencia(p: Proforma, lot: boolean)');
+  const corpo = FONTE.slice(ini, FONTE.indexOf('_renderMedidores', ini));
+  assert.ok(corpo.includes('p.areaVendavel'), 'a faixa deixou de comparar com a base dos produtos');
+  assert.ok(!corpo.includes('p.areaPrivativa'), 'a faixa voltou à Área Privativa Total (com as abertas)');
+});

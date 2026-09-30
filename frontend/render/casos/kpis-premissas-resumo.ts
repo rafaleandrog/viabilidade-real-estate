@@ -3,7 +3,7 @@
 // quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1526-1555`)
 // só aparece na sub-aba `secao: 'produtos'`, e a MESMA `.kpis` que ele usa
 // também rege `.kpis.aproveitamento` (#569) e `.kpis.area-alocada` (#573,
-// que corenderiza aqui — `_renderAreaAlocada()` mora na mesma sub-aba): os
+// que corenderiza aqui — `_renderAlocacaoAlv()` mora na mesma sub-aba): os
 // três modificadores só ajustam `margin-top`, a track é uma regra só, e este
 // caso prova a track para os três de uma vez.
 //
