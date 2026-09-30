@@ -18,6 +18,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-09-30 — Preliminar: saem "Marketing global / estrutura" e "Valor venal do terreno (outorga)"
+
+Pedido direto do autor, sem issue: retirar os dois campos de **todos** os estudos Preliminares
+(Incorporação e Loteamento), aba Premissas › Custos. Saem da tela, do motor, do schema e dos dados:
+
+- **Tela:** os campos e o interruptor "Considerar Marketing global / estrutura".
+- **Motor** (`frontend/proforma.ts`): o custo indireto deixa de ter a parcela de marketing global, e
+  o custo de **outorga** — que só existia a partir do valor venal — deixa de existir; a chave
+  `outorga` sai do resultado, com a linha da Proforma, do PDF/CSV e do gráfico de custos. A chave
+  `marketingGlobal` virou **`standVendas`**: o que restava nela era só o Stand de vendas do
+  Loteamento (que **fica**), e a linha passou a se chamar "(-) Stand de vendas".
+- **Schema/dados:** `estudos.marketing_global_pct`, `considerar_marketing_global` e
+  `valor_venal_terreno_m2` saem do `schema.json`; a migração `041` esvazia o dado
+  (`limparColuna`) e a `versao` sobe para `0.1.40`.
+- **Coeficientes de aproveitamento** (mínimo/máximo) **ficam** como campos de Terreno & Áreas. O
+  máximo alimenta o teto de aproveitamento; o **mínimo** era lido só pelo custo de outorga e passa a
+  ser dado cadastral sem efeito na Proforma — se ele deve sair também, é decisão à parte.
+- **PATCH de estudo:** as três chaves entraram em `CAMPOS_APOSENTADOS` (aba aberta através do
+  deploy não pode quebrar o Salvar).
+
+⚠️ **Os números dos estudos existentes mudam, de propósito:** quem tinha marketing global (1 % do VGV
+por padrão) ou valor venal preenchido deixa de carregar esse custo, e o Resultado sobe na mesma
+medida. Não há migração de valor para outro campo.
+
 ## 2026-09-30 — #784: Produtos da Incorporação por % da área privativa fechada
 
 Continuação da #781, pedida pelo autor para o Preliminar de **Incorporação**. Base do percentual,

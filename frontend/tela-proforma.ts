@@ -207,7 +207,6 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   linhas.push({ l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', ocultarSeZero: true, memo: terrenoMemo });
   linhas.push({ l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto', ocultarSeZero: true, memo: projetosMemo });
   linhas.push({ l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, grupo: 'direto', ocultarSeZero: true, memo: infraMemo });
-  linhas.push({ l: '(-) Outorga', v: p.outorga, soInc: true, grupo: 'direto', ocultarSeZero: true });
   linhas.push({ l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: `${pct(e.incorporacao_registro_pct)} do VGV` });
   linhas.push({ l: '(-) Construção', v: p.construcao, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: construcaoMemo });
   linhas.push({ l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: `${pct(e.taxa_gestao_pct)} das obras` });
@@ -217,7 +216,7 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
   linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' });
   linhas.push({ l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' });
-  linhas.push({ l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', ocultarSeZero: true, memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` });
+  linhas.push({ l: '(-) Stand de vendas', v: p.standVendas, soLot: true, grupo: 'indireto', ocultarSeZero: true });
   // #13: rename "Gestão e outros indiretos" → "…custos indiretos".
   linhas.push({ l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos, grupo: 'indireto', ocultarSeZero: true, memo: `${pct(e.gestao_indiretos_pct)} do VGV` });
   // #13: removida a linha "(memo) Permuta física entregue".

@@ -148,7 +148,6 @@ const DEFICIT: ProformaInput = {
   projetos_pct: 2,
   manutencao_pct: 1,
   contingencias_pct: 0,
-  marketing_global_pct: 1,
   gestao_indiretos_pct: 1.25,
 };
 
@@ -160,7 +159,7 @@ test('#567: fixture deficitária — custo direto sozinho já passa a receita l�
   assert.ok(perto(p.receitaLiquida, 65_250_000), `receitaLiquida=${p.receitaLiquida}`);
   assert.ok(perto(p.custoTerreno, 300_000_000), `custoTerreno=${p.custoTerreno}`);
   assert.ok(perto(p.custoDiretoTotal, 324_750_000), `custoDiretoTotal=${p.custoDiretoTotal}`);
-  assert.ok(perto(p.custoIndiretoTotal, 1_687_500), `custoIndiretoTotal=${p.custoIndiretoTotal}`);
+  assert.ok(perto(p.custoIndiretoTotal, 937_500), `custoIndiretoTotal=${p.custoIndiretoTotal}`);
 });
 
 test('#567: a cadeia Receita líquida → Custo direto → Receita operacional → Custo indireto → Resultado fecha aritmeticamente', () => {

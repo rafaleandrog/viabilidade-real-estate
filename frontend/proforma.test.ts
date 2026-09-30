@@ -50,7 +50,6 @@ const LOT: ProformaInput = {
   projetos_pct: 2,
   manutencao_pct: 1,
   contingencias_pct: 0,
-  marketing_global_pct: 1,
   gestao_indiretos_pct: 1.25,
 };
 
@@ -96,12 +95,12 @@ test('loteamento: custos, resultado e margem', () => {
   assert.ok(perto(p.infraestrutura, 22_500_000));
   assert.ok(perto(p.projetos, 1_500_000));
   assert.ok(perto(p.custoDiretoTotal, 34_750_000), `custoDireto=${p.custoDiretoTotal}`);
-  assert.ok(perto(p.custoIndiretoTotal, 1_687_500), `custoIndireto=${p.custoIndiretoTotal}`);
-  assert.ok(perto(p.resultado, 28_812_500), `resultado=${p.resultado}`);
+  assert.ok(perto(p.custoIndiretoTotal, 937_500), `custoIndireto=${p.custoIndiretoTotal}`);
+  assert.ok(perto(p.resultado, 29_562_500), `resultado=${p.resultado}`);
   // #571: vgv > 0 neste fixture, então margemLiquidaPct nunca é `null` aqui —
   // a checagem de runtime é o que deixa o `!` seguro para o TS.
   assert.notEqual(p.margemLiquidaPct, null);
-  assert.ok(perto(p.margemLiquidaPct!, 38.4167, 0.01), `margem=${p.margemLiquidaPct}`);
+  assert.ok(perto(p.margemLiquidaPct!, 39.4167, 0.01), `margem=${p.margemLiquidaPct}`);
   assert.equal(p.numUnidades, 250);
   assert.ok(perto(p.precoMedioUnidade, 300_000));
 });
@@ -242,8 +241,8 @@ test('custo do terreno desconsiderado zera a linha', () => {
   assert.equal(p.custoTerreno, 0);
 });
 
-// item 5 — checkbox por custo: Marketing global/estrutura, Gestão indiretos,
-// Contingências, mesmo padrão de considerar_custo_terreno.
+// item 5 — checkbox por custo: Gestão indiretos, Contingências, mesmo padrão
+// de considerar_custo_terreno.
 test('contingências desconsideradas zera a linha (custo direto)', () => {
   const p = calcularProforma({ ...LOT, considerar_contingencias: false, contingencias_pct: 5 });
   assert.equal(p.contingencias, 0);
@@ -251,9 +250,13 @@ test('contingências desconsideradas zera a linha (custo direto)', () => {
   assert.ok(comContingencia.contingencias > 0);
 });
 
-test('marketing global desconsiderado zera só a parte percentual (custo indireto) — stand de vendas continua', () => {
-  const p = calcularProforma({ ...LOT, considerar_marketing_global: false, stand_vendas_valor: 50_000 });
-  assert.ok(perto(p.marketingGlobal, 50_000), `marketingGlobal=${p.marketingGlobal}`);
+test('stand de vendas entra no custo indireto do Loteamento e só nele', () => {
+  const lot = calcularProforma({ ...LOT, stand_vendas_valor: 50_000 });
+  assert.ok(perto(lot.standVendas, 50_000), `standVendas=${lot.standVendas}`);
+  assert.ok(perto(lot.custoIndiretoTotal, lot.standVendas + lot.gestaoIndiretos, 0.02), 'custoIndiretoTotal');
+  const inc = calcularProforma({ tipo_empreendimento: 'incorporacao', terreno_manual_area: 5_000, area_pvt_r_fechada: 1_000,
+    preco_venda_m2_residencial: 10_000, stand_vendas_valor: 50_000 });
+  assert.equal(inc.standVendas, 0);
 });
 
 test('gestão indiretos desconsiderada zera a linha (custo indireto)', () => {
@@ -1032,10 +1035,11 @@ test('#725 custo_terreno: considerar_custo_terreno=false continua soberano com f
 });
 
 test('#725 custo_indireto: fatorSens escala custoIndiretoTotal preservando a identidade das duas parcelas', () => {
-  const sem = calcularProforma(LOT);
-  const com = calcularProforma({ ...LOT, sensibilidade: { variavel: 'custo_indireto', fator: 1.1 } });
+  const base = { ...LOT, stand_vendas_valor: 50_000 };
+  const sem = calcularProforma(base);
+  const com = calcularProforma({ ...base, sensibilidade: { variavel: 'custo_indireto', fator: 1.1 } });
   assert.ok(perto(com.custoIndiretoTotal, sem.custoIndiretoTotal * 1.1), `indireto=${com.custoIndiretoTotal}`);
-  assert.ok(perto(com.marketingGlobal + com.gestaoIndiretos, com.custoIndiretoTotal, 0.02), 'identidade marketingGlobal+gestaoIndiretos');
+  assert.ok(perto(com.standVendas + com.gestaoIndiretos, com.custoIndiretoTotal, 0.02), 'identidade standVendas+gestaoIndiretos');
   assert.ok(perto(com.custoTerreno, sem.custoTerreno), `terreno=${com.custoTerreno}`);
 });
 

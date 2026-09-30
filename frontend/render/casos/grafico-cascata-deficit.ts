@@ -33,7 +33,6 @@ const ESTUDO_DEFICIT: ProformaInput = {
   projetos_pct: 2,
   manutencao_pct: 1,
   contingencias_pct: 2,
-  marketing_global_pct: 1,
   gestao_indiretos_pct: 1.25,
 };
 

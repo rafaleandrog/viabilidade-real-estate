@@ -58,7 +58,7 @@ const INC_COM_PERMUTA: ProformaInput = {
   construcao_modo: 'valor_total', construcao_valor_total: 8_000_000,
   taxa_gestao_pct: 3, custo_decoracao_m2: 50,
   manutencao_pct: 0.5, contingencias_pct: 1,
-  marketing_global_pct: 1, gestao_indiretos_pct: 1,
+  gestao_indiretos_pct: 1,
   incorporacao_registro_pct: 0.5,
 };
 
@@ -82,7 +82,7 @@ const LOT_COM_PERMUTA: ProformaInput = {
   infra_modo: 'pct_vgv', infra_pct: 25,
   projetos_modo: 'pct_vgv', projetos_pct: 2,
   manutencao_pct: 0.5, contingencias_pct: 1,
-  marketing_global_pct: 1, gestao_indiretos_pct: 1,
+  gestao_indiretos_pct: 1,
 };
 
 function ctxDe(e: ProformaInput): ContextoLinhasProforma {

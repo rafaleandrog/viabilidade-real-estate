@@ -49,7 +49,7 @@ export const caso = {
     // determinístico — sem isso, a seleção seguiria "a maior amplitude do
     // ranking", que É medida (o fixture tem outras alavancas com efeito real:
     // `custo_obras` via `custo_construcao_m2` e `custo_indireto` via
-    // `marketing_global_pct`/`gestao_indiretos_pct` — achado da lente L2, PR
+    // `gestao_indiretos_pct` — achado da lente L2, PR
     // #757) e portanto sujeita a mudar de variável a cada edição do motor ou
     // do fixture, sem que ninguém precise tocar este arquivo. Fixar a
     // variável é o que faz a prova (o fator alcança o catálogo) resistir a
@@ -89,7 +89,7 @@ export const caso = {
     'urbi-select.label',
     'urbi-select.opcoes',
     // #734: o alerta de cenário inviável (o preço deste fixture suporta cair
-    // ~7% e o Bear aplica −10%) — a variante do banner não é reproduzida.
+    // ~9% e o Bear aplica −10%) — a variante do banner não é reproduzida.
     'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {

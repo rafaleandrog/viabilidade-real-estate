@@ -42,8 +42,8 @@ test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEdit
   // PATCH recusa, e uma asserção de presença continuaria verde.
   //
   // ⚠️ `p.podeEditar` sozinho NÃO BASTA aqui — é role-only (`perm.ehEditor ||
-  // podeAprovar`, `backend/rotas/estudos.ts:589`), e o PATCH real usa
-  // `podeEditarEstudo(status, funcao)` (`backend/rotas/estudos.ts:690`), que
+  // podeAprovar`, `backend/rotas/estudos.ts:660`), e o PATCH real usa
+  // `podeEditarEstudo(status, funcao)` (`backend/rotas/estudos.ts:702`), que
   // trava rascunho/aprovado/reprovado/arquivado para só o aprovador editar.
   // Um editor num estudo travado veria o lápis com `p.podeEditar` e levaria
   // 403 ao salvar — foi exatamente o defeito que esta issue introduziu na
@@ -60,7 +60,7 @@ test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEdit
 
 test('#678: `funcaoEfetiva` eleva admin de app a aprovador, como o PATCH faz — não usa `p.funcao` cru', () => {
   // Achado do Codex na 1ª correção (`7647f42`): `_permissao.funcao` vem CRU
-  // (`funcao: perm.funcao,`, `backend/rotas/estudos.ts:594`) e NÃO carrega a
+  // (`funcao: perm.funcao,`, `backend/rotas/estudos.ts:666`) e NÃO carrega a
   // elevação de admin de app; `p.podeAprovar` sim (`perm.ehAprovador ||
   // perm.ehAdminApp`). Usar `p.funcao` puro esconde o lápis de um admin
   // não-membro num estudo travado, mesmo o PATCH permitindo — a mesma

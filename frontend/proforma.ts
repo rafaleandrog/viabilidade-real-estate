@@ -50,7 +50,6 @@ export interface ProformaInput {
   area_comum_total?: number | string; num_unidades?: number | string;
   num_unidades_residencial?: number | string; num_unidades_nao_residencial?: number | string;
   preco_venda_m2_residencial?: number | string; preco_venda_m2_nao_residencial?: number | string;
-  valor_venal_terreno_m2?: number | string;
   // deduções da receita
   sujeito_ret?: boolean; imposto_percentual?: number | string;
   corretagem_percentual?: number | string; marketing_percentual?: number | string;
@@ -71,8 +70,7 @@ export interface ProformaInput {
   manutencao_pct?: number | string; contingencias_pct?: number | string; stand_vendas_valor?: number | string;
   considerar_contingencias?: boolean;
   // custos indiretos
-  marketing_global_pct?: number | string; gestao_indiretos_pct?: number | string;
-  considerar_marketing_global?: boolean; considerar_gestao_indiretos?: boolean;
+  gestao_indiretos_pct?: number | string; considerar_gestao_indiretos?: boolean;
   // permuta física — o par legado (`permuta_fisica_*`) é o RESIDENCIAL (e o único
   // do loteamento); o par `_nr_*` é o não residencial (só incorporação). (#10)
   permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string; permuta_fisica_area_canonica?: number | string;
@@ -357,13 +355,13 @@ export interface Proforma {
   imposto: number; corretagem: number; marketing: number;
   permutaFinResidencial: number; permutaFinNaoResidencial: number; receitaLiquida: number;
   // custos diretos (linhas)
-  custoTerreno: number; projetos: number; infraestrutura: number; outorga: number;
+  custoTerreno: number; projetos: number; infraestrutura: number;
   incorporacaoRegistro: number; construcao: number; gestaoConstrucao: number; decoracao: number;
   manutencao: number; contingencias: number; custoDiretoTotal: number;
   // receita operacional = receita líquida − custo direto total
   receitaOperacional: number;
   // custos indiretos
-  marketingGlobal: number; gestaoIndiretos: number; custoIndiretoTotal: number;
+  standVendas: number; gestaoIndiretos: number; custoIndiretoTotal: number;
   // resultado (final — permutas financeiras e físicas já o reduzem)
   // #571: os três indicadores "% VGV" abaixo (`margemLiquidaPct`,
   // `custoObrasVgvPct`, `receitaLiquidaSobreVgvPct`) ficam `null` quando o
@@ -457,7 +455,7 @@ function estadosCascataLoteamento(e: ProformaInput): Record<string, EstadoLinha>
 // Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
 // origem é Núcleo; senão, a área informada manualmente no estudo. Pelo MESMO
 // piso das demais áreas (#612, rodada 2 de revisão): a cascata mostra a âncora
-// cortada em 0, e custoTerreno/outorga/teto leem o mesmo 0.
+// cortada em 0, e custoTerreno/teto leem o mesmo 0.
 function areaTerrenoDe(e: ProformaInput): number {
   return e.origem_terreno === 'nucleo'
     ? areaM2(e.area_terreno_nucleo)
@@ -757,30 +755,26 @@ export function calcularProforma(e: ProformaInput): Proforma {
 
   const projetosLegado = e.projetos_modo === 'valor_fixo' ? n(e.projetos_valor_fixo) : vgv * n(e.projetos_pct) / 100;
   const projetos = canonico(e.projetos_valor_canonico, projetosLegado);
-  const outorga = lot ? 0 : (n(e.coef_aproveitamento_basico) > 0
-    ? (n(e.valor_venal_terreno_m2) / n(e.coef_aproveitamento_basico)) * areaTerreno
-      * (n(e.coef_aproveitamento_maximo) - n(e.coef_aproveitamento_basico)) * 0.20
-    : 0);
   const incorporacaoRegistro = lot ? 0 : vgv * n(e.incorporacao_registro_pct) / 100;
   const manutencao = vgv * n(e.manutencao_pct) / 100;
   const contingencias = e.considerar_contingencias === false ? 0 : vgv * n(e.contingencias_pct) / 100;
 
-  const custoDiretoTotal = custoTerreno + projetos + infraestrutura + outorga + incorporacaoRegistro
+  const custoDiretoTotal = custoTerreno + projetos + infraestrutura + incorporacaoRegistro
     + construcao + gestaoConstrucao + decoracao + manutencao + contingencias;
 
   // ── Custos indiretos ──
   // #725: o fator incide nas DUAS parcelas, não na soma — a alternativa
   // (aplicar só em `custoIndiretoTotal`) quebraria a identidade
-  // `marketingGlobal + gestaoIndiretos === custoIndiretoTotal` que a tela e os
+  // `standVendas + gestaoIndiretos === custoIndiretoTotal` que a tela e os
   // testes verificam campo a campo. Exata AQUI, antes do arredondamento; no
   // objeto público os três campos passam por `moeda()` independentemente
   // (ver `monetarios`, adiante), então na superfície a igualdade vale a
   // ±0,02 — é o que `frontend/proforma.test.ts` mede (achado da lente S2,
   // PR #757).
-  const marketingGlobal = ((e.considerar_marketing_global === false ? 0 : vgv * n(e.marketing_global_pct) / 100)
-    + (lot ? n(e.stand_vendas_valor) : 0)) * fatorSens('custo_indireto');
+  // O stand de vendas só existe no Loteamento; na Incorporação a parcela é 0.
+  const standVendas = (lot ? n(e.stand_vendas_valor) : 0) * fatorSens('custo_indireto');
   const gestaoIndiretos = (e.considerar_gestao_indiretos === false ? 0 : vgv * n(e.gestao_indiretos_pct) / 100) * fatorSens('custo_indireto');
-  const custoIndiretoTotal = marketingGlobal + gestaoIndiretos;
+  const custoIndiretoTotal = standVendas + gestaoIndiretos;
 
   // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
   const receitaOperacional = receitaLiquida - custoDiretoTotal;
@@ -883,10 +877,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
     semProdutos, permutaCapada, vgvPermutaSolicitada,
     vgvResidencial, vgvNaoResidencial, vgv,
     imposto, corretagem, marketing, permutaFinResidencial, permutaFinNaoResidencial, receitaLiquida,
-    custoTerreno, projetos, infraestrutura, outorga, incorporacaoRegistro, construcao, gestaoConstrucao,
+    custoTerreno, projetos, infraestrutura, incorporacaoRegistro, construcao, gestaoConstrucao,
     decoracao, manutencao, contingencias, custoDiretoTotal,
     receitaOperacional,
-    marketingGlobal, gestaoIndiretos, custoIndiretoTotal,
+    standVendas, gestaoIndiretos, custoIndiretoTotal,
     resultado, valorPermutaFisica, margemLiquidaPct,
     investimentoTotal, custoObras, custoObrasVgvPct, receitaLiquidaSobreVgvPct, roiPct, eficienciaPct,
     eficienciaMedida, roiMedido,
@@ -902,9 +896,9 @@ export function calcularProforma(e: ProformaInput): Proforma {
     'vgvPermutaResidencial', 'vgvPermutaNaoResidencial', 'vgvPermutaSolicitada',
     'vgvResidencial', 'vgvNaoResidencial', 'vgv',
     'imposto', 'corretagem', 'marketing', 'permutaFinResidencial', 'permutaFinNaoResidencial', 'receitaLiquida',
-    'custoTerreno', 'projetos', 'infraestrutura', 'outorga', 'incorporacaoRegistro', 'construcao', 'gestaoConstrucao',
+    'custoTerreno', 'projetos', 'infraestrutura', 'incorporacaoRegistro', 'construcao', 'gestaoConstrucao',
     'decoracao', 'manutencao', 'contingencias', 'custoDiretoTotal', 'receitaOperacional',
-    'marketingGlobal', 'gestaoIndiretos', 'custoIndiretoTotal', 'resultado', 'valorPermutaFisica',
+    'standVendas', 'gestaoIndiretos', 'custoIndiretoTotal', 'resultado', 'valorPermutaFisica',
     'investimentoTotal', 'custoObras', 'precoMedioUnidade', 'precoMedioUnidadeResidencial', 'precoMedioUnidadeNaoResidencial',
   ];
   for (const campo of monetarios) resultadoProforma[campo] = moeda(resultadoProforma[campo] as number) as never;

@@ -1,13 +1,13 @@
 // Caso de render: o card "Resumo" de Premissas → Produtos (Incorporação),
 // com "Preço médio/unid." de 9 DÍGITOS (#579 — "o VALOR salta para fora do
-// quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1526-1555`)
+// quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1522-1551`)
 // só aparece na sub-aba `secao: 'produtos'`, e a MESMA `.kpis` que ele usa
 // também rege `.kpis.aproveitamento` (#569) e `.kpis.area-alocada` (#573,
 // que corenderiza aqui — `_renderAlocacaoAlv()` mora na mesma sub-aba): os
 // três modificadores só ajustam `margin-top`, a track é uma regra só, e este
 // caso prova a track para os três de uma vez.
 //
-// `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:829-830`)
+// `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:823-824`)
 // e `vgv = área_média_m2 × preço_m2 × unidades` por produto — o `unidades`
 // se CANCELA na divisão, então `precoMedioUnidade = area_media_m2 ×
 // preco_venda_m2`, independente de quantas unidades o catálogo tiver. Por

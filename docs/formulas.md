@@ -91,16 +91,15 @@ manutenção pós-obra e contingências (% do VGV) e, por tipo:
 
 - **Loteamento** — infraestrutura, em uma de três unidades: % do VGV, R$ fixo ou
   `R$/m² × área vendável bruta` (antes da permuta física).
-- **Incorporação** — construção, decoração, gestão da construção, outorga, incorporação e registro.
+- **Incorporação** — construção, decoração, gestão da construção, incorporação e registro.
 
-No Loteamento a gestão da construção não incide, e construção, decoração, outorga e incorporação e
+No Loteamento a gestão da construção não incide, e construção, decoração e incorporação e
 registro saem zerados: o produto de obra ali é a infraestrutura, que é sozinha o **custo de obras**
 (o numerador de **Custo obras / VGV**).
 
 ## Custos indiretos
 
-Marketing global e estrutura (mais o stand de vendas no Loteamento) e gestão e outros custos
-indiretos, em % do VGV.
+Stand de vendas (só no Loteamento, em R$) e gestão e outros custos indiretos (em % do VGV).
 
 ## Resultado
 
@@ -135,8 +134,9 @@ a tela pede que ele seja definido. Ver [Benchmarks](benchmarks).
 
 O Avançado não roda as fórmulas acima. A sua Proforma relê as séries mensais já calculadas pelo
 fluxo de caixa — a contratação por safra, os componentes de pagamento, a carteira e o repasse, os
-custos distribuídos no tempo — e as achata na hierarquia de linhas do Preliminar, para que os dois
-níveis se comparem na mesma coluna.
+custos distribuídos no tempo — e as achata em linhas de Proforma comparáveis às do Preliminar, para
+que os dois níveis se comparem na mesma coluna. As linhas Outorga e Marketing global existem só no
+Avançado, onde são categorias de custo.
 
 As fórmulas do fluxo por safras — contratação bruta, desconto e líquido, os componentes de
 pagamento (imediato, prazo fixo, até marco, concentrado), a parcela, o primeiro vencimento, a

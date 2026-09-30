@@ -10,7 +10,7 @@ import { ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE } from './fixtures/sensibi
 // #735 — cenário composto: as três maiores alavancas estressadas juntas
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Fixture com custo percentual sobre o VGV (projetos, marketing global,
+// Fixture com custo percentual sobre o VGV (projetos,
 // gestão de indiretos): é o que faz os efeitos INTERAGIREM, e o composto
 // diferir da soma dos deltas isolados.
 const ENTRADA: ProformaInput = { ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE, permuta_financeira_residencial_pct: 5 };
@@ -70,7 +70,7 @@ test('#735 critério 4: as escolhidas são as de maior amplitudeRS entre as NÃO
   const semCircular = al.filter((a) => !a.circular).sort((a, b) => b.amplitudeRS - a.amplitudeRS);
   assert.deepEqual(esc.map((a) => a.variavel), semCircular.slice(0, 3).map((a) => a.variavel));
   // Loteamento com infra % do VGV: custo_infra é circular e fica de fora mesmo rankeado alto.
-  const lot: ProformaInput = { tipo_empreendimento: 'loteamento', terreno_manual_area: 100_000, area_viario_publico_modo: 'pct_poligonal', area_viario_publico_valor: 25, produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }], imposto_percentual: 7, corretagem_percentual: 5, marketing_percentual: 1, considerar_custo_terreno: true, custo_terreno_m2: 100, infra_modo: 'pct_vgv', infra_pct: 30, projetos_modo: 'pct_vgv', projetos_pct: 2, manutencao_pct: 1, marketing_global_pct: 1, gestao_indiretos_pct: 1.25 } as ProformaInput;
+  const lot: ProformaInput = { tipo_empreendimento: 'loteamento', terreno_manual_area: 100_000, area_viario_publico_modo: 'pct_poligonal', area_viario_publico_valor: 25, produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }], imposto_percentual: 7, corretagem_percentual: 5, marketing_percentual: 1, considerar_custo_terreno: true, custo_terreno_m2: 100, infra_modo: 'pct_vgv', infra_pct: 30, projetos_modo: 'pct_vgv', projetos_pct: 2, manutencao_pct: 1, gestao_indiretos_pct: 1.25 } as ProformaInput;
   const alLot = rankearAlavancas(lot, 10, true);
   assert.ok(alLot.find((a) => a.variavel === 'custo_infra')!.circular);
   const escLot = escolherAlavancas(alLot);

@@ -192,7 +192,6 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Terreno', v: p.custoTerreno, ocultarSeZero: true },
     { l: '(-) Projetos e aprovação', v: p.projetos, ocultarSeZero: true },
     { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, ocultarSeZero: true },
-    { l: '(-) Outorga', v: p.outorga, soInc: true, ocultarSeZero: true },
     { l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, ocultarSeZero: true },
     { l: '(-) Construção', v: p.construcao, soInc: true, ocultarSeZero: true },
     { l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, ocultarSeZero: true },
@@ -201,7 +200,7 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true },
     { l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' },
     { l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado' },
-    { l: '(-) Marketing global e estrutura', v: p.marketingGlobal, ocultarSeZero: true },
+    { l: '(-) Stand de vendas', v: p.standVendas, soLot: true, ocultarSeZero: true },
     { l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos, ocultarSeZero: true },
     { l: '= Resultado', v: p.resultado, tipo: 'resultado' },
   ];

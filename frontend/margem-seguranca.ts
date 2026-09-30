@@ -5,7 +5,7 @@
 // exigiria um campo `base_calculo` por linha de custo no schema — mas essa
 // decomposição é um jeito de CALCULAR, não o resultado: `calcularProforma` já
 // sabe, no código, qual base cada linha usa. Invertendo o motor numericamente
-// (o precedente é `precoSugeridoM2`, `frontend/proforma.ts:965`) recuperam-se
+// (o precedente é `precoSugeridoM2`, `frontend/proforma.ts:959`) recuperam-se
 // os mesmos números sem campo novo, sem migração — e continua correto se uma
 // linha mudar de base amanhã.
 
