@@ -1,22 +1,20 @@
-// Caso de render: #573 — o ESTADO DE EXCESSO do indicador de área privativa
-// alocada, aba "Produtos" da Incorporação
-// (`frontend/tela-premissas.ts:_renderAreaAlocada`).
+// Caso de render: #573/#784 — o ESTADO DE EXCESSO do indicador de alocação, aba
+// "Produtos" da Incorporação (`frontend/tela-premissas.ts:_renderAlocacaoAlv`).
 //
 // A prova de que o AVISO está na tela (e não só o cálculo, testado em
-// `proforma.test.ts`) só existe aqui: nenhum teste de lógica pura vê o DOM, e
-// apagar `_renderAreaAlocada` do template deixaria a suíte de lógica pura
+// `produtos-alv.test.ts`) só existe aqui: nenhum teste de lógica pura vê o DOM, e
+// apagar `_renderAlocacaoAlv` do template deixaria a suíte de lógica pura
 // inteira verde — mesma classe de defeito que `aproveitamento-coeficiente-
 // excedido.ts` cobre para o indicador irmão (#569).
 
 import '../../tela-premissas.js';
 import { ESTUDO, forcarEstado } from './dados.js';
 
-// ESTUDO base: área PVT residencial fechada 4.960 m² (registrada). O
-// catálogo abaixo aloca 100 × 80 m² = 8.000 m² — 3.040 m² de excedente sobre
-// os 4.960 m² registrados, largo o bastante para o estouro não depender de
-// arredondamento.
+// Um produto com 160% da área privativa fechada registrada em Terreno & Áreas:
+// 60 pontos de excedente, largo o bastante para o estouro não depender de
+// arredondamento. Σ ≠ 100% barra salvar e submeter, então o aviso é `erro`.
 const PRODUTOS_EXCEDENTE = [
-  { id: 1, nome: 'Torre A', ordem: 0, area_media_m2: 80, preco_venda_m2: 11_000, unidades: 100 },
+  { id: 1, nome: 'Torre A', ordem: 0, pct_alv: 160, preco_venda_m2: 11_000, unidades: 100 },
 ];
 
 export const caso = {
@@ -26,12 +24,11 @@ export const caso = {
   // que mudou — passa por TODAS as lentes com "limpo". Reproduzido no PR 506.
   exigir: [
     { seletor: 'table.prod', minimo: 1 },
-    // O indicador (3 `urbi-kpi`: alocada, registrada, diferença) continua
+    // O indicador (3 `urbi-kpi`: alocado, área privativa fechada, restante) continua
     // presente mesmo em excesso — só o aviso é que é condicional.
     { seletor: '.kpis.area-alocada', minimo: 1 },
     { seletor: '.kpis.area-alocada urbi-kpi', minimo: 3 },
-    // A prova do critério 2 da #573: o AVISO na tela, não só
-    // `diferencaAreaAlocada` no motor.
+    // A prova do estado "excesso": o AVISO na tela, não só a soma dos % no helper puro.
     { seletor: 'urbi-banner.aviso-area-alocada', minimo: 1 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
@@ -52,9 +49,9 @@ export const caso = {
     'urbi-botao.pequeno',
     'urbi-botao.icone',
     'urbi-botao.variante',
-    // Os 3 `urbi-kpi` do indicador ligam `variante` (o 3º vira "alerta" em
-    // excesso, #693) — mesma natureza de `aproveitamento-coeficiente-excedido.ts`.
-    // E o `urbi-banner` do aviso liga `variante="alerta"` — mesma natureza.
+    // Os 3 `urbi-kpi` do indicador ligam `variante` (o 3º vira "erro" quando a
+    // soma ≠ 100%, #784) — mesma natureza de `aproveitamento-coeficiente-excedido.ts`.
+    // E o `urbi-banner` do aviso liga `variante="erro"` — mesma natureza.
     'urbi-kpi.variante',
     'urbi-banner.variante',
   ],

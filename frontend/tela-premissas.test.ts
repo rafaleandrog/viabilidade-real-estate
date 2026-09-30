@@ -56,28 +56,24 @@ test('#566: modoEfetivo preserva um modo válido em uso (não força o padrão)'
 // exigir PRESENÇA (`exigir`/`minimo`): ele não conta células nem prova que algo
 // está ausente. É o mesmo recurso que a #566 usou para provar que a Permuta
 // física parou de oferecer "Unidade" — a lista é exportada e conferida direto.
-test('#781: o grid de Produtos do Loteamento cadastra por % da ALV e Unidades; áreas são calculadas', () => {
-  const cols = colunasProduto(true);
-  assert.deepEqual(cols.map((c) => c.chave),
-    ['nome', 'tipo', 'pct', 'unidades', 'areaTotal', 'area', 'preco', 'vgv']);
-  // Área total e área média NÃO têm input: a célula delas é texto calculado.
-  // A prova mora no array porque o harness de render só exige PRESENÇA.
-  assert.ok(cols.some((c) => c.chave === 'tipo'), 'o Loteamento classifica Residencial/Comercial');
-  assert.equal(cols.find((c) => c.chave === 'area')!.rotulo, 'Área média do lote');
+test('#781/#784: o grid de Produtos cadastra por % da base e Unidades; áreas são calculadas — nos dois tipos', () => {
+  const chaves = ['nome', 'tipo', 'pct', 'unidades', 'areaTotal', 'area', 'preco', 'vgv'];
+  const lot = colunasProduto(true);
+  const inc = colunasProduto(false);
+  assert.deepEqual(lot.map((c) => c.chave), chaves);
+  assert.deepEqual(inc.map((c) => c.chave), chaves);
+  // A posição importa: é o que os casos de render medem pelo `colgroup`, e as duas
+  // provas têm que concordar (Tipo logo depois de Nome, % logo depois de Tipo).
+  assert.equal(inc.findIndex((c) => c.chave === 'tipo'), inc.findIndex((c) => c.chave === 'nome') + 1);
+  assert.equal(inc.findIndex((c) => c.chave === 'pct'), inc.findIndex((c) => c.chave === 'tipo') + 1);
 });
 
-test('rev1: na Incorporação a coluna "Tipo" continua entre Nome e Área média', () => {
-  const chaves = colunasProduto(false).map((c) => c.chave);
-  assert.deepEqual(chaves, ['nome', 'tipo', 'area', 'preco', 'unidades', 'vgv']);
-  // A posição importa: é o que o caso de render `catalogo-produtos-tipo` mede
-  // pelo `colgroup`, e as duas provas têm que concordar.
-  assert.equal(chaves.indexOf('tipo'), chaves.indexOf('nome') + 1);
-  assert.equal(chaves.indexOf('area'), chaves.indexOf('tipo') + 1);
-});
-
-test('#781: a Incorporação não ganha coluna de % da ALV nem de área calculada', () => {
-  const inc = colunasProduto(false).map((c) => c.chave);
-  assert.ok(!inc.includes('pct') && !inc.includes('areaTotal'));
+test('#784: os rótulos dizem a base do % de cada tipo', () => {
+  const rot = (lot: boolean, chave: string) => colunasProduto(lot).find((c) => c.chave === chave)!.rotulo;
+  assert.equal(rot(true, 'pct'), '% da ALV');
+  assert.equal(rot(false, 'pct'), '% da área privativa fechada');
+  assert.equal(rot(true, 'area'), 'Área média do lote');
+  assert.equal(rot(false, 'area'), 'Área média');
 });
 
 // #698 — prova de FIAÇÃO: `linhasCascataIncorporacao` é a MESMA função que
@@ -178,9 +174,9 @@ const FONTE_TELA_ALV = readFileSync(new URL('./tela-premissas.ts', import.meta.u
   .split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); })
   .join('\n');
 
-test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 100% ANTES de gravar', () => {
-  const iCatalogo = FONTE_TELA_ALV.indexOf('if (!this._produtosLidos) {\n        this.erroGeral = \'Aguarde o carregamento dos produtos');
-  const iSoma = FONTE_TELA_ALV.indexOf('validarSomaPctAlv(this.produtos, alvDoLoteamento(this._entradaProforma()))');
+test('#781/#784 fiação: _salvar (os dois tipos) espera o catálogo e recusa soma ≠ 100% ANTES de gravar', () => {
+  const iCatalogo = FONTE_TELA_ALV.indexOf('if (!this._produtosLidos) {\n      this.erroGeral = \'Aguarde o carregamento dos produtos');
+  const iSoma = FONTE_TELA_ALV.indexOf('validarSomaPctAlv(this.produtos, baseProdutosM2(this._entradaProforma()), rotuloBase)');
   const iGrava = FONTE_TELA_ALV.indexOf('this.salvando = true;');
   // ...e cada portão RETORNA (sem o `return;` ele só avisa e o salvamento segue).
   assert.match(FONTE_TELA_ALV, /if \(!this\._produtosLidos\) \{[\s\S]{0,300}?return;\s*\}/, 'a espera pelo catálogo perdeu o return');
@@ -188,19 +184,23 @@ test('#781 fiação: _salvar do Loteamento espera o catálogo e recusa soma ≠ 
   assert.ok(iCatalogo > 0, 'a espera pelo catálogo saiu do _salvar');
   assert.ok(iSoma > iCatalogo, 'a soma é conferida depois da espera pelo catálogo');
   assert.ok(iGrava > iSoma, 'ambos os portões precedem a gravação');
+  // Vale para os DOIS tipos: o portão não pode voltar a morar dentro de um ramo do Loteamento.
+  const corpoSalvar = FONTE_TELA_ALV.slice(FONTE_TELA_ALV.indexOf('_salvar = async () => {'), iGrava);
+  assert.ok(!corpoSalvar.includes('_ehLoteamento'), 'o portão da soma do _salvar voltou a ser condicional ao Loteamento');
+  assert.ok(!/tipo_empreendimento\s*[!=]==/.test(corpoSalvar), 'o portão da soma do _salvar voltou a ramificar pelo tipo do estudo');
 });
 
-test('#781 fiação: adicionar produto no Loteamento espera o catálogo ser lido', () => {
-  assert.match(FONTE_TELA_ALV, /_adicionarProduto = async \(\) => \{\s*if \(this\._ehLoteamento && !this\._produtosLidos\) \{[\s\S]{0,200}?return;/,
+test('#781/#784 fiação: adicionar produto espera o catálogo ser lido', () => {
+  assert.match(FONTE_TELA_ALV, /_adicionarProduto = async \(\) => \{\s*if \(!this\._produtosLidos\) \{[\s\S]{0,200}?return;/,
     'o restante do produto novo seria calculado sobre o catálogo placeholder');
 });
 
-test('#781 fiação: a primeira edição de linha legada deriva o % da ALV PERSISTIDA (snapshot)', () => {
-  assert.ok(FONTE_TELA_ALV.includes('alvDoLoteamento({ ...this._snapshot,') && FONTE_TELA_ALV.includes('const alv = this._alvPersistida();') && FONTE_TELA_ALV.includes('alocacaoAlv(this.produtos, this._alvPersistida())'),
+test('#781/#784 fiação: a primeira edição de linha legada deriva o % da base PERSISTIDA (snapshot)', () => {
+  assert.ok(FONTE_TELA_ALV.includes('baseProdutosM2({ ...this._snapshot,') && FONTE_TELA_ALV.includes('const alv = this._basePersistida();') && FONTE_TELA_ALV.includes('alocacaoAlv(this.produtos, this._basePersistida())'),
     'com o formulário, uma premissa de área não salva gravaria um % sobre ALV que o estudo não tem');
 });
 
-test('#781 fiação: a primeira edição de linha legada só grava pct_alv com ALV positiva', () => {
+test('#781/#784 fiação: a primeira edição de linha legada só grava pct_alv com base positiva', () => {
   assert.ok(FONTE_TELA_ALV.includes('if (alv > 0 && efetivo >= 0 && efetivo <= 100) enviar = { ...dados, pct_alv:'),
     'sem esta guarda, ALV ≤ 0 grava pct_alv = 0 e destrói a área legada da linha');
   assert.ok(FONTE_TELA_ALV.includes('pct_alv: e.detail.valor ?? 0'),

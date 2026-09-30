@@ -424,10 +424,13 @@ test('#569: área do terreno zerada com coeficiente preenchido — teto 0, sem N
   assert.equal(p.aproveitamentoExcedido, false); // sem teto positivo, não há "excedente" a acusar
 });
 
-// #573 — indicador de área privativa alocada nos produtos. `registrada` é
-// `areaPrivativa` (a MESMA grandeza que o teto de aproveitamento #569 usa
-// como "usada"); `alocada` é `areaTotalProdutos` do catálogo EFETIVO,
-// Residencial + Não Residencial somados.
+// #573 — indicador de área alocada nos produtos. `registrada` é a BASE dos
+// produtos (`areaVendavel`: a ALV no Loteamento; as áreas privativas FECHADAS
+// na Incorporação — #784). Estas fixtures não têm áreas abertas, então a base
+// coincide com `areaPrivativa` (a grandeza que o teto de aproveitamento #569
+// usa como "usada"); o caso com abertas está em `produtos-alv.test.ts`.
+// `alocada` é `areaTotalProdutos` do catálogo EFETIVO, Residencial + Não
+// Residencial somados.
 test('#573: alocada == registrada → diferença zero, percentual 100%, nenhum estado de excesso/sobra', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',

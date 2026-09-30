@@ -132,7 +132,7 @@ export class ViabTelaGraficos extends LitElement {
     const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
     return html`
       ${this._renderKpisPreliminar(p)}
-      ${this._renderConsistencia(p)}
+      ${this._renderConsistencia(p, lot)}
       <div class="graficos">
         <urbi-card titulo="Cascata do resultado">
           ${this._renderCascata(p)}
@@ -282,10 +282,13 @@ export class ViabTelaGraficos extends LitElement {
   }
 
   // Rodada 12 (handoff §4.5) — faixa de consistência: reexibe (não recalcula)
-  // a mesma trava que `tela-premissas.ts` (`_renderAreaAlocada`) já produz —
-  // continua só informativa, nunca bloqueia salvar (decisão registrada na
-  // #693; o handoff pede bloqueio, mas isso fica fora de escopo desta rodada).
-  private _renderConsistencia(p: Proforma): TemplateResult {
+  // a mesma checagem que `tela-premissas.ts` (`_renderAlocacaoAlv`) produz. Desde
+  // a #781/#784 o catálogo é cadastrado por % da base (ALV no Loteamento, áreas
+  // privativas fechadas na Incorporação) e Σ ≠ 100% BLOQUEIA salvar; a faixa só
+  // aparece para o que escapou do bloqueio (produto legado, premissa de área
+  // ainda não salva) e compara a área do catálogo com a MESMA base do cadastro
+  // (`p.areaVendavel`, ver `baseProdutosM2`).
+  private _renderConsistencia(p: Proforma, lot: boolean): TemplateResult {
     // Achado real da revisão (Codex, P2, PR #707): sem este portão, o
     // instante entre `connectedCallback()` e o catálogo carregar (produtos
     // ainda `[]`) computava `diferencaAreaAlocada` contra 0 m² alocado e
@@ -295,11 +298,12 @@ export class ViabTelaGraficos extends LitElement {
     const excesso = p.diferencaAreaAlocada > 0;
     const sobra = p.diferencaAreaAlocada < 0;
     if (!excesso && !sobra) return html``;
+    const base = lot ? 'ALV' : 'área privativa fechada';
     return html`
       ${excesso ? html`
         <urbi-banner class="aviso-consistencia" variante="alerta">
-          A soma das áreas dos produtos (${fmtM2(p.areaProdutosAlocada)}) é maior que a área
-          registrada em Terreno &amp; Áreas (${fmtM2(p.areaPrivativa)}) — ver Premissas.
+          A soma das áreas dos produtos (${fmtM2(p.areaProdutosAlocada)}) é maior que a ${base}
+          registrada em Terreno &amp; Áreas (${fmtM2(p.areaVendavel)}) — ver Premissas.
         </urbi-banner>` : nothing}
       ${sobra ? html`
         <urbi-banner class="aviso-consistencia" variante="alerta">

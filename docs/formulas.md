@@ -42,7 +42,8 @@ A fonte única do VGV, nos dois tipos, é o catálogo de **Produtos**:
 
 ```text
 VGV bruto da categoria = Σ (área média × preço de venda/m² × unidades) das linhas daquele tipo
-Loteamento: área média da linha = ALV × % da ALV ÷ unidades   (a área não é digitada)
+área média da linha    = base × % ÷ unidades   (a área não é digitada; base = ALV no Loteamento,
+                         áreas privativas fechadas na Incorporação)
 VGV da categoria       = VGV bruto da categoria − permuta física efetiva da categoria
 VGV                    = VGV residencial + VGV não residencial
 ```

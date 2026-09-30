@@ -6,8 +6,8 @@ import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
-import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, alvDoLoteamento, produtosDoEstudo, type ProformaInput, type Proforma } from './proforma.js';
-import { alocacaoAlv, areaMediaDaLinha, areaTotalDaLinha, pctAlvEfetivo, somaPctAlv, validarSomaPctAlv } from './produtos-alv.js';
+import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, baseProdutosM2, produtosDoEstudo, type ProformaInput, type Proforma } from './proforma.js';
+import { alocacaoAlv, areaMediaDaLinha, areaTotalDaLinha, pctAlvEfetivo, rotuloBaseProdutos, somaPctAlv, validarSomaPctAlv } from './produtos-alv.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, trocaBadgePremissas, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -155,35 +155,26 @@ const fmtPctAlv = (v: number): string => `${fmtNum(v, 2)}%`;
  * provar que a Permuta física parou de oferecer "Unidade": a prova mora no
  * array, testável direto.
  *
- * ⚠️ **O Loteamento tem colunas próprias (#781).** Nele o usuário digita o
- * `% da ALV` e as `Unidades` (e o Tipo Residencial/Comercial, que governa nº de
- * unidades e preço médio por tipo); `Área total` e `Área média do lote` são
- * CALCULADAS a partir deles e da ALV — por isso as duas não têm input. Na
- * Incorporação a área média continua sendo entrada.
+ * ⚠️ **Os dois tipos cadastram por % da base (#781 Loteamento, #784
+ * Incorporação).** O usuário digita o `%` (da ALV no Loteamento; das áreas
+ * privativas fechadas na Incorporação), as `Unidades` e o Tipo; `Área total` e
+ * `Área média` são CALCULADAS a partir deles e da base — por isso as duas não
+ * têm input. O `lot` só muda os RÓTULOS (a base do %, e "Área média do lote" no
+ * Loteamento contra "Área média" na Incorporação).
  *
  * O `<colgroup>`, o `<thead>` e a linha de Total saem TODOS desta lista, então
  * a contagem de células nunca desalinha por esquecimento de um dos três.
  */
 export interface ColunaProduto { chave: string; rotulo: string; classe: string; num?: boolean }
 export function colunasProduto(lot: boolean): ColunaProduto[] {
-  if (lot) {
-    return [
-      { chave: 'nome', rotulo: 'Nome', classe: 'p-nome' },
-      { chave: 'tipo', rotulo: 'Tipo', classe: 'p-tipo' },
-      { chave: 'pct', rotulo: '% da ALV', classe: 'p-pct', num: true },
-      { chave: 'unidades', rotulo: 'Unidades', classe: 'p-un', num: true },
-      { chave: 'areaTotal', rotulo: 'Área total', classe: 'p-atotal', num: true },
-      { chave: 'area', rotulo: 'Área média do lote', classe: 'p-amedia', num: true },
-      { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
-      { chave: 'vgv', rotulo: 'VGV', classe: 'p-vgv', num: true },
-    ];
-  }
   return [
     { chave: 'nome', rotulo: 'Nome', classe: 'p-nome' },
     { chave: 'tipo', rotulo: 'Tipo', classe: 'p-tipo' },
-    { chave: 'area', rotulo: 'Área média do lote', classe: 'p-area', num: true },
-    { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
+    { chave: 'pct', rotulo: `% da ${rotuloBaseProdutos(lot ? 'loteamento' : 'incorporacao')}`, classe: 'p-pct', num: true },
     { chave: 'unidades', rotulo: 'Unidades', classe: 'p-un', num: true },
+    { chave: 'areaTotal', rotulo: 'Área total', classe: 'p-atotal', num: true },
+    { chave: 'area', rotulo: lot ? 'Área média do lote' : 'Área média', classe: 'p-amedia', num: true },
+    { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
     { chave: 'vgv', rotulo: 'VGV', classe: 'p-vgv', num: true },
   ];
 }
@@ -539,18 +530,17 @@ export class ViabTelaPremissas extends LitElement {
     }
     table.prod th.num, table.prod td.num { text-align: right; }
     table.prod td { padding: 6px 8px; border-bottom: 1px solid var(--cor-borda-sutil); font-size: var(--texto-corpo, 0.8125rem); }
-    col.p-nome { width: 12%; } col.p-tipo { width: 14%; } col.p-area { width: 20%; } col.p-preco { width: 20%; }
-    col.p-un { width: 12%; } col.p-vgv { width: 16%; } col.p-acao { width: 60px; }
-    /* Loteamento (#781): oito colunas, duas delas calculadas. */
-    table.prod.lot col.p-nome { width: 14%; } table.prod.lot col.p-tipo { width: 12%; }
-    table.prod.lot col.p-pct { width: 11%; } table.prod.lot col.p-un { width: 10%; }
-    table.prod.lot col.p-atotal { width: 13%; } table.prod.lot col.p-amedia { width: 12%; }
-    table.prod.lot col.p-preco { width: 14%; } table.prod.lot col.p-vgv { width: 14%; }
-    /* Oito colunas não cabem em 600px sem espremer os inputs: a tabela do
-       Loteamento tem largura mínima e a rolagem horizontal fica no contêiner,
+    /* Oito colunas (#781, #784), duas delas calculadas. */
+    table.prod col.p-nome { width: 14%; } table.prod col.p-tipo { width: 12%; }
+    table.prod col.p-pct { width: 11%; } table.prod col.p-un { width: 10%; }
+    table.prod col.p-atotal { width: 13%; } table.prod col.p-amedia { width: 12%; }
+    table.prod col.p-preco { width: 14%; } table.prod col.p-vgv { width: 14%; }
+    col.p-acao { width: 60px; }
+    /* Oito colunas não cabem em 600px sem espremer os inputs: a tabela
+       tem largura mínima e a rolagem horizontal fica no contêiner,
        nunca no documento. */
     .prod-rolagem { overflow-x: auto; }
-    table.prod.lot { min-width: 980px; }
+    table.prod { min-width: 980px; }
     table.prod td.calc { color: var(--cor-texto-sec); }
     table.prod td.nome urbi-input { width: 100%; }
     table.prod td.tipo urbi-select { width: 100%; }
@@ -881,7 +871,7 @@ export class ViabTelaPremissas extends LitElement {
             <h4>Produtos</h4>
             ${this._renderTabelaProdutos(dis, lot)}
           </div>
-          ${this._renderAreaAlocada()}
+          ${this._renderAlocacaoAlv()}
 
           ${this._renderRodapeForm()}
         </urbi-card>
@@ -991,9 +981,9 @@ export class ViabTelaPremissas extends LitElement {
 
   // ── Catálogo de Produtos (#315) — tabela add/remove, CRUD à parte do form ──
 
-  // `lot` é OBRIGATÓRIO (sem default): é ele que decide quais colunas existem
-  // (no Loteamento, % da ALV + Unidades são entrada e as áreas são calculadas —
-  // #781), e um default silencioso reintroduziria a área digitada no Loteamento
+  // `lot` é OBRIGATÓRIO (sem default): é ele que decide os RÓTULOS das colunas
+  // (a base do % — ALV ou áreas privativas fechadas — e "Comercial" no Tipo;
+  // #781, #784), e um default silencioso mostraria a base errada num dos tipos
   // sem nada ficar vermelho. Apagar o argumento na chamada vira `TS2554`.
   private _renderTabelaProdutos(dis: boolean, lot: boolean): TemplateResult {
     if (this.produtos.length === 0) {
@@ -1010,31 +1000,30 @@ export class ViabTelaPremissas extends LitElement {
           </div>` : nothing}
       `;
     }
-    // ALV e catálogo já com a área DERIVADA (Loteamento) — `produtosDoEstudo` é
-    // o mesmo caminho do motor, então a tela nunca mostra um número que a
-    // Proforma não usa.
-    const alv = lot ? alvDoLoteamento(this._entradaProforma()) : 0;
+    // Base (ALV / áreas privativas fechadas) e catálogo já com a área DERIVADA —
+    // `produtosDoEstudo` é o mesmo caminho do motor, então a tela nunca mostra um
+    // número que a Proforma não usa.
+    const alv = baseProdutosM2(this._entradaProforma());
     const efetivos = produtosDoEstudo(this._entradaProforma());
     const { vgv, unidades } = totalProdutos(efetivos);
     // Uma lista só governa colgroup, cabeçalho, corpo e total — ver `colunasProduto`.
     const colunas = colunasProduto(lot);
-    const somaPct = lot ? somaPctAlv(this.produtos, alv) : 0;
-    const areaTotal = lot ? this.produtos.reduce((t, x) => t + areaTotalDaLinha(x, alv), 0) : 0;
+    const somaPct = somaPctAlv(this.produtos, alv);
+    const areaTotal = this.produtos.reduce((t, x) => t + areaTotalDaLinha(x, alv), 0);
     const totalPorColuna = (chave: string): TemplateResult => {
       switch (chave) {
         case 'nome': return html`<td>Total</td>`;
         case 'pct': return html`<td class="num">${fmtPctAlv(somaPct)}</td>`;
         case 'unidades': return html`<td class="num">${fmtNum(unidades, 0)}</td>`;
         case 'areaTotal': return html`<td class="num">${fmtM2(areaTotal)}</td>`;
-        // Só o Loteamento tem área média calculada; na Incorporação a célula do total segue vazia.
-        case 'area': return lot ? html`<td class="num">${unidades > 0 ? fmtM2(areaTotal / unidades) : '—'}</td>` : html`<td></td>`;
+        case 'area': return html`<td class="num">${unidades > 0 ? fmtM2(areaTotal / unidades) : '—'}</td>`;
         case 'vgv': return html`<td class="num">${fmtR$(vgv)}</td>`;
         default: return html`<td></td>`;
       }
     };
     return html`
       <div class="prod-rolagem">
-      <table class="prod ${lot ? 'lot' : ''}">
+      <table class="prod">
         <colgroup>
           ${colunas.map((c) => html`<col class=${c.classe}>`)}
           ${dis ? nothing : html`<col class="p-acao">`}
@@ -1046,7 +1035,7 @@ export class ViabTelaPremissas extends LitElement {
           </tr>
         </thead>
         <tbody>
-          ${this.produtos.map((p) => this._linhaProduto(p, dis, colunas, alv))}
+          ${this.produtos.map((p) => this._linhaProduto(p, dis, colunas, alv, lot))}
           <tr class="total">
             ${colunas.map((c) => totalPorColuna(c.chave))}
             ${dis ? nothing : html`<td></td>`}
@@ -1066,11 +1055,11 @@ export class ViabTelaPremissas extends LitElement {
   // `colunas` é OBRIGATÓRIO (sem default) de propósito: é a MESMA lista que já
   // desenhou o cabeçalho e a linha de Total, e cada célula sai dela — sem o
   // parâmetro, corpo e cabeçalho poderiam divergir em silêncio, a classe de
-  // defeito que a auditoria da Rodada 9 cobrou. `alv` só importa no Loteamento
-  // (0 na Incorporação, onde nenhuma coluna a lê).
-  private _linhaProduto(p: any, dis: boolean, colunas: ColunaProduto[], alv: number): TemplateResult {
-    const lot = colunas.some((c) => c.chave === 'pct');
-    const areaMedia = lot ? areaMediaDaLinha(p, alv) : Number(p.area_media_m2) || 0;
+  // defeito que a auditoria da Rodada 9 cobrou. `alv` é a base do % (ALV ou áreas
+  // privativas fechadas) e `lot` só decide o rótulo "Comercial" do Tipo — ambos
+  // obrigatórios: sem a base a área derivada cairia em 0 sem erro nenhum.
+  private _linhaProduto(p: any, dis: boolean, colunas: ColunaProduto[], alv: number, lot: boolean): TemplateResult {
+    const areaMedia = areaMediaDaLinha(p, alv);
     const vgvLinha = vgvProduto({ ...p, area_media_m2: areaMedia });
     const numOuNulo = (v: any) => (v !== null && v !== undefined ? Number(v) : null);
     const celula = (chave: string): TemplateResult => {
@@ -1100,15 +1089,7 @@ export class ViabTelaPremissas extends LitElement {
             ></viab-num>
           </td>`;
         case 'areaTotal': return html`<td class="num calc">${fmtM2(areaTotalDaLinha(p, alv))}</td>`;
-        case 'area': return lot
-          ? html`<td class="num calc">${p.unidades > 0 ? fmtM2(areaMedia) : '—'}</td>`
-          : html`
-          <td class="num">
-            <viab-num sufixo="m²" ?desabilitado=${dis}
-              .valor=${numOuNulo(p.area_media_m2)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { area_media_m2: e.detail.valor })}
-            ></viab-num>
-          </td>`;
+        case 'area': return html`<td class="num calc">${p.unidades > 0 ? fmtM2(areaMedia) : '—'}</td>`;
         case 'preco': return html`
           <td class="num">
             <viab-num sufixo="R$/m²" ?desabilitado=${dis}
@@ -1143,27 +1124,27 @@ export class ViabTelaPremissas extends LitElement {
     return this.estudo?.tipo_empreendimento === 'loteamento';
   }
 
-  /** A ALV do estudo como está SALVO (`_snapshot`), não a do formulário em edição. */
-  private _alvPersistida(): number {
-    return alvDoLoteamento({ ...this._snapshot, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
+  /** A base do % (ALV ou áreas privativas fechadas) como está SALVA (`_snapshot`), não a do formulário em edição. */
+  private _basePersistida(): number {
+    return baseProdutosM2({ ...this._snapshot, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
   }
 
   private _adicionarProduto = async () => {
-    // No Loteamento o produto novo nasce com o restante do catálogo: enquanto ele
-    // não foi LIDO, `produtos` é o placeholder `[]` e o restante sairia 100%.
-    if (this._ehLoteamento && !this._produtosLidos) {
+    // O produto novo nasce com o restante do catálogo: enquanto ele não foi LIDO,
+    // `produtos` é o placeholder `[]` e o restante sairia 100%.
+    if (!this._produtosLidos) {
       urbiVerso.notificar('Aguarde o carregamento dos produtos para adicionar.', 'alerta');
       return;
     }
     try {
-      const dados: Record<string, any> = { ordem: this.produtos.length };
-      if (this._ehLoteamento) {
-        // #781: o produto novo já nasce com o que falta para fechar 100% da ALV.
-        // Sobre a ALV PERSISTIDA: o produto é gravado na hora, e uma premissa de área
-        // ainda não salva não pode decidir quanto do catálogo já está alocado.
-        const restante = alocacaoAlv(this.produtos, this._alvPersistida()).restante;
-        dados.pct_alv = Math.max(0, Math.round(restante * 10000) / 10000);
-      }
+      // #781/#784: o produto novo já nasce com o que falta para fechar 100% da base.
+      // Sobre a base PERSISTIDA: o produto é gravado na hora, e uma premissa de área
+      // ainda não salva não pode decidir quanto do catálogo já está alocado.
+      const restante = alocacaoAlv(this.produtos, this._basePersistida()).restante;
+      const dados: Record<string, any> = {
+        ordem: this.produtos.length,
+        pct_alv: Math.max(0, Math.round(restante * 10000) / 10000),
+      };
       const res = await criarProdutoPreliminar(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar produto', 'erro'); return; }
       this.produtos = [...this.produtos, res];
@@ -1174,22 +1155,22 @@ export class ViabTelaPremissas extends LitElement {
 
   private async _salvarProduto(p: any, dados: Record<string, any>) {
     try {
-      // #781: produto LEGADO do Loteamento (sem `pct_alv`) tem o percentual
+      // #781/#784: produto LEGADO (sem `pct_alv`) tem o percentual
       // derivado da área antiga. Editar QUALQUER outro campo sem gravá-lo
       // deixaria o % derivado se mover junto (ex.: mais unidades → % maior, e a
       // área média fixa). Grava o efetivo agora, na primeira edição da linha.
       let enviar = dados;
       //
-      // Só com ALV positiva: sem ela o percentual "não é expressível" e o
+      // Só com base positiva: sem ela o percentual "não é expressível" e o
       // `pctAlvEfetivo` devolve 0 — gravar esse 0 destruiria a área legada da
       // linha para sempre (a linha deixa de ser legada e passa a valer 0% da
       // ALV, mesmo depois de a cascata ser preenchida).
-      if (this._ehLoteamento && dados.pct_alv === undefined
+      if (dados.pct_alv === undefined
         && (p.pct_alv === null || p.pct_alv === undefined || p.pct_alv === '')) {
-        // A ALV PERSISTIDA (`_snapshot`), não a do formulário: o percentual é gravado
+        // A base PERSISTIDA (`_snapshot`), não a do formulário: o percentual é gravado
         // na hora, e uma premissa de área ainda não salva (ou barrada) deixaria o
-        // produto com um % calculado sobre uma ALV que o estudo não tem.
-        const alv = this._alvPersistida();
+        // produto com um % calculado sobre uma base que o estudo não tem.
+        const alv = this._basePersistida();
         // Também só entre 0 e 100%: uma linha antiga fora disso (maior que a ALV, ou
         // com área/unidades negativas) não é expressível (a API recusa fora da faixa) e a edição de outro campo não pode morrer por isso.
         const efetivo = pctAlvEfetivo(p, alv);
@@ -1229,110 +1210,46 @@ export class ViabTelaPremissas extends LitElement {
   };
 
   /**
-   * §Indicador de área privativa alocada (#573, aba Produtos).
+   * §Indicador de alocação da base dos produtos (aba Produtos) — #781 no
+   * Loteamento (base = ALV), #784 na Incorporação (base = áreas privativas
+   * FECHADAS, residencial + não residencial).
    *
-   * Compara o que o catálogo aloca (Residencial + Não Residencial somados —
-   * `p.areaProdutosAlocada`, calculado em `proforma.ts:calcularProforma`)
-   * contra a área privativa de venda REGISTRADA em Terreno & Áreas
-   * (`p.areaPrivativa` — a mesma grandeza que `_renderAproveitamentoCoeficiente`
-   * usa como "usada"). Vale para os dois tipos de empreendimento: no
-   * Loteamento `areaPrivativa` é a ALV da cascata, e o catálogo — bucket único
-   * residencial ali (comentário em `porTipo`, `proforma.ts`) — entra na mesma
-   * soma sem precisar de ramo `lot` aqui, porque a soma é agnóstica a quantas
-   * categorias existem.
+   * Substitui o indicador de área da #573/#693: a área do catálogo é DERIVADA da
+   * base, então comparar área com área é sempre 0 por construção. O que pode
+   * divergir é a soma dos percentuais — e ela precisa ser 100%.
    *
-   * Sem NADA registrado e NADA alocado (estudo recém-criado, catálogo vazio,
-   * Terreno & Áreas ainda em branco) o indicador não desenha nada — mesmo
-   * espírito null-safe da #569, mas aqui a condição é "nada para comparar",
-   * não "razão sem denominador": a subtração continua definida com os dois
-   * lados em zero, só que mostrá-la seria ruído num estudo que ainda não
-   * começou. Qualquer outro caso — inclusive só um dos dois lados preenchido —
-   * desenha os 3 KPIs, porque já há algo concreto para comparar.
-   *
-   * `variante` ecoa o sinal de `p.diferencaAreaAlocada`: em branco quando
-   * tudo alocado (`=== 0`) e "alerta" nos dois estados não neutros — sobra
-   * por alocar (`< 0`, falta produto para a área toda) ou catálogo excede a
-   * área registrada (`> 0`) — os três estados do critério 2 da #573. Os dois
-   * estados não neutros são só informativos — nunca houve bloqueio de
-   * salvamento aqui (`_salvar` só lê `validarObrigatorios`), mas o estilo
-   * "erro"/vermelho lia como se houvesse (#693). O catálogo de Produtos é
-   * quem manda na área/preço de venda do VGV; a área registrada em Terreno &
-   * Áreas CONTINUA sendo a base dos custos por m² (`construcaoLegada`,
-   * `decoracao`, `infraestruturaLegada` em `proforma.ts`) — o banner de
-   * excesso não estende essa leitura de "só referência" para custo, achado
-   * do Codex no PR #695. O aviso abaixo só aparece nos dois estados não
-   * neutros, com o texto que diz qual lado está maior.
-   */
-  private _renderAreaAlocada(): TemplateResult {
-    // #781: no Loteamento o indicador é o da ALV (Σ % = 100%), não o de área.
-    if (this._ehLoteamento) return this._renderAlocacaoAlv();
-    const p = calcularProforma(this._entradaProforma());
-    if (p.areaPrivativa <= 0 && p.areaProdutosAlocada <= 0) return html``;
-    const excesso = p.diferencaAreaAlocada > 0;
-    const sobra = p.diferencaAreaAlocada < 0;
-    const variante = excesso || sobra ? 'alerta' : '';
-    return html`
-      <div class="kpis area-alocada">
-        <urbi-kpi rotulo="Área alocada nos produtos" .valor=${p.pctAreaAlocada === null
-          ? fmtM2(p.areaProdutosAlocada)
-          : `${fmtM2(p.areaProdutosAlocada)} (${fmtPct(p.pctAreaAlocada)})`}></urbi-kpi>
-        <urbi-kpi rotulo="Área registrada em Terreno & Áreas" .valor=${fmtM2(p.areaPrivativa)}></urbi-kpi>
-        <urbi-kpi rotulo="Diferença" .valor=${fmtM2(p.diferencaAreaAlocada)} variante=${variante}></urbi-kpi>
-      </div>
-      ${excesso ? html`
-        <urbi-banner class="aviso-area-alocada" variante="alerta">
-          A soma dos produtos (${fmtM2(p.areaProdutosAlocada)}) é maior que a área registrada em
-          Terreno & Áreas (${fmtM2(p.areaPrivativa)}). A área e o preço de venda usados no VGV vêm
-          do catálogo de Produtos; a área registrada em Terreno & Áreas continua sendo a base dos
-          custos por m² (construção, decoração, infraestrutura).
-        </urbi-banner>` : nothing}
-      ${sobra ? html`
-        <urbi-banner class="aviso-area-alocada" variante="alerta">
-          Ainda faltam ${fmtM2(Math.abs(p.diferencaAreaAlocada))} para alocar — a área registrada em
-          Terreno & Áreas (${fmtM2(p.areaPrivativa)}) é maior que a soma dos produtos
-          (${fmtM2(p.areaProdutosAlocada)}).
-        </urbi-banner>` : nothing}
-    `;
-  }
-
-  /**
-   * §Indicador de alocação da ALV (#781, aba Produtos do Loteamento).
-   *
-   * Substitui o indicador de área (#573) no Loteamento: a área do catálogo é
-   * DERIVADA da ALV, então comparar área com área é sempre 0 por construção. O
-   * que pode divergir é a soma dos percentuais — e ela precisa ser 100%.
-   *
-   * ⚠️ Diferente do indicador da Incorporação (#693, só informativo), aqui a
-   * divergência BLOQUEIA: `_salvar` recusa e `POST /estudos/:id/status` recusa a
-   * submissão. Por isso a variante é `erro`, e o texto diz o que trava. Catálogo
-   * vazio não bloqueia (estado de quem ainda não chegou aqui), então o aviso só
-   * aparece com pelo menos um produto.
+   * ⚠️ A divergência BLOQUEIA (não é mais só informativa, como era na Incorporação
+   * pela #693): `_salvar` recusa e `POST /estudos/:id/status` recusa a submissão.
+   * Por isso a variante é `erro`, e o texto diz o que trava. Catálogo vazio não
+   * bloqueia (estado de quem ainda não chegou aqui), então o aviso só aparece com
+   * pelo menos um produto.
    */
   private _renderAlocacaoAlv(): TemplateResult {
-    const alv = alvDoLoteamento(this._entradaProforma());
+    const alv = baseProdutosM2(this._entradaProforma());
     if (alv <= 0 && this.produtos.length === 0) return html``;
     const a = alocacaoAlv(this.produtos, alv);
+    const rotulo = rotuloBaseProdutos(this.estudo?.tipo_empreendimento);
     // O estado de erro e os avisos de bloqueio espelham `validarSomaPctAlv`: só
-    // valem com produto cadastrado E ALV positiva. Sem ALV a regra não se aplica,
+    // valem com produto cadastrado E base positiva. Sem base a regra não se aplica,
     // e anunciar um bloqueio que não existe é o inverso do defeito de falhar aberto.
     const aplica = this.produtos.length > 0 && alv > 0;
     const variante = aplica && a.estado !== 'completa' ? 'erro' : '';
     const m2 = (pct: number) => fmtM2(alv * pct / 100);
     return html`
       <div class="kpis area-alocada">
-        <urbi-kpi rotulo="Alocado da ALV" .valor=${`${fmtPctAlv(a.soma)} (${m2(a.soma)})`}></urbi-kpi>
-        <urbi-kpi rotulo="Área Líquida de Venda (ALV)" .valor=${fmtM2(alv)}></urbi-kpi>
+        <urbi-kpi rotulo=${`Alocado da ${rotulo}`} .valor=${`${fmtPctAlv(a.soma)} (${m2(a.soma)})`}></urbi-kpi>
+        <urbi-kpi rotulo=${this._ehLoteamento ? 'Área Líquida de Venda (ALV)' : 'Área privativa fechada'} .valor=${fmtM2(alv)}></urbi-kpi>
         <urbi-kpi rotulo="Restante" .valor=${`${fmtPctAlv(a.restante)} (${m2(a.restante)})`} variante=${variante}></urbi-kpi>
       </div>
       ${aplica && a.estado === 'falta' ? html`
         <urbi-banner class="aviso-area-alocada" variante="erro">
-          Faltam ${fmtPctAlv(a.restante)} da ALV (${m2(a.restante)}) para alocar. Os produtos precisam
-          somar 100% da ALV para salvar as premissas e submeter o estudo.
+          Faltam ${fmtPctAlv(a.restante)} da ${rotulo} (${m2(a.restante)}) para alocar. Os produtos precisam
+          somar 100% da ${rotulo} para salvar as premissas e submeter o estudo.
         </urbi-banner>` : nothing}
       ${aplica && a.estado === 'excesso' ? html`
         <urbi-banner class="aviso-area-alocada" variante="erro">
-          Os produtos somam ${fmtPctAlv(a.soma)} da ALV — ${fmtPctAlv(Math.abs(a.restante))}
-          (${m2(Math.abs(a.restante))}) acima do disponível. Os produtos precisam somar 100% da ALV
+          Os produtos somam ${fmtPctAlv(a.soma)} da ${rotulo} — ${fmtPctAlv(Math.abs(a.restante))}
+          (${m2(Math.abs(a.restante))}) acima do disponível. Os produtos precisam somar 100% da ${rotulo}
           para salvar as premissas e submeter o estudo.
         </urbi-banner>` : nothing}
     `;
@@ -1668,24 +1585,25 @@ export class ViabTelaPremissas extends LitElement {
       urbiVerso.notificar('Há campos obrigatórios não preenchidos.', 'erro');
       return;
     }
-    // #781: Loteamento só salva com os produtos somando 100% da ALV. O portão
-    // fica DEPOIS dos obrigatórios (o erro de campo tem prioridade) e vale em
-    // qualquer sub-aba — o botão é o mesmo em todas.
-    if (this._ehLoteamento) {
-      // Catálogo ainda a caminho (ou a carga falhou): `produtos` é `[]`, e o
-      // catálogo vazio é VÁLIDO para a soma — salvar agora deixaria passar uma
-      // premissa que muda a ALV sem conferir os percentuais que já existem.
-      if (!this._produtosLidos) {
-        this.erroGeral = 'Aguarde o carregamento dos produtos para salvar as premissas.';
-        urbiVerso.notificar(this.erroGeral, 'erro');
-        return;
-      }
-      const soma = validarSomaPctAlv(this.produtos, alvDoLoteamento(this._entradaProforma()));
-      if (!soma.ok) {
-        this.erroGeral = `${soma.mensagem} Ajuste na sub-aba Produtos.`;
-        urbiVerso.notificar(soma.mensagem ?? 'Os produtos devem somar 100% da ALV.', 'erro');
-        return;
-      }
+    // #781/#784: o Preliminar só salva com os produtos somando 100% da base (ALV no
+    // Loteamento, áreas privativas fechadas na Incorporação). O portão fica DEPOIS
+    // dos obrigatórios (o erro de campo tem prioridade) e vale em qualquer
+    // sub-aba — o botão é o mesmo em todas.
+    //
+    // Catálogo ainda a caminho (ou a carga falhou): `produtos` é `[]`, e o
+    // catálogo vazio é VÁLIDO para a soma — salvar agora deixaria passar uma
+    // premissa que muda a base sem conferir os percentuais que já existem.
+    if (!this._produtosLidos) {
+      this.erroGeral = 'Aguarde o carregamento dos produtos para salvar as premissas.';
+      urbiVerso.notificar(this.erroGeral, 'erro');
+      return;
+    }
+    const rotuloBase = rotuloBaseProdutos(this.estudo.tipo_empreendimento);
+    const soma = validarSomaPctAlv(this.produtos, baseProdutosM2(this._entradaProforma()), rotuloBase);
+    if (!soma.ok) {
+      this.erroGeral = `${soma.mensagem} Ajuste na sub-aba Produtos.`;
+      urbiVerso.notificar(soma.mensagem ?? `Os produtos devem somar 100% da ${rotuloBase}.`, 'erro');
+      return;
     }
     this.erroGeral = '';
     this.salvando = true;
