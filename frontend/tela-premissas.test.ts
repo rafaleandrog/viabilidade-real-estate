@@ -187,6 +187,7 @@ test('#781/#784 fiação: _salvar (os dois tipos) espera o catálogo e recusa so
   // Vale para os DOIS tipos: o portão não pode voltar a morar dentro de um ramo do Loteamento.
   const corpoSalvar = FONTE_TELA_ALV.slice(FONTE_TELA_ALV.indexOf('_salvar = async () => {'), iGrava);
   assert.ok(!corpoSalvar.includes('_ehLoteamento'), 'o portão da soma do _salvar voltou a ser condicional ao Loteamento');
+  assert.ok(!/tipo_empreendimento\s*[!=]==/.test(corpoSalvar), 'o portão da soma do _salvar voltou a ramificar pelo tipo do estudo');
 });
 
 test('#781/#784 fiação: adicionar produto espera o catálogo ser lido', () => {

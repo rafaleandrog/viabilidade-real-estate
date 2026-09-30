@@ -303,3 +303,13 @@ test('#784: trocar Incorporação → Loteamento leva a área derivada da base d
   ]);
   assert.notDeepEqual(areasParaTrocarDeTipo(produtos, ALV), areasParaTrocarDeTipo(produtos, BASE_INC));
 });
+
+test('#784 revisão: o Avançado não deriva por pct_alv — a área guardada segue valendo', () => {
+  const base = { tipo_empreendimento: 'incorporacao', area_pvt_r_fechada: 6000, area_pvt_nr_fechada: 2000,
+    produtos: [{ pct_alv: 50, unidades: 10, area_media_m2: 123 }] } as ProformaInput;
+  assert.equal(Number(produtosDoEstudo({ ...base, nivel_analise: 'avancado' })[0].area_media_m2), 123);
+  // Preliminar, e estudo antigo sem nível (lê como Preliminar), derivam: 50% × 8.000 ÷ 10 = 400.
+  for (const nivel of ['preliminar', null, undefined]) {
+    assert.ok(perto(Number(produtosDoEstudo({ ...base, nivel_analise: nivel })[0].area_media_m2), 400));
+  }
+});

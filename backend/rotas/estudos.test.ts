@@ -1031,7 +1031,7 @@ test('#781/#784 fiação: PATCH que troca o tipo do rascunho leva a área deriva
 test('#781/#784 fiação: POST /estudos/:id/status recusa em_analise (Loteamento e Incorporação) com soma ≠ 100% da base', () => {
   for (const parte of [
     "novoStatus === 'em_analise'",
-    "estudo.nivel_analise === 'preliminar'", // o Avançado não tem tela para corrigir o catálogo obsoleto
+    "estudo.nivel_analise !== 'avancado'", // o Avançado não tem tela para corrigir o catálogo obsoleto; linha antiga sem nível segue barrada
     "(estudo.tipo_empreendimento === 'loteamento' || estudo.tipo_empreendimento === 'incorporacao')",
     "varrerTudo('preliminar_produtos'",
     'validarSomaPctAlv(produtos, baseProdutosM2(',

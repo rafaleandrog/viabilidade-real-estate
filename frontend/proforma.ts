@@ -16,6 +16,8 @@ import { produtosComAreaDerivada } from './produtos-alv.js';
 
 export interface ProformaInput {
   tipo_empreendimento: string;
+  // Só `produtosDoEstudo` lê: o Avançado lê `area_media_m2` como entrada e não deriva por `pct_alv`.
+  nivel_analise?: string | null;
   // terreno
   origem_terreno?: string;                          // 'nucleo' | 'manual'
   terreno_manual_area?: number | string | null;     // usado quando origem = manual
@@ -490,14 +492,20 @@ export function baseProdutosM2(e: ProformaInput): number {
 }
 
 /**
- * O catálogo do estudo como o cálculo o enxerga (#781, #784): nos dois tipos,
- * com a área média DERIVADA de `pct_alv` × base ÷ unidades (produto legado,
+ * O catálogo do estudo como o cálculo o enxerga (#781, #784): nos dois tipos
+ * de Preliminar, com a área média DERIVADA de `pct_alv` × base ÷ unidades (produto legado,
  * sem `pct_alv`, segue com a área que já tinha). Consumidores que listam
  * produtos fora de `calcularProforma` (linhas da Proforma, Apelo Comercial,
  * tabela de Produtos) leem por aqui — ler `area_media_m2` cru é ler o campo
  * legado.
  */
 export function produtosDoEstudo(e: ProformaInput): ProdutoPreliminar[] {
+  // O Avançado não cadastra por % (não tem tela para isso) e lê `area_media_m2`
+  // como entrada: linha com `pct_alv` numa Avançado só chega pela API ou por
+  // duplicação, e derivá-la da área do Preliminar (estática, talvez zerada)
+  // trocaria a área guardada por outra. `!== 'avancado'`, a convenção do
+  // repositório: estudo antigo sem `nivel_analise` lê como Preliminar.
+  if (e.nivel_analise === 'avancado') return e.produtos ?? [];
   return produtosComAreaDerivada(e.produtos, baseProdutosM2(e));
 }
 
