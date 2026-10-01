@@ -29,8 +29,9 @@ estrita (`"12.5"`) passa a ser aceita e gravada como número — antes o shell a
 Em `PATCH` de tipologia, a coerção roda depois do `400 QUANTIDADE_INVALIDA` (contrato anterior para
 o que nem é número) e antes do portão de saldo.
 
-- Fases e alocações não mudam: usam `Number(x) || 0`, que nunca produz `NaN` e portanto nunca chega
-  ao shell com valor recusável.
+- Fases e alocações não mudam: usam `Number(x) || 0`, que descarta `NaN` (o caso do relato). Não
+  medi o que o shell faz com `Infinity` (`Number('1e999')`), que atravessa o `||`; fica fora deste
+  PR.
 - Teste: `backend/rotas/avancado-coercao-rota.test.ts` (Express real, `DadosFake` que reproduz a
   regra `typeof === 'number'` do shell). Prova de fiação medida: neutralizar, uma a uma, cada uma das
   7 chamadas de `coagirOuRecusar` e a coerção do `PATCH` de tipologia deixa a suíte vermelha (8 de 8).

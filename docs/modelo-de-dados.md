@@ -125,11 +125,13 @@ representações derivadas, com precisão plena internamente e arredondamento s�
 persistidas arredondadas. As três exceções de exibição estão em
 [Fórmulas da Proforma](formulas), na seção Estado de conformidade.
 
-**Entrada pela API** — toda escrita em coluna numérica, nos estudos e nas rotas do Avançado
-(tipologias, linhas de custo, operações de funding e cenários), aceita número ou string decimal
-estrita (`"12.5"`) e grava sempre um número. Recusa com `400 CAMPO_INVALIDO`, nomeando o campo,
-o que não for decimal estrito — `"abc"`, `"12,5"`, `"1e3"`, `"0x10"`, `""` — e, em coluna inteira,
-o valor fracionário. `null` continua valendo para limpar uma coluna opcional.
+**Entrada pela API** — a escrita de colunas numéricas em `/estudos` e nas rotas do Avançado de
+tipologias, linhas de custo, operações de funding e cenários aceita número ou string decimal
+estrita (`"12.5"`) e grava sempre um número. Recusa com `400 CAMPO_INVALIDO`, nomeando o campo, o
+que não for decimal estrito — `"abc"`, `"12,5"`, `"1e3"`, `"0x10"`, `""` — e, em coluna inteira, o
+valor fracionário. `null` limpa uma coluna opcional, exceto a `quantidade` de uma tipologia, que
+responde `400 QUANTIDADE_INVALIDA`. Fases, alocações, cronograma e curvas têm validação própria e
+não usam essa coerção.
 
 ## Identificador legível
 

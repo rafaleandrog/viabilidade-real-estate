@@ -4,6 +4,7 @@ import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { rotasAvancado } from './avancado.js';
 import { rotasFunding } from './funding.js';
+import esquema from '../../schema.json';
 
 // Coerção numérica na fronteira de escrita das rotas `/avancado/*` — prova de
 // FIAÇÃO de ponta a ponta. O shell recusa string em coluna numérica, e sem a
@@ -13,12 +14,17 @@ import { rotasFunding } from './funding.js';
 // shell (`typeof valor !== 'number'` → lança), para que a ausência da chamada
 // apareça como 500 e não passe calada.
 
-const COLUNAS_NUMERICAS: Record<string, string[]> = {
-  avancado_tipologias: ['area_privativa_m2', 'area_privativa_aberta_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'],
-  avancado_linhas_custo: ['orcamento_valor', 'orcamento_valor_canonico', 'inicio_mes', 'duracao_meses', 'ordem', 'permuta_quantidade'],
-  avancado_funding_operacoes: ['valor', 'taxa_anual', 'inicio_mes', 'ordem'],
-  avancado_cenarios: ['preco_venda_pct', 'custo_obra_pct', 'ordem'],
-};
+// Derivado do `schema.json` (a regra do shell é por tipo de coluna), e não de uma lista à mão:
+// coluna numérica nova passa a ser vigiada pelo fake sem que alguém lembre de listá-la.
+const TABELAS_FAKE = ['avancado_tipologias', 'avancado_linhas_custo', 'avancado_funding_operacoes', 'avancado_cenarios'];
+const COLUNAS_NUMERICAS: Record<string, string[]> = Object.fromEntries(
+  TABELAS_FAKE.map((t) => [
+    t,
+    Object.entries((esquema as any).tabelas[t].colunas as Record<string, { tipo: string }>)
+      .filter(([, c]) => ['decimal', 'inteiro', 'referencia'].includes(c.tipo))
+      .map(([nome]) => nome),
+  ]),
+);
 
 class DadosFake {
   private tabelas = new Map<string, Map<number, any>>();
