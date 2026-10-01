@@ -50,6 +50,11 @@ aba default, tabelas obsoletas), o teste `api-caminho-relativo` transpilado com 
 validação completa (typecheck, suíte, build, render) é a do CI do PR. O pin do SDK continua em
 `57.0.0`: subir exige regenerar o `pnpm-lock.yaml`, que precisa do registry.
 
+O `validation.yml` passou a rodar o mesmo `urbi-empacotar` do `release.yml`, para que o
+empacotador do SDK fixado leia o manifesto (`sdk_min` e `dependencias`) no PR, e não pela primeira
+vez na release. O `INSTRUCOES-CODE.md` ganhou nota de superação nos três trechos que ainda
+prescreviam o contrato do núcleo.
+
 ## 2026-09-30 — Preliminar: saem "Marketing global / estrutura" e "Valor venal do terreno (outorga)"
 
 Pedido direto do autor, sem issue: retirar os dois campos de **todos** os estudos Preliminares

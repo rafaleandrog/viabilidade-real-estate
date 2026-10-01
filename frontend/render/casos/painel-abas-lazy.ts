@@ -63,9 +63,13 @@ export const caso = {
     (globalThis as any).__chamadasPainel = [];
     const registrar = (rota: string) => { (globalThis as any).__chamadasPainel.push(rota); return { dados: [] }; };
     (globalThis as any).urbiVerso.api = async (rota: string) => registrar(rota);
+    // Registra ANTES de recusar o slug: este caso é a asserção NEGATIVA ("nenhuma
+    // rota de terreno"), e um mock que lançasse primeiro deixaria a chamada indevida
+    // fora de `chamadas` — o caso passaria verde justamente por não ter registrado.
     (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
+      const r = registrar(rota);
       if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
-      return registrar(rota);
+      return r;
     };
 
     const el = document.createElement('viab-tela-dashboard');

@@ -139,8 +139,9 @@ e lotes vêm de `imoveis`, e `parcelamentos` serve só para excluir do seletor d
 Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um setor
 habitacional. O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
 `modulos/imobiliario/*` do app e o frontend as chama pelo cliente de módulo, com os caminhos
-relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não lê o banco
-do módulo — guarda só o id do imóvel como referência lógica. A permissão é ligada pelo
+relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não consulta o
+banco do módulo: guarda o id e o tipo do imóvel como referência lógica, sem FK, e a área somada no
+próprio estudo (abaixo). A permissão é ligada pelo
 administrador da instância, na aba Núcleo do app; sem ela os endpoints respondem 403 e
 a interface degrada com aviso, sem quebrar — ver [Administração](administracao).
 
