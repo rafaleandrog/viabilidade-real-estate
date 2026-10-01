@@ -37,7 +37,8 @@ export const caso = {
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).__chamadasNucleo = [];
     (globalThis as any).urbiVerso.api = async () => ({ dados: [] });
-    (globalThis as any).urbiVerso.nucleo = async (rota: string) => {
+    (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
+      if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
       (globalThis as any).__chamadasNucleo.push(rota);
       if (rota.startsWith('/parcelamentos')) {
         // Parcelamento 10 = regularização fundiária; 20 = normal.

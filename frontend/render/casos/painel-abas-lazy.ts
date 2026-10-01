@@ -14,7 +14,7 @@
 // verificar o que a API stub recebeu prova isso. Mesma classe de defeito nº 1
 // do CLAUDE.md (a fiação, não o cálculo) do caso irmão
 // `funding-fap-checkbox.ts`, de onde este caso copia a técnica de espionar
-// `urbiVerso.api`/`urbiVerso.nucleo` e devolver o resultado por `medir()`.
+// `urbiVerso.api`/`urbiVerso.modulo` e devolver o resultado por `medir()`.
 
 import '../../tela-dashboard.js';
 import { forcarEstado } from './dados.js';
@@ -56,14 +56,17 @@ export const caso = {
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // Espiona AS DUAS portas que os 5 destinos usam (`urbiVerso.api` para
-    // curvas/benchmarks/mercado/estudos, `urbiVerso.nucleo` para terrenos) —
+    // curvas/benchmarks/mercado/estudos, `urbiVerso.modulo('imobiliario', …)` para terrenos) —
     // e grava cada chamada num array global que `medir()` lê depois. Precisa
     // estar montado ANTES do `appendChild`: `connectedCallback` chama
     // `_carregar()` de forma síncrona no momento da conexão.
     (globalThis as any).__chamadasPainel = [];
     const registrar = (rota: string) => { (globalThis as any).__chamadasPainel.push(rota); return { dados: [] }; };
     (globalThis as any).urbiVerso.api = async (rota: string) => registrar(rota);
-    (globalThis as any).urbiVerso.nucleo = async (rota: string) => registrar(rota);
+    (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
+      if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
+      return registrar(rota);
+    };
 
     const el = document.createElement('viab-tela-dashboard');
     forcarEstado(el, { aba: 'estudos' });

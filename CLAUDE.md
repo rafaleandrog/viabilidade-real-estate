@@ -1261,9 +1261,14 @@ Isso não impede publicar release de código: a plataforma decide instalar por
 segundo caminho funcionar, a tag **precisa carregar o sha**:
 
 ```
-viabilidade-v<x.y.z>_<sha8>     ✅ permite upgrade de build em mesma versão
-viabilidade-v<x.y.z>            ⚠️ aceita, mas trava upgrade dentro da mesma versão
+viabilidade-a<x.y.z>_<sha8>     ✅ permite upgrade de build em mesma versão
+viabilidade-a<x.y.z>            ⚠️ aceita, mas trava upgrade dentro da mesma versão
 ```
+
+A letra do meio é o **tipo** do instalável (`-a` app, `-m` módulo). A forma `viabilidade-v…` é a
+anterior e está em obsolescência (`tag-release-v`): instalar de release `-v` avisa até 2026-11-12,
+dá erro depois e é **recusado** (`422 ALVO_TAG_LEGADA`) a partir de 2026-12-27. As releases `-v`
+publicadas ficam como estão — release é imutável, não renomeie.
 
 O workflow `.github/workflows/release.yml` gera a tag com sha sozinho quando disparado por
 **workflow_dispatch** (Actions → release → Run workflow) — é o caminho preferido.

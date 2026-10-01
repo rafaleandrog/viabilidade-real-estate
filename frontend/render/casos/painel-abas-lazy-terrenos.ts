@@ -10,7 +10,7 @@
 // `listarEstudos()` e, em cascata, `_calcularAvancados()` (uma chamada extra
 // por estudo Avançado) para uma tabela que nunca aparece na tela. Este caso
 // prova que ISSO também parou, reusando a mesma técnica de espionar
-// `urbiVerso.api`/`urbiVerso.nucleo` de `painel-abas-lazy.ts`.
+// `urbiVerso.api`/`urbiVerso.modulo` de `painel-abas-lazy.ts`.
 
 import '../../tela-dashboard.js';
 import { forcarEstado } from './dados.js';
@@ -34,7 +34,10 @@ export const caso = {
     (globalThis as any).__chamadasPainel = [];
     const registrar = (rota: string) => { (globalThis as any).__chamadasPainel.push(rota); return { dados: [] }; };
     (globalThis as any).urbiVerso.api = async (rota: string) => registrar(rota);
-    (globalThis as any).urbiVerso.nucleo = async (rota: string) => registrar(rota);
+    (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
+      if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
+      return registrar(rota);
+    };
 
     const el = document.createElement('viab-tela-dashboard');
     // Simula chegar direto na aba Terrenos (deep link) — não é 'estudos' desde

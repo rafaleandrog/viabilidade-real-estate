@@ -133,12 +133,15 @@ tipo de empreendimento e o identificador não muda quando o estudo é renomeado.
 
 ## Núcleo
 
-O app declara `dependencias_nucleo: ["imoveis", "parcelamentos"]` e `permissoes_nucleo` de leitura
-para os dois: glebas e lotes vêm de `imoveis`, e `parcelamentos` serve só para excluir do seletor
-de terreno da Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um
-setor habitacional. O consumo segue o contrato
-padrão do Núcleo: o shell provê as rotas `nucleo/*` do app e o frontend as chama pelo cliente do
-Núcleo. A permissão é ligada pelo administrador da instância; sem ela os endpoints respondem 403 e
+O app declara, no bloco `dependencias` do manifesto, uma dependência do módulo imobiliário da
+plataforma (`urbiverso/urbiverso::imobiliario`), com leitura de `imoveis` e `parcelamentos`: glebas
+e lotes vêm de `imoveis`, e `parcelamentos` serve só para excluir do seletor de terreno da
+Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um setor
+habitacional. O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
+`modulos/imobiliario/*` do app e o frontend as chama pelo cliente de módulo, com os caminhos
+relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não lê o banco
+do módulo — guarda só o id do imóvel como referência lógica. A permissão é ligada pelo
+administrador da instância, na aba Núcleo do app; sem ela os endpoints respondem 403 e
 a interface degrada com aviso, sem quebrar — ver [Administração](administracao).
 
 O app consome apenas a área do imóvel (e o `id_legivel`, para exibir). Ao vincular ou desvincular

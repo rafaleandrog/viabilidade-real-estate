@@ -1066,7 +1066,7 @@ export async function verificarRender(opcoes) {
 <script>
   window.urbiVerso = {
     api: async () => ({ dados: [] }),
-    nucleo: async () => ({ dados: [] }),
+    modulo: async () => ({ dados: [] }),
     usuario: () => ({ id: 1, nome: 'Render Check', email: 'render@check', tipo: 'interno', avatar_url: '' }),
     contexto: () => ({ nivel: 'admin', roles: [] }),
     navegar: () => {},
