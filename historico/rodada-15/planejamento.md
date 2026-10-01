@@ -61,9 +61,9 @@ primeiro.
 |---|---|---|---|---|---|
 | 0 | esta | — | este plano, `CLAUDE.md`, `PROGRESSO.md` | — | — |
 | 1 | `[viab - 1]` | #790 | `n(taxaDescontoAa) \|\| 12` → teste de ausência; conferir a tela de Financeiro | Sonnet 5.5 | — |
-| 5 | `[viab - 5]` | #793 | `coagirNumericosDeclarados` nas escritas de tipologias, custos, funding, cenários | Sonnet 5.5 | — |
+| 5 | `[viab - 5]` | #793 | `coagirNumericosDeclarados` nas escritas de tipologias, custos, funding, cenários — **entregue: PR 805, mergeado em 01/10** | Sonnet 5.5 | — |
 | 2 | `[viab - 2]` | #789 + #749 | `carteiraSaldoSafra` lê a parcela do mês da safra; `validarSafrasReceita` sem `break` que mascara; porta os dois consertos do #751 (`VENDA_BRUTA` pela série do motor; `CARTEIRA_RESSURGE` isenta `concentrado`) com caso `COMPONENTES_EVI` | Opus 5.5 | 1 |
-| 6 | `[viab - 6]` | #802 | semeadura idempotente: guarda no servidor (get-or-create nas obrigatórias) + single-flight e reconsulta na UI; sem índice único | Opus 5.5 | 5 |
+| 6 | `[viab - 6]` | #802 | semeadura idempotente: guarda no servidor (get-or-create nas obrigatórias) + single-flight e reconsulta na UI; sem índice único | Opus 5.5 | 5 (já na `main`) |
 | 3 | `[viab - 3]` | #801 | `validarFunding`: equity sem retorno não excede receita negativa | Sonnet 5.5 | 2 |
 | 4 | `[viab - 4]` | #791 | `validarFluxoPagamento` exige `sinalPct`/`defasagemMeses`/`descontoPct`; `Math.max(mesPagamento, safra)` nos chamadores de `pagamentosConcentrado`; inventário #464 antes | Opus 5.5 | 2, 6 |
 | 7 | `[viab - 7]` | #792 | permuta física: `saldoTipologiaNoEstudo`, `validarProduto`, `validarPermutaFisica`; testes 2 e 4 ajustados a (b) | Opus 5.5 | 4 |
@@ -75,7 +75,7 @@ primeiro.
 | 13 | `[viab - 13]` | #798 | janela das chaves configurável e mês único por grupo | Opus 5.5 | 2, 4 |
 | QA | `[viab - QA]` | #800 | ambiente `QA Apps`: gêmeo do estudo 15, limpeza da linha 78, reconferência do #789 após o PR 2, estudos de Loteamento, `conferir-estudo.ts` | Sonnet 5.5 | credencial de QA |
 
-Ondas: **1** = PRs 1 e 5 · **2** = 2 e 6 · **3** = 3 e 4 · **4** = 7 e 8 · **5** = 9 e 10 · **6** = 11
+Ondas: **1** = PRs 1 e 5 (o 5 já mergeado) · **2** = 2 e 6 · **3** = 3 e 4 · **4** = 7 e 8 · **5** = 9 e 10 · **6** = 11
 e 13 · **7** = 12 (depende do 11). A sessão de QA corre em paralelo e só escreve na instância com
 autorização na conversa.
 
