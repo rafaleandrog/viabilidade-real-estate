@@ -1169,8 +1169,11 @@ function semSubcategoria(subcategoria: unknown): boolean {
  * A linha é a SEMEADURA de uma obrigatória: categoria do catálogo no grupo
  * dela, e sem subcategoria. Linha com subcategoria (a 2ª "Preço" de permuta
  * física/financeira, #444) não é semeadura e não entra na chave de
- * idempotência — a chave é a mesma `grupo::categoria::subcategoria` com que
- * `validarCustosDuplicados` acusa duplicata.
+ * idempotência. A chave é PARECIDA com a `grupo::categoria::subcategoria` de
+ * `validarCustosDuplicados`, mas não idêntica: aqui subcategoria só com espaços
+ * conta como ausente (o `trim`), lá ela é uma chave própria. Uma linha legada
+ * com `'   '` e outra sem subcategoria são a mesma semeadura para o servidor
+ * (que devolve a mais antiga) e duas chaves distintas para o alerta.
  */
 export function eSemeaduraObrigatoria(linha: any): boolean {
   const doGrupo = LINHAS_OBRIGATORIAS[linha?.grupo] ?? [];
