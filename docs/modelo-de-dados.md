@@ -125,6 +125,12 @@ representações derivadas, com precisão plena internamente e arredondamento s�
 persistidas arredondadas. As três exceções de exibição estão em
 [Fórmulas da Proforma](formulas), na seção Estado de conformidade.
 
+**Entrada pela API** — toda escrita em coluna numérica, nos estudos e nas rotas do Avançado
+(tipologias, linhas de custo, operações de funding e cenários), aceita número ou string decimal
+estrita (`"12.5"`) e grava sempre um número. Recusa com `400 CAMPO_INVALIDO`, nomeando o campo,
+o que não for decimal estrito — `"abc"`, `"12,5"`, `"1e3"`, `"0x10"`, `""` — e, em coluna inteira,
+o valor fracionário. `null` continua valendo para limpar uma coluna opcional.
+
 ## Identificador legível
 
 `id_legivel` segue `{SIGLA} - {nome} - {UF} - {sequência}` (por exemplo `INC - Pátio Urbitá 1 - DF
