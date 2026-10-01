@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
-import { coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
+import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -834,7 +834,9 @@ rotasAvancado.post('/estudos/:id/avancado/tipologias', async (req: Request, res:
       erro(res, 400, 'TIPO_UNIDADE_INVALIDO', `tipo_unidade deve ser um de: ${TIPOS_UNIDADE.join(', ')}`);
       return;
     }
-    const criada = await req.dados!.criar('avancado_tipologias', dados);
+    const coagida = coagirOuRecusar(res, 'avancado_tipologias', dados);
+    if (!coagida) return;
+    const criada = await req.dados!.criar('avancado_tipologias', coagida);
     res.status(201).json(criada);
   } catch (e: any) {
     console.error('Erro em POST /avancado/tipologias:', e);
@@ -917,7 +919,7 @@ export async function montarPatchTipologia(
   tipologia: { quantidade?: unknown },
   saldoNoEstudo: () => Promise<number>,
 ): Promise<{ dados: Record<string, any> } | { http: number; codigo: string; mensagem: string }> {
-  const dados: Record<string, any> = {};
+  let dados: Record<string, any> = {};
   for (const campo of CAMPOS_TIPOLOGIA) {
     if (body?.[campo] !== undefined) dados[campo] = body[campo];
   }
@@ -943,6 +945,14 @@ export async function montarPatchTipologia(
         mensagem: 'quantidade precisa ser um número; para não alterá-la, omita o campo do PATCH',
       };
     }
+  }
+  // Coerção ANTES do portão do saldo: ele lê `dados.quantidade`, e `'1e3'` ou
+  // `'0x10'` passam por `quantidadeNumerica` (que usa `Number()`) mas não são
+  // string decimal estrita.
+  const coagido = coagirNumericosDeclarados('avancado_tipologias', dados);
+  if ('falha' in coagido) return { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: coagido.falha.mensagem };
+  dados = coagido.dados;
+  if (dados.quantidade !== undefined) {
     const comprometidas = comprometidasDeTipologia(tipologia?.quantidade, await saldoNoEstudo());
     const msg = erroQuantidadeTipologia(dados.quantidade, comprometidas);
     if (msg) return { http: 422, codigo: 'SALDO_EXCEDIDO', mensagem: msg };
@@ -1557,7 +1567,7 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
     if (!(await exigirEscrita(req, res, estudo))) return;
 
     const lote = estudo.tipo_empreendimento === 'loteamento';
-    const dados: Record<string, any> = {
+    let dados: Record<string, any> = {
       estudo_id: estudo.id,
       grupo: 'indireto',
       orcamento_unidade: lote ? 'rs_m2_terreno' : 'rs',
@@ -1569,6 +1579,9 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
     for (const campo of CAMPOS_CUSTO) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
+    const coagidos = coagirOuRecusar(res, 'avancado_linhas_custo', dados);
+    if (!coagidos) return;
+    dados = coagidos;
     if (!validarCamposCusto(res, dados)) return;
     if (!(await validarPermutaTipologia(req, res, estudo.id, dados.permuta_tipologia_id))) return;
     if (!(await validarPermutaFisica(req, res, estudo.id, dados))) return;
@@ -1622,11 +1635,14 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
       erro(res, 404, 'CUSTO_NAO_ENCONTRADO', 'Linha de custo não encontrada neste estudo');
       return;
     }
-    const dados: Record<string, any> = {};
+    let dados: Record<string, any> = {};
     for (const campo of CAMPOS_CUSTO) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    const coagidos = coagirOuRecusar(res, 'avancado_linhas_custo', dados);
+    if (!coagidos) return;
+    dados = coagidos;
     // `custo` entra como contexto (#257): num PATCH de `subcategoria` sozinho,
     // o grupo e a categoria que decidem a regra vêm da linha já gravada.
     if (!validarCamposCusto(res, dados, custo)) return;
@@ -1975,7 +1991,9 @@ rotasAvancado.post('/estudos/:id/avancado/cenarios', async (req: Request, res: R
     for (const campo of CAMPOS_CENARIO) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
-    const criado = await req.dados!.criar('avancado_cenarios', dados);
+    const coagidos = coagirOuRecusar(res, 'avancado_cenarios', dados);
+    if (!coagidos) return;
+    const criado = await req.dados!.criar('avancado_cenarios', coagidos);
     res.status(201).json(criado);
   } catch (e: any) {
     console.error('Erro em POST /avancado/cenarios:', e);
@@ -2002,8 +2020,10 @@ rotasAvancado.patch('/estudos/:id/avancado/cenarios/:cid', async (req: Request, 
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    const coagidos = coagirOuRecusar(res, 'avancado_cenarios', dados);
+    if (!coagidos) return;
 
-    const atualizado = await req.dados!.atualizar('avancado_cenarios', cid, dados);
+    const atualizado = await req.dados!.atualizar('avancado_cenarios', cid, coagidos);
     res.json(atualizado);
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/cenarios/:cid:', e);
@@ -2030,3 +2050,16 @@ rotasAvancado.delete('/estudos/:id/avancado/cenarios/:cid', async (req: Request,
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
+
+/**
+ * Coerção numérica da FRONTEIRA de escrita de uma rota `/avancado/*` — o mesmo
+ * parser único de `/estudos` (`coagirNumericosDeclarados`). Sem ela o corpo cru
+ * chegava ao shell, que recusa string em coluna numérica, e o `catch` genérico
+ * devolvia a recusa do CLIENTE como `500 ERRO_INTERNO`. Devolve os dados
+ * coagidos, ou `null` depois de responder `400 CAMPO_INVALIDO`.
+ */
+export function coagirOuRecusar(res: Response, tabela: string, dados: Record<string, any>): Record<string, any> | null {
+  const r = coagirNumericosDeclarados(tabela, dados);
+  if ('falha' in r) { erro(res, 400, 'CAMPO_INVALIDO', r.falha.mensagem); return null; }
+  return r.dados;
+}

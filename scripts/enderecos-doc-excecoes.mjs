@@ -140,12 +140,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "referencia/padrao-incorporacao.md",
-    endereco: "backend/rotas/avancado.ts:1134,1148",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :1134,1148 — \"inicio_mes\" está em :1084. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "referencia/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:601-603",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :601-603 — \"ePermutaFinanceira\" está em :670. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
