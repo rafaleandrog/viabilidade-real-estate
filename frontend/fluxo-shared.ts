@@ -1130,8 +1130,9 @@ export interface LinhaObrigatoria { categoria: string; posicao: number; unidade?
  * linhas "Preço". Um espelho no backend teria de ser mantido à mão; importando
  * daqui (módulo sem dependências), o CATÁLOGO é um só. O predicado não é
  * idêntico: a tela confere a existência só por grupo + categoria (qualquer
- * subcategoria), o servidor só conta linha sem subcategoria — o servidor é o
- * mais estrito dos dois, então a tela nunca pede o que ele duplicaria.
+ * subcategoria), o servidor só conta como ocupante a linha sem subcategoria.
+ * A tela é a mais exigente para CRIAR: só pede a linha quando não existe
+ * nenhuma da categoria no grupo, e aí o servidor também não acha ocupante.
  *
  * A migração 002 moveu "Gestão da obra" de `obra` para `diretos` — este mapa
  * só declara o que hoje é exigido em cada grupo. Não redeclarar "Gestão da

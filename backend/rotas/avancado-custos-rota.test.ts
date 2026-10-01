@@ -434,7 +434,7 @@ test('#802 cada linha do catálogo LINHAS_OBRIGATORIAS (o mesmo que a tela semei
   });
 });
 
-test('#802 a guarda é por estudo e só para a semeadura: outro estudo cria a sua; categoria fora do catálogo continua livre', async () => {
+test('#802 a guarda é por estudo e só para a semeadura: outro estudo cria a sua; a mesma categoria em grupo fora do catálogo continua livre', async () => {
   const dados = new DadosFakeLento();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('estudos', { id: 2, nivel_analise: 'avancado', status: 'em_analise' });
