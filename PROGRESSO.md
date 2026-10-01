@@ -34,6 +34,27 @@ O autor respondeu às dez perguntas do fechamento aceitando as recomendações; 
 comentário na própria issue (#792 b, #794 a, #795 itens 1 e 3, #796 a, #797 a, #798 aprovado,
 #799 a, #726 a). A rodada executa em **sessões filhas** orquestradas; fila, ondas, modelos e riscos
 em `historico/rodada-15/planejamento.md`. Este PR é o PR 0 da fila: só documentação.
+## 2026-10-01 — Rotas `/avancado/*`: entrada numérica inválida volta 400, não 500
+
+Entrada não numérica numa escrita de tipologia, linha de custo, operação de funding ou cenário
+chegava crua ao shell, que a recusa por tipo, e o `catch` genérico devolvia a recusa do CLIENTE como
+`500 ERRO_INTERNO`. Agora `coagirOuRecusar` (`backend/rotas/avancado.ts`, sobre o parser único
+`coagirNumericosDeclarados`, o mesmo de `/estudos`) roda na fronteira de POST e PATCH das quatro
+famílias e responde `400 CAMPO_INVALIDO` nomeando o campo. Efeito colateral pedido: string decimal
+estrita (`"12.5"`) passa a ser aceita e gravada como número — antes o shell a recusava.
+Em `PATCH` de tipologia, a coerção roda depois do `400 QUANTIDADE_INVALIDA` (contrato anterior para
+o que nem é número) e antes do portão de saldo.
+
+- Fases e alocações não mudam: usam `Number(x) || 0`, que descarta `NaN` (o caso do relato). Não
+  medi o que o shell faz com `Infinity` (`Number('1e999')`), que atravessa o `||`; fica fora deste
+  PR.
+- Teste: `backend/rotas/avancado-coercao-rota.test.ts` (Express real, `DadosFake` que reproduz a
+  regra `typeof === 'number'` do shell). Prova de fiação medida: neutralizar, uma a uma, cada uma das
+  7 chamadas de `coagirOuRecusar` e a coerção do `PATCH` de tipologia deixa a suíte vermelha (8 de 8).
+- Sem migração; `versao` do `manifesto.json` mantida.
+- `scripts/enderecos-doc-excecoes.mjs`: a exceção de `avancado.ts:1134,1148` foi retirada porque o
+  deslocamento de linhas deste PR fez o endereço passar a resolver — o guard exige a remoção. A
+  citação em si segue descrevendo código anterior; é nota consultiva em `referencia/`.
 
 ## 2026-10-01 — Contrato de módulos (`dependencias`) e tag de release `-a`
 
