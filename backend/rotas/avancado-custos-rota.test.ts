@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { rotasAvancado } from './avancado.js';
+import { LINHAS_OBRIGATORIAS } from '../../frontend/fluxo-shared.js';
 
 // #590/#514 — PROVA DE FIAÇÃO DE PONTA A PONTA (critério de aceite 3 da
 // #590). Teste puro de frontend NÃO satisfaz este critério: era exatamente
@@ -364,5 +365,101 @@ test('#756 saldo de permuta com 1100 linhas de custo reservando (mais de uma pá
     assert.match(r.corpo.mensagem, /100 unidade/);
     const ok = await patch(base, cid, { permuta_quantidade: 100 });
     assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
+  });
+});
+
+// ── #802: a semeadura das linhas obrigatórias é idempotente no servidor ─────
+//
+// Duas execuções concorrentes de `_garantirLinhasObrigatorias` (duas abas,
+// remontagem do componente) criavam duas linhas "Preço" a 0,19 s uma da outra.
+// O fake abaixo segura o `criar` por alguns milissegundos: sem isso a 1ª
+// requisição terminaria inteira antes de a 2ª chegar, e o teste passaria com
+// ou sem a fila em série da rota — não exerceria a corrida.
+class DadosFakeLento extends DadosFake {
+  async criar(tabela: string, dados: Record<string, any>) {
+    await new Promise((r) => setTimeout(r, 40));
+    return super.criar(tabela, dados);
+  }
+}
+
+async function postCusto(base: string, estudoId: number, body: Record<string, any>) {
+  const res = await fetch(`${base}/estudos/${estudoId}/avancado/custos`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, corpo: await res.json() };
+}
+
+async function linhasDe(dados: DadosFake, estudoId: number, grupo: string, categoria: string) {
+  return dados.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId, grupo, categoria } });
+}
+
+test('#802 duas criações CONCORRENTES de Preço/terreno num estudo sem Preço resultam em UMA linha; a 2ª devolve a existente (200)', async () => {
+  const dados = new DadosFakeLento();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+
+  await comServidor(criarApp(dados), async (base) => {
+    const corpo = { grupo: 'terreno', categoria: 'Preço', cronograma_evento: 'customizado', ordem: 0 };
+    const [a, b] = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, corpo)]);
+    assert.deepEqual([a.status, b.status].sort(), [200, 201], `status: ${a.status}, ${b.status}`);
+    assert.equal(a.corpo.id, b.corpo.id, 'as duas respostas têm de ser a MESMA linha');
+    assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 1);
+
+    // A 2ª linha legítima de "Preço" — com subcategoria (#444) — continua aceita.
+    const permuta = await postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física' });
+    assert.equal(permuta.status, 201, JSON.stringify(permuta.corpo));
+    assert.notEqual(permuta.corpo.id, a.corpo.id);
+    assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 2);
+  });
+});
+
+test('#802 cada linha do catálogo LINHAS_OBRIGATORIAS (o mesmo que a tela semeia) é idempotente sob concorrência', async () => {
+  const entradas = Object.entries(LINHAS_OBRIGATORIAS).flatMap(([grupo, obrigs]) => obrigs.map((o) => ({ grupo, ...o })));
+  // Contagem exata: catálogo crescendo sem este teste perceber é sinal de que
+  // alguém mexeu na semeadura — confira a tela e a doc junto.
+  assert.deepEqual(entradas.map((e) => `${e.grupo}::${e.categoria}`),
+    ['terreno::Preço', 'obra::Construção', 'diretos::Corretagem de vendas']);
+
+  const dados = new DadosFakeLento();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  await comServidor(criarApp(dados), async (base) => {
+    for (const e of entradas) {
+      const corpo: Record<string, any> = { grupo: e.grupo, categoria: e.categoria, ordem: e.posicao };
+      if (e.unidade) corpo.orcamento_unidade = e.unidade;
+      const rs = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, corpo), postCusto(base, 1, corpo)]);
+      assert.deepEqual(rs.map((r) => r.status).sort(), [200, 200, 201], `${e.categoria}: ${JSON.stringify(rs)}`);
+      assert.equal((await linhasDe(dados, 1, e.grupo, e.categoria)).length, 1, e.categoria);
+    }
+  });
+});
+
+test('#802 a guarda é por estudo e só para a semeadura: outro estudo cria a sua; categoria fora do catálogo continua livre', async () => {
+  const dados = new DadosFakeLento();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('estudos', { id: 2, nivel_analise: 'avancado', status: 'em_analise' });
+  await comServidor(criarApp(dados), async (base) => {
+    const preco = { grupo: 'terreno', categoria: 'Preço' };
+    const [a, b] = await Promise.all([postCusto(base, 1, preco), postCusto(base, 2, preco)]);
+    assert.deepEqual([a.status, b.status], [201, 201]);
+    assert.equal((await linhasDe(dados, 2, 'terreno', 'Preço')).length, 1);
+
+    // "Preço" em OUTRO grupo não é a semeadura do terreno.
+    const fora = { grupo: 'indireto', categoria: 'Preço' };
+    await Promise.all([postCusto(base, 1, fora), postCusto(base, 1, fora)]);
+    assert.equal((await linhasDe(dados, 1, 'indireto', 'Preço')).length, 2);
+  });
+});
+
+test('#802 estudo com duplicata LEGADA não muda de número: a criação devolve a mais antiga e nada é apagado', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1, { subcategoria: null, orcamento_valor: null, orcamento_valor_canonico: null }), id: 78 });
+  dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1, { subcategoria: null, orcamento_valor: null, orcamento_valor_canonico: null }), id: 77 });
+  await comServidor(criarApp(dados), async (base) => {
+    const r = await postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço' });
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.id, 77);
+    assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 2);
   });
 });

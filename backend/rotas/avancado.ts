@@ -3,6 +3,7 @@ import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
+import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -1560,6 +1561,44 @@ async function validarPermutaTipologia(
   return true;
 }
 
+// #802: a semeadura das linhas obrigatórias (Preço/terreno, Construção/obra,
+// Corretagem de vendas/diretos — catálogo `LINHAS_OBRIGATORIAS`, o MESMO que a
+// tela usa) é idempotente. Duas execuções concorrentes da semeadura (duas
+// abas, remontagem do componente) criavam duas linhas — e o motor SOMA as
+// duas: duas Corretagens a 5% viram 10% do VGV. Sem índice único de propósito:
+// ele quebraria as duplicatas legadas e a 2ª "Preço" com subcategoria (#444),
+// que segue aceita porque a chave só vale para linha SEM subcategoria.
+//
+// A conferência e a criação correm em série por chave
+// `(estudo_id, grupo, categoria)` — sem isso as duas requisições conferem
+// antes de qualquer uma criar, e as duas criam. A fila é deste processo: com
+// mais de uma réplica do backend a janela volta a existir entre réplicas, e a
+// tela continua a primeira defesa (single-flight por estudo).
+const filaSemeadura = new Map<string, Promise<unknown>>();
+
+async function emSerie<T>(chave: string, fn: () => Promise<T>): Promise<T> {
+  const anterior = filaSemeadura.get(chave) ?? Promise.resolve();
+  const atual = anterior.then(fn, fn);
+  const cauda = atual.then(() => undefined, () => undefined);
+  filaSemeadura.set(chave, cauda);
+  try {
+    return await atual;
+  } finally {
+    if (filaSemeadura.get(chave) === cauda) filaSemeadura.delete(chave);
+  }
+}
+
+/** Primeira linha do estudo que já ocupa a chave de semeadura de `dados`, ou `null`. */
+async function semeaduraExistente(req: Request, estudoId: number, dados: Record<string, any>): Promise<any | null> {
+  const linhas = await req.dados!.varrerTudo('avancado_linhas_custo', {
+    filtros: { estudo_id: estudoId, grupo: dados.grupo, categoria: dados.categoria },
+  });
+  const ocupantes = linhas
+    .filter((l: any) => eSemeaduraObrigatoria(l))
+    .sort((a: any, b: any) => Number(a.id) - Number(b.id));
+  return ocupantes[0] ?? null;
+}
+
 rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
@@ -1612,6 +1651,16 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
         dados.inicio_mes = ancora.inicio_mes;
         dados.duracao_meses = ancora.duracao_meses;
       }
+    }
+
+    if (eSemeaduraObrigatoria(dados)) {
+      const r = await emSerie(`${estudo.id}::${dados.grupo}::${dados.categoria}`, async () => {
+        const existente = await semeaduraExistente(req, estudo.id, dados);
+        if (existente) return { linha: existente, criada: false };
+        return { linha: await req.dados!.criar('avancado_linhas_custo', dados), criada: true };
+      });
+      res.status(r.criada ? 201 : 200).json(r.linha);
+      return;
     }
 
     const criada = await req.dados!.criar('avancado_linhas_custo', dados);

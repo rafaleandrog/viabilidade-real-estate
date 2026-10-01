@@ -5,7 +5,7 @@ import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtNum } from './viab-format.js';
 import { permutaFisicaPorTipologia } from './fluxo-invariantes.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
-  CATEGORIA_CONSTRUCAO, eConstrucao, regimeCronogramaLinha,
+  CATEGORIA_CONSTRUCAO, eConstrucao, regimeCronogramaLinha, LINHAS_OBRIGATORIAS, type LinhaObrigatoria,
   vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
@@ -179,42 +179,54 @@ const EVENTOS_ANCORA = [
 // todo estudo existente — cada um, marcado, deduz sua própria série (imposto
 // ou corretagem) da receita antes de aplicar o percentual da permuta.
 
-// Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
-// posições ao abrir a tela pela primeira vez — a linha inexistente é criada
-// automaticamente (`_garantirLinhasObrigatorias`), com `unidade` fixando a
-// unidade de orçamento na criação. #335: não travam mais categoria/remoção
-// depois de criadas — são só a semeadura inicial.
-//
-// A migração 002 moveu "Gestão da obra" de `obra` para `diretos` — este mapa
-// só declara o que hoje é exigido em cada grupo. Não redeclarar "Gestão da
-// obra" aqui: fazia `_garantirLinhasObrigatorias` recriar, em `obra`, uma
-// linha que a migração já tinha movido para `diretos` — a origem da
-// duplicação indeletável do #178 (a categoria existia, só que no grupo
-// errado, então a checagem de existência falhava sempre).
+// Linhas obrigatórias por grupo: o catálogo `LINHAS_OBRIGATORIAS` mora em
+// `fluxo-shared.ts`, porque o backend usa o MESMO catálogo para tornar a
+// semeadura idempotente (#802) — o porquê de cada linha e a armadilha do #178
+// estão documentados lá.
 // Categorias do grupo Obra referenciadas por nome no código (#192): a
 // Construção é a linha obrigatória/ancorada e a Gestão da obra é a série
-// opcional empilhada nos gráficos de avanço. Declaradas ANTES de
-// `LINHAS_OBRIGATORIAS`, que as consome na inicialização do módulo.
+// opcional empilhada nos gráficos de avanço.
 const CATEGORIA_GESTAO_OBRA = 'Gestão da obra';
 
-interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
+// #802: semeadura em voo, por estudo, no MÓDULO (não na instância). A guarda
+// `carregado` de `updated()` só impede reentrada dentro de UMA instância; uma
+// remontagem do componente (ou duas instâncias na mesma página) rodava a
+// semeadura duas vezes em paralelo, e as duas criavam "Preço". A 2ª chamada
+// para o mesmo estudo espera a 1ª em vez de semear de novo. Entre abas do
+// navegador quem protege é o servidor (o POST é idempotente para a semeadura).
+const semeaduraEmVoo = new Map<number, Promise<any[]>>();
 
-const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
-  // Preço: 1ª linha de Custos do Terreno — todo estudo tem aquisição do
-  // terreno (#180; renomeada de "Compra" no #193).
-  terreno: [
-    { categoria: 'Preço', posicao: 0 },
-  ],
-  obra: [
-    { categoria: CATEGORIA_CONSTRUCAO, posicao: 0 },
-  ],
-  // Corretagem de vendas: 1ª linha de Custos Diretos, sempre em % VGV (#121).
-  diretos: [
-    { categoria: CATEGORIA_CORRETAGEM, posicao: 0, unidade: 'pct_vgv' },
-  ],
-};
+// Devolve a lista de custos do estudo com as obrigatórias garantidas. Só
+// reconsulta o servidor quando a lista local diz que falta alguma — o caso
+// comum (estudo já semeado) não paga requisição a mais.
+async function semearObrigatorias(estudoId: number, locais: any[]): Promise<any[]> {
+  const falta = (lista: any[]) => Object.entries(LINHAS_OBRIGATORIAS).some(([grupo, obrigs]) =>
+    obrigs.some((o) => !lista.some((c) => c.grupo === grupo && c.categoria === o.categoria)));
+  let custos = locais;
+  if (!falta(custos)) return custos;
+  const atual = await listarCustosAvancado(estudoId);
+  if (!atual?.erro) custos = atual.dados || [];
+  for (const [grupo, obrigatorias] of Object.entries(LINHAS_OBRIGATORIAS)) {
+    for (const obrig of obrigatorias) {
+      const existe = custos.some((c) => c.grupo === grupo && c.categoria === obrig.categoria);
+      if (existe) continue;
+      const dados: Record<string, any> = {
+        grupo,
+        categoria: obrig.categoria,
+        cronograma_evento: grupo === 'obra' ? 'obra' : 'customizado',
+        ordem: obrig.posicao,
+      };
+      if (obrig.unidade) dados.orcamento_unidade = obrig.unidade;
+      const res = await criarCustoAvancado(estudoId, dados);
+      // O servidor devolve a linha EXISTENTE quando outra aba já semeou —
+      // não a acrescente duas vezes à lista.
+      if (!res?.erro && !custos.some((c) => c.id === res.id)) custos = [...custos, res];
+    }
+  }
+  return custos;
+}
 
-function obrigatoriasDoGrupo(grupo: string | null | undefined): LinhaObrigatoria[] {
+function obrigatoriasDoGrupo(grupo: string | null | undefined): readonly LinhaObrigatoria[] {
   return LINHAS_OBRIGATORIAS[grupo as GrupoId] ?? [];
 }
 
@@ -1045,22 +1057,20 @@ export class ViabFluxoCustos extends LitElement {
   // Cria as linhas obrigatórias (de todos os grupos) que ainda não existem.
   // Corretagem nasce sem âncora de cronograma: quem manda no seu calendário é a
   // absorção das vendas, resolvida no motor (#121).
+  //
+  // #802: single-flight por estudo (`semeaduraEmVoo`) + reconsulta do servidor
+  // antes de criar — a lista local foi carregada antes, e outra instância pode
+  // ter semeado nesse intervalo. A existência é conferida pela categoria no
+  // grupo (com ou sem subcategoria), como sempre foi.
   private async _garantirLinhasObrigatorias() {
-    for (const [grupo, obrigatorias] of Object.entries(LINHAS_OBRIGATORIAS)) {
-      for (const obrig of obrigatorias ?? []) {
-        const existe = this.custos.some((c) => c.grupo === grupo && c.categoria === obrig.categoria);
-        if (existe) continue;
-        const dados: Record<string, any> = {
-          grupo,
-          categoria: obrig.categoria,
-          cronograma_evento: grupo === 'obra' ? 'obra' : 'customizado',
-          ordem: obrig.posicao,
-        };
-        if (obrig.unidade) dados.orcamento_unidade = obrig.unidade;
-        const res = await criarCustoAvancado(this.estudo.id, dados);
-        if (!res?.erro) this.custos = [...this.custos, res];
-      }
+    const estudoId = this.estudo.id;
+    let voo = semeaduraEmVoo.get(estudoId);
+    if (!voo) {
+      voo = semearObrigatorias(estudoId, this.custos).finally(() => semeaduraEmVoo.delete(estudoId));
+      semeaduraEmVoo.set(estudoId, voo);
     }
+    const custos = await voo;
+    if (this.estudo?.id === estudoId) this.custos = custos;
   }
 
   private async _adicionar(g: Grupo) {

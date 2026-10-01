@@ -57,6 +57,13 @@ curva de absorção; três linhas não escolhem — a corretagem sai no mês da 
 entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
 consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
 
+Três linhas são **semeadas**: na primeira vez que a aba Custos abre um estudo editável, o app cria o
+**Preço** no Terreno, a **Construção** nas Obras e a **Corretagem de vendas** nos Diretos (em % do
+VGV) — só as que faltam, e uma vez por estudo, mesmo que o estudo seja aberto em duas abas ao mesmo
+tempo. Depois de criadas são linhas comuns: dá para editar, trocar a categoria ou remover. Uma
+segunda linha de Preço com subcategoria (a permuta física ou financeira) continua sendo uma linha
+nova.
+
 ### Viabilidade
 
 | Sub-aba | O que se informa |
@@ -117,6 +124,12 @@ usuário do app, escrita e `semear` só para o `admin` do app.
 | Cenários | `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH`/`DELETE /estudos/:id/avancado/cenarios/:cid` |
 | Curvas (catálogo do app) | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` |
 | Anexos do empreendimento | `GET`/`POST /estudos/:id/empreendimento/documentos` · `DELETE …/documentos/:docId` |
+
+O `POST /estudos/:id/avancado/custos` é idempotente para as três linhas semeadas: com `categoria`
+`Preço` em `terreno`, `Construção` em `obra` ou `Corretagem de vendas` em `diretos`, **sem**
+`subcategoria`, e o estudo já tendo uma linha assim, a rota devolve a existente (`200`, a de menor
+`id`) em vez de criar outra; a criação de verdade responde `201`. Qualquer outra combinação — inclusive
+a mesma categoria com subcategoria — cria sempre.
 
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.
