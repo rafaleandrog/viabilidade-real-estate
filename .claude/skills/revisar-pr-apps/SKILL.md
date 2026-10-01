@@ -532,7 +532,9 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
 > - **Subir `shell_min`/`sdk_min` NÃO bumpa a `versao`** — decisão da issue #422: "o piso existe
 >   para ser honesto, e nada de schema mudou".
 > - Mudança só de frontend/backend **mantém** a versão. Release de código se distribui pela tag com
->   sha (`viabilidade-v<x.y.z>_<sha8>`), não por degrau de versão vazio.
+>   sha (`viabilidade-a<x.y.z>_<sha8>`), não por degrau de versão vazio. A letra `-a` é o tipo app;
+>   `-v` é a forma anterior, em obsolescência (`tag-release-v`) — tag `-v` nova num PR é achado,
+>   tag `-v` já publicada não é (release é imutável).
 >
 > O guard de `versao` do `validar-backend.sh` barra os **dois** erros simétricos: migração nova sem
 > bump, e bump sem migração nova. **Portanto: acusar "faltou bumpar a versão" num PR que só sobe o
