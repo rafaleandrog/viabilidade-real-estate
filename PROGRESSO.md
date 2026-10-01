@@ -18,6 +18,23 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-01 — Rodada 15 aberta: conferência EVI Urbitá em sessões filhas
+
+Fechado o registro da conferência de QA da EVI Urbitá (estudos 14 e 15 da Pinguim, índice #800):
+criadas as issues #801 (`RETORNO_EQUITY_EXCEDE_RECEITA` acusa equity de R$ 0 quando a receita
+líquida do mês é negativa) e #802 (semeadura das linhas obrigatórias cria "Preço" em duplicidade
+por concorrência — o servidor não tem unicidade), comentários em #791 e #798 com o que o estado de
+01/10 do estudo 15 mostrou, e a nota de estado no #800: o estudo 15 **mudou depois da conferência**
+(Curva S, funding vazio, absorção dos dois grupos, tudo pela tela), as medições das issues são de
+30/09 e a referência passa a ser um gêmeo congelado. Os testes "que falham hoje" das #789, #790,
+#791 e #801 foram reconferidos numa worktree limpa da `main` (`c4e7d0c`), inclusive o esboço de
+backend da #791, que nunca tinha rodado e falha como esperado.
+
+O autor respondeu às dez perguntas do fechamento aceitando as recomendações; cada decisão está em
+comentário na própria issue (#792 b, #794 a, #795 itens 1 e 3, #796 a, #797 a, #798 aprovado,
+#799 a, #726 a). A rodada executa em **sessões filhas** orquestradas; fila, ondas, modelos e riscos
+em `historico/rodada-15/planejamento.md`. Este PR é o PR 0 da fila: só documentação.
+
 ## 2026-10-01 — Contrato de módulos (`dependencias`) e tag de release `-a`
 
 Pedido direto do autor, sem issue: a instância (shell `0.56.21`) acusou, no boot e no upgrade para
