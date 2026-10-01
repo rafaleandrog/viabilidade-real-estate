@@ -82,6 +82,22 @@ financiável; é a única operação com o interruptor **Ativo**. As regras de c
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
 | **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
 
+A **carteira de clientes** é o saldo a receber das vendas já contratadas, somado safra a safra
+(cada mês de venda decai isolado, com a sua taxa e o seu principal): ela sobe com as parcelas da
+tabela e o saldo a repassar e zera no último vencimento de cada safra; o pico é a **carteira
+máxima**. Quando o plano paga a 1ª parcela no próprio mês da venda, essa parcela já abate a
+carteira daquele mês — os juros dela são reconhecidos nesse mês e só a amortização sai do saldo —,
+então a carteira e a carteira máxima de planos assim ficam abaixo do que saíam antes, sem mudar o
+que entra em caixa.
+
+A **reconciliação** confere o fluxo contra regras que o cálculo deve respeitar: a venda bruta
+contratada recomposta linha a linha, mês a mês, com o mesmo arredondamento do fluxo; os
+componentes de pagamento somando 100% em cada safra; a carteira de cada componente zerando no
+último vencimento; e a carteira dos componentes que amortizam nunca voltando a crescer — o saldo a
+repassar fica fora desta última, porque capitaliza até o repasse. Cada aviso aparece uma vez por
+componente, na primeira safra em que acontece, e um aviso numa safra não esconde os das safras
+seguintes.
+
 ### Cenários
 
 Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** e compare a

@@ -18,6 +18,41 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-01 — Reconciliação da carteira de recebíveis: parcela no mês da venda e dois falsos positivos
+
+`carteiraSaldoSafra` (`frontend/fluxo-caixa-motor.ts`) nunca lia o pagamento do próprio mês da
+safra: com `defasagemMeses = 0` (1ª parcela no mês da venda — o plano da EVI de 25/09) a carteira
+ficava superestimada pela 1ª parcela até o grampo final e, com N_s = 1, terminava com o principal
+inteiro (`CARTEIRA_NAO_ZERA` falso, safra 41 do estudo 15 da Pinguim). Convenção escolhida e
+documentada: `saldo_s,s = principal × (1 + taxa) − parcela_s,s` — a PMT é postecipada, a 1ª parcela
+carrega um período de juros e só a amortização sai do saldo. É a única leitura em que a carteira
+espelha os pagamentos que o motor já gerava; o recebimento não muda (nenhuma linha de pagamento foi
+tocada). `calcularRecebiveisComponentes` reparte a 1ª parcela pela mesma convenção (juros =
+principal × taxa), em vez de juro 0 com o período inteiro caindo como resíduo na última parcela. O
+`concentrado` pago no próprio mês da safra também zera em `s`.
+
+Validador (`frontend/fluxo-invariantes.ts`), porte do conserto do PR 751 (fork, parado desde 16/09;
+refeito aqui por decisão do autor): `validarContratacao` recompõe o esperado por
+`vendaBrutaContratadaMensal`, com o `round2` mensal do motor (o arredondamento único no fim divergia
+por centavos e acusava `VENDA_BRUTA_NAO_RECONCILIA`); `CARTEIRA_RESSURGE` isenta o `concentrado`,
+que capitaliza por desenho, e `CARTEIRA_NAO_ZERA` continua valendo para todos. E o que escondia o
+defeito da carteira: `validarSafrasReceita` dava `break` na primeira safra com divergência de cada
+linha; agora coleta a primeira divergência de cada código **por componente**, em todas as safras.
+
+- Teste novo: `frontend/fluxo-carteira-reconciliacao.test.ts` — os três casos da issue da carteira,
+  `COMPONENTES_EVI` em todas as safras até o fim da obra (antes: `CARTEIRA_RESSURGE` em toda safra),
+  o mesmo plano com 1ª parcela no mês da venda (incluindo a safra do marco), o não-mascaramento e um
+  caso equivalente ao estudo 15 por `calcularFluxo`.
+- Prova de fiação medida contra a suíte de frontend inteira, uma mutação por vez: apagar a leitura
+  de `porMes.get(safra)` (2 vermelhos), tirar a isenção do `concentrado` (4), devolver o `break` por
+  linha (1), tirar a repartição de juros da 1ª parcela (1, depois de acrescentar o teste que faltava
+  — a primeira medição desta mutação deu verde).
+- Efeito visível: em planos com 1ª parcela no mês da venda, a carteira e a carteira máxima ficam
+  abaixo do que saíam antes; registrado em `docs/avancado.md` e `docs/formulas.md`.
+- Endereços `arquivo:linha` deslocados pelo diff no motor, consertados: `frontend/proforma-avancado.ts`,
+  `referencia/fluxo-investidor-formulas.md` e `referencia/padrao-incorporacao.md` (dois).
+- Sem migração; `versao` do `manifesto.json` mantida.
+
 ## 2026-10-01 — Rotas `/avancado/*`: entrada numérica inválida volta 400, não 500
 
 Entrada não numérica numa escrita de tipologia, linha de custo, operação de funding ou cenário

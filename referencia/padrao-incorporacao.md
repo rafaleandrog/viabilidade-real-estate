@@ -1627,6 +1627,21 @@ saldo_s,t = 0
 
 A última parcela pode absorver resíduo imaterial dentro da tolerância.
 
+> ✅ **Comportamento vigente (#789) — primeira parcela NO mês da contratação** (`defasagemMeses = 0`,
+> o plano da EVI de 25/09 e a entrada parcelada do legado). A PMT é a mesma de sempre (juros entre
+> vencimentos), então a 1ª parcela, paga no mês da venda, carrega um período de juros sobre o
+> principal; ela abate do saldo só a sua amortização:
+>
+> ```text
+> saldo_s,s = principal_s × (1 + taxa) − pagamento_s,s
+> ```
+>
+> Nada é capitalizado no saldo do mês da contratação — os juros desse período são recebidos dentro
+> da parcela —, e o recebimento é idêntico ao de antes. Com N_s = 1 (venda no mês do marco) a única
+> parcela liquida a safra no próprio mês e o saldo é 0. Implementado em `carteiraSaldoSafra`
+> (`frontend/fluxo-caixa-motor.ts`); a repartição juros × principal da parcela segue a mesma
+> convenção em `calcularRecebiveisComponentes`.
+
 ### 13.7 Carteira total
 
 ```text
@@ -1851,7 +1866,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2108`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2143`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2215,7 +2230,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2344`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2379`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
