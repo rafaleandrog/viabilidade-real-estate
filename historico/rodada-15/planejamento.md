@@ -49,8 +49,9 @@ esse arquivo é declarada, não presumida: o `.gitattributes` tem `PROGRESSO.md 
 segundo PR de cada onda, depois do primeiro merge, **sempre** sincroniza com `origin/main` (merge
 para dentro, commit "sincroniza com origin/main", sem citar issue — armadilha 6); isso move o head,
 então CI e uma rodada de revisão repetem antes de ele ser mergeável — a fan-out das lentes
-**reduzida ao delta** (§8 da skill), mas o `@codex review` inteiro, que nunca decai; e o commit
-de sincronização não é conserto de achado, é só o que move o head. E o `union` troca conflito
+**calibrada pelo delta** pela tabela da §8 da skill (um merge da `main` não é "delta escopado aos
+achados": a sessão anuncia o motivo da calibragem que escolher), e o `@codex review` **inteiro**,
+que nunca decai; o commit de sincronização não é conserto de achado, é só o que move o head. E o `union` troca conflito
 ruidoso por falha calada: depois de **toda** sincronização, quem sincronizou confere o
 `PROGRESSO.md` pelas três medidas da armadilha 10 — seções da base + 1, zero títulos duplicados,
 zero marcadores residuais — e a orquestradora repete a conferência antes de pedir o merge. É o preço do paralelismo de desenvolvimento, e ele é pago pelo segundo PR, nunca pelo
@@ -85,7 +86,8 @@ as regras do `CLAUDE.md` que o CI cobra (branch de `origin/main` com `--unset-up
 nome explícito; `validar-frontend.sh` sempre e `validar-backend.sh` se tocar backend, `schema.json`
 ou migração; prova de fiação; guia em `docs/` no mesmo PR; `versao` só bumpa com migração; corpo
 do PR em arquivo e `preflight-pr.mjs --titulo`; `Closes #N` em inglês só com todos os critérios
-cumpridos), a sequência de revisão (acionar `@codex review` antes de despachar a fan-out; rodadas
+cumpridos; depois de sincronizar com a `main`, o `PROGRESSO.md` conferido pelas três medidas da
+armadilha 10), a sequência de revisão (acionar `@codex review` antes de despachar a fan-out; rodadas
 até zero bloqueantes; os dois canais do Codex lidos na mesma passada) e a proibição de mergear.
 
 Devolve à orquestradora, por mensagem entre sessões, uma linha fixa: `head`, link do PR, placar
