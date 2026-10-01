@@ -41,9 +41,15 @@ cada sessão (hoje Kimi; o CLI do Codex não sobe neste ambiente — `CLAUDE.md`
 
 ## Fila de PRs
 
-Um assunto por PR (R3). **Merge estritamente serial**; até duas sessões em voo quando os arquivos
-forem disjuntos. Quem está atrás sincroniza com `origin/main` depois de cada merge (commit de
-sincronização sem citar issue — armadilha 6 do `CLAUDE.md`).
+Um assunto por PR (R3). **Merge estritamente serial.** Até duas sessões **desenvolvem** em
+paralelo, em arquivos de produto disjuntos — mas nenhum par de PRs é disjunto de verdade, porque
+todo PR prepende uma seção no `PROGRESSO.md` (armadilha 10 do `CLAUDE.md`). A estratégia para
+esse arquivo é declarada, não presumida: o `.gitattributes` tem `PROGRESSO.md merge=union`, e o
+segundo PR de cada onda, depois do primeiro merge, **sempre** sincroniza com `origin/main` (merge
+para dentro, commit "sincroniza com origin/main", sem citar issue — armadilha 6); isso move o head,
+então CI e uma rodada de revisão **reduzida ao delta** (§8 da skill) repetem antes de ele ser
+mergeável. É o preço do paralelismo de desenvolvimento, e ele é pago pelo segundo PR, nunca pelo
+primeiro.
 
 | # | Sessão | Issues | Escopo | Modelo | Depende de |
 |---|---|---|---|---|---|
@@ -63,8 +69,9 @@ sincronização sem citar issue — armadilha 6 do `CLAUDE.md`).
 | 13 | `[viab - 13]` | #798 | janela das chaves configurável e mês único por grupo | Opus 5.5 | 2, 4 |
 | QA | `[viab - QA]` | #800 | ambiente `QA Apps`: gêmeo do estudo 15, limpeza da linha 78, reconferência do #789 após o PR 2, estudos de Loteamento, `conferir-estudo.ts` | Sonnet 5.5 | credencial de QA |
 
-Ondas: **1** = PRs 1 e 5 · **2** = 2 e 6 · **3** = 3 e 4 · **4** = 7 e 8 · **5** = 9 e 10 · **6** = 11, 12
-e 13. A sessão de QA corre em paralelo e só escreve na instância com autorização na conversa.
+Ondas: **1** = PRs 1 e 5 · **2** = 2 e 6 · **3** = 3 e 4 · **4** = 7 e 8 · **5** = 9 e 10 · **6** = 11
+e 13 · **7** = 12 (depende do 11). A sessão de QA corre em paralelo e só escreve na instância com
+autorização na conversa.
 
 ## O que cada sessão filha recebe e devolve
 
@@ -88,7 +95,8 @@ manda a próxima sincronizar.
   juros; só entra se o autor confirmar que a planilha de 25/09 é a verdade.
 - **Índice único em `avancado_linhas_custo`** (#802): quebraria as duplicatas legadas e a 2ª linha
   legítima de "Preço" com subcategoria (#444); a guarda fica no servidor e na UI.
-- **#795 itens 2 e 4** e **#797 (b)**: mantidos e documentados por decisão do autor.
+- **#795 itens 2 e 4**: mantidos e documentados por decisão do autor. **#797 (b)** (acrescentar KPIs e
+  séries) não foi adotada: fica a (a), manter e documentar.
 - **Taxa de juros por grupo** (#585): decidida antes, fora da #798.
 
 ## Riscos declarados
@@ -100,4 +108,13 @@ manda a próxima sincronizar.
 - **Sessão filha herda o modo de permissão da orquestradora.** Modo que pergunta trava a filha na
   primeira permissão, sem humano para responder — a orquestradora confere o modo antes de criar.
 - **Duas sessões no mesmo arquivo** é a armadilha que a fila serial evita: a orquestradora só
-  libera uma onda quando os arquivos das duas são disjuntos, e nunca duas na mesma branch.
+  libera uma onda quando os arquivos de produto das duas são disjuntos, e nunca duas na mesma
+  branch. O `PROGRESSO.md` é a exceção conhecida, tratada acima.
+- **A revisão depende de dois motores externos, e os dois são medidos, não presumidos.** O App do
+  Codex (`@codex review`) respondeu no PR de abertura desta rodada, mas as Rodadas 13 e 14
+  registram cota esgotada no meio da fila; App mudo no teto de 15 min vira `bloqueantes=1`
+  (`CLAUDE.md` § A revisão em si). A fan-out: no ambiente de nuvem em que a rodada abriu, o CLI do
+  Codex está ausente e o `kimi` não alcança `api.moonshot.ai` (403 no CONNECT do proxy de saída —
+  credencial e variáveis presentes e corretas; a política de rede do ambiente é que não libera o
+  host). Enquanto isso valer, a fan-out roda no motor nativo, declarado como menos adversarial em
+  cada relatório; liberado o host, as sessões voltam ao Kimi pelo smoke do preflight.
