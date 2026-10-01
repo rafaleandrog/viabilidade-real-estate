@@ -5,7 +5,7 @@ import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estud
 // operações (#609), e este arquivo JÁ importa daquele — declarar a constante
 // aqui e importá-la de lá fecharia um CICLO de módulos por uma lista de strings.
 import {
-  ancorarLinhaCusto, ancorarLinhaCustoEmFase, lerCronograma, CAMPOS_OPERACAO,
+  ancorarLinhaCusto, ancorarLinhaCustoEmFase, lerCronograma, CAMPOS_OPERACAO, coagirOuRecusar,
 } from './avancado.js';
 
 // Rotas de Funding (#355, item 48 da Rodada 7) — CRUD de
@@ -311,10 +311,13 @@ rotasFunding.post('/estudos/:id/avancado/funding', async (req: Request, res: Res
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
 
-    const dados: Record<string, any> = { estudo_id: estudo.id, ordem: 0, valor: 0 };
+    let dados: Record<string, any> = { estudo_id: estudo.id, ordem: 0, valor: 0 };
     for (const campo of CAMPOS_OPERACAO) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
+    const coagidos = coagirOuRecusar(res, 'avancado_funding_operacoes', dados);
+    if (!coagidos) return;
+    dados = coagidos;
     if (!dados.tipo) { erro(res, 400, 'TIPO_OBRIGATORIO', 'tipo é obrigatório'); return; }
     if (!dados.nome) { erro(res, 400, 'NOME_OBRIGATORIO', 'nome é obrigatório'); return; }
 
@@ -357,11 +360,14 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
       return;
     }
 
-    const dados: Record<string, any> = {};
+    let dados: Record<string, any> = {};
     for (const campo of CAMPOS_OPERACAO) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    const coagidos = coagirOuRecusar(res, 'avancado_funding_operacoes', dados);
+    if (!coagidos) return;
+    dados = coagidos;
 
     // Validação sobre o estado FINAL (atual + patch): senão um PATCH que manda
     // só a carência escaparia da regra carência < amortização.

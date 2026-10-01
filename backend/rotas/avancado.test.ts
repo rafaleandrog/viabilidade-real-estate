@@ -636,7 +636,8 @@ test('#433 o 400 novo não engoliu o que já era aceito', async () => {
   );
   assert.deepEqual(
     await montarPatchTipologia({ quantidade: '300' }, TIP_CORROMPIDA, saldoCheio),
-    { dados: { quantidade: '300' } },
+    // Aceita, mas gravada como NÚMERO: o shell recusa string em coluna numérica.
+    { dados: { quantidade: 300 } },
   );
   // E o 422 do saldo continua vindo antes de qualquer gravação.
   const r: any = await montarPatchTipologia({ quantidade: 1 }, TIP_CORROMPIDA, saldoNegativo);
