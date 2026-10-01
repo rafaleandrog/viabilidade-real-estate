@@ -3266,7 +3266,7 @@ já estão certos.
 
 Rotas **relativas**; o shell prefixa tudo com `/api/viabilidade/`. O frontend chama via
 `urbiVerso.api('/estudos')`, `urbiVerso.api('/config')` — **caminho relativo, sem o slug da app**
-— e o Núcleo via `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id')`. Persistência via
+— e o módulo imobiliário via `urbiVerso.modulo('imobiliario', '/glebas' | '/lotes' | '/imoveis/:id')`. Persistência via
 `req.dados`; o cálculo é do frontend (a API **não** tem endpoint de "simular").
 
 > ⚠️ **Nunca escreva o `/viabilidade` você mesmo.** Esta linha já prescreveu

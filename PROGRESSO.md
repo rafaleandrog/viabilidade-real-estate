@@ -18,6 +18,43 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-01 — Contrato de módulos (`dependencias`) e tag de release `-a`
+
+Pedido direto do autor, sem issue: a instância (shell `0.56.21`) acusou, no boot e no upgrade para
+`0.1.40`, três avisos. O que cada um era e o que foi feito:
+
+- **`manifesto-dependencias-nucleo`** (erro a partir de 2026-10-03, **gate** — reprova no
+  empacotamento, no CI e na instalação — a partir de 2026-10-06). `dependencias_nucleo` e
+  `permissoes_nucleo` saíram do `manifesto.json`; no lugar, o bloco `dependencias` com
+  `urbiverso/urbiverso::imobiliario` (`versao_min` `1.0.0`, `imoveis` e `parcelamentos` com `ler`,
+  as mesmas flags de antes) e `sdk_min: 87`, que o bloco exige. O `shell_min` fica em `0.53.20`,
+  acima do par `0.53.10` que o contrato pede. Os toggles já ligados na aba Núcleo continuam valendo.
+- **Frontend na mesma release** — com `dependencias` o shell deixa de montar `/nucleo/*` para a app,
+  então as quatro leituras (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`) passaram de
+  `urbiVerso.nucleo(c)` para `urbiVerso.modulo('imobiliario', c)`; no imobiliário o caminho não
+  muda, só o prefixo. Isso fecha também `urbiverso-nucleo-frontend` (quebra em 2026-10-21), que a
+  instância não chegou a acusar porque a detecção lê o fonte; e o `req-nucleo`, que só existia num
+  comentário do backend. Auditoria de obsolescência rodada com o catálogo do monorepo (SDK 88):
+  3 achados na `main`, 0 na branch.
+- **`tag-release-v`** (recusa a partir de 2026-12-27). O `release.yml` passa a cunhar
+  `viabilidade-a<versao>_<sha8>`. As releases `-v` publicadas ficam como estão.
+- **15 literais de cor** — não muda: é a exceção registrada do `frontend/exportar.ts` (CSS da janela
+  de impressão/PDF), ver § Contratos inegociáveis do `CLAUDE.md`.
+
+⚠️ **Validação parcial nesta sessão.** A política de rede do ambiente negou tanto
+`npm.pkg.github.com` (SDK) quanto `registry.npmjs.org` (403 nos dois), então `validar-frontend.sh`
+não instalou nada. Rodou: os guards estáticos (JSON, tokens, props, box model, endereços, fiação,
+aba default, tabelas obsoletas), o teste `api-caminho-relativo` transpilado com o `tsc` global
+(verde, e vermelho nas três mutações de controle: slug errado, caminho com `/nucleo`, chamada por
+`api()`), o validador de manifesto do monorepo (zero erros) e a auditoria de obsolescência. A
+validação completa (typecheck, suíte, build, render) é a do CI do PR. O pin do SDK continua em
+`57.0.0`: subir exige regenerar o `pnpm-lock.yaml`, que precisa do registry.
+
+O `validation.yml` passou a rodar o mesmo `urbi-empacotar` do `release.yml`, para que o
+empacotador do SDK fixado leia o manifesto (`sdk_min` e `dependencias`) no PR, e não pela primeira
+vez na release. O `INSTRUCOES-CODE.md` ganhou nota de superação nos três trechos que ainda
+prescreviam o contrato do núcleo.
+
 ## 2026-09-30 — Preliminar: saem "Marketing global / estrutura" e "Valor venal do terreno (outorga)"
 
 Pedido direto do autor, sem issue: retirar os dois campos de **todos** os estudos Preliminares

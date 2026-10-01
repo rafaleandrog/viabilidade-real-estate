@@ -34,10 +34,10 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
 | Item | Valor |
 |---|---|
 | **appId** | `viabilidade` (snake_case — é o nome da pasta, o schema PostgreSQL e o prefixo de rota) |
-| **Nome da tag / release** | `viabilidade-v<x.y.z>_<sha8>` (ex.: `viabilidade-v0.1.0_c03c34e1`) — ver [Lançar uma release](#lançar-uma-release) |
+| **Nome da tag / release** | `viabilidade-a<x.y.z>_<sha8>` (ex.: `viabilidade-a0.1.0_c03c34e1`; o `-a` é o tipo app — a forma `-v` antiga está em obsolescência) — ver [Lançar uma release](#lançar-uma-release) |
 | **Web component** | `app-viabilidade` |
 | **Prefixo de rota** | shell prefixa tudo com `/api/viabilidade/` — **nunca** escreva o prefixo você mesmo |
-| **Versão do shell / SDK alvo** | `shell_min` = `0.53.20`; `@urbiverso/sdk` = `57.0.0` (os dois não andam juntos desde 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
+| **Versão do shell / SDK alvo** | `shell_min` = `0.53.20`; `sdk_min` = `87` (exigido pelo bloco `dependencias`); `@urbiverso/sdk` fixado = `57.0.0` (os dois não andam juntos desde 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
 | **Escopo** | **Somente MVP.** Tudo marcado como "v2" na spec fica **de fora**. |
 
 ### Fontes de verdade que você DEVE ler (não invente contratos)
@@ -117,7 +117,7 @@ viabilidade-real-estate/
 
 A app é distribuída como pacote `viabilidade-<versao>.urbiapp.tgz`, publicado como **release do GitHub** por `.github/workflows/release.yml`.
 
-Tag canônica: **`viabilidade-v<x.y.z>_<sha8>`** (ex.: `viabilidade-v0.1.0_c03c34e1`). Dois pedaços de identidade, papéis distintos:
+Tag canônica: **`viabilidade-a<x.y.z>_<sha8>`** (ex.: `viabilidade-a0.1.0_c03c34e1`). A letra `a` é o **tipo** do instalável (app); a forma `viabilidade-v…` é a anterior e está em obsolescência (`tag-release-v`: a instalação de release `-v` é recusada a partir de 2026-12-27). As releases `-v` já publicadas não se renomeiam — release é imutável. Dois pedaços de identidade, papéis distintos:
 
 - **`versao` (`x.y.z`)** vem do `manifesto.json` e é o contrato de **schema**: bump de `z` só quando há migração de banco. Mudança só de código **não** bumpa versão. Downgrade é recusado pelo instalador.
 - **`_<sha8>`** é a identidade de **build**: o short sha (8 chars, hexa minúsculo) do commit do qual o tarball é buildado. É ele que permite à plataforma atualizar entre releases de **mesma versão** (compara por ancestralidade git). Tag sem sha instala, mas nunca gera upgrade de build.
@@ -128,7 +128,7 @@ O sha vive **só na tag** — o `manifesto.json` nunca o contém (ele não exist
 
 **Como publicar:** Actions → **release** → Run workflow (ref `main`, ou a branch que contenha a correção). O workflow deriva a versão do `manifesto.json`, cria a tag com o sha8 do commit e publica a release — sem terminal. (Se e só se houve migração de schema, bumpe antes a `versao` no `manifesto.json` — e no `package.json`, por higiene.)
 
-Push manual de tag também funciona (`git tag viabilidade-v0.1.0_<sha8> && git push origin <tag>`); o workflow valida que a versão bate com o manifesto e que o sha bate com o commit tagueado. Em ambos os caminhos ele builda, testa, empacota com `urbi-empacotar` e publica a release com tarball + `.sha256`.
+Push manual de tag também funciona (`git tag viabilidade-a0.1.0_<sha8> && git push origin <tag>`); o workflow valida que a versão bate com o manifesto e que o sha bate com o commit tagueado. Em ambos os caminhos ele builda, testa, empacota com `urbi-empacotar` e publica a release com tarball + `.sha256`.
 
 > **Importante:** merge na `main` não vira release sozinho — o auto-update instala *releases*. Mudou código e quer o novo build nas instâncias? Publique release nova com a **mesma** versão e a tag com o sha novo.
 

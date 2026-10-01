@@ -62,3 +62,10 @@ jobs:
         run: bash scripts/validar-frontend.sh
       - name: Validar backend
         run: bash scripts/validar-backend.sh
+      # O mesmo `urbi-empacotar`, na mesma versão do SDK fixada, que o `release.yml` roda.
+      # Sem este passo o primeiro lugar onde o empacotador lia o manifesto era a própria
+      # release — depois do merge —, e uma chave de manifesto que o empacotador recusasse
+      # (um piso, um bloco novo) só aparecia como release vermelha. Aqui ela aparece no PR.
+      # A saída vai para fora da árvore: `dist/` não é artefato deste job.
+      - name: Empacotar (o mesmo passo do release)
+        run: pnpm exec urbi-empacotar viabilidade --dir . --saida "$RUNNER_TEMP/dist"

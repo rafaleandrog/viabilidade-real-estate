@@ -75,6 +75,10 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
   (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). O `sdk_min` **não** foi declarado: ele exige
   `shell_min ≥ 0.53.10` pareado e um SDK em versionamento inteiro ("SDK N"), e o alvo aqui ainda é
   o `0.50.3`.
+  > ⚠️ **Superado em 2026-10-01.** O manifesto declara **`sdk_min: 87`**, exigido pelo bloco
+  > `dependencias` (contrato de módulos), que substituiu `dependencias_nucleo`/`permissoes_nucleo`
+  > — os campos antigos entraram em obsolescência com gate em 2026-10-06. O pin do pacote segue
+  > `57.0.0`. Ver `PROGRESSO.md` (2026-10-01).
 - **Parâmetro do manifesto usa `padrao`, e o default é VIVO** — não é persistido; o banco guarda só
   a sobrescrita do admin, e mudar o `padrao` num release passa a valer sozinho onde ninguém
   personalizou. Não duplique o default no código.
@@ -120,12 +124,16 @@ component Lit) e `recrutamento/` (IA + exportação).
   `apelo_comercial_documentos` — todas `acesso_externo:"restrito"`, respeitando precisão decimal.
 - Manifesto: `appId=viabilidade`, roles (leitor/editor/aprovador), nav, `ia`, eventos (§6.9),
   `dependencias_nucleo:["imoveis","parcelamentos"]` + `permissoes_nucleo:{imoveis:["ler"],parcelamentos:["ler"]}`, params configuráveis (§6.5).
+  > ⚠️ **Superado em 2026-10-01** — hoje é o bloco `dependencias` com
+  > `urbiverso/urbiverso::imobiliario` (`imoveis` e `parcelamentos`, `ler`). Não reintroduza os
+  > campos antigos: o manifesto com eles reprova no empacotamento e na instalação a partir de
+  > 2026-10-06.
 - Done: schema valida, manifesto valida, `urbi-empacotar` aceita.
 
 ### Etapa 2 — Backend núcleo
 - Rotas customizadas: CRUD de estudos (filtrado por membership), membros, **transições de status** com
-  regras (§3), proxy do Núcleo (`/nucleo/glebas`, `/nucleo/lotes`, `/nucleo/imoveis/:id`) com filtro
-  excludente, eventos `estudo_criado`/`estudo_status_alterado`. Gates de permissão espelhando o padrão
+  regras (§3), proxy do Núcleo (`/nucleo/glebas`, `/nucleo/lotes`, `/nucleo/imoveis/:id`; hoje
+  `/modulos/imobiliario/…` via `urbiVerso.modulo`) com filtro excludente, eventos `estudo_criado`/`estudo_status_alterado`. Gates de permissão espelhando o padrão
   do OKR (`permissoes-ciclo.ts`). id_legivel/sequência por tipo.
 - Done: typecheck/build verdes; rotas cobrem criar/editar/mover status/membros.
 

@@ -5,7 +5,8 @@ export const rotasImoveisEstudo: ReturnType<typeof Router> = Router();
 
 // Vínculo imóvel ↔ estudo (§4.3). A seleção só é editável em Rascunho.
 // Loteamento → exatamente 1 gleba. Incorporação → 1+ lotes.
-// imovel_nucleo_id é referência lógica ao Núcleo (glebas/lotes via req.nucleo).
+// imovel_nucleo_id é referência lógica, sem FK, a um imóvel (gleba/lote) do
+// módulo imobiliário da plataforma — o frontend o lê por urbiVerso.modulo().
 
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });

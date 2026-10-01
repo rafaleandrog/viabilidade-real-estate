@@ -66,10 +66,10 @@ const MARCA_RECUSA = Symbol('recusa-do-resolver');
 // outra — pô-la aqui a isentaria do teste que ela deve passar. O que ela tem
 // de próprio é conferido em separado, no fim.
 const SEM_CHAMADA_API: Record<string, string> = {
-  listarGlebasNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
-  listarLotesNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
-  listarParcelamentosNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
-  buscarImovelNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
+  listarGlebasNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
+  listarLotesNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
+  listarParcelamentosNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
+  buscarImovelNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
   uploadDocumentoApelo: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
   uploadDocumentoEmpreendimento: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
 };
@@ -130,7 +130,7 @@ function resolverComoOShell(caminho: string, fn: string): void {
 
 test('nenhuma função do wrapper repete o slug da app no caminho', async () => {
   const chamadasApi: Registro[] = [];
-  const chamadasNucleo: Registro[] = [];
+  const chamadasModulo: (Registro & { slug: string })[] = [];
   const chamadasFetch: Registro[] = [];
   let fnAtual = '?';
 
@@ -140,8 +140,8 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
       resolverComoOShell(url, fnAtual);
       return Promise.resolve({ dados: [] });
     },
-    nucleo(url: string) {
-      chamadasNucleo.push({ fn: fnAtual, url });
+    modulo(slug: string, url: string) {
+      chamadasModulo.push({ fn: fnAtual, slug, url });
       return Promise.resolve({ dados: [] });
     },
   };
@@ -291,10 +291,22 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
       `${fn}() usa fetch nativo e deve bater em /api/dados/... — veio "${url}"`
     );
   }
-  for (const { fn, url } of chamadasNucleo) {
+  // `modulo()` recebe o slug do MÓDULO como argumento próprio e o caminho
+  // RELATIVO a ele: nem o slug da app, nem o prefixo `/modulos/…`, nem o slug
+  // do módulo repetido, nem o `/nucleo/…` do contrato anterior entram no
+  // caminho — qualquer um deles viraria `/api/viabilidade/modulos/imobiliario/
+  // modulos/…` e um 404. O único módulo declarado no manifesto é o imobiliário.
+  assert.deepEqual(
+    [...new Set(chamadasModulo.map((c) => c.fn))].sort(),
+    ['buscarImovelNucleo', 'listarGlebasNucleo', 'listarLotesNucleo', 'listarParcelamentosNucleo'],
+    'as funções que leem o módulo imobiliário divergiram das que chamam urbiVerso.modulo()'
+  );
+  for (const { fn, slug, url } of chamadasModulo) {
+    assert.equal(slug, 'imobiliario', `${fn}() chamou o módulo "${slug}", que o manifesto não declara`);
+    const primeiro = comBarra(url.split(/[?#]/)[0]).split('/')[1] ?? '';
     assert.ok(
-      !url.startsWith(`/${APP_ID}`),
-      `${fn}() passou "${url}" a nucleo() — o slug não entra aqui tampouco`
+      ![APP_ID, 'modulos', 'nucleo', slug].includes(primeiro),
+      `${fn}() passou "${url}" a modulo() — o caminho é relativo ao módulo`
     );
   }
 });

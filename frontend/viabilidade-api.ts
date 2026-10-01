@@ -26,7 +26,8 @@
 // plausível é pior que nenhuma: ela desincentiva a conferência.
 //
 // As três exceções legítimas:
-//   · `urbiVerso.nucleo(`/glebas?${qs}`)` — nucleo() não passa pelo resolver;
+//   · `urbiVerso.modulo('imobiliario', `/glebas?${qs}`)` — modulo() não passa
+//     pelo resolver: o shell monta `/api/<appId>/modulos/<slug>` sozinho;
 //   · `api('/shell/apps/...')`       — `shell` é namespace cross-app, sem injeção;
 //   · `fetch('/api/dados/viabilidade/...')` — fetch nativo, caminho absoluto.
 //
@@ -42,9 +43,11 @@
 
 interface UrbiVersoApi {
   api(url: string, opts?: RequestInit): Promise<any>;
-  // Acesso ao Núcleo compartilhado. Monta /api/<appId>/nucleo/... e aplica os
-  // gates do manifesto (permissoes_nucleo) + toggles do admin. Lança em não-2xx.
-  nucleo(url: string, opts?: RequestInit): Promise<any>;
+  // Acesso a um módulo da plataforma declarado no bloco `dependencias` do
+  // manifesto. Monta /api/<appId>/modulos/<slug><caminho>, com o caminho
+  // RELATIVO ao módulo, e aplica os gates (flag pedida + toggle do admin na
+  // aba Núcleo). Lança em não-2xx.
+  modulo(slug: string, caminho: string, opts?: RequestInit): Promise<any>;
   usuario(): { id: number; nome: string; email: string; tipo: string; avatar_url: string };
   contexto(): { nivel: string | null; roles: string[] };
   navegar(rota: string): void;
@@ -329,19 +332,26 @@ export function removerCenario(estudoId: number, cid: number): Promise<any> {
   return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios/${cid}`, { method: 'DELETE' });
 }
 
-// ── Núcleo (glebas/lotes/imóveis) ──
-// Consumo padrão via urbiVerso.nucleo → /api/viabilidade/nucleo/... (o shell
-// provê essas rotas para apps que declaram dependencias_nucleo no manifesto).
+// ── Módulo imobiliário (glebas/lotes/imóveis/parcelamentos) ──
+// Consumo via urbiVerso.modulo('imobiliario', …) → /api/viabilidade/modulos/
+// imobiliario/... — o shell monta essas rotas para a dependência
+// `urbiverso/urbiverso::imobiliario` declarada no bloco `dependencias` do
+// manifesto. No imobiliário os caminhos são os mesmos do antigo contrato do
+// núcleo (`/glebas`, `/lotes`, `/imoveis/:id`); só o prefixo mudou.
 // Loteamento usa glebas; Incorporação usa lotes. Só leitura (flag "ler").
+const MODULO_IMOBILIARIO = 'imobiliario';
+function imobiliario(caminho: string): Promise<any> {
+  return urbiVerso.modulo(MODULO_IMOBILIARIO, caminho);
+}
 export function listarGlebasNucleo(busca = '', pagina = 1, porPagina = 100): Promise<any> {
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   if (busca) qs.set('busca', busca);
-  return urbiVerso.nucleo(`/glebas?${qs}`);
+  return imobiliario(`/glebas?${qs}`);
 }
 export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Promise<any> {
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   if (busca) qs.set('busca', busca);
-  return urbiVerso.nucleo(`/lotes?${qs}`);
+  return imobiliario(`/lotes?${qs}`);
 }
 // Parcelamentos — usado só para descobrir quais parcelamentos ficam FORA do
 // seletor de lotes da Incorporação: os de regularização fundiária
@@ -352,10 +362,10 @@ export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Prom
 // filtrar no cliente.
 export function listarParcelamentosNucleo(pagina = 1, porPagina = 200): Promise<any> {
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
-  return urbiVerso.nucleo(`/parcelamentos?${qs}`);
+  return imobiliario(`/parcelamentos?${qs}`);
 }
 export function buscarImovelNucleo(id: number): Promise<any> {
-  return urbiVerso.nucleo(`/imoveis/${id}`);
+  return imobiliario(`/imoveis/${id}`);
 }
 
 // ── Apelo Comercial (IA) ──
