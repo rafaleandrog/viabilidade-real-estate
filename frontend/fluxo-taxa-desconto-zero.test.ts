@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularFluxo, taxaDescontoOuPadrao, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { readFileSync } from 'node:fs';
 import type { EventoCrono } from './fluxo-shared.js';
 
 const CRONO: EventoCrono[] = [
@@ -20,7 +21,8 @@ const config = (taxaDescontoAa: any): FluxoConfig => ({
     cronograma_evento: 'obra', inicio_mes: 17, duracao_meses: 24, curva_id: null, distribuicao_modo: 'fixo' }],
   areaTerreno: 1000,
 } as FluxoConfig);
-// VPL medido no motor anterior à correção (taxas 10 e 12 não mudam).
+// VPL medido no motor anterior à correção (taxas 10 e 12 não mudam). Se uma mudança
+// legítima de receita/custo/quantização mexer no VPL, re-baseline esperado — a causa não é a taxa.
 const V10 = 29248604.99, V12 = 29054009.82;
 const soma = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
 
@@ -49,4 +51,16 @@ test('taxaDescontoOuPadrao: 0 fica 0, ausente vira 12', () => {
   assert.equal(taxaDescontoOuPadrao(10), 10);
   assert.equal(taxaDescontoOuPadrao(undefined), 12);
   assert.equal(taxaDescontoOuPadrao(null), 12);
+  for (const lixo of [' ', false, true, [], [0], {}, Infinity]) {
+    assert.equal(taxaDescontoOuPadrao(lixo), 12, `lixo=${JSON.stringify(lixo)}`);
+  }
+});
+
+// Fiação da tela Funding: ela só importa o helper, então a mutação para
+// `Number(...) || 12` não derruba nenhum teste de função pura. A leitura da taxa do
+// estudo tem de passar por `taxaDescontoOuPadrao`, e o `|| 12` não pode voltar.
+test('tela-funding lê a taxa do estudo por taxaDescontoOuPadrao, sem || 12', () => {
+  const src = readFileSync(new URL('./tela-funding.ts', import.meta.url), 'utf8');
+  assert.match(src, /taxaDescontoOuPadrao\(params\.taxa_desconto_aa\)/);
+  assert.doesNotMatch(src, /taxa_desconto_aa\)\s*\|\|\s*12/);
 });

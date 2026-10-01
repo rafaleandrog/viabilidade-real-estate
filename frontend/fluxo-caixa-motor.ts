@@ -2407,7 +2407,9 @@ function avisarAbsorcaoDescartada(linhasReceita: any[], crono: EventoCrono[]): v
 
 /** Taxa de desconto % a.a.: ausente (null/undefined/vazio/não numérico) → 12; `0` fica 0. */
 export function taxaDescontoOuPadrao(v: unknown): number {
-  if (v === null || v === undefined || v === '') return 12;
+  // Fail-closed: só número ou texto não vazio chegam ao `Number()`, que converteria
+  // `' '`, `false` e `[]` em 0 — taxa válida — onde antes o valor caía em 12.
+  if (typeof v === 'string' ? v.trim() === '' : typeof v !== 'number') return 12;
   const t = Number(v);
   return Number.isFinite(t) ? t : 12;
 }
