@@ -20,7 +20,8 @@ nuvem, uma por PR, Sonnet 5.5 ou Opus 5.5 conforme o risco), orquestradas por um
 escreve código de produto — ela cria as filhas, acompanha os PRs, confere o estado antes de pedir
 o merge e avança a fila. A revisão continua em duas camadas por PR: o App do Codex
 (`@codex review`) e a fan-out da skill `revisar-pr-apps`, cujo motor é medido por smoke no começo de
-cada sessão (hoje Kimi; o CLI do Codex não sobe neste ambiente — `CLAUDE.md` § A revisão em si).
+cada sessão — nunca presumido: o motor que o ambiente da rodada permite está medido na seção de
+riscos, abaixo.
 
 ## Decisões do autor (01/10/2026, registradas em comentário em cada issue)
 
@@ -47,8 +48,9 @@ todo PR prepende uma seção no `PROGRESSO.md` (armadilha 10 do `CLAUDE.md`). A 
 esse arquivo é declarada, não presumida: o `.gitattributes` tem `PROGRESSO.md merge=union`, e o
 segundo PR de cada onda, depois do primeiro merge, **sempre** sincroniza com `origin/main` (merge
 para dentro, commit "sincroniza com origin/main", sem citar issue — armadilha 6); isso move o head,
-então CI e uma rodada de revisão **reduzida ao delta** (§8 da skill) repetem antes de ele ser
-mergeável. É o preço do paralelismo de desenvolvimento, e ele é pago pelo segundo PR, nunca pelo
+então CI e uma rodada de revisão repetem antes de ele ser mergeável — a fan-out das lentes
+**reduzida ao delta** (§8 da skill), mas o `@codex review` inteiro, que nunca decai; e o commit
+de sincronização não é conserto de achado, é só o que move o head. É o preço do paralelismo de desenvolvimento, e ele é pago pelo segundo PR, nunca pelo
 primeiro.
 
 | # | Sessão | Issues | Escopo | Modelo | Depende de |
