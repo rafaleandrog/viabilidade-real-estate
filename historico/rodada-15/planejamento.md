@@ -50,7 +50,10 @@ segundo PR de cada onda, depois do primeiro merge, **sempre** sincroniza com `or
 para dentro, commit "sincroniza com origin/main", sem citar issue — armadilha 6); isso move o head,
 então CI e uma rodada de revisão repetem antes de ele ser mergeável — a fan-out das lentes
 **reduzida ao delta** (§8 da skill), mas o `@codex review` inteiro, que nunca decai; e o commit
-de sincronização não é conserto de achado, é só o que move o head. É o preço do paralelismo de desenvolvimento, e ele é pago pelo segundo PR, nunca pelo
+de sincronização não é conserto de achado, é só o que move o head. E o `union` troca conflito
+ruidoso por falha calada: depois de **toda** sincronização, quem sincronizou confere o
+`PROGRESSO.md` pelas três medidas da armadilha 10 — seções da base + 1, zero títulos duplicados,
+zero marcadores residuais — e a orquestradora repete a conferência antes de pedir o merge. É o preço do paralelismo de desenvolvimento, e ele é pago pelo segundo PR, nunca pelo
 primeiro.
 
 | # | Sessão | Issues | Escopo | Modelo | Depende de |
@@ -88,7 +91,9 @@ até zero bloqueantes; os dois canais do Codex lidos na mesma passada) e a proib
 Devolve à orquestradora, por mensagem entre sessões, uma linha fixa: `head`, link do PR, placar
 da última rodada, o que ficou aberto. A orquestradora confere, antes de pedir o merge ao autor: PR
 mergeável, check runs posteriores ao último commit da `main`, `revisao/bloqueantes` verde, issue
-com `Closes` só se os critérios estiverem cumpridos. Depois do merge, confere que a issue fechou e
+com `Closes` só se os critérios estiverem cumpridos, e — num PR que sincronizou com a `main` — o
+`PROGRESSO.md` do head pelas três medidas da armadilha 10 (seções da base + 1, zero títulos
+duplicados, zero marcadores residuais). Depois do merge, confere que a issue fechou e
 manda a próxima sincronizar.
 
 ## Fora da rodada, com motivo
