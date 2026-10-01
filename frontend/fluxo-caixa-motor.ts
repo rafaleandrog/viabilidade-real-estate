@@ -2405,13 +2405,21 @@ function avisarAbsorcaoDescartada(linhasReceita: any[], crono: EventoCrono[]): v
   }
 }
 
+/** Taxa de desconto % a.a.: ausente (null/undefined/vazio/não numérico) → 12; `0` fica 0. */
+export function taxaDescontoOuPadrao(v: unknown): number {
+  if (v === null || v === undefined || v === '') return 12;
+  const t = Number(v);
+  return Number.isFinite(t) ? t : 12;
+}
+
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const crono = config.cronograma ?? [];
   const linhasReceitaOriginal = config.linhasReceita ?? [];
   // #429: antes de qualquer conta — a absorção que não fecha deixa rastro.
   avisarAbsorcaoDescartada(linhasReceitaOriginal, crono);
   const linhasCusto = config.linhasCusto ?? [];
-  const taxa = n(config.taxaDescontoAa) || 12;
+  // `0` é taxa válida (VPL = soma do fluxo); o 12 vale só para valor ausente.
+  const taxa = taxaDescontoOuPadrao(config.taxaDescontoAa);
 
   // Horizonte: cobre TODO mês em que algo entra ou sai (#446 — decisão do
   // autor, 2026-08-22: "o fluxo vai até o último mês que é enquanto alguma
