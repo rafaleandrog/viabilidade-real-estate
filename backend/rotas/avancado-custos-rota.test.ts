@@ -451,6 +451,31 @@ test('#802 a guarda é por estudo e só para a semeadura: outro estudo cria a su
   });
 });
 
+test('#802 a busca da existente é filtrada por estudo: Preço do estudo 1 já semeado não é devolvido ao estudo 2', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('estudos', { id: 2, nivel_analise: 'avancado', status: 'em_analise' });
+  await comServidor(criarApp(dados), async (base) => {
+    const preco = { grupo: 'terreno', categoria: 'Preço' };
+    const um = await postCusto(base, 1, preco);
+    const dois = await postCusto(base, 2, preco);
+    assert.equal(um.status, 201);
+    assert.equal(dois.status, 201, `o estudo 2 recebeu a linha de outro estudo: ${JSON.stringify(dois.corpo)}`);
+    assert.equal(dois.corpo.estudo_id, 2);
+  });
+});
+
+test('#802 subcategoria só com espaços conta como "sem subcategoria" (a mesma regra da validação): continua UMA linha', async () => {
+  const dados = new DadosFakeLento();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  await comServidor(criarApp(dados), async (base) => {
+    const corpo = { grupo: 'terreno', categoria: 'Preço', subcategoria: '   ' };
+    const rs = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço' })]);
+    assert.deepEqual(rs.map((r) => r.status).sort(), [200, 201], JSON.stringify(rs));
+    assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 1);
+  });
+});
+
 test('#802 estudo com duplicata LEGADA não muda de número: a criação devolve a mais antiga e nada é apagado', async () => {
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });

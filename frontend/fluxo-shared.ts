@@ -1127,8 +1127,11 @@ export interface LinhaObrigatoria { categoria: string; posicao: number; unidade?
  * Mora aqui, e não na tela, porque o `POST /estudos/:id/avancado/custos` usa o
  * MESMO catálogo para ser idempotente na semeadura (#802): duas execuções
  * concorrentes da semeadura (duas abas, remontagem do componente) criavam duas
- * linhas "Preço". Um espelho no backend teria de ser mantido à mão; importar
- * daqui (módulo sem dependências) torna a divergência impossível.
+ * linhas "Preço". Um espelho no backend teria de ser mantido à mão; importando
+ * daqui (módulo sem dependências), o CATÁLOGO é um só. O predicado não é
+ * idêntico: a tela confere a existência só por grupo + categoria (qualquer
+ * subcategoria), o servidor só conta linha sem subcategoria — o servidor é o
+ * mais estrito dos dois, então a tela nunca pede o que ele duplicaria.
  *
  * A migração 002 moveu "Gestão da obra" de `obra` para `diretos` — este mapa
  * só declara o que hoje é exigido em cada grupo. Não redeclarar "Gestão da
@@ -1152,17 +1155,22 @@ export const LINHAS_OBRIGATORIAS: Readonly<Record<string, readonly LinhaObrigato
   ],
 };
 
-/** Subcategoria ausente — a mesma normalização (`|| ''`) de `validarCustosDuplicados`. */
+/**
+ * Subcategoria ausente: `null`, `undefined` ou texto em branco — a mesma regra
+ * de `subcategoriaPrecoValida` no backend, que aceita só-espaços como "sem
+ * subcategoria". Sem o `trim`, dois POSTs com `subcategoria: '   '` passavam
+ * pela guarda de idempotência e criavam duas linhas equivalentes à semeadura.
+ */
 function semSubcategoria(subcategoria: unknown): boolean {
-  return String(subcategoria || '') === '';
+  return subcategoria === null || subcategoria === undefined || String(subcategoria).trim() === '';
 }
 
 /**
  * A linha é a SEMEADURA de uma obrigatória: categoria do catálogo no grupo
  * dela, e sem subcategoria. Linha com subcategoria (a 2ª "Preço" de permuta
  * física/financeira, #444) não é semeadura e não entra na chave de
- * idempotência — é a mesma chave `grupo::categoria::subcategoria` que
- * `validarCustosDuplicados` usa para acusar duplicata.
+ * idempotência — a chave é a mesma `grupo::categoria::subcategoria` com que
+ * `validarCustosDuplicados` acusa duplicata.
  */
 export function eSemeaduraObrigatoria(linha: any): boolean {
   const doGrupo = LINHAS_OBRIGATORIAS[linha?.grupo] ?? [];

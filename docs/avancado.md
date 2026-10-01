@@ -57,12 +57,13 @@ curva de absorção; três linhas não escolhem — a corretagem sai no mês da 
 entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
 consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
 
-Três linhas são **semeadas**: na primeira vez que a aba Custos abre um estudo editável, o app cria o
-**Preço** no Terreno, a **Construção** nas Obras e a **Corretagem de vendas** nos Diretos (em % do
-VGV) — só as que faltam, e uma vez por estudo, mesmo que o estudo seja aberto em duas abas ao mesmo
-tempo. Depois de criadas são linhas comuns: dá para editar, trocar a categoria ou remover. Uma
-segunda linha de Preço com subcategoria (a permuta física ou financeira) continua sendo uma linha
-nova.
+Três linhas são **semeadas**: ao abrir um estudo editável, a aba Custos cria o **Preço** no Terreno,
+a **Construção** nas Obras e a **Corretagem de vendas** nos Diretos (em % do VGV) que ainda não
+existirem no grupo. Cada uma é criada uma única vez por estudo, mesmo que o estudo seja aberto em
+duas abas ao mesmo tempo. Depois de criadas são linhas comuns, que se editam como as outras; a que
+for removida, ou tiver a categoria trocada, volta a ser semeada na abertura seguinte, porque a aba
+recria a categoria que faltar no grupo. Uma segunda linha de Preço com subcategoria (a permuta
+física ou financeira) continua sendo uma linha nova.
 
 ### Viabilidade
 

@@ -35,15 +35,21 @@ migração.
   réplica do backend a janela volta entre réplicas, e a tela é a primeira defesa.
 - **Tela.** `_garantirLinhasObrigatorias` guarda a semeadura em voo por estudo (no módulo) e
   reconsulta o servidor antes de criar, quando a lista local diz que falta alguma.
-- Linha com subcategoria (permuta física/financeira) continua criando; duplicata legada não é
-  apagada nem renumerada (a autocura ficou fora).
-- Testes: quatro casos em `backend/rotas/avancado-custos-rota.test.ts` (Express real, `DadosFake`
+- Linha com subcategoria (permuta física/financeira) continua criando; subcategoria só com espaços
+  conta como ausente (a mesma regra da validação de subcategoria do Preço); duplicata legada não é
+  apagada nem renumerada (a autocura ficou fora). A tela mescla o resultado da semeadura por `id`
+  em vez de substituir a lista.
+- Fora do escopo, registrado: o `PATCH` que troca a categoria de outra linha para uma das três
+  continua podendo criar a duplicata (o alerta de duplicata segue acusando).
+- Testes: seis casos em `backend/rotas/avancado-custos-rota.test.ts` (Express real, `DadosFake`
   com `criar` atrasado para a corrida existir) e o caso de render `custos-semeadura` (duas instâncias
   no mesmo estudo, remontagem e carga com lista velha, contra um servidor falso que cria sempre).
   Prova de fiação medida, 4 de 4 mutações vermelhas: sem a fila do servidor, sem a guarda do
   servidor, sem o single-flight da tela, sem a reconsulta da tela.
-- `docs/avancado.md`: Custos diz que as três linhas são semeadas uma vez por estudo; Instruções para
-  não humanos descreve o `200` idempotente.
+- `docs/avancado.md`: Custos diz que cada uma das três linhas é criada uma única vez por estudo,
+  mesmo em duas abas, e que a removida volta na abertura seguinte (a semeadura recria a categoria
+  que faltar — comportamento anterior, mantido); Instruções para não humanos descreve o `200`
+  idempotente.
 - Sem migração; `versao` do `manifesto.json` mantida.
 
 ## 2026-10-01 — Rotas `/avancado/*`: entrada numérica inválida volta 400, não 500

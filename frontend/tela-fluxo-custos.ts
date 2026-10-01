@@ -197,8 +197,9 @@ const CATEGORIA_GESTAO_OBRA = 'Gestão da obra';
 const semeaduraEmVoo = new Map<number, Promise<any[]>>();
 
 // Devolve a lista de custos do estudo com as obrigatórias garantidas. Só
-// reconsulta o servidor quando a lista local diz que falta alguma — o caso
-// comum (estudo já semeado) não paga requisição a mais.
+// reconsulta o servidor quando a lista local diz que falta alguma — estudo com
+// as três categorias presentes não paga requisição a mais (o que removeu uma
+// delas paga a reconsulta e a recriação, como sempre pagou a recriação).
 async function semearObrigatorias(estudoId: number, locais: any[]): Promise<any[]> {
   const falta = (lista: any[]) => Object.entries(LINHAS_OBRIGATORIAS).some(([grupo, obrigs]) =>
     obrigs.some((o) => !lista.some((c) => c.grupo === grupo && c.categoria === o.categoria)));
@@ -1070,7 +1071,11 @@ export class ViabFluxoCustos extends LitElement {
       semeaduraEmVoo.set(estudoId, voo);
     }
     const custos = await voo;
-    if (this.estudo?.id === estudoId) this.custos = custos;
+    if (this.estudo?.id !== estudoId) return;
+    // Mescla por `id` em vez de substituir: o voo pode ser de OUTRA instância,
+    // e uma linha que esta já tinha (ou criou no intervalo) não pode sumir.
+    const novas = custos.filter((c) => !this.custos.some((atual) => atual.id === c.id));
+    if (novas.length > 0) this.custos = [...this.custos, ...novas];
   }
 
   private async _adicionar(g: Grupo) {
