@@ -161,6 +161,7 @@ test('o modal recusa regravar verbatim um plano incompleto que o backend recusar
     { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, taxaMensal: 0.0098636 },
   ] });
   assert.match(erroFormularioPagamento(form, CRONO)!, /prazo_fixo requer sinalPct/);
+  assert.match(erroFormularioPagamento(form, CRONO)!, /substitui o gravado/);
   // a saída: acrescentar uma linha regenera o plano com todos os campos
   form.entrada.push({ pct: 10, parcelas: 1, descontoPct: 0 });
   form.parcelas.push({ pct: 90, periodicidade: 'mensal', parcelas: 48, ao_longo_obra: false });

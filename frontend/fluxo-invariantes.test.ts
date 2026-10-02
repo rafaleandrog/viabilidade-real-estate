@@ -708,6 +708,23 @@ test('validarSafrasReceita: repasse antes da venda vira alerta, não erro', () =
   assert.deepEqual(r.map((d) => [d.codigo, d.severidade, d.safra]), [['REPASSE_ANTES_DA_VENDA', 'alerta', 1]]);
 });
 
+test('validarSafrasReceita: repasse sem participação antes da venda não alerta', () => {
+  const linhas = [{
+    nome: 'Torre D',
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    tipologias: [{ tipologia_id: 1, quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: {
+      componentes: [
+        { tipo: 'imediato', participacaoPct: 100, descontoPct: 0 },
+        { tipo: 'concentrado', participacaoPct: 0, mesPagamento: 0, taxaMensal: 0, rotulo: 'repasse' },
+      ],
+    },
+  }];
+  // repasse de 0% não paga nada: o mês configurado é irrelevante
+  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0);
+  assert.deepEqual(r.filter((d) => d.codigo === 'REPASSE_ANTES_DA_VENDA'), []);
+});
+
 test('validarProduto: alocação + permuta acima do catálogo identifica tipologia e mês negativo', () => {
   const custos = [{
     grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',

@@ -388,7 +388,7 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
   // recusa.
   for (const c of componentes) {
     const invalido = erroComponentePagamento(c);
-    if (invalido) return `O plano gravado nesta linha não pode ser salvo como está (${invalido}). Adicione uma linha de entrada ou de parcelamento para regenerá-lo.`;
+    if (invalido) return `O plano gravado nesta linha não pode ser salvo como está (${invalido}). Para salvar, monte o plano de novo com linhas de entrada e de parcelamento — ele substitui o gravado.`;
   }
   return null;
 }

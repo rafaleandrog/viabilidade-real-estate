@@ -1824,7 +1824,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:88`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:773`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:774`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
@@ -3200,7 +3200,7 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 **A9 — Início e Duração não são campos simétricos em Custos.** A UI trava o Início em três casos
 (Construção, fase-âncora, evento fixo) e a Duração **só** em Construção
 (`frontend/tela-fluxo-custos.ts:724-757` vs `:758-780`). O backend faz o mesmo: devolve 422 para
-`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1127,1141`), mas **aceita** sobrescrever
+`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1128,1142`), mas **aceita** sobrescrever
 `duracao_meses` (`:1130,1144`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
 Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescreve as duas grandezas.
 → **#249**, validada por **#255**.
