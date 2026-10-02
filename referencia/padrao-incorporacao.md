@@ -724,6 +724,15 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > gravado com `evento: 'pos_obra'` — é dado em coluna `json`, reconhecido por esse nome pelo backend
 > (`backend/rotas/avancado.ts:217`), e renomeá-lo seria mudança de dado com migração.
 >
+> ⚠️ **A duração constante e o rótulo "12 meses fixos" acima deixaram de valer (#798).** Decisão do
+> autor de 2026-10-01: a janela Pós-chaves passa a ser **do Grupo**, de 1 a 12 meses, com 12 como
+> padrão — campo opcional `absorcao.pos_chaves_meses`, lido por `mesesPosChaves` só no modo
+> `distribuido` (curva `personalizado`/`linear` legada continua com 12). `APOS_CHAVES_MESES` virou
+> **teto e padrão**, não a duração única. A tabela de Absorção mostra a faixa calculada na linha
+> "Pós-chaves" e um campo **Janela Pós-chaves**; o atalho **À vista, mês único (1º mês das chaves)**
+> é 0% nos três primeiros períodos com janela de 1 mês. Estudo sem o campo mantém os 12 meses e o
+> mesmo resultado. A EVI, que trava 12 literal em `cfINC!J`, continua reproduzível no padrão.
+>
 > ⚠️ **Enquanto isso, `pos_obra.duracao_meses` continua editável e não faz o que o nome promete.**
 > O evento nasce com `duracao_meses: 12` e `travado_duracao: false`
 > (`backend/rotas/avancado.ts:42`); editá-lo **não** move a janela de vendas, só a **âncora de
@@ -988,7 +997,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > Pré-lançamento que desative a fase passa a vender 80%.
 >
 > ✅ **Desde a #429, "e ninguém é avisado" deixou de valer.** O percentual da faixa vazia entra em
-> `pctDescartado` (`frontend/fluxo-shared.ts:617`, o incremento dentro de `espalhar`) e o
+> `pctDescartado` (`frontend/fluxo-shared.ts:625`, o incremento dentro de `espalhar`) e o
 > painel de Reconciliação acusa
 > `ABSORCAO_NAO_FECHA`. O comportamento **não** mudou: o percentual continua não sendo computado e
 > continua não sendo redistribuído — a camada denuncia, não corrige.

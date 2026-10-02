@@ -81,8 +81,10 @@ período espalha o seu percentual por igual pelos meses que tem. O Pós-chaves c
 ele não depende da duração da fase Pós-obras do Cronograma, que é de custo. Uma janela curta
 concentra as vendas das chaves em poucos meses. O atalho **À vista, mês único (1º mês das chaves)**
 vende o Grupo inteiro no primeiro mês depois da entrega: ele zera os três primeiros períodos e põe
-a janela em 1 mês. Toda venda feita depois da entrega é recebida à vista, qualquer que seja o fluxo
-de pagamento do Grupo.
+a janela em 1 mês. Com o plano de pagamento do Grupo já aplicado, toda venda feita depois da entrega
+é recebida à vista, qualquer que seja o plano. Num Grupo com **Plano não migrado** o atalho fica
+indisponível até o **Fluxo de Pagamento** ser aplicado, porque o plano antigo não recebe à vista a
+venda posterior à entrega.
 
 ### Funding
 

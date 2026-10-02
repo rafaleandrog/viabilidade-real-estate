@@ -44,7 +44,7 @@ resultado ou indicador nenhum. Continuam no schema porque removê-las é mudanç
 `blocos: [{evento, pct}]` para `pre_lancamento` (só quando o Cronograma tem essa fase),
 `lancamento`, `obra` e `pos_obra`. O percentual de pós-chaves é sempre derivado
 (`100 − Σ dos três primeiros`), e o bloco `pos_obra` gravado é um espelho do valor efetivo, com
-precisão plena; nada o relê. `pos_chaves_meses` (opcional, inteiro de 1 a 12) é a duração da janela
+precisão plena; nada o relê. `pos_chaves_meses` (opcional, inteiro de 1 a 12, só no modo distribuído) é a duração da janela
 Pós-chaves do Grupo; ausente vale 12, e a tela só o grava quando difere de 12. "À vista, mês único"
 não tem campo próprio: é 0% nos três primeiros períodos com `pos_chaves_meses: 1`.
 

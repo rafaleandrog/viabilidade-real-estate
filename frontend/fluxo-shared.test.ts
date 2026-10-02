@@ -239,7 +239,7 @@ test('#226/#348: a janela Pós-chaves ignora pos_obra.duracao_meses — é const
   ];
   const f = faixasAbsorcao(cronoPosLongo, APOS_CHAVES_MESES)!;
   assert.equal(APOS_CHAVES_MESES, 12);
-  // A absorção usa 12 meses fixos, não os 24 do evento pos_obra.
+  // A absorção usa a janela padrão de 12 meses, não os 24 do evento pos_obra.
   assert.deepEqual(f.pos_chaves, { inicio: 31, fim: 31 + APOS_CHAVES_MESES - 1 });
   // Alterar pos_obra.duracao_meses não muda mais o período total de absorção.
   const cronoPosCurto: EventoCrono[] = [
@@ -785,15 +785,29 @@ test('#465 eMarketing reconhece as duas categorias, cada uma só no grupo certo'
 // ─────────────────────────────────────────────────────────────────
 
 test('mesesPosChaves: ausente, nulo ou fora da faixa → 12; inteiro de 1 a 12 → ele mesmo', () => {
+  const d = (v: unknown) => ({ modo: 'distribuido', pos_chaves_meses: v });
   assert.equal(mesesPosChaves(undefined), 12);
   assert.equal(mesesPosChaves({ modo: 'distribuido' }), 12);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: null }), 12);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: 0 }), 12);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: 13 }), 12);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: 2.5 }), 12);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: 1 }), 1);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: 3 }), 3);
-  assert.equal(mesesPosChaves({ pos_chaves_meses: 12 }), 12);
+  assert.equal(mesesPosChaves(d(null)), 12);
+  assert.equal(mesesPosChaves(d(0)), 12);
+  assert.equal(mesesPosChaves(d(13)), 12);
+  assert.equal(mesesPosChaves(d(2.5)), 12);
+  assert.equal(mesesPosChaves(d(1)), 1);
+  assert.equal(mesesPosChaves(d(3)), 3);
+  assert.equal(mesesPosChaves(d(12)), 12);
+});
+
+test('mesesPosChaves é fail-closed como o backend: só number inteiro, só no modo distribuido', () => {
+  // `Number()` cru aceitaria os dois — e a janela encolheria em silêncio.
+  assert.equal(mesesPosChaves({ modo: 'distribuido', pos_chaves_meses: true }), 12);
+  assert.equal(mesesPosChaves({ modo: 'distribuido', pos_chaves_meses: '6' }), 12);
+  // Curva personalizada (meses absolutos) e linear ignoram o campo: janela de 12.
+  assert.equal(mesesPosChaves({ modo: 'personalizado', pos_chaves_meses: 3 }), 12);
+  assert.equal(mesesPosChaves({ modo: 'linear', pos_chaves_meses: 3 }), 12);
+  assert.equal(mesesPosChaves({ pos_chaves_meses: 3 }), 12); // sem modo = linear
+  // E a curva personalizada não perde ponto por causa de um campo que não lhe pertence.
+  const r = absorcaoMensal({ modo: 'personalizado', pos_chaves_meses: 3, meses: [{ mes: 50, pct: 100 }] }, CRONO)!;
+  assert.equal(r.pctDescartado, 0);
 });
 
 test('faixasAbsorcao: a janela Pós-chaves tem a duração pedida, começando no 1º mês das chaves', () => {

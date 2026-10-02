@@ -124,7 +124,7 @@ export const EVENTO_LABEL: Record<string, string> = {
   // pos_obra intacto. Não confundir com "Pós-chaves"/APOS_CHAVES_MESES logo
   // abaixo, a janela comercial da Absorção, de 1 a 12 meses por Grupo (#348) — nomes
   // parecidos, conceitos diferentes (fase de custo livre × janela de vendas
-  // travada em 12 meses).
+  // do Grupo, de 1 a 12 meses).
   pos_obra: 'Pós-obras',
 };
 
@@ -373,12 +373,20 @@ export const POS_CHAVES_MESES_MIN = 1;
  *
  * Continua sem relação com a duração do evento `pos_obra` do Cronograma (a
  * fase de CUSTO): o que muda é só de onde vem a duração da janela comercial.
- * O backend recusa valor fora da faixa (`validarAbsorcao`); o fallback aqui é
- * para dado que não passou por ele.
+ * Só o modo `distribuido` tem janela configurável: é o único que a tela
+ * escreve, e uma curva `personalizado` traz meses ABSOLUTOS que uma janela mais
+ * curta descartaria. Nos outros modos vale 12, como sempre.
+ *
+ * Fail-closed, com a MESMA regra do backend (`validarAbsorcao`): só um `number`
+ * inteiro de 1 a 12 vale. `Number()` cru aceitaria `true` (= 1) e `'6'` — dois
+ * validadores do mesmo campo com regras diferentes. Qualquer outra coisa → 12.
  */
 export function mesesPosChaves(absorcao: any): number {
-  const v = Number(absorcao?.pos_chaves_meses);
-  if (!Number.isInteger(v) || v < POS_CHAVES_MESES_MIN || v > APOS_CHAVES_MESES) return APOS_CHAVES_MESES;
+  if (absorcao?.modo !== 'distribuido') return APOS_CHAVES_MESES;
+  const v = absorcao?.pos_chaves_meses;
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < POS_CHAVES_MESES_MIN || v > APOS_CHAVES_MESES) {
+    return APOS_CHAVES_MESES;
+  }
   return v;
 }
 

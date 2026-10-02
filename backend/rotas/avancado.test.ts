@@ -726,4 +726,9 @@ test('validarAbsorcao: pos_chaves_meses opcional, inteiro de 1 a 12', () => {
   assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: 2.5 }));
   assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: '3' }));
   assert.ok(validarAbsorcao({ modo: 'personalizado', meses: [], pos_chaves_meses: 20 }));
+  // Só o modo distribuido tem janela configurável — em outro modo o campo seria ignorado.
+  assert.ok(validarAbsorcao({ modo: 'personalizado', meses: [], pos_chaves_meses: 3 }));
+  assert.ok(validarAbsorcao({ modo: 'linear', pos_chaves_meses: 3 }));
+  assert.ok(validarAbsorcao({ pos_chaves_meses: 3 }));
+  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: true }));
 });

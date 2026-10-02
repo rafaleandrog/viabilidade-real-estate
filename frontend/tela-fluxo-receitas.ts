@@ -629,6 +629,12 @@ export class ViabFluxoReceitas extends LitElement {
     // persistida — a faixa exibida acompanha a edição.
     const faixas = faixasAbsorcao(this.crono, f.pos_chaves_meses);
     const mesUnico = ehMesUnico(f);
+    // "À vista" só vale no contrato canônico de recebíveis: é ele que recebe à
+    // vista toda venda posterior à entrega (`componentesEfetivosSafra`). Num
+    // Grupo com "Plano não migrado" o ramo legado segue entrada, parcelas e
+    // repasse do plano antigo, e o atalho venderia num mês só recebendo ao
+    // longo de meses. Por isso ele fica indisponível até o plano ser aplicado.
+    const planoLegado = ramoLegadoDeRecebiveis(this.modalAbs?.fluxo_pagamento);
     const posDerivado = pctPosChavesDerivado(this._absorcaoJson().blocos);
     const erroAbs = erroFormularioAbsorcao(f);
     // rot: formata o rótulo de período; retorna '—' para faixas vazias (fim < inicio).
@@ -670,10 +676,12 @@ export class ViabFluxoReceitas extends LitElement {
                   <td><span class="derivado">${fmtPctEntrada(posDerivado)}</span></td>
                 </tr>
                 <tr class="janela-pos-chaves">
-                  <td>Janela Pós-chaves<br /><span class="sec">de ${POS_CHAVES_MESES_MIN} a ${APOS_CHAVES_MESES} meses depois da entrega</span></td>
-                  <td><viab-num casas-decimais="0" passo="1" sufixo=" meses" ?desabilitado=${dis || mesUnico}
+                  <td>Janela Pós-chaves<br /><span class="sec">${mesUnico
+                    ? 'fixa em 1 mês pelo atalho "mês único"'
+                    : `de ${POS_CHAVES_MESES_MIN} a ${APOS_CHAVES_MESES} meses depois da entrega`}</span></td>
+                  <td><viab-num casas-decimais="0" passo="1" sufixo="meses" ?desabilitado=${dis || mesUnico}
                     .valor=${f.pos_chaves_meses}
-                    @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pos_chaves_meses: e.detail.valor ?? APOS_CHAVES_MESES }}></viab-num></td>
+                    @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pos_chaves_meses: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
               </tbody>
             </table>
@@ -703,10 +711,18 @@ export class ViabFluxoReceitas extends LitElement {
           <span class="badges-par">
             <urbi-badge cor="info" interativo ?ativo=${!mesUnico}
               @click=${() => { if (!dis && mesUnico) this.absForm = alternarMesUnico(f, false); }}>Não</urbi-badge>
-            <urbi-badge cor="info" interativo ?ativo=${mesUnico}
-              @click=${() => { if (!dis && !mesUnico) this.absForm = alternarMesUnico(f, true); }}>Sim</urbi-badge>
+            <urbi-badge cor="info" ?interativo=${!planoLegado} ?ativo=${mesUnico}
+              @click=${() => { if (!dis && !mesUnico && !planoLegado) this.absForm = alternarMesUnico(f, true); }}>Sim</urbi-badge>
           </span>
+          ${planoLegado ? html`
+            <span class="sec nota-legado">Disponível depois de aplicar o Fluxo de Pagamento deste Grupo: com o
+              plano não migrado, a venda depois da entrega não é recebida à vista.</span>` : nothing}
         </div>
+        ${planoLegado && mesUnico ? html`
+          <urbi-banner variante="alerta">
+            Este Grupo vende tudo no 1º mês das chaves, mas o plano de pagamento ainda não foi migrado:
+            o recebimento segue o plano antigo, não à vista. Abra Fluxo de Pagamento e clique em Aplicar.
+          </urbi-banner>` : nothing}
 
         <div class="modal-rodape">
           <span class="sec">Correção de estoque</span>

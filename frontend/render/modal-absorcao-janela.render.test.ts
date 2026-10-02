@@ -25,13 +25,14 @@ test('Modal de Absorção: a janela do Grupo chega ao rótulo, e "mês único" l
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 
-  const g = a.extra?.['900'] as { antes: Leitura; depois: Leitura } | undefined;
+  const g = a.extra?.['900'] as { antes: Leitura; depois: Leitura; notaLegado: number } | undefined;
   assert.ok(g, 'o caso não devolveu a medida extra — medir() não rodou' + relato(a));
   // Antes: janela de 3 meses lida do persistido; a faixa exibida tem 3 meses.
   assert.equal(g!.antes.janela, 3, 'o campo da janela não mostra o valor persistido' + relato(a));
   assert.match(g!.antes.posChaves, /\(3m\)/, 'a faixa Pós-chaves não acompanha a janela do Grupo' + relato(a));
   assert.equal(g!.antes.desabilitados, 0, 'campo desabilitado sem mês único' + relato(a));
   assert.match(g!.antes.derivado, /^35/, 'Pós-chaves derivado errado antes do clique' + relato(a));
+  assert.equal(g!.notaLegado, 0, 'plano migrado não pode mostrar o atalho como indisponível' + relato(a));
   // Depois de "Sim": 100% num único mês, campos travados.
   assert.equal(g!.depois.janela, 1, 'mês único não pôs a janela em 1 mês' + relato(a));
   assert.match(g!.depois.posChaves, /\(1m\)/, 'a faixa Pós-chaves não virou um único mês' + relato(a));

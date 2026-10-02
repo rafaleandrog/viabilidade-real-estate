@@ -36,6 +36,10 @@ const FASE = {
     ],
     aplicado: true,
   },
+  // Plano de pagamento já migrado (contrato canônico): é o que torna o atalho
+  // "mês único" disponível — no plano legado ele fica travado (ver o caso
+  // `modal-absorcao`, cuja fixture não tem `componentes`).
+  fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] },
 };
 
 export const caso = {
@@ -76,6 +80,7 @@ export const caso = {
   async medir(raiz: HTMLElement): Promise<{
     antes: { posChaves: string; janela: number | null; desabilitados: number; derivado: string };
     depois: { posChaves: string; janela: number | null; desabilitados: number; derivado: string };
+    notaLegado: number;
   }> {
     const el = raiz.querySelector('viab-fluxo-receitas') as any;
     await el.updateComplete;
@@ -97,6 +102,7 @@ export const caso = {
     (badges[1] as HTMLElement).click(); // "Sim"
     await el.updateComplete;
     const depois = ler();
-    return { antes, depois };
+    // Plano migrado: a nota de indisponibilidade do atalho NÃO pode aparecer.
+    return { antes, depois, notaLegado: sr.querySelectorAll('div.mes-unico .nota-legado').length };
   },
 };

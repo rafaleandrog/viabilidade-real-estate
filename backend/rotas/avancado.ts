@@ -232,13 +232,15 @@ export function validarAbsorcao(a: any): string | null {
     if (soma > 100.01) return `a soma dos períodos informados não pode superar 100% (atual: ${soma.toFixed(2)}%)`;
   }
   // Duração da janela Pós-chaves do Grupo: opcional (ausente = 12, a janela de
-  // sempre); quando informada, inteiro de 1 a 12. Vale para qualquer modo,
-  // porque o motor a lê em todos (`mesesPosChaves`, frontend/fluxo-shared.ts).
+  // sempre); quando informada, inteiro de 1 a 12, e só no modo `distribuido` —
+  // o único em que o motor a lê (`mesesPosChaves`, frontend/fluxo-shared.ts).
+  // Num `personalizado` ela seria ignorada em silêncio, então é recusada.
   if (a.pos_chaves_meses !== undefined && a.pos_chaves_meses !== null) {
-    const m = Number(a.pos_chaves_meses);
-    if (typeof a.pos_chaves_meses !== 'number' || !Number.isInteger(m) || m < 1 || m > 12) {
+    const m = a.pos_chaves_meses;
+    if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 12) {
       return 'absorcao.pos_chaves_meses deve ser um inteiro de 1 a 12';
     }
+    if (modo !== 'distribuido') return 'absorcao.pos_chaves_meses só vale no modo distribuido';
   }
   return null;
 }
