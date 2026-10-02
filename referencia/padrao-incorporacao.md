@@ -1606,7 +1606,7 @@ Com taxa zero, o repasse é apenas a soma dos principais.
 
 **Comportamento vigente — divergência conhecida da planilha EVI de 25/09/2026.** O app capitaliza
 o repasse por `mês do pagamento − mês da venda` períodos (`mesesDeJuros` em
-`pagamentosConcentrado`, `frontend/fluxo-caixa-motor.ts:1231`): o principal só rende juros
+`pagamentosConcentrado`, `frontend/fluxo-caixa-motor.ts:1235`): o principal só rende juros
 a partir do mês seguinte à venda. A planilha atual capitaliza `mês do pagamento − mês da venda + 1`:
 `Saldo Para Repasse` recebe a venda e já rende `Juros Saldo Repasse` no próprio mês da venda. Medido
 no estudo Avançado 15 da Pinguim, o repasse do app multiplicado por `(1 + taxa mensal)` reproduz o da
