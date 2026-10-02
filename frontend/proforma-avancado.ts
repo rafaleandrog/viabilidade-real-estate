@@ -1,4 +1,5 @@
 import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
+import { CATEGORIA_MANUTENCAO_POS_OBRA } from './fluxo-shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #351/#742: Proforma do nível AVANÇADO — a segunda sub-aba de Resultados.
@@ -250,10 +251,7 @@ const BUCKETS_DIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }>
   { rotulo: 'Construção', casa: (l) => catBase(l) === 'Construção' },
   { rotulo: 'Gestão da construção', casa: (l) => catBase(l) === 'Gestão da obra' },
   { rotulo: 'Decoração', casa: (l) => catBase(l) === 'Decoração' },
-  // "Manutenção pós-obra" não tem categoria correspondente no catálogo de
-  // Custos do Avançado (só existe como `manutencao_pct` no Preliminar) — sem
-  // bucket aqui, de propósito: nenhuma linha bateria nele, e um bucket morto
-  // não é diferente de omiti-lo.
+  { rotulo: 'Manutenção pós-obra', casa: (l) => catBase(l) === CATEGORIA_MANUTENCAO_POS_OBRA },
   //
   // ⚠️ #742 (achado do Codex, rodada 1): "Contingências" NÃO entra nesta
   // lista — ela precisa ser emitida DEPOIS de "Despesas Financeiras" (ordem
