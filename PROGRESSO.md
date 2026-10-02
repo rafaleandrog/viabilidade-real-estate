@@ -34,6 +34,15 @@ O autor respondeu às dez perguntas do fechamento aceitando as recomendações; 
 comentário na própria issue (#792 b, #794 a, #795 itens 1 e 3, #796 a, #797 a, #798 aprovado,
 #799 a, #726 a). A rodada executa em **sessões filhas** orquestradas; fila, ondas, modelos e riscos
 em `historico/rodada-15/planejamento.md`. Este PR é o PR 0 da fila: só documentação.
+## 2026-10-01 — Taxa de desconto 0% deixa de virar 12% no motor do Avançado
+
+- `calcularFluxo` lia a taxa com `n(config.taxaDescontoAa) || 12`, e o `||` engolia o `0`: o backend aceita 0 a 100, mas o VPL a 0% saía igual ao de 12%. Agora `taxaDescontoOuPadrao` (`frontend/fluxo-caixa-motor.ts`) devolve 12 só para valor ausente (`null`, `undefined`, vazio ou não numérico) e preserva o `0`.
+- Mesma classe em `frontend/tela-funding.ts` (`Number(params.taxa_desconto_aa) || 12`): trocado pelo mesmo helper. As demais telas já liam com `?? 12`. A tela Financeiro não barra 0 na taxa de desconto (só valida juros de tabela), então não mudou.
+- Teste novo `frontend/fluxo-taxa-desconto-zero.test.ts`: VPL a 0% = soma do fluxo, controle a 12%, taxa ausente = 12 e regressão de 10% e 12% contra o VPL medido no motor anterior (29.248.604,99 e 29.054.009,82). Voltar ao `|| 12` no motor deixa o primeiro teste vermelho (medido); a fiação da tela Funding, que só importa o helper, é travada por um teste que lê o texto da tela (também medido com a mutação).
+- A citação de `proforma-avancado.ts` para `fluxoMensal` foi reajustada à nova linha. Guia `docs/avancado.md` atualizado. Sem migração: `versao` não bumpa.
+- `validar-frontend.sh` verde.
+
+---
 ## 2026-10-01 — Rotas `/avancado/*`: entrada numérica inválida volta 400, não 500
 
 Entrada não numérica numa escrita de tipologia, linha de custo, operação de funding ou cenário
