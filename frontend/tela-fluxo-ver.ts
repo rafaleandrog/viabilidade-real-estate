@@ -478,8 +478,8 @@ export class ViabFluxoVer extends LitElement {
     }
     this.divergencias = [
       ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, this.calc.prazo),
-      // #269: validarProduto já cobre alocado+permutado > estoque para tipologias do
-      // catálogo; esta é a única que pega permuta_tipologia_id "solto" (referência sem
+      // #269: validarProduto já cobre alocado > estoque e permutado > alocado para
+      // tipologias do catálogo; esta é a única que pega permuta_tipologia_id "solto" (referência sem
       // tipologia correspondente no catálogo) — validarProduto nunca visita esse caso
       // porque itera o catálogo, não as linhas de custo.
       ...validarPermutaFisica(d.custos, d.tipologias),

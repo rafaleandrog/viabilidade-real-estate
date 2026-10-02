@@ -802,12 +802,19 @@ Cada Grupo é um card ou bloco comercial que reúne:
 > mesma lista antes de o `tipo` existir; hoje cada uma só enxerga as suas.
 >
 > A trava de saldo é **agregada por estudo** (`saldoTipologiaNoEstudo`): o comprometido da
-> tipologia — as alocações em **todos** os Grupos **mais a permuta física**, que consome catálogo
-> igual — não pode exceder a `quantidade`. Na tela, as unidades **cascateiam** de um Grupo para o
+> tipologia — as alocações em **todos** os Grupos — não pode exceder a `quantidade`. A permuta
+> física **não soma** a esse comprometido: as unidades permutadas são **parte** das alocadas, que é
+> como o motor as lê (`reservarPermutasFisicas` as reserva de dentro das alocações de Receitas), e o
+> teto dela é o alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO` na escrita da
+> permuta; `permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO` no PATCH e no DELETE de alocação
+> e no DELETE de grupo, que reduzem o alocado). Até a decisão da
+> #792 (opção b, 2026-10-01) backend e invariantes somavam permuta ao alocado contra o catálogo: a
+> tela deixava alocar só `catálogo − permutadas` e o motor tirava as permutadas de novo, perdendo
+> VGV vendável sem aviso. Na tela, as unidades **cascateiam** de um Grupo para o
 > seguinte: o `Total` de cada linha é a quantidade do catálogo menos o que as linhas acima já
 > venderam (#170).
 >
-> São **quatro** as portas que gravam contra esse saldo, e a #433 fechou a última:
+> São **quatro** as portas que gravam contra esse saldo (catálogo − alocado; as três que reduzem o alocado conferem a outra relação, permutadas ≤ alocadas), e a #433 fechou a última:
 > `POST` e `PATCH` de alocação, a permuta física, e o **`PATCH` da própria tipologia** — reduzir o
 > catálogo por baixo do comprometido chegava ao mesmo estado impossível sem `422` nenhum. O portão
 > do `PATCH` de tipologia recusa a redução com `422 SALDO_EXCEDIDO`, e recusa `quantidade`
@@ -882,12 +889,11 @@ O saldo é global por tipologia:
 
 ```text
 saldo disponível
-= quantidade vendável da tipologia
+= quantidade da tipologia no catálogo
 − soma das alocações anteriores em todos os Grupos
-− unidades comprometidas em permuta física
 ```
 
-A ordem de exibição pode determinar a leitura em cascata, mas a validação final deve considerar o estudo inteiro — e a permuta física entra na conta, porque consome catálogo igual a uma venda.
+A ordem de exibição pode determinar a leitura em cascata, mas a validação final deve considerar o estudo inteiro. A permuta física **não** entra nesta conta: ela sai de dentro das unidades alocadas (permutadas ≤ alocadas), e o que separa venda de permuta é a reserva do motor, não o saldo do catálogo (comportamento vigente desde a #792).
 
 ### 9.6 Quando criar outro Grupo
 
@@ -1452,8 +1458,11 @@ Ao fim da absorção:
 
 - o estoque vendável deve ser zero;
 - o estoque nunca pode ser negativo;
-- a soma das alocações **mais a permuta física** não pode ultrapassar o catálogo — e o catálogo não
-  pode ser reduzido por baixo desse total (#433).
+- a soma das alocações não pode ultrapassar o catálogo — e o catálogo não pode ser reduzido por
+  baixo desse total (#433);
+- a permuta física não pode ultrapassar as alocações da sua tipologia (`PERMUTA_FISICA_EXCEDE_ALOCADO`):
+  as unidades permutadas são parte das alocadas e saem do estoque na entrega, e só as vendáveis
+  (alocadas − permutadas) baixam pela absorção (#792).
 
 ## 13. Recebimentos, safras, carteiras e repasse
 
@@ -1829,6 +1838,7 @@ Receita Bruta — VGV
 
 A permuta física:
 
+- é **parte** das unidades alocadas da sua tipologia, não adicional a elas (permutadas ≤ alocadas — comportamento vigente desde a #792);
 - reduz estoque vendável;
 - não gera contratação;
 - não gera recebimento;
@@ -3229,8 +3239,8 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 **A9 — Início e Duração não são campos simétricos em Custos.** A UI trava o Início em três casos
 (Construção, fase-âncora, evento fixo) e a Duração **só** em Construção
 (`frontend/tela-fluxo-custos.ts:724-757` vs `:758-780`). O backend faz o mesmo: devolve 422 para
-`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1134,1148`), mas **aceita** sobrescrever
-`duracao_meses` (`:1130,1144`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
+`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1140,1154`), mas **aceita** sobrescrever
+`duracao_meses` (`:1136,1150`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
 Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescreve as duas grandezas.
 → **#249**, validada por **#255**.
 
