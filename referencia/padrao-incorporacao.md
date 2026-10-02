@@ -1604,6 +1604,26 @@ saldo final = 0
 
 Com taxa zero, o repasse é apenas a soma dos principais.
 
+**Comportamento vigente — divergência conhecida da planilha EVI de 25/09/2026.** O app capitaliza
+o repasse por `mês do pagamento − mês da venda` períodos (`mesesDeJuros` em
+`pagamentosConcentrado`, `frontend/fluxo-caixa-motor.ts:1231`): o principal só rende juros
+a partir do mês seguinte à venda. A planilha atual capitaliza `mês do pagamento − mês da venda + 1`:
+`Saldo Para Repasse` recebe a venda e já rende `Juros Saldo Repasse` no próprio mês da venda. Medido
+no estudo Avançado 15 da Pinguim, o repasse do app multiplicado por `(1 + taxa mensal)` reproduz o da
+planilha com diferença de R$ 6,43 em R$ 95,7 milhões; a receita bruta recebida do app fica R$
+935.012,60 (0,45%) abaixo. **Decisão do autor (01/10/2026): manter a convenção do app.** Os documentos
+EVI são consultivos, e alinhar o motor mudaria o número publicado em todo estudo com repasse a juros
+maiores que zero. O alinhamento fica em aberto para o dia em que o autor confirmar que a planilha
+atual é a verdade; ele pediria o expoente `+ 1` em `pagamentosConcentrado` e na carteira do ramo
+concentrado (`carteiraSaldoSafra`); `jurosSafra` não tem expoente próprio, ele deriva o valor de
+`pagamentosConcentrado` e acompanha a mudança sozinho.
+
+A outra convenção que mudou na planilha, a primeira parcela da tabela longa no mês da venda (30
+parcelas em vez de 29 numa obra que vai até o mês 29), o app já expressa: `defasagemMeses: 0` em
+`pagamentosPrazoFixo` e no ramo `ate_marco` reproduz a planilha (parcela do mês 12 do estudo 15 de
+R$ 165.177,49 contra R$ 165.177,50). A carteira
+(`carteiraSaldoSafra`) também abate a parcela do mês da venda quando `defasagemMeses` é `0`. O padrão do app continua `defasagemMeses: 1`.
+
 ### 13.6 Carteira por safra
 
 Para componente com primeira parcela no mês seguinte:
