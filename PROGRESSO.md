@@ -40,6 +40,13 @@ repasse anterior à venda é recebido no mês da venda, sem juros, em vez de `pa
 lançar e a tela do estudo quebrar. A reconciliação acusa o caso como alerta
 `REPASSE_ANTES_DA_VENDA`; os três testes de identidade por componente que usavam esse caso como
 veículo de `COMPONENTE_INVALIDO` passaram a usar o alerta novo. Sem migração, `versao` intacta.
+## 2026-10-02 — Cenários: o estresse de "custo de obras" move o KPI inteiro
+
+Decisão do autor (ramo a da issue 726): o fator da variável `custo_obras` passa a incidir também na
+decoração, de modo que estressar ±X% mova o KPI "Custo obras" (construção + decoração + gestão) em
+exatamente ±X%. Muda os números de Bear/Bull e do tornado em Incorporação com decoração lançada;
+Loteamento não muda. Sem migração, `versao` mantida. Teste novo em `frontend/proforma.test.ts` fixa a
+identidade (falha na base, passa com o conserto); guia `docs/preliminar.md` atualizado.
 
 ## 2026-10-01 — Reconciliação da carteira de recebíveis: parcela no mês da venda e dois falsos positivos
 
