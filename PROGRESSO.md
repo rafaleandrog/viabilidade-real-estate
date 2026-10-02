@@ -28,8 +28,10 @@ sem converter. `validarFluxoPagamento` (`backend/rotas/avancado.ts`) usa essa fu
 de fase passa a responder `400 FLUXO_PAGAMENTO_INVALIDO` aos corpos da QA (prazo_fixo sem
 `sinalPct`/`defasagemMeses`, ate_marco sem defasagem, defasagem negativa). Inventário antes de
 endurecer: o único caminho de escrita validado é o PATCH de fase; a tela grava pelo
-`componentesDoLegado`, que produz todos os campos, ou devolve o persistido verbatim (só um plano
-gravado incompleto pela API passa a ser recusado ao regravar). A leitura **não** mudou — nenhum
+`componentesDoLegado`, que produz todos os campos, ou devolve o persistido verbatim. Passam a ser
+recusados o plano gravado incompleto pela API e o sinal ou desconto fora de 0–100 digitado no
+modal — e o modal (`erroFormularioPagamento`) confere o mesmo `erroComponentePagamento` sobre o
+array que vai gravar, então o usuário vê a mensagem antes do Aplicar. A leitura **não** mudou — nenhum
 default novo —, e o inventário do `conferir-estudo.ts inventario` ganhou a coluna `ilegivel` para
 medir na instância as linhas já gravadas fora do contrato (pendência do autor/QA: rodar).
 

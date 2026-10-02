@@ -258,7 +258,7 @@ export function validarSafrasReceita(
         // venda, sem juros. Não é erro de cálculo — é o plano do Grupo que
         // ficou atrás de uma venda —, mas o mês que o usuário digitou não é o
         // que o fluxo usa, e isso precisa aparecer.
-        if (origem.tipo === 'concentrado' && origem.mesPagamento < safra) {
+        if (origem.tipo === 'concentrado' && origem.mesPagamento < safra && origem.participacaoPct > 0) {
           registra({
             codigo: 'REPASSE_ANTES_DA_VENDA', severidade: 'alerta',
             linha: c.rotulo ?? c.tipo, safra,

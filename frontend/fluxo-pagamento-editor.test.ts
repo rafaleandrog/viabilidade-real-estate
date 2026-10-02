@@ -142,6 +142,31 @@ test('#248 bloqueia soma acima de 100% antes de chamar o backend', () => {
   assert.match(erroFormularioPagamento(form, CRONO)!, /não pode superar 100%/);
 });
 
+test('o modal recusa sinal e desconto fora de 0–100 antes de chamar o backend', () => {
+  const form = formularioPagamento(null);
+  form.entrada[0].descontoPct = 120;
+  assert.match(erroFormularioPagamento(form, CRONO)!, /desconto da entrada/);
+  form.entrada[0].descontoPct = 5;
+  (form.parcelas[0] as any).sinalPct = -1;
+  assert.match(erroFormularioPagamento(form, CRONO)!, /sinal do parcelamento/);
+  (form.parcelas[0] as any).sinalPct = 10;
+  assert.equal(erroFormularioPagamento(form, CRONO), null);
+});
+
+test('o modal recusa regravar verbatim um plano incompleto que o backend recusaria', () => {
+  // o corpo da QA gravado pela API: só componentes, sem espelho legado — o
+  // modal o devolveria verbatim e o PATCH tomaria 400
+  const form = formularioPagamento({ componentes: [
+    { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, taxaMensal: 0.0098636 },
+  ] });
+  assert.match(erroFormularioPagamento(form, CRONO)!, /prazo_fixo requer sinalPct/);
+  // a saída: acrescentar uma linha regenera o plano com todos os campos
+  form.entrada.push({ pct: 10, parcelas: 1, descontoPct: 0 });
+  form.parcelas.push({ pct: 90, periodicidade: 'mensal', parcelas: 48, ao_longo_obra: false });
+  assert.equal(erroFormularioPagamento(form, CRONO), null);
+});
+
 test('#248 rejeita prazo fixo vazio e aceita parcelas mensais válidas', () => {
   const form = formularioPagamento(null);
   form.parcelas[0] = { pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: false };

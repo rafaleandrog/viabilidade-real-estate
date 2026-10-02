@@ -687,8 +687,9 @@ test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (carteira lan
   // cai antes da venda, a carteira não fecha e o componente é acusado,
   // independente da conversão do `ate_marco` degenerado que a #444 introduziu.
   const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0)
-    .find((d) => d.codigo === 'COMPONENTE_INVALIDO' || d.codigo === 'CARTEIRA_NAO_ZERA');
+    .find((d) => d.codigo === 'CARTEIRA_NAO_ZERA');
   assert.ok(div, 'componente genuinamente inválido deveria continuar sendo acusado');
+  assert.equal(div.severidade, 'erro');
 });
 
 test('validarSafrasReceita: repasse antes da venda vira alerta, não erro', () => {

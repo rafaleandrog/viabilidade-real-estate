@@ -57,7 +57,7 @@ traz, como número, os campos que o cálculo lê: `participacaoPct` (0 a 100) em
 no `ate_marco`, mais `prazoMeses` (inteiro ≥ 1) no primeiro e `marcoMes` (inteiro ≥ 0) no
 segundo; `mesPagamento` (inteiro ≥ 0) no `concentrado`. Componente sem algum deles, com texto no
 lugar do número ou fora da faixa é recusado com `400 FLUXO_PAGAMENTO_INVALIDO`, e a mensagem nomeia
-o tipo e o campo. `taxaMensal` é opcional: o cálculo usa a taxa de tabela do estudo. A tela grava os
+o campo recusado. O modal de pagamento confere a mesma regra antes de aplicar. `taxaMensal` é opcional: o cálculo usa a taxa de tabela do estudo. A tela grava os
 componentes em toda escrita e preserva taxa e sinal que o espelho legado não sabe representar. Um
 sub-objeto `ret` por linha pode existir em JSON antigo e está morto: a RET é global do estudo
 (`estudos.considerar_ret` e `estudos.ret_pct`), e nada lê o `ret` do blob.

@@ -3,6 +3,7 @@ import {
   type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import type { EventoCrono } from './fluxo-shared.js';
+import { erroComponentePagamento } from './fluxo-pagamento-contrato.js';
 
 const n = (v: any): number => Number(v) || 0;
 const lista = (v: any): any[] => Array.isArray(v)
@@ -343,16 +344,23 @@ function percentualValido(v: any): boolean {
   return Number.isFinite(valor) && valor >= 0 && valor <= 100;
 }
 
-/** Validação local bloqueante; o backend repete o contrato por segurança. */
+/**
+ * Validação local bloqueante. O backend confere o mesmo array com
+ * `erroComponentePagamento`, e esta função também o confere, no fim — o que
+ * a tela aprova é exatamente o que a escrita aceita. As checagens de campo
+ * antes dele existem só para a mensagem falar a língua do formulário.
+ */
 export function erroFormularioPagamento(form: FormularioPagamento, cronograma: EventoCrono[]): string | null {
   for (const e of form.entrada) {
     if (!percentualValido(e.pct)) return 'Cada percentual de entrada deve ficar entre 0% e 100%.';
+    if (!percentualValido(e.descontoPct ?? 0)) return 'O desconto da entrada deve ficar entre 0% e 100%.';
     if (!Number.isInteger(Number(e.parcelas)) || Number(e.parcelas) < 1) {
       return 'A quantidade de parcelas da entrada deve ser um inteiro maior que zero.';
     }
   }
   for (const p of form.parcelas) {
     if (!percentualValido(p.pct)) return 'Cada percentual de parcelamento deve ficar entre 0% e 100%.';
+    if (!percentualValido(p.sinalPct ?? 0)) return 'O sinal do parcelamento deve ficar entre 0% e 100%.';
     if (!p.ao_longo_obra && (!Number.isInteger(Number(p.parcelas)) || Number(p.parcelas) < 1)) {
       return 'O prazo fixo deve ter ao menos uma parcela mensal.';
     }
@@ -373,6 +381,14 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
   const somaComponentes = componentes.reduce((s, c) => s + n(c.participacaoPct), 0);
   if (Math.abs(somaComponentes - 100) > 0.01) {
     return `A soma dos componentes deve ser 100% (atual: ${somaComponentes.toFixed(2)}%).`;
+  }
+  // O contrato da escrita, sobre o array que vai ser gravado — inclusive o
+  // persistido que `componentesParaSalvar` devolve verbatim (um plano gravado
+  // incompleto pela API). Sem isto o botão Aplicar aprovaria o que o PATCH
+  // recusa.
+  for (const c of componentes) {
+    const invalido = erroComponentePagamento(c);
+    if (invalido) return `O plano gravado nesta linha não pode ser salvo como está (${invalido}). Adicione uma linha de entrada ou de parcelamento para regenerá-lo.`;
   }
   return null;
 }
