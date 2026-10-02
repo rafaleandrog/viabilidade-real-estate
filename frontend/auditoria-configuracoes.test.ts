@@ -9,7 +9,7 @@ test('#464: linha vazia — todos os contadores zerados, exceto total', () => {
   const r = contarConfiguracoesAvancadas([]);
   assert.deepEqual(r, {
     total: 0, comTaxa: 0, comSinal: 0, comJurosNaContratacao: 0,
-    absorcaoPersonalizada: 0, ramoLegado: 0,
+    absorcaoPersonalizada: 0, ramoLegado: 0, comComponenteIlegivel: 0,
   });
 });
 
@@ -116,5 +116,25 @@ test('#464: os seis contadores juntos, num payload sintético com um exemplar de
   assert.deepEqual(r, {
     total: 4, comTaxa: 1, comSinal: 1, comJurosNaContratacao: 1,
     absorcaoPersonalizada: 1, ramoLegado: 1,
+    // os três componentes sintéticos acima não têm os campos que o motor lê
+    comComponenteIlegivel: 3,
   });
+});
+
+test('comComponenteIlegivel: conta a linha gravada que a escrita hoje recusaria', () => {
+  const completo = [
+    { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, sinalPct: 0, defasagemMeses: 1 },
+  ];
+  const linhas: LinhaReceitaAuditavel[] = [
+    { fluxo_pagamento: { componentes: completo } },
+    // a reprodução da QA: prazo_fixo sem sinalPct nem defasagemMeses
+    { fluxo_pagamento: { componentes: [
+      { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+      { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, taxaMensal: 0.0098636 },
+    ] } },
+    // ramo legado não é avaliado pelo contrato de componentes
+    { fluxo_pagamento: {} },
+  ];
+  assert.equal(contarConfiguracoesAvancadas(linhas).comComponenteIlegivel, 1);
 });

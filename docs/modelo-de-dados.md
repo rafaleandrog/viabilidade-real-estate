@@ -51,7 +51,13 @@ precisão plena; nada o relê.
 repasse é derivado (`100 − Σ entrada − Σ parcelas`) e não é persistido — quem somar `entrada` e
 `parcelas` pela API não fecha 100 % por construção. O mesmo campo aceita o contrato canônico
 `componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`,
-cujas `participacaoPct` fecham 100 %, com `taxaMensal` e `sinalPct` por componente. A tela grava os
+cujas `participacaoPct` fecham 100 %, com `taxaMensal` e `sinalPct` por componente. Cada componente
+traz, como número, os campos que o cálculo lê: `participacaoPct` (0 a 100) em todos; `descontoPct`
+(0 a 100) no `imediato`; `sinalPct` (0 a 100) e `defasagemMeses` (inteiro ≥ 0) no `prazo_fixo` e
+no `ate_marco`, mais `prazoMeses` (inteiro ≥ 1) no primeiro e `marcoMes` (inteiro ≥ 0) no
+segundo; `mesPagamento` (inteiro ≥ 0) no `concentrado`. Componente sem algum deles, com texto no
+lugar do número ou fora da faixa é recusado com `400 FLUXO_PAGAMENTO_INVALIDO`, e a mensagem nomeia
+o tipo e o campo. `taxaMensal` é opcional: o cálculo usa a taxa de tabela do estudo. A tela grava os
 componentes em toda escrita e preserva taxa e sinal que o espelho legado não sabe representar. Um
 sub-objeto `ret` por linha pode existir em JSON antigo e está morto: a RET é global do estudo
 (`estudos.considerar_ret` e `estudos.ret_pct`), e nada lê o `ret` do blob.

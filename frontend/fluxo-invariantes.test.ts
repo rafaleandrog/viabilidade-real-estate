@@ -671,7 +671,27 @@ test('#444 validarSafrasReceita: ate_marco degenerado (N_s ≤ 0, mesmo mecanism
   assert.equal(calc.fluxoMensal[1], 500_000);
 });
 
-test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (concentrado pago antes da safra, não o caso degenerado) continua acusado', () => {
+test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (carteira lança, não o caso degenerado) continua acusado', () => {
+  const linhas = [{
+    nome: 'Torre D',
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    tipologias: [{ tipologia_id: 1, quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: {
+      componentes: [{
+        tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 1, defasagemMeses: -1,
+        taxaMensal: 0, rotulo: 'tabela',
+      }],
+    },
+  }];
+  // defasagem negativa (dado gravado antes de a escrita o recusar): a parcela
+  // cai antes da venda, a carteira não fecha e o componente é acusado,
+  // independente da conversão do `ate_marco` degenerado que a #444 introduziu.
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0)
+    .find((d) => d.codigo === 'COMPONENTE_INVALIDO' || d.codigo === 'CARTEIRA_NAO_ZERA');
+  assert.ok(div, 'componente genuinamente inválido deveria continuar sendo acusado');
+});
+
+test('validarSafrasReceita: repasse antes da venda vira alerta, não erro', () => {
   const linhas = [{
     nome: 'Torre D',
     absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
@@ -682,11 +702,9 @@ test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (concentrado 
       }],
     },
   }];
-  // contratação na safra 1 (lançamento, inicio_mes 1); mesPagamento 0 < safra
-  // 1 — `pagamentosConcentrado` lança (#234), independente da conversão do
-  // `ate_marco` degenerado que esta issue introduziu.
-  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0).find((d) => d.codigo === 'COMPONENTE_INVALIDO');
-  assert.ok(div, 'componente genuinamente inválido deveria continuar sendo acusado');
+  // contratação na safra 1 (lançamento, inicio_mes 1); mesPagamento 0 < safra 1.
+  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0);
+  assert.deepEqual(r.map((d) => [d.codigo, d.severidade, d.safra]), [['REPASSE_ANTES_DA_VENDA', 'alerta', 1]]);
 });
 
 test('validarProduto: alocação + permuta acima do catálogo identifica tipologia e mês negativo', () => {

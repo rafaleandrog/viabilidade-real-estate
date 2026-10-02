@@ -246,13 +246,27 @@ export function validarSafrasReceita(
       for (const c of efetivos) {
         if (c.tipo === 'imediato') continue;
         // `componentesIntegradosSafra` devolve o próprio objeto persistido,
-        // exceto o `concentrado` que recebeu o resíduo de um `ate_marco` sem
-        // prazo — esse vem como CÓPIA. Concentrado nunca é removido nem
+        // exceto dois `concentrado`, que vêm como CÓPIA: o que recebeu o
+        // resíduo de um `ate_marco` sem prazo e o que tinha o repasse antes da
+        // venda (`componentesEfetivosSafra`). Concentrado nunca é removido nem
         // reordenado, então o k-ésimo efetivo é o k-ésimo persistido.
         const origem = c.tipo === 'concentrado' && !componentes.includes(c)
           ? concentradosOrigem[concentradosEfetivos.indexOf(c)]
           : c;
         const identidade = `#${componentes.indexOf(origem as ComponentePagamento)}`;
+        // Repasse configurado antes da venda: o motor o recebe no mês da
+        // venda, sem juros. Não é erro de cálculo — é o plano do Grupo que
+        // ficou atrás de uma venda —, mas o mês que o usuário digitou não é o
+        // que o fluxo usa, e isso precisa aparecer.
+        if (origem.tipo === 'concentrado' && origem.mesPagamento < safra) {
+          registra({
+            codigo: 'REPASSE_ANTES_DA_VENDA', severidade: 'alerta',
+            linha: c.rotulo ?? c.tipo, safra,
+            esperado: safra, encontrado: origem.mesPagamento, diferenca: origem.mesPagamento - safra,
+            mensagem: `Safra ${safra}, ${c.rotulo ?? c.tipo}: o repasse está configurado para o mês ` +
+              `${origem.mesPagamento}, antes desta venda — o fluxo o recebe no próprio mês da venda, sem juros.`,
+          }, identidade);
+        }
         for (const d of validarComponentesSafra([c], safra, valor, tol)) {
           if (d.codigo !== 'SOMA_COMPONENTES_DIVERGE') registra(d, identidade);
         }
