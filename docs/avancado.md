@@ -62,7 +62,7 @@ consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de constr
 | Sub-aba | O que se informa |
 |---|---|
 | **Receitas** | A **absorção de vendas** — quanto do estoque se vende em cada mês, em percentual acumulado, a partir de uma curva que pode ser substituída — e o **fluxo de pagamento** de cada safra de vendas: **Sinal**, **Nº parcelas**, o que é pago **Ao longo da obra**, o **Desconto** e o **Resíduo sem prazo** (o saldo nas chaves: caixa imediato, o padrão, ou rolando para o repasse). |
-| **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota de imposto aparece aqui só para leitura. |
+| **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL; `0` é uma taxa válida e não desconta nada, de modo que o VPL iguala a soma do fluxo; estudo sem taxa gravada usa 12% a.a.) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota de imposto aparece aqui só para leitura. |
 
 ### Funding
 
