@@ -9,7 +9,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 Fechamento da rodada aberta em 2026-10-01 (`historico/rodada-15/planejamento.md`): as 14 issues
 da fila fechadas por 13 PRs mergeados entre 2026-10-01 e 2026-10-02 (11 fecham as 14; o #817
 fecha a #726, incorporada; o #803 é o plano), cada um revisado até zero bloqueantes, na ordem de
-merge da tabela; o índice #800 fecha neste PR.
+merge da tabela; o índice #800 fechou pelo PR 825.
 
 | PR | Issues | Sessão |
 |---|---|---|
@@ -92,8 +92,9 @@ relatório completo está em comentário no #800.
 
 Com isso a release de build **`viabilidade-a0.1.40_faebece6`** foi publicada por
 `workflow_dispatch` do `release.yml` na `main`, não homologada (`prerelease=true`), com a mesma
-`versao` 0.1.40 — nenhuma migração entrou na rodada, então é upgrade de build na mesma versão,
-que a Pinguim (`aceitacao = 'releases'`) instala sozinha. ⚠️ O que a conferência acima **não**
+`versao` 0.1.40 — nenhuma migração entrou na rodada, então é upgrade de build na mesma versão.
+A Pinguim (`aceitacao = 'releases'`) a instala sozinha se o auto-update estiver ligado; senão o
+autor instala pela tela de Upgrades. ⚠️ O que a conferência acima **não**
 exercitou: backend e tela — a instância ainda rodava a release anterior, então os consertos de
 contrato de escrita (#791, #793, #802) e as telas (#798, #795, #796) só são testáveis depois do
 upgrade, pelo autor, antes de homologar.
