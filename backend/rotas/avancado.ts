@@ -209,7 +209,8 @@ export function validarValoresCurva(valores: any): string | null {
  * Valida o JSON de absorção de vendas de uma FASE (Lote 6 · #20).
  * Modelo vigente: **Distribuído** em até 4 períodos — Pré-lançamento (bloco
  * `pre_lancamento`, opcional — #330), Lançamento (`lancamento`), Durante a
- * obra (`obra`) e Pós-obra (derivado, nunca informado). Modos legados
+ * obra (`obra`) e Pós-obra (derivado, nunca informado), este último numa
+ * janela de `pos_chaves_meses` (1 a 12; ausente = 12). Modos legados
  * (`linear`/`personalizado`) são tolerados na leitura, sem exigência de soma.
  *
  * #347: a soma dos períodos INFORMADOS (tudo exceto `pos_obra`, que é
@@ -229,6 +230,15 @@ export function validarAbsorcao(a: any): string | null {
       .filter((b: any) => b?.evento !== 'pos_obra')
       .reduce((s: number, b: any) => s + (Number(b?.pct) || 0), 0);
     if (soma > 100.01) return `a soma dos períodos informados não pode superar 100% (atual: ${soma.toFixed(2)}%)`;
+  }
+  // Duração da janela Pós-chaves do Grupo: opcional (ausente = 12, a janela de
+  // sempre); quando informada, inteiro de 1 a 12. Vale para qualquer modo,
+  // porque o motor a lê em todos (`mesesPosChaves`, frontend/fluxo-shared.ts).
+  if (a.pos_chaves_meses !== undefined && a.pos_chaves_meses !== null) {
+    const m = Number(a.pos_chaves_meses);
+    if (typeof a.pos_chaves_meses !== 'number' || !Number.isInteger(m) || m < 1 || m > 12) {
+      return 'absorcao.pos_chaves_meses deve ser um inteiro de 1 a 12';
+    }
   }
   return null;
 }
