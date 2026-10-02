@@ -67,8 +67,36 @@ criou os estudos de Loteamento 17 (Preliminar, zero divergências) e 18 (Avança
   Avançado sem Loteamento), #815 (resíduo do ate_marco com 2+ concentrados), #823 (nota A9
   vencida) e #824 (resíduo de R$ 0,28 com permuta e juros). Uma nona, a #816 (defasagem negativa),
   foi aberta e fechada dentro da rodada, pelo PR 820.
-- O PR #751 do fork (`maximilian-ia`) continua aberto e ficou obsoleto: o conserto foi portado pelo
-  PR 807 em PR próprio, por decisão do autor. Fechar o #751 com essa nota.
+- ~~O PR #751 do fork (`maximilian-ia`) continua aberto~~ — fechado em 2026-10-02 com a nota de que
+  o conserto foi portado pelo PR 807 em PR próprio, por decisão do autor.
+- Testar a release `viabilidade-a0.1.40_faebece6` pela tela da Pinguim e **homologar** (Admin →
+  Apps → viabilidade → Geral); só então a produção a enxerga.
+
+### Pós-fechamento (2026-10-02): reconferência com o motor novo e release
+
+Antes de publicar, a sessão de QA reexecutou `scripts/conferir-estudo.ts` com o motor da `main`
+em `faebece6` (os 13 PRs da rodada) contra os inputs reais da Pinguim, que ainda rodava a release
+anterior — só `GET`, nenhuma escrita. O que mudou e o que não mudou, estudo a estudo:
+
+| Estudo | Números | Divergências antes → depois |
+|---:|---|---|
+| 14 (Preliminar EVI) | iguais | 0 → 0 |
+| 15 (Avançado EVI) | TIR, VPL, exposição e receita bruta iguais; carteira máxima 96.746.861 → 93.984.908 (mês 41) | 5 → 1: saem `CARTEIRA_RESSURGE` e 3× `RETORNO_EQUITY_EXCEDE_RECEITA`; resta o D14 |
+| 16 (gêmeo congelado) | idem; carteira máxima 96.746.861 → 93.984.908 | 3 → 1: saem `VENDA_BRUTA_NAO_RECONCILIA` e `CARTEIRA_RESSURGE`; `CARTEIRA_NAO_ZERA` não aparece; resta o D14 |
+| 17 (Loteamento Preliminar) | iguais | 0 → 0 |
+| 18 (Loteamento Avançado) | iguais | 2 → 1: sai `VENDA_BRUTA_NAO_RECONCILIA` (Δ 0,06); resta o D14 |
+
+A única mudança numérica é a parcela no mês da venda do PR 807 (#789); o que sumiu é o que os PRs
+807 e 809 (#801) prometeram; o que resta é o alerta D14, esperado. Nenhuma issue nova. O
+relatório completo está em comentário no #800.
+
+Com isso a release de build **`viabilidade-a0.1.40_faebece6`** foi publicada por
+`workflow_dispatch` do `release.yml` na `main`, não homologada (`prerelease=true`), com a mesma
+`versao` 0.1.40 — nenhuma migração entrou na rodada, então é upgrade de build na mesma versão,
+que a Pinguim (`aceitacao = 'releases'`) instala sozinha. ⚠️ O que a conferência acima **não**
+exercitou: backend e tela — a instância ainda rodava a release anterior, então os consertos de
+contrato de escrita (#791, #793, #802) e as telas (#798, #795, #796) só são testáveis depois do
+upgrade, pelo autor, antes de homologar.
 
 ---
 
