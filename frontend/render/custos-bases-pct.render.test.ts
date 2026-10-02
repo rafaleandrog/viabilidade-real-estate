@@ -36,4 +36,11 @@ test('Custos do Avançado: badges % Construção / % Recebido e as bases que a t
   assert.ok(perto(m!.receitaRecebida, m!.receitaBrutaMotor!), relato(a));
   assert.ok(perto(m!.ligacaoRecebido, m!.receitaBrutaMotor!), relato(a));
   assert.notEqual(m!.resultadoMarketing, 'R$ 100.000,00', 'o % Recebido caiu no VGV de tabela' + relato(a));
+
+  // Fallback fail-closed: linha sem categoria, ou categoria fora do catálogo
+  // do grupo, nunca ganha as unidades novas — e continua com as antigas.
+  for (const u of [m!.unidsDecoracaoMigrada, m!.unidsSemCategoria]) {
+    assert.ok(!u.includes('pct_constr') && !u.includes('pct_recebido'), `fallback ofereceu unidade nova: ${u}` + relato(a));
+    assert.deepEqual(u, ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita', 'pct_obra'], relato(a));
+  }
 });

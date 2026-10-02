@@ -635,8 +635,8 @@ export interface ContextoCusto {
   /** Receita RECEBIDA: Σ do recebimento bruto, com juros de tabela — a mesma
    * grandeza que o motor publica como `receitaBruta`. Base de `pct_recebido`. */
   receitaRecebida?: number;
-  /** Custo de construção: linhas do grupo Obra das categorias de
-   * `CATEGORIAS_BASE_CONSTRUCAO` — ver `totalConstrucaoCustos`. Base de `pct_constr`. */
+  /** Custo de construção: linhas das categorias de `CATEGORIAS_BASE_CONSTRUCAO`,
+   * em qualquer grupo — ver `totalConstrucaoCustos`. Base de `pct_constr`. */
   totalConstrucao?: number;
   /**
    * #473: base da Corretagem de vendas quanto à permuta física. `true`

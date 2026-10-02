@@ -145,14 +145,16 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   // `pct_vgv` e `pct_constr` dividem `projetos_pct`, e a troca de badge grava só
   // o canônico — então, com canônico presente, a coluna pode carregar o % da
   // OUTRA base. O memo deriva o % do valor que a Proforma aplica.
-  const projetosPct = (base: number) => {
-    // Mesmo predicado de `canonico` em `proforma.ts`: presente = não nulo.
-    const temCanonico = e.projetos_valor_canonico !== null && e.projetos_valor_canonico !== undefined;
-    return temCanonico && base > 0 ? p.projetos / base * 100 : Number(e.projetos_pct) || 0;
-  };
+  // Com canônico e base zerada não há percentual a publicar: a Proforma aplica
+  // o R$ canônico, e o memo diz isso em vez de repetir a coluna.
+  // Mesmo predicado de `canonico` em `proforma.ts`: presente = não nulo.
+  const projetosTemCanonico = e.projetos_valor_canonico !== null && e.projetos_valor_canonico !== undefined;
+  const projetosPctMemo = (base: number, rotulo: string) => !projetosTemCanonico
+    ? `${pct(e.projetos_pct)} ${rotulo}`
+    : base > 0 ? `${pct(p.projetos / base * 100)} ${rotulo}` : 'valor fixo';
   const projetosMemo = e.projetos_modo === 'valor_fixo' ? 'valor fixo'
-    : e.projetos_modo === 'pct_constr' ? `${pct(projetosPct(p.custoObras))} do custo de obras`
-    : `${pct(projetosPct(p.vgv))} do VGV`;
+    : e.projetos_modo === 'pct_constr' ? projetosPctMemo(p.custoObras, 'do custo de obras')
+    : projetosPctMemo(p.vgv, 'do VGV');
   const infraMemo = e.infra_modo === 'valor_m2' ? `${rsm2(e.custo_infra_m2)} × área vendável`
     : e.infra_modo === 'valor_fixo' ? 'valor fixo'
     : `${pct(e.infra_pct)} do VGV`;

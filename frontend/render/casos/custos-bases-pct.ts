@@ -58,6 +58,8 @@ export interface MedidaBasesPct {
   receitaBrutaMotor: number | undefined;
   ligacaoConstrucao: number | undefined;
   ligacaoRecebido: number | undefined;
+  unidsDecoracaoMigrada: string[];
+  unidsSemCategoria: string[];
 }
 
 export const caso = {
@@ -125,6 +127,10 @@ export const caso = {
       receitaBrutaMotor: tela._calcObra()?.receitaBruta,
       ligacaoConstrucao: tela._ctxConversao(PROJETOS.id).construcao,
       ligacaoRecebido: tela._ctxConversao(MARKETING.id).recebido,
+      // Decoração que a migração 002 deixou em `diretos`: categoria fora do
+      // catálogo do grupo cai no fallback, que não oferece as unidades novas.
+      unidsDecoracaoMigrada: tela._unidsPerm('diretos', 'Decoração'),
+      unidsSemCategoria: tela._unidsPerm('diretos', null),
     };
   },
 };

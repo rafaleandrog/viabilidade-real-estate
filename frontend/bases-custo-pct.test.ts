@@ -188,6 +188,10 @@ test('Preliminar: o memo de Projetos deriva o % do valor aplicado, não da colun
   // Sem canônico (linha legada), a coluna É o percentual aplicado.
   const legado = memo({ ...INC, projetos_modo: 'pct_constr' });
   assert.equal(legado.memo, '1,6% do custo de obras');
+  // Canônico com base zerada: não há % a publicar — o memo não repete a coluna.
+  const semBase = memo({ ...INC, projetos_modo: 'pct_constr', construcao_valor_total: 0, construcao_valor_canonico: 0, taxa_gestao_pct: 0, projetos_valor_canonico: 500_000 });
+  assert.equal(semBase.p.custoObras, 0);
+  assert.equal(semBase.memo, 'valor fixo');
   // A recíproca: canônico vindo da base de construção, modo de volta a % VGV.
   const volta = memo({ ...INC, projetos_modo: 'pct_vgv', projetos_valor_canonico: 1_628_160 });
   assert.equal(volta.memo, `${fmtNum(1_628_160 / vgv * 100, 2)}% do VGV`);

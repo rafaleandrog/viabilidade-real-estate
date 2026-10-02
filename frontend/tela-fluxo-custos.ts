@@ -127,6 +127,13 @@ const UNIDADES = [
   { valor: 'pct_constr', rotulo: '% Construção' },
 ];
 
+// Unidades que só existem onde a categoria as lista em `UNIDADES_CAT`: o
+// fallback "todas as unidades" de `_unidsPerm` (linha sem categoria, ou
+// categoria fora do catálogo do grupo — ex.: Decoração e Gestão da obra que a
+// migração `002` deixou em `diretos`) não as oferece. Fail-closed: sem isso,
+// uma Decoração em `diretos` poderia virar `% Construção` da própria base.
+const UNIDADES_SO_POR_CATEGORIA = new Set(['pct_recebido', 'pct_constr']);
+
 // Unidades permitidas por grupo+categoria. Ausência = todas as unidades.
 // Garante coerência entre a opção visível e o que o motor calcula.
 const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
@@ -350,8 +357,9 @@ export class ViabFluxoCustos extends LitElement {
 
   // Unidades permitidas para o combo grupo+categoria. Sem categoria → todas.
   private _unidsPerm(grupo: GrupoId, categoria: string | null | undefined): string[] {
-    if (!categoria) return UNIDADES.map((u) => u.valor);
-    return UNIDADES_CAT[grupo]?.[categoria] ?? UNIDADES.map((u) => u.valor);
+    const todas = UNIDADES.map((u) => u.valor).filter((v) => !UNIDADES_SO_POR_CATEGORIA.has(v));
+    if (!categoria) return todas;
+    return UNIDADES_CAT[grupo]?.[categoria] ?? todas;
   }
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
