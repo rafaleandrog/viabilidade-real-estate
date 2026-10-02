@@ -1018,6 +1018,24 @@ test('BUG7-08 custo_obras: escala os 2 modos (R$/m², valor total) e o canônico
   assert.ok(perto(canon.construcao, 6_000_000), `canonico=${canon.construcao}`);
 });
 
+test('custo_obras: estressar move o KPI custoObras em exatamente o fator, com decoração e gestão', () => {
+  const base: ProformaInput = {
+    tipo_empreendimento: 'incorporacao', area_pvt_r_fechada: 1000,
+    construcao_modo: 'valor_total', construcao_valor_total: 100,
+    custo_decoracao_m2: 0.01, taxa_gestao_pct: 5,
+  };
+  const sem = calcularProforma(base);
+  assert.ok(perto(sem.decoracao, 10), `decoracao base=${sem.decoracao}`);
+  assert.ok(perto(sem.custoObras, 115.5), `custoObras base=${sem.custoObras}`);
+  const com = calcularProforma({ ...base, sensibilidade: { variavel: 'custo_obras', fator: 1.1 } });
+  assert.ok(perto(com.construcao, 110), `construcao=${com.construcao}`);
+  assert.ok(perto(com.decoracao, 11), `decoracao=${com.decoracao}`);
+  assert.ok(perto(com.gestaoConstrucao, 6.05), `gestao=${com.gestaoConstrucao}`);
+  assert.ok(perto(com.custoObras, sem.custoObras * 1.1), `custoObras=${com.custoObras}`);
+  const bear = calcularProforma({ ...base, sensibilidade: { variavel: 'custo_obras', fator: 0.9 } });
+  assert.ok(perto(bear.custoObras, sem.custoObras * 0.9), `bear=${bear.custoObras}`);
+});
+
 // #725 — o tornado de alavancas (Rodada 13) precisa estressar também o custo
 // do terreno e os custos indiretos, que até aqui não tinham fator.
 test('#725 custo_terreno: fatorSens escala só custoTerreno', () => {
