@@ -1616,8 +1616,7 @@ EVI são consultivos, e alinhar o motor mudaria o número publicado em todo estu
 maiores que zero. O alinhamento fica em aberto para o dia em que o autor confirmar que a planilha
 atual é a verdade; ele pediria o expoente `+ 1` em `pagamentosConcentrado` e na carteira do ramo
 concentrado (`carteiraSaldoSafra`); `jurosSafra` não tem expoente próprio, ele deriva o valor de
-`pagamentosConcentrado` e acompanha a mudança sozinho. Viria depois do ajuste da carteira com
-`defasagemMeses: 0`.
+`pagamentosConcentrado` e acompanha a mudança sozinho.
 
 A outra convenção que mudou na planilha, a primeira parcela da tabela longa no mês da venda (30
 parcelas em vez de 29 numa obra que vai até o mês 29), o app já expressa: `defasagemMeses: 0` em
