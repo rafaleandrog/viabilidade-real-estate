@@ -113,8 +113,9 @@ mantém as suas:
   um mês de juros a menos do que na planilha.
 - **Primeira parcela da tabela longa.** O app paga a primeira parcela no mês seguinte ao da venda; a
   planilha paga no mês da venda. O motor aceita a primeira parcela no mês da venda (`defasagemMeses`
-  igual a `0` no componente de pagamento), que reproduz a planilha; a tela de Receitas não tem controle
-  para isso.
+  igual a `0` no componente de pagamento), que reproduz o valor e o mês do recebimento da planilha; a
+  tela de Receitas não tem controle para isso. Com `0`, a série de **carteira** de clientes ainda não
+  desconta a parcela paga no mês da venda, e o saldo da carteira fica acima do da planilha.
 
 ### Cenários
 

@@ -178,8 +178,10 @@ Exposição máxima da planilha = mín.(Fluxo de Caixa Acumulado, após o fundin
 `tm` é a taxa de desconto mensal, `(1 + taxa a.a.)^(1/12) − 1`, e `n` o número de meses entre o início
 do planejamento e o lançamento. A diferença que sobra depois da conversão do VPL é efeito dos fluxos,
 não da convenção. A exposição máxima do app, por sua vez, olha o fluxo livre de todo o período; a
-da planilha olha o caixa depois do funding, só a partir do lançamento, e por isso os custos feitos
-antes do lançamento (marketing, registro) pesam em uma e não na outra.
+da planilha olha o caixa depois do funding, só a partir do lançamento. Tomar o mínimo da linha
+**Fluxo de Caixa Acumulado** a partir do lançamento muda só a janela de observação: o saldo
+acumulado vem do primeiro mês, e os custos anteriores ao lançamento continuam dentro dele. Uma
+diferença que sobrar depois disso vem do calendário dos custos, não da definição.
 
 ### O fecho de três linhas
 

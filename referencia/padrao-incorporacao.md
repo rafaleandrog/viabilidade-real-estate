@@ -1621,7 +1621,9 @@ concentrado (`carteiraSaldoSafra`) e em `jurosSafra`, e viria depois do ajuste d
 A outra convenção que mudou na planilha, a primeira parcela da tabela longa no mês da venda (30
 parcelas em vez de 29 numa obra que vai até o mês 29), o app já expressa: `defasagemMeses: 0` em
 `pagamentosPrazoFixo` e no ramo `ate_marco` reproduz a planilha (parcela do mês 12 do estudo 15 de
-R$ 165.177,49 contra R$ 165.177,50). O padrão do app continua `defasagemMeses: 1`.
+R$ 165.177,49 contra R$ 165.177,50). Ressalva: `carteiraSaldoSafra`
+(`frontend/fluxo-caixa-motor.ts:1274`) começa a abater pagamentos em `safra + 1`, então com `0` a
+parcela do mês da venda não sai da carteira; o recebimento reproduz a planilha, a carteira ainda não. O padrão do app continua `defasagemMeses: 1`.
 
 ### 13.6 Carteira por safra
 
