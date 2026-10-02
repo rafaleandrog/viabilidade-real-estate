@@ -134,7 +134,8 @@ const UNIDADES = [
 // uma Decoração em `diretos` poderia virar `% Construção` da própria base.
 const UNIDADES_SO_POR_CATEGORIA = new Set(['pct_recebido', 'pct_constr']);
 
-// Unidades permitidas por grupo+categoria. Ausência = todas as unidades.
+// Unidades permitidas por grupo+categoria. Ausência = todas as unidades, menos
+// as de `UNIDADES_SO_POR_CATEGORIA`.
 // Garante coerência entre a opção visível e o que o motor calcula.
 const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   terreno: {
@@ -355,7 +356,8 @@ export class ViabFluxoCustos extends LitElement {
     return ctx;
   }
 
-  // Unidades permitidas para o combo grupo+categoria. Sem categoria → todas.
+  // Unidades permitidas para o combo grupo+categoria. Sem categoria (ou fora do
+  // catálogo do grupo) → todas, menos as de `UNIDADES_SO_POR_CATEGORIA`.
   private _unidsPerm(grupo: GrupoId, categoria: string | null | undefined): string[] {
     const todas = UNIDADES.map((u) => u.valor).filter((v) => !UNIDADES_SO_POR_CATEGORIA.has(v));
     if (!categoria) return todas;

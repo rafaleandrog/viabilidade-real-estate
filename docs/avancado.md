@@ -60,7 +60,7 @@ consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de constr
 
 As unidades em % diferem na base. **% da receita** é a receita líquida do RET, sem juros; **% do
 recebido** é o que de fato entra em caixa, com os juros de tabela — oferecido no marketing, na
-manutenção pós-obra, no marketing global, na gestão e em Outro. **% da obra** é o grupo Obras inteiro, outorga
+manutenção pós-obra, no marketing global, na gestão e no Outro dos custos diretos e indiretos. **% da obra** é o grupo Obras inteiro, outorga
 e contingência inclusas; **% da construção** é só construção, decoração e gestão da obra — oferecido
 em Projetos. As bases estão em [Fórmulas](formulas).
 
