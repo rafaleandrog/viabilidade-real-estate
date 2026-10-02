@@ -132,9 +132,11 @@ test('validarComponentesSafra: soma dos componentes diverge de 100%', () => {
 
 test('validarComponentesSafra: componente que fecha exato (N_s = 1) não reporta carteira residual', () => {
   // CARTEIRA_NAO_ZERA/CARTEIRA_RESSURGE são defensivas: as funções puras do
-  // motor de safra (#232-#237) já garantem o fechamento por construção — não
-  // há hoje um componente válido que viole essas duas checagens. Ficam
-  // prontas para pegar uma REGRESSÃO futura no motor, não um caso atual.
+  // motor de safra (#232-#237) garantem o fechamento por construção. Esta
+  // frase já disse que "não há componente válido que viole" as duas, e era
+  // falsa: o `concentrado` com taxa > 0 violava a RESSURGE (#749) e o
+  // `ate_marco` com 1ª parcela no mês da venda e N_s = 1 violava a NAO_ZERA
+  // (#789). Os dois casos estão em `fluxo-carteira-reconciliacao.test.ts`.
   const componenteAteMarco: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
     tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 11,
     defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'até marco',

@@ -21,10 +21,10 @@
 import type { FluxoCalc, ComponentePagamento, ResiduoAteMarco } from './fluxo-caixa-motor.js';
 import {
   carteiraSaldoSafra, componentesIntegradosSafra, componentesPagamento,
-  linhasReceitaComPermutaReservada, vendaLiquidaContratadaMensal,
+  linhasReceitaComPermutaReservada, vendaBrutaContratadaMensal, vendaLiquidaContratadaMensal,
 } from './fluxo-caixa-motor.js';
 import {
-  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo, ultimoMesFunding, vgvVendavelLinha,
+  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo, ultimoMesFunding,
   type AbsorcaoMensal, type EventoCrono,
 } from './fluxo-shared.js';
 import type { FundingCalc } from './funding-motor.js';
@@ -139,8 +139,9 @@ export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO):
   return out;
 }
 
-/** Contratação bruta independente do total calculado: Σ quantidade × área ×
- * preço/m² × absorção efetiva de cada fase.
+/** Contratação bruta recomposta LINHA A LINHA e confrontada com o total que o
+ * motor agregou: Σ quantidade × área × preço/m² × absorção efetiva de cada
+ * fase, mês a mês, com o `round2` mensal do motor (#749 — ver o corpo).
  *
  * #444: a grandeza é o VGV VENDÁVEL (`vgvVendavelLinha`, a mesma que
  * `vendaBrutaContratadaMensal` usa) — não o VGV bruto. Num estudo com permuta
@@ -161,16 +162,16 @@ export function validarContratacao(
   const linhas = linhasCusto.length > 0
     ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
     : linhasReceita;
+  // #749: o esperado usa a MESMA aritmética do motor — `round2` por mês, via
+  // `vendaBrutaContratadaMensal` (que é quantidade × área × preço/m² ×
+  // absorção, mês a mês). Somar os percentuais e arredondar uma vez só no fim
+  // divergia do motor por centavos (R$ 0,04 em VGV de nove dígitos) e virava
+  // um `VENDA_BRUTA_NAO_RECONCILIA` de severidade erro sem defeito nenhum. O
+  // que a checagem continua pegando é a AGREGAÇÃO: linha que o total do motor
+  // perdeu, contou duas vezes ou contou sem a reserva de permuta.
   let esperado = 0;
   for (const linha of linhas) {
-    const vgv = vgvVendavelLinha(linha.tipologias ?? []);
-    const abs = absorcaoMensal(linha.absorcao ?? { modo: 'linear' }, cronograma);
-    if (!abs) continue;
-    const pctNoHorizonte = abs.pcts.reduce((s, pct, i) => {
-      const mes = abs.inicio + i;
-      return s + (mes >= 0 && mes < prazo ? Number(pct ?? 0) : 0);
-    }, 0);
-    esperado += vgv * pctNoHorizonte / 100;
+    esperado += vendaBrutaContratadaMensal(linha, cronograma, prazo).reduce((s, v) => s + v, 0);
   }
   esperado = Math.round((esperado + Number.EPSILON) * 100) / 100;
   if (Math.abs(esperado - vendaBrutaEncontrada) <= tol) return [];
@@ -212,15 +213,50 @@ export function validarSafrasReceita(
     // degenerado chegava intacto a `carteiraSaldoSafra`, que lança — o motor
     // roda sem exceção e produz número porque passa pela integrada.
     const residuoAteMarco: ResiduoAteMarco = linha?.fluxo_pagamento?.residuoAteMarco ?? 'imediato';
-    for (let safra = 0; safra < contratacoes.length; safra++) {
-      if ((contratacoes[safra] ?? 0) <= tol) continue;
-      const efetivos = componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco);
-      const divergencias = validarComponentesSafra(efetivos, safra, contratacoes[safra], tol);
-      for (const d of divergencias) out.push({
+    // #789: a PRIMEIRA divergência de cada código POR COMPONENTE, varrendo
+    // todas as safras — não a primeira safra com qualquer divergência na linha.
+    // O `break` por linha que havia aqui escondia defeito: um falso positivo
+    // na safra 12 interrompia a checagem e a safra 41, com outro componente e
+    // outro defeito, nunca era olhada.
+    //
+    // A identidade do componente é a POSIÇÃO dele no plano persistido, não o
+    // rótulo: dois componentes do mesmo tipo sem rótulo (ou com o mesmo)
+    // seriam um só, e o defeito do segundo ficaria escondido atrás do do
+    // primeiro — o mesmo mascaramento, em escala menor.
+    const vistos = new Set<string>();
+    const registra = (d: Divergencia, identidade: string) => {
+      const chave = `${d.codigo}|${identidade}`;
+      if (vistos.has(chave)) return;
+      vistos.add(chave);
+      out.push({
         ...d,
         linha: `${linha.nome || 'Receita'}${d.linha ? ` / ${d.linha}` : ''}`,
       });
-      if (divergencias.length > 0) break;
+    };
+    const concentradosOrigem = componentes.filter((c) => c.tipo === 'concentrado');
+    for (let safra = 0; safra < contratacoes.length; safra++) {
+      if ((contratacoes[safra] ?? 0) <= tol) continue;
+      const valor = contratacoes[safra];
+      const efetivos = componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco);
+      // A soma das participações é da SAFRA inteira, não de um componente.
+      for (const d of validarComponentesSafra(efetivos, safra, valor, tol)) {
+        if (d.codigo === 'SOMA_COMPONENTES_DIVERGE') registra(d, 'linha');
+      }
+      const concentradosEfetivos = efetivos.filter((c) => c.tipo === 'concentrado');
+      for (const c of efetivos) {
+        if (c.tipo === 'imediato') continue;
+        // `componentesIntegradosSafra` devolve o próprio objeto persistido,
+        // exceto o `concentrado` que recebeu o resíduo de um `ate_marco` sem
+        // prazo — esse vem como CÓPIA. Concentrado nunca é removido nem
+        // reordenado, então o k-ésimo efetivo é o k-ésimo persistido.
+        const origem = c.tipo === 'concentrado' && !componentes.includes(c)
+          ? concentradosOrigem[concentradosEfetivos.indexOf(c)]
+          : c;
+        const identidade = `#${componentes.indexOf(origem as ComponentePagamento)}`;
+        for (const d of validarComponentesSafra([c], safra, valor, tol)) {
+          if (d.codigo !== 'SOMA_COMPONENTES_DIVERGE') registra(d, identidade);
+        }
+      }
     }
   }
   return out;
@@ -290,8 +326,8 @@ export function validarCustosDuplicados(linhasCusto: any[]): Divergencia[] {
  * simplesmente menor que a realidade.
  *
  * 🔴 **Por que esta checagem não saiu da validação que já existia.**
- * `validarContratacao` (`pctNoHorizonte`) soma `abs.pcts`, a saída JÁ
- * TRUNCADA de `absorcaoMensal`: consome a saída de quem deveria fiscalizar,
+ * `validarContratacao` (via `vendaBrutaContratadaMensal`) soma `abs.pcts`, a
+ * saída JÁ TRUNCADA de `absorcaoMensal`: consome a saída de quem deveria fiscalizar,
  * então `VENDA_BRUTA_NAO_RECONCILIA` fecha certinho enquanto o percentual
  * evapora. O `somaPct` de `validarProduto` (abaixo) chega a comparar essa
  * soma com 100, mas só para SUPRIMIR `ESTOQUE_FINAL_NAO_ZERA`.
@@ -705,6 +741,12 @@ export function validarComponentesSafra(
       });
     }
 
+    // #749: o `concentrado` capitaliza juros por desenho até o pagamento único
+    // (#234) — o saldo DEVE crescer, e acusá-lo era falso positivo em todo
+    // repasse com taxa > 0 (o plano EVI de referência inclusive). A
+    // monotonicidade continua valendo para os tipos que amortizam; o
+    // `CARTEIRA_NAO_ZERA` acima continua valendo para todos.
+    if (c.tipo === 'concentrado') continue;
     for (let i = 1; i < saldos.length; i++) {
       if (saldos[i].saldo > saldos[i - 1].saldo + tol) {
         out.push({
