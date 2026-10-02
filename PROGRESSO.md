@@ -18,6 +18,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-02 — Permuta física é parte das unidades alocadas: backend e invariantes alinhados ao motor
+
+Decisão do autor na #792, opção (b): o motor (`reservarPermutasFisicas`, sem mudança) lê as unidades
+permutadas como PARTE das alocadas; backend, invariantes e a tela de Receitas as liam como
+ADICIONAIS. Com catálogo 200 e 20 permutadas a tela só deixava alocar 180, e o motor tirava as 20 de
+novo: R$ 6 mi de VGV vendável sumiam no estado da issue, sem aviso. Agora:
+
+- backend (`backend/rotas/avancado.ts`): `saldoTipologiaNoEstudo` = catálogo − alocado (as três
+  portas — POST/PATCH de alocação e PATCH de tipologia — herdam); o teto da permuta física é o
+  alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO`), não o catálogo;
+- invariantes (`validarProduto`): `PRODUTO_EXCEDE_ESTOQUE` só com alocado > catálogo;
+  `PRODUTO_SUBALOCADO` = catálogo − alocado; erro novo `PERMUTA_FISICA_EXCEDE_ALOCADO`; o estoque
+  mensal baixa só as vendáveis (a reserva do motor), e as reservadas saem na entrega;
+  `unidadesNaoAlocadasPorTipologia` perdeu o parâmetro de custos;
+- telas: `_saldo` de Receitas e o banner de Tipologias deixaram de descontar permuta.
+
+Nenhum número publicado muda. Estudo montado na regra antiga (alocado + permutado = catálogo) calcula
+igual e passa a mostrar `PRODUTO_SUBALOCADO` (alerta). Sem migração, `versao` não bumpa. Testes:
+`frontend/fluxo-permuta-semantica.test.ts` (os da issue, ajustados à opção b), casos em
+`fluxo-invariantes.test.ts` e requisições HTTP reais em `backend/rotas/avancado-custos-rota.test.ts`;
+cada mutação (saldo voltar a descontar, teto voltar ao catálogo, invariante voltar a somar, estoque
+voltar a baixar a quantidade bruta) deixa testes vermelhos.
+
 ## 2026-10-01 — Reconciliação da carteira de recebíveis: parcela no mês da venda e dois falsos positivos
 
 `carteiraSaldoSafra` (`frontend/fluxo-caixa-motor.ts`) nunca lia o pagamento do próprio mês da

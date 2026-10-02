@@ -226,10 +226,10 @@ test('#753 fiação: subcategoria → tipologia → quantidade, cada uma num PAT
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   // Tipologia do MESMO estudo (`estudo_id` numérico: `DadosFake.listar` e a
-  // rota comparam por `===`/`Number()`), com 10 unidades, 8 já alocadas em
-  // Receitas → saldo 2 para permuta.
+  // rota comparam por `===`/`Number()`), com 10 unidades, 2 alocadas em
+  // Receitas → saldo 2 para permuta (a permuta sai das unidades ALOCADAS).
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 10, area_privativa_m2: 30, preco_m2: 10_000 });
-  dados.semear('avancado_alocacoes', { id: 501, tipologia_id: 11, unidades: 8 });
+  dados.semear('avancado_alocacoes', { id: 501, tipologia_id: 11, unidades: 2 });
   const cid = dados.semear('avancado_linhas_custo', precoTerrenoBase(1));
 
   await comServidor(criarApp(dados), async (base) => {
@@ -272,6 +272,7 @@ test('#753 fiação: a quantidade pode vir ANTES da tipologia — a ordem dos ca
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 10 });
+  dados.semear('avancado_alocacoes', { id: 501, tipologia_id: 11, unidades: 10 });
   const cid = dados.semear('avancado_linhas_custo', precoTerrenoBase(1, { subcategoria: 'Permuta física', orcamento_valor: null, orcamento_valor_canonico: null }));
 
   await comServidor(criarApp(dados), async (base) => {
@@ -279,7 +280,7 @@ test('#753 fiação: a quantidade pode vir ANTES da tipologia — a ordem dos ca
     // deixava a linha "Permuta física" sem tipologia).
     const r1 = await patch(base, cid, { permuta_quantidade: 3 });
     assert.equal(r1.status, 200, `esperava 200, veio ${r1.status}: ${JSON.stringify(r1.corpo)}`);
-    // Depois a tipologia: agora a linha está completa e o saldo (10) é conferido.
+    // Depois a tipologia: agora a linha está completa e o saldo (10 alocadas) é conferido.
     const r2 = await patch(base, cid, { permuta_tipologia_id: 11 });
     assert.equal(r2.status, 200, `esperava 200, veio ${r2.status}: ${JSON.stringify(r2.corpo)}`);
     const linha = await dados.buscar('avancado_linhas_custo', cid);
@@ -336,13 +337,13 @@ test('#756 saldo de permuta com 1200 alocações (mais de uma página): a guarda
   const cid = dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11 });
 
   await comServidor(criarApp(dados), async (base) => {
-    // 1500 − 1200 alocadas = 300 disponíveis. Só a primeira página (1000)
-    // daria 500, e 400 passaria.
-    const r = await patch(base, cid, { permuta_quantidade: 400 });
+    // A permuta sai das 1200 alocadas: 1200 disponíveis. Só a primeira página
+    // (1000) daria 1000, e 1100 tomaria 422 indevido.
+    const r = await patch(base, cid, { permuta_quantidade: 1201 });
     assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
     assert.equal(r.corpo.codigo, 'PERMUTA_SALDO_EXCEDIDO');
-    assert.match(r.corpo.mensagem, /300 unidade/);
-    const ok = await patch(base, cid, { permuta_quantidade: 300 });
+    assert.match(r.corpo.mensagem, /1200 unidade/);
+    const ok = await patch(base, cid, { permuta_quantidade: 1100 });
     assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
   });
 });
@@ -351,13 +352,14 @@ test('#756 saldo de permuta com 1100 linhas de custo reservando (mais de uma pá
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 1200, area_privativa_m2: 30, preco_m2: 10_000 });
+  dados.semear('avancado_alocacoes', { tipologia_id: 11, unidades: 1200 });
   for (let i = 0; i < 1100; i++) {
     dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11, permuta_quantidade: 1 });
   }
   const cid = dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11 });
 
   await comServidor(criarApp(dados), async (base) => {
-    // 1200 − 1100 reservadas = 100 disponíveis. Só a primeira página (1000)
+    // 1200 alocadas − 1100 reservadas = 100 disponíveis. Só a primeira página (1000)
     // daria 200, e 200 passaria.
     const r = await patch(base, cid, { permuta_quantidade: 200 });
     assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
@@ -501,5 +503,88 @@ test('#802 POST comum (sem `semeadura: true`) cria como sempre, mesmo com a obri
     assert.notEqual(r.corpo.id, existente);
     assert.equal(Number(r.corpo.orcamento_valor), 2_500_000, 'o valor enviado tem de ser gravado, não descartado');
     assert.equal((await linhasDe(dados, 1, 'obra', 'Construção')).length, 2);
+  });
+});
+
+// ── #792: permuta física é PARTE das unidades alocadas ───────────────────────
+//
+// Decisão do autor (opção b): o backend segue o motor (`reservarPermutasFisicas`
+// reserva a permuta de DENTRO das alocações de Receitas). Saldo de alocação =
+// catálogo − alocado; permuta ≤ alocado; o catálogo não desce abaixo do alocado.
+// Antes, a permuta era descontada também do saldo de alocação: com catálogo 200
+// e 20 permutadas a tela só deixava alocar 180, e o motor tirava as 20 de novo —
+// R$ 6 mi de VGV vendável sumiam no estado da issue. Requisições HTTP reais
+// contra `rotasAvancado`, para provar a fiação das rotas, não só a função pura.
+
+function semearEstudoPermuta(dados: DadosFake, alocadas: number) {
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 200, area_privativa_m2: 25, preco_m2: 12_000 });
+  dados.semear('avancado_fases', { id: 21, estudo_id: 1, tipo: 'receita', nome: 'G' });
+  const aid = alocadas > 0 ? dados.semear('avancado_alocacoes', { estudo_id: 1, fase_id: 21, tipologia_id: 11, unidades: alocadas, ordem: 0 }) : null;
+  const cid = dados.semear('avancado_linhas_custo', precoTerrenoBase(1, {
+    subcategoria: 'Permuta física', orcamento_valor: null, orcamento_valor_canonico: null,
+    permuta_tipologia_id: 11, permuta_quantidade: 20,
+  }));
+  return { aid, cid };
+}
+
+async function enviar(base: string, metodo: string, caminho: string, body: Record<string, any>) {
+  const res = await fetch(`${base}${caminho}`, {
+    method: metodo, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  return { status: res.status, corpo: await res.json() };
+}
+
+test('#792 alocação: com 20 permutadas, o catálogo de 200 aloca inteiro (POST) — a permuta não desconta do saldo', async () => {
+  const dados = new DadosFake();
+  semearEstudoPermuta(dados, 0);
+  await comServidor(criarApp(dados), async (base) => {
+    const r = await enviar(base, 'POST', '/estudos/1/avancado/fases/21/alocacoes', { tipologia_id: 11, unidades: 200 });
+    assert.equal(r.status, 201, `esperava 201, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    // Controle: o catálogo continua sendo o teto.
+    const r2 = await enviar(base, 'POST', '/estudos/1/avancado/fases/21/alocacoes', { tipologia_id: 11, unidades: 1 });
+    assert.equal(r2.status, 422);
+    assert.equal(r2.corpo.codigo, 'SALDO_ESGOTADO');
+  });
+});
+
+test('#792 alocação: estudo na regra antiga (180 + 20 = 200) completa as 200 pelo PATCH, e 201 continua 422', async () => {
+  const dados = new DadosFake();
+  const { aid } = semearEstudoPermuta(dados, 180);
+  await comServidor(criarApp(dados), async (base) => {
+    const passa = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, { unidades: 200 });
+    assert.equal(passa.status, 200, `esperava 200, veio ${passa.status}: ${JSON.stringify(passa.corpo)}`);
+    const barra = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, { unidades: 201 });
+    assert.equal(barra.status, 422);
+    assert.equal(barra.corpo.codigo, 'SALDO_EXCEDIDO');
+    assert.match(barra.corpo.mensagem, /200 unidade/);
+  });
+});
+
+test('#792 permuta: o teto é o ALOCADO, não o catálogo — sem alocação não há o que permutar', async () => {
+  const dados = new DadosFake();
+  const { cid } = semearEstudoPermuta(dados, 15);
+  await comServidor(criarApp(dados), async (base) => {
+    // 15 alocadas: 20 permutadas não cabem, ainda que o catálogo tenha 200.
+    const r = await patch(base, cid, { permuta_quantidade: 16 });
+    assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    assert.equal(r.corpo.codigo, 'PERMUTA_SALDO_EXCEDIDO');
+    assert.match(r.corpo.mensagem, /15 unidade/);
+    const ok = await patch(base, cid, { permuta_quantidade: 15 });
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
+  });
+});
+
+test('#792 catálogo: reduzir a quantidade vai até o ALOCADO (permuta inclusa), não até alocado + permutado', async () => {
+  const dados = new DadosFake();
+  semearEstudoPermuta(dados, 180);
+  await comServidor(criarApp(dados), async (base) => {
+    // Regra antiga: 180 + 20 = 200 comprometidas, e reduzir para 180 tomava 422.
+    const ok = await enviar(base, 'PATCH', '/estudos/1/avancado/tipologias/11', { quantidade: 180 });
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
+    const barra = await enviar(base, 'PATCH', '/estudos/1/avancado/tipologias/11', { quantidade: 179 });
+    assert.equal(barra.status, 422);
+    assert.equal(barra.corpo.codigo, 'SALDO_EXCEDIDO');
+    assert.match(barra.corpo.mensagem, /180 unidade/);
   });
 });

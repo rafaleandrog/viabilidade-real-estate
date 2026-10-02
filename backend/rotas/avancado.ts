@@ -846,10 +846,12 @@ rotasAvancado.post('/estudos/:id/avancado/tipologias', async (req: Request, res:
 });
 
 /**
- * Unidades de uma tipologia já COMPROMETIDAS no estudo — alocações de venda
- * **mais** permuta física. É o complemento aritmético do saldo devolvido por
- * `saldoTipologiaNoEstudo` (`quantidade − vendido − permutadas`), e por isso não
- * reconta nada: recebe a quantidade do catálogo e o saldo, e devolve a diferença.
+ * Unidades de uma tipologia já COMPROMETIDAS no estudo — as alocações de venda.
+ * A permuta física não soma: as unidades permutadas são PARTE das alocadas (é
+ * como o motor as lê, `reservarPermutasFisicas`), então quem limita o catálogo
+ * é só o alocado. É o complemento aritmético do saldo devolvido por
+ * `saldoTipologiaNoEstudo` (`quantidade − alocado`), e por isso não reconta
+ * nada: recebe a quantidade do catálogo e o saldo, e devolve a diferença.
  *
  * Saldo negativo é entrada legítima — é exatamente o estado que a #433 encontrou
  * na instância (234 no catálogo, 276 comprometidas ⇒ saldo −42).
@@ -864,7 +866,8 @@ export function comprometidasDeTipologia(quantidadeCatalogo: unknown, saldo: unk
 
 /**
  * Regra do portão de `PATCH .../tipologias/:tid` (#433): a `quantidade` nova não
- * pode ficar abaixo do que já está comprometido (alocações + permuta física).
+ * pode ficar abaixo do que já está comprometido (as alocações de venda — a
+ * permuta física é parte delas, não soma).
  * Devolve a mensagem do 422 `SALDO_EXCEDIDO`, ou `null` quando o PATCH passa.
  *
  * ⚠️ Pura de propósito — a contagem do comprometido é assíncrona (lê
@@ -882,7 +885,7 @@ export function comprometidasDeTipologia(quantidadeCatalogo: unknown, saldo: unk
  *    `PATCH {"quantidade": null}` cairia no ramo `NaN`, sairia `null` daqui e
  *    gravaria `quantidade = NULL` numa tipologia com unidades comprometidas:
  *    o mesmo estado impossível que a #433 existe para impedir, um degrau pior;
- *  - nada comprometido — sem alocação nem permuta não há o que proteger, e
+ *  - nada comprometido — sem alocação não há o que proteger, e
  *    zerar (ou até um valor negativo, que esta regra não fiscaliza) segue livre.
  */
 export function quantidadeNumerica(valor: unknown): number | null {
@@ -901,7 +904,7 @@ export function erroQuantidadeTipologia(quantidadeNova: unknown, comprometidas: 
   if (usadas <= 0) return null;
   if (nova >= usadas) return null;
 
-  return `Já há ${usadas} unidade(s) comprometida(s) desta tipologia (alocações de venda + permuta física) — a quantidade não pode ser reduzida para ${nova}`;
+  return `Já há ${usadas} unidade(s) comprometida(s) desta tipologia (alocações de venda, permuta física inclusa) — a quantidade não pode ser reduzida para ${nova}`;
 }
 
 /**
@@ -1176,40 +1179,50 @@ function porOrdem<T extends { ordem?: unknown }>(linhas: T[]): T[] {
 }
 
 /**
- * Σ de unidades desta tipologia entregues como PERMUTA FÍSICA no estudo — as
- * linhas de custo `terreno / Preço / Permuta física` que apontam para ela
- * (#266/#267/#268), ignorando opcionalmente uma linha em edição.
- */
-async function unidadesPermutadasNoEstudo(
-  req: Request, estudoId: number, tipologiaId: number, ignorarCustoId?: number,
-): Promise<number> {
-  const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
-  return custos
-    .filter((c: any) => Number(c.id) !== Number(ignorarCustoId)
-      && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
-      && Number(c.permuta_tipologia_id) === Number(tipologiaId))
-    .reduce((s: number, c: any) => s + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
-}
-
-/**
  * Saldo de unidades de uma tipologia no ESTUDO INTEIRO (#52 · trava agregada por
  * todas as fases): quantidade do catálogo − Σ unidades já alocadas em qualquer
- * fase (ignorando, opcionalmente, uma alocação em edição) − Σ unidades dadas em
- * permuta física. Como cada tipologia pertence a um único estudo, filtrar por
- * `tipologia_id` já cobre todo o estudo. Pode ser **negativo** em estudo com o
- * estado que a #433 fechou.
+ * fase (ignorando, opcionalmente, uma alocação em edição). Como cada tipologia
+ * pertence a um único estudo, filtrar por `tipologia_id` já cobre todo o
+ * estudo. Pode ser **negativo** em estudo com o estado que a #433 fechou.
+ *
+ * A permuta física NÃO entra aqui: as unidades permutadas são PARTE das
+ * alocadas — o motor as reserva de dentro das alocações de Receitas
+ * (`reservarPermutasFisicas`, `frontend/fluxo-caixa-motor.ts`). Subtraí-las de
+ * novo deixava alocar só `catálogo − permutadas`, e o motor tirava as
+ * permutadas uma segunda vez dessas alocações: VGV vendável perdido sem aviso.
+ * Quem limita a permuta é `saldoPermutaDisponivel` (permutadas ≤ alocadas).
  */
 async function saldoTipologiaNoEstudo(
   req: Request, tipologia: any, ignorarAlocId?: number,
 ): Promise<number> {
   const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologia.id } });
-  const [permutadas] = await Promise.all([
-    unidadesPermutadasNoEstudo(req, Number(tipologia.estudo_id), Number(tipologia.id)),
-  ]);
-  const vendido = alocacoes
+  return saldoTipologia(tipologia.quantidade, alocacoes, ignorarAlocId);
+}
+
+/** Decisão pura do saldo de `saldoTipologiaNoEstudo`: catálogo − alocado. */
+export function saldoTipologia(quantidadeCatalogo: unknown, alocacoes: any[], ignorarAlocId?: number): number {
+  const vendido = (alocacoes ?? [])
     .filter((a: any) => Number(a.id) !== Number(ignorarAlocId))
     .reduce((s: number, a: any) => s + (Number(a.unidades) || 0), 0);
-  return (Number(tipologia.quantidade) || 0) - vendido - permutadas;
+  return (Number(quantidadeCatalogo) || 0) - vendido;
+}
+
+/**
+ * Unidades de uma tipologia ainda disponíveis para PERMUTA FÍSICA: Σ alocado
+ * em Receitas − Σ já permutado nas outras linhas `terreno / Preço / Permuta
+ * física` (ignorando a linha em edição). A permuta sai de dentro das alocações
+ * — a mesma leitura do motor —, então o teto é o alocado, não o catálogo.
+ */
+export function saldoPermutaDisponivel(alocacoes: any[], custos: any[], tipologiaId: unknown, ignorarCustoId?: unknown): number {
+  const alocado = (alocacoes ?? [])
+    .filter((a: any) => Number(a.tipologia_id) === Number(tipologiaId))
+    .reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
+  const reservada = (custos ?? [])
+    .filter((c: any) => Number(c.id) !== Number(ignorarCustoId)
+      && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
+      && Number(c.permuta_tipologia_id) === Number(tipologiaId))
+    .reduce((sum: number, c: any) => sum + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
+  return alocado - reservada;
 }
 
 async function alocacaoDaFase(req: Request, res: Response, faseId: number): Promise<any | null> {
@@ -1494,7 +1507,8 @@ function validarCamposCusto(
 
 /**
  * #266/#753: `permuta_tipologia_id` precisa referenciar uma tipologia do MESMO
- * estudo, e a quantidade não pode estourar o saldo da tipologia.
+ * estudo, e a quantidade não pode estourar as unidades ALOCADAS da tipologia
+ * (`saldoPermutaDisponivel`: a permuta sai de dentro das alocações).
  *
  * Linha INCOMPLETA (sem tipologia, ou com quantidade < 1) é ACEITA. A tela
  * salva cada campo num PATCH próprio (`tela-fluxo-custos.ts`: subcategoria,
@@ -1533,17 +1547,11 @@ async function validarPermutaFisica(
   // "Todas as linhas" é `varrerTudo`, nunca um `por_pagina` grande: com mais
   // de uma página de alocações ou de linhas de custo, `listar` subcontava o
   // já reservado, `disponivel` inflava e a guarda 422 falhava ABERTA.
-  const vendida = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId } });
+  const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId } });
   const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
-  const usada = vendida.reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
-  const reservada = custos
-    .filter((c: any) => Number(c.id) !== Number(atual?.id)
-      && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
-      && Number(c.permuta_tipologia_id) === Number(tipologiaId))
-    .reduce((sum: number, c: any) => sum + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
-  const disponivel = (Number(tip.quantidade) || 0) - usada - reservada;
+  const disponivel = saldoPermutaDisponivel(alocacoes, custos, tipologiaId, atual?.id);
   if (Number(quantidade) > disponivel) {
-    erro(res, 422, 'PERMUTA_SALDO_EXCEDIDO', `Só há ${disponivel} unidade(s) disponível(is) para permuta desta tipologia`);
+    erro(res, 422, 'PERMUTA_SALDO_EXCEDIDO', `Só há ${Math.max(0, disponivel)} unidade(s) alocada(s) em Receitas disponível(is) para permuta desta tipologia — a permuta física sai das unidades alocadas`);
     return false;
   }
   return true;
