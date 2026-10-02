@@ -7,15 +7,15 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ## 2026-10-02 — Rodada 15 encerrada: conferência EVI Urbitá em sessões filhas
 
 Fechamento da rodada aberta em 2026-10-01 (`historico/rodada-15/planejamento.md`): as 14 issues
-da fila fechadas por 13 PRs mergeados entre 2026-10-01 e 2026-10-02 (10 fecham as 14; o #817
+da fila fechadas por 13 PRs mergeados entre 2026-10-01 e 2026-10-02 (11 fecham as 14; o #817
 fecha a #726, incorporada; o #803 é o plano), cada um revisado até zero bloqueantes, na ordem de
 merge da tabela; o índice #800 fecha neste PR.
 
 | PR | Issues | Sessão |
 |---|---|---|
-| #803 | plano da rodada | orquestradora |
-| #804 | #790 | `[viab - 1]` |
 | #805 | #793 | `[viab - 5]` |
+| #804 | #790 | `[viab - 1]` |
+| #803 | plano da rodada | orquestradora |
 | #806 | #802 | `[viab - 6]` |
 | #807 | #789, #749 (porte do PR #751 do fork) | `[viab - 2]` |
 | #809 | #801 | `[viab - 3]` |
