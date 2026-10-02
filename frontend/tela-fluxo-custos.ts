@@ -6,7 +6,7 @@ import { permutaFisicaPorTipologia } from './fluxo-invariantes.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   CATEGORIA_CONSTRUCAO, CATEGORIA_MANUTENCAO_POS_OBRA, eConstrucao, regimeCronogramaLinha, LINHAS_OBRIGATORIAS, type LinhaObrigatoria,
-  vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
+  vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, totalConstrucaoCustos, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
@@ -109,6 +109,11 @@ const CONV_UNIDADE: Record<string, ConvUnidade> = {
   // também usado na ESCRITA por `_editarOrcamento`/`dadosDaTrocaDeUnidade`),
   // erro de 3,4× no valor calculado.
   pct_obra: { tipo: 'pct', link: 'obra' },
+  // Receita recebida (Σ do recebimento bruto, com juros de tabela) e custo de
+  // construção (Construção + Decoração + Gestão da obra) — as mesmas bases que
+  // o motor aplica em `resolverCustoTotal`.
+  pct_recebido: { tipo: 'pct', link: 'recebido' },
+  pct_constr: { tipo: 'pct', link: 'construcao' },
 };
 
 const UNIDADES = [
@@ -118,6 +123,8 @@ const UNIDADES = [
   { valor: 'pct_vgv', rotulo: '% VGV' },
   { valor: 'pct_receita', rotulo: '% Receita' },
   { valor: 'pct_obra', rotulo: '% Obra' },
+  { valor: 'pct_recebido', rotulo: '% Recebido' },
+  { valor: 'pct_constr', rotulo: '% Construção' },
 ];
 
 // Unidades permitidas por grupo+categoria. Ausência = todas as unidades.
@@ -137,18 +144,18 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
     'Outro':         ['rs', 'pct_vgv'],
   },
   diretos: {
-    'Marketing & Publicidade': ['rs', 'pct_vgv'],
+    'Marketing & Publicidade': ['rs', 'pct_vgv', 'pct_recebido'],
     'Corretagem de vendas':    ['pct_vgv'],
-    'Projetos':                ['rs', 'rs_m2_priv'],
+    'Projetos':                ['rs', 'rs_m2_priv', 'pct_constr'],
     'Licenças e Aprovações':   ['rs', 'rs_m2_priv'],
-    [CATEGORIA_MANUTENCAO_POS_OBRA]: ['rs', 'pct_vgv'],
-    'Outro':                   ['rs', 'pct_vgv'],
+    [CATEGORIA_MANUTENCAO_POS_OBRA]: ['rs', 'pct_vgv', 'pct_recebido'],
+    'Outro':                   ['rs', 'pct_vgv', 'pct_recebido'],
   },
   indireto: {
-    'Marketing global': ['rs', 'pct_vgv'],
+    'Marketing global': ['rs', 'pct_vgv', 'pct_recebido'],
     'Stand de vendas':  ['rs', 'pct_vgv'],
-    'Gestão':           ['rs', 'pct_vgv'],
-    'Outro':            ['rs', 'pct_vgv'],
+    'Gestão':           ['rs', 'pct_vgv', 'pct_recebido'],
+    'Outro':            ['rs', 'pct_vgv', 'pct_recebido'],
   },
   // #181: Financeiro não tinha entrada aqui — sem restrição, `_unidsPerm` caía
   // no fallback "todas as unidades" e oferecia badges sem sentido para custo
@@ -309,13 +316,36 @@ export class ViabFluxoCustos extends LitElement {
   private _totalObra(excluirId?: number): number {
     return this.custos
       .filter((c) => c.grupo === 'obra' && c.id !== excluirId && (c.orcamento_unidade || 'rs') !== 'pct_obra')
-      .reduce((s, c) => s + resolverCustoTotal(c, this.ctxCusto), 0);
+      .reduce((s, c) => s + resolverCustoTotal(c, this._ctxBase()), 0);
   }
 
-  // Contexto completo incluindo totalObra (usado no render/cálculos — nenhuma
-  // linha específica sendo convertida, então sem exclusão).
+  // Receita recebida (base de `pct_recebido`): a `receitaBruta` do MESMO
+  // `calcularFluxo` que produz o Fluxo de Caixa — Σ do recebimento bruto, com
+  // juros de tabela —, para a tela não ter uma segunda conta da base. Ela não
+  // depende do valor de nenhum custo, então não há circularidade. Memorizada
+  // pelos insumos: `_ctxConversao` e `_ctx` são chamados por linha no render.
+  private _memoRecebida: { chave: unknown[]; valor: number | undefined } | null = null;
+  private _receitaRecebida(): number | undefined {
+    const chave = [this.custos, this.linhasReceita, this.crono, this.dataInicio, this.estudo?.juros_tabela_aa_padrao];
+    if (this._memoRecebida && this._memoRecebida.chave.every((v, i) => v === chave[i])) return this._memoRecebida.valor;
+    const valor = this._calcObra()?.receitaBruta;
+    this._memoRecebida = { chave, valor };
+    return valor;
+  }
+
+  // Contexto sem as bases que dependem de outros custos (`totalObra`,
+  // `totalConstrucao`) — o ponto de partida das duas.
+  private _ctxBase(): ContextoCusto {
+    return { ...this.ctxCusto, receitaRecebida: this._receitaRecebida() };
+  }
+
+  // Contexto completo incluindo totalObra e totalConstrucao (usado no
+  // render/cálculos — nenhuma linha específica sendo convertida, então sem
+  // exclusão). Mesma ordem do motor: `totalConstrucao` depois de `totalObra`.
   private _ctx(): ContextoCusto {
-    return { ...this.ctxCusto, totalObra: this._totalObra() };
+    const ctx: ContextoCusto = { ...this._ctxBase(), totalObra: this._totalObra() };
+    ctx.totalConstrucao = totalConstrucaoCustos(this.custos, ctx);
+    return ctx;
   }
 
   // Unidades permitidas para o combo grupo+categoria. Sem categoria → todas.
@@ -1114,6 +1144,11 @@ export class ViabFluxoCustos extends LitElement {
       receita: this.ctxCusto.receitaTotal ?? this.ctxCusto.vgvTotal,
       // #514: mesma base que o motor usa para `pct_obra`.
       obra: this._totalObra(excluirId),
+      recebido: this._receitaRecebida(),
+      // `excluirId` pelo mesmo motivo do `pct_obra`: a linha que vai PARA
+      // `pct_constr` ainda carrega a unidade antiga e entraria na própria base.
+      construcao: totalConstrucaoCustos(this.custos,
+        { ...this._ctxBase(), totalObra: this._totalObra(excluirId) }, excluirId),
     };
   }
 

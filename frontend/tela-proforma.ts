@@ -142,7 +142,9 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   const terrenoMemo = e.considerar_custo_terreno === false
     ? 'desconsiderado'
     : `${rsm2(e.custo_terreno_m2)} × ${fmtNum(p.areaTerreno)} m²`;
-  const projetosMemo = e.projetos_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.projetos_pct)} do VGV`;
+  const projetosMemo = e.projetos_modo === 'valor_fixo' ? 'valor fixo'
+    : e.projetos_modo === 'pct_constr' ? `${pct(e.projetos_pct)} do custo de obras`
+    : `${pct(e.projetos_pct)} do VGV`;
   const infraMemo = e.infra_modo === 'valor_m2' ? `${rsm2(e.custo_infra_m2)} × área vendável`
     : e.infra_modo === 'valor_fixo' ? 'valor fixo'
     : `${pct(e.infra_pct)} do VGV`;

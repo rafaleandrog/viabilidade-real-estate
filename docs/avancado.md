@@ -49,7 +49,7 @@ gestão; no Financeiro, juros de financiamento, taxas bancárias, estruturação
 investidores; e em todo grupo a categoria **Outro**. Só o Terreno tem a coluna **Subcategoria**:
 para o preço, à vista, parcelado, permuta física ou permuta financeira; para Outro, o texto de
 **Descreva…**. O orçamento é lançado na unidade escolhida (R$, R$/m² privativo, R$/m² de terreno, %
-do VGV, % da receita ou % da obra) e a **distribuição no tempo** diz o início (uma fase do
+do VGV, % da receita, % da obra, % do recebido ou % da construção) e a **distribuição no tempo** diz o início (uma fase do
 cronograma, ou **Customizado** para um mês), a duração e a forma — **Linear** ou uma **curva** do
 catálogo do Painel (aba **Curvas**), que reparte o valor pelos meses. O preço do terreno pode, em
 vez disso, acompanhar a receita das vendas: **Unit Delivery** o distribui na proporção da receita
@@ -57,6 +57,12 @@ que entra em caixa (sinal, parcelas e repasse) e **Sales Revenue** na proporçã
 curva de absorção; três linhas não escolhem — a corretagem sai no mês da venda, a permuta física na
 entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
 consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
+
+As unidades em % diferem na base. **% da receita** é a receita líquida do RET, sem juros; **% do
+recebido** é o que de fato entra em caixa, com os juros de tabela — oferecido no marketing, na
+manutenção pós-obra, no marketing global e na gestão. **% da obra** é o grupo Obras inteiro, outorga
+e contingência inclusas; **% da construção** é só construção, decoração e gestão da obra — oferecido
+em Projetos. As bases estão em [Fórmulas](formulas).
 
 Três linhas são **semeadas**: ao abrir um estudo editável, a aba Custos cria o **Preço** no Terreno,
 a **Construção** nas Obras e a **Corretagem de vendas** nos Diretos (em % do VGV) que ainda não

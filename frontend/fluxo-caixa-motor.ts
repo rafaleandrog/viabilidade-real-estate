@@ -17,7 +17,7 @@
 import {
   absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha,
   vgvTipologia, vgvVendavelTipologia, vgvVendavelLinha,
-  areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
+  areaPrivativaTotalLinhas, resolverCustoTotal, totalConstrucaoCustos, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, eMarketing, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
   mesRepasse, ultimoMesFunding,
@@ -2540,9 +2540,6 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
     (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), config.ret), 0);
-  ctxCusto.totalObra = linhasCusto
-    .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
-    .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
 
   // Receitas por linha (e por tipologia, proporcional ao VGV VENDÁVEL da
   // tipologia, #195 — uma tipologia 100% permutada não recebe fatia de caixa).
@@ -2578,6 +2575,17 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   }).map((linha) => quantizarLinhaMonetaria(linha, taxa));
   const calcReceitasBrutas = montarLinhasReceita((l, c, p) => recebimentoBrutoMensal(l, c, p, config.jurosTabelaAaEstudo));
+  // Bases dos custos que dependem do recebimento ou de outros custos — antes de
+  // qualquer custo ser resolvido. `receitaRecebida` é a mesma Σ de
+  // `recebimentoBrutoMensal` que vira `receitaBruta`, com juros de tabela;
+  // `totalConstrucao` vem depois de `totalObra` porque a Gestão da obra costuma
+  // estar em `pct_obra`.
+  ctxCusto.receitaRecebida = linhasReceita.reduce((s, l) =>
+    s + recebimentoBrutoMensal(l, crono, prazo, config.jurosTabelaAaEstudo).reduce((a, v) => a + v, 0), 0);
+  ctxCusto.totalObra = linhasCusto
+    .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
+    .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
+  ctxCusto.totalConstrucao = totalConstrucaoCustos(linhasCusto, ctxCusto);
   const calcVendasContratadas = montarLinhasReceita((l, c, p) => vendaBrutaContratadaMensal(l, c, p));
   // #346: RET é global (config.ret) — a série líquida de cada linha usa o
   // mesmo valor para todas, em vez de ler `linha.fluxo_pagamento.ret`.

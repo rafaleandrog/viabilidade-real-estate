@@ -756,7 +756,14 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const custoTotalConstrucao = lot ? infraestrutura : (construcao + decoracao);
   const gestaoConstrucao = lot ? 0 : custoTotalConstrucao * n(e.taxa_gestao_pct) / 100;
 
-  const projetosLegado = e.projetos_modo === 'valor_fixo' ? n(e.projetos_valor_fixo) : vgv * n(e.projetos_pct) / 100;
+  // Custo de obras: construção + decoração + gestão da obra (Loteamento: a
+  // infraestrutura). É o KPI "Custo obras" e a base de Projetos em `pct_constr`.
+  const custoObras = lot ? infraestrutura : (construcao + decoracao + gestaoConstrucao);
+  // `pct_constr` e `pct_vgv` gravam o percentual na MESMA coluna (`projetos_pct`):
+  // o modo diz a base, e o canônico em R$, quando existe, é quem vale.
+  const projetosLegado = e.projetos_modo === 'valor_fixo' ? n(e.projetos_valor_fixo)
+    : e.projetos_modo === 'pct_constr' ? custoObras * n(e.projetos_pct) / 100
+    : vgv * n(e.projetos_pct) / 100;
   const projetos = canonico(e.projetos_valor_canonico, projetosLegado);
   const incorporacaoRegistro = lot ? 0 : vgv * n(e.incorporacao_registro_pct) / 100;
   const manutencao = vgv * n(e.manutencao_pct) / 100;
@@ -808,7 +815,6 @@ export function calcularProforma(e: ProformaInput): Proforma {
 
   // ── KPIs ──
   const investimentoTotal = custoDiretoTotal + custoIndiretoTotal;
-  const custoObras = lot ? infraestrutura : (construcao + decoracao + gestaoConstrucao);
   const custoObrasVgvPct = vgv > 0 ? custoObras / vgv * 100 : null;
   const receitaLiquidaSobreVgvPct = vgv > 0 ? receitaLiquida / vgv * 100 : null;
   // #611: o predicado do denominador é NOMEADO e reusado pela própria divisão
