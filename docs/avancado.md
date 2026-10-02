@@ -86,9 +86,9 @@ A **carteira de clientes** é o saldo a receber das vendas já contratadas, soma
 (cada mês de venda decai isolado, com a sua taxa e o seu principal): ela sobe com as parcelas da
 tabela e o saldo a repassar e zera no último vencimento de cada safra; o pico é a **carteira
 máxima**. Quando o plano paga a 1ª parcela no próprio mês da venda, essa parcela já abate a
-carteira daquele mês — os juros dela são reconhecidos nesse mês e só a amortização sai do saldo —,
-então a carteira e a carteira máxima de planos assim ficam abaixo do que saíam antes, sem mudar o
-que entra em caixa.
+carteira daquele mês: os juros dela são reconhecidos nesse mês e só a amortização sai do saldo. O
+que entra em caixa é o mesmo; a carteira e a carteira máxima desses planos já descontam essa
+parcela.
 
 A **reconciliação** confere o fluxo contra regras que o cálculo deve respeitar: a venda bruta
 contratada recomposta linha a linha, mês a mês, com o mesmo arredondamento do fluxo; os

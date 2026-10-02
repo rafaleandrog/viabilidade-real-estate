@@ -218,18 +218,44 @@ export function validarSafrasReceita(
     // O `break` por linha que havia aqui escondia defeito: um falso positivo
     // na safra 12 interrompia a checagem e a safra 41, com outro componente e
     // outro defeito, nunca era olhada.
+    //
+    // A identidade do componente é a POSIÇÃO dele no plano persistido, não o
+    // rótulo: dois componentes do mesmo tipo sem rótulo (ou com o mesmo)
+    // seriam um só, e o defeito do segundo ficaria escondido atrás do do
+    // primeiro — o mesmo mascaramento, em escala menor.
     const vistos = new Set<string>();
+    const registra = (d: Divergencia, identidade: string) => {
+      const chave = `${d.codigo}|${identidade}`;
+      if (vistos.has(chave)) return;
+      vistos.add(chave);
+      out.push({
+        ...d,
+        linha: `${linha.nome || 'Receita'}${d.linha ? ` / ${d.linha}` : ''}`,
+      });
+    };
+    const concentradosOrigem = componentes.filter((c) => c.tipo === 'concentrado');
     for (let safra = 0; safra < contratacoes.length; safra++) {
       if ((contratacoes[safra] ?? 0) <= tol) continue;
+      const valor = contratacoes[safra];
       const efetivos = componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco);
-      for (const d of validarComponentesSafra(efetivos, safra, contratacoes[safra], tol)) {
-        const chave = `${d.codigo}|${d.linha ?? ''}`;
-        if (vistos.has(chave)) continue;
-        vistos.add(chave);
-        out.push({
-          ...d,
-          linha: `${linha.nome || 'Receita'}${d.linha ? ` / ${d.linha}` : ''}`,
-        });
+      // A soma das participações é da SAFRA inteira, não de um componente.
+      for (const d of validarComponentesSafra(efetivos, safra, valor, tol)) {
+        if (d.codigo === 'SOMA_COMPONENTES_DIVERGE') registra(d, 'linha');
+      }
+      const concentradosEfetivos = efetivos.filter((c) => c.tipo === 'concentrado');
+      for (const c of efetivos) {
+        if (c.tipo === 'imediato') continue;
+        // `componentesIntegradosSafra` devolve o próprio objeto persistido,
+        // exceto o `concentrado` que recebeu o resíduo de um `ate_marco` sem
+        // prazo — esse vem como CÓPIA. Concentrado nunca é removido nem
+        // reordenado, então o k-ésimo efetivo é o k-ésimo persistido.
+        const origem = c.tipo === 'concentrado' && !componentes.includes(c)
+          ? concentradosOrigem[concentradosEfetivos.indexOf(c)]
+          : c;
+        const identidade = `#${componentes.indexOf(origem as ComponentePagamento)}`;
+        for (const d of validarComponentesSafra([c], safra, valor, tol)) {
+          if (d.codigo !== 'SOMA_COMPONENTES_DIVERGE') registra(d, identidade);
+        }
       }
     }
   }

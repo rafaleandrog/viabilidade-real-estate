@@ -142,8 +142,8 @@ As fórmulas do fluxo por safras — contratação bruta, desconto e líquido, o
 pagamento (imediato, prazo fixo, até marco, concentrado), a parcela, o primeiro vencimento, a
 carteira e o repasse — estão descritas, com os cenários de referência, nos documentos consultivos
 do repositório: `referencia/padrao-incorporacao.md` (seções 11 a 14 e o anexo G, os cenários
-dourados) e `referencia/inteligencia-evi-incorporacao.md` (o significado econômico). A recorrência da carteira é por safra: `saldo_s,s = principal_s` e
-`saldo_s,t = saldo_s,t−1 + juros_s,t − pagamento_s,t`; o saldo nunca fica negativo, zera no último
+dourados) e `referencia/inteligencia-evi-incorporacao.md` (o significado econômico). A recorrência da carteira é por safra: com o 1º vencimento no mês seguinte à venda ou depois,
+`saldo_s,s = principal_s`, e `saldo_s,t = saldo_s,t−1 + juros_s,t − pagamento_s,t`; o saldo nunca fica negativo, zera no último
 vencimento e, nos componentes que amortizam, nunca volta a crescer. Quando a 1ª parcela vence no
 próprio mês da venda, ela já abate o saldo desse mês: `saldo_s,s = principal_s × (1 + taxa) −
 parcela_s,s` — a parcela é a de uma tabela com juros entre vencimentos, então leva um período de

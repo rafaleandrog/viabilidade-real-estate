@@ -741,7 +741,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > (`frontend/fluxo-caixa-motor.ts:1782-1800`) e o painel de Reconciliação acusa
 > **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
 > ou o total que a curva declarou quando houve descarte —
-> `frontend/fluxo-invariantes.ts:266-322`, chamada por `validarProduto:333`).
+> `frontend/fluxo-invariantes.ts:343-376` (`divergenciasAbsorcao`), chamada por `validarProduto:418`).
 >
 > 🔴 **Por que ela não podia sair da validação existente.** `validarContratacao`
 > (`pctNoHorizonte`) soma `abs.pcts`, a saída **já truncada** de `absorcaoMensal`: consome a saída
@@ -1636,8 +1636,8 @@ A última parcela pode absorver resíduo imaterial dentro da tolerância.
 > saldo_s,s = principal_s × (1 + taxa) − pagamento_s,s
 > ```
 >
-> Nada é capitalizado no saldo do mês da contratação — os juros desse período são recebidos dentro
-> da parcela —, e o recebimento é idêntico ao de antes. Com N_s = 1 (venda no mês do marco) a única
+> A parcela quita no próprio mês o juro desse período, então nada dele sobra acumulado no saldo da
+> contratação; e o recebimento é idêntico ao de antes. Com N_s = 1 (venda no mês do marco) a única
 > parcela liquida a safra no próprio mês e o saldo é 0. Implementado em `carteiraSaldoSafra`
 > (`frontend/fluxo-caixa-motor.ts`); a repartição juros × principal da parcela segue a mesma
 > convenção em `calcularRecebiveisComponentes`.
@@ -1866,7 +1866,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2143`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2148`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2230,7 +2230,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2379`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2448`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`

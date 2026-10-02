@@ -1265,8 +1265,9 @@ export interface SaldoSafra {
  * quem quiser a carteira total do estudo SOMA as séries desta função, nunca
  * substitui por um único acumulador recorrente.
  *
- * `saldo_{s,s} = principal_s` (após o sinal, se houver — mesma convenção da
- * #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
+ * Sem parcela no mês da contratação (1º vencimento no mês seguinte ou
+ * depois): `saldo_{s,s} = principal_s` (após o sinal, se houver — mesma
+ * convenção da #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
  * (1+taxa) − pagamentos_s(t)`, nunca negativo — o último mês da safra é
  * grampeado em zero (liquidação exata; resíduo de ponto flutuante não é
  * saldo real). `imediato` não tem saldo (paga e encerra no mesmo mês).
@@ -1279,9 +1280,9 @@ export interface SaldoSafra {
  *   saldo_{s,s} = principal_s × (1+taxa) − parcela_s(s)
  *
  * — a PMT do plano é a de uma anuidade postecipada, então a 1ª parcela, ainda
- * que paga no mês da venda, carrega um período de juros (`principal × taxa`,
- * recebido como juros, não capitalizado) e só a sua AMORTIZAÇÃO sai do saldo.
- * O saldo da contratação continua sem juros capitalizados (#234). Com taxa 0
+ * que paga no mês da venda, carrega um período de juros (`principal × taxa`)
+ * e só a sua AMORTIZAÇÃO sai do saldo. A parcela quita esse juro no próprio
+ * mês: nada dele sobra acumulado no saldo da contratação. Com taxa 0
  * a fórmula se reduz a `principal − parcela`. Assim o saldo decresce até o
  * último vencimento e zera nele — inclusive com N_s = 1 (venda no mês do
  * marco: uma parcela só, paga no próprio mês, saldo 0). Antes, `porMes` nunca
@@ -1333,7 +1334,11 @@ export function carteiraSaldoSafra(
   let saldo = porMes.has(safra)
     ? round2(principal * (1 + c.taxaMensal) - (porMes.get(safra) ?? 0))
     : principal;
-  if (safra === ultimoMes) saldo = 0;
+  // Grampo só quando o último vencimento É o mês da contratação (N_s = 1).
+  // `ultimoMes` nasce em `safra`; sem parcela nele (parcela única antes da
+  // venda, por defasagem negativa persistida) o principal NÃO foi pago aqui, e
+  // zerar esconderia o `CARTEIRA_NAO_ZERA` que a carteira deve acusar.
+  if (safra === ultimoMes && porMes.has(safra)) saldo = 0;
   const out: SaldoSafra[] = [{ safra, mes: safra, saldo: Math.max(0, saldo) }];
   for (let mes = safra + 1; mes <= ultimoMes; mes++) {
     saldo = round2(saldo * (1 + c.taxaMensal) - (porMes.get(mes) ?? 0));

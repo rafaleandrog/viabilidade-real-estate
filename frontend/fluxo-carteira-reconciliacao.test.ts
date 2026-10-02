@@ -119,17 +119,47 @@ test('#789/#749 plano EVI de 25/09 (1ª parcela no mês da venda) em todas as sa
   }
 });
 
-test('#749 CARTEIRA_RESSURGE continua ativa para quem amortiza, e CARTEIRA_NAO_ZERA para o concentrado', () => {
-  // O motor não produz um `prazo_fixo` crescente; o que se prova aqui é que a
-  // isenção é só do `concentrado`: o mesmo concentrado, válido, não acusa
-  // nada, e um componente que amortiza continua limpo (a checagem não foi
-  // desligada — ela roda e não acha).
+test('#749 a isenção da CARTEIRA_RESSURGE é só do concentrado: a checagem continua rodando para os tipos que amortizam', () => {
+  // O concentrado capitaliza por desenho e não acusa nada.
   const concentrado: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
     tipo: 'concentrado', participacaoPct: 100, mesPagamento: 15, taxaMensal: 0.01, rotulo: 'repasse',
   };
   const saldos = carteiraSaldoSafra(concentrado, 5, 100_000);
   assert.ok(saldos[1].saldo > saldos[0].saldo, 'o concentrado capitaliza');
   assert.deepEqual(validarComponentesSafra([concentrado], 5, 100_000), []);
+
+  // Para os que amortizam, o único saldo crescente que o motor produz hoje é
+  // o da carência que capitaliza (1º vencimento dois ou mais meses depois da
+  // venda, com juros > 0). Esse caso é um FALSO positivo registrado na #808 e
+  // fora deste conserto — aqui ele serve só para provar que a checagem não
+  // foi desligada para `prazo_fixo` nem para `ate_marco`. Quando a #808 for
+  // resolvida, este teste muda junto (e precisa de outro saldo crescente).
+  const comCarencia: ComponentePagamento[] = [
+    {
+      tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4, defasagemMeses: 3,
+      taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'trimestral',
+    },
+    {
+      tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 20, defasagemMeses: 2,
+      taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'obra com carência',
+    },
+  ];
+  for (const c of comCarencia) {
+    const r = validarComponentesSafra([c], 5, 100_000);
+    assert.equal(r.filter((d) => d.codigo === 'CARTEIRA_RESSURGE').length, 1, c.tipo);
+  }
+});
+
+test('#789 parcela única ANTES da venda (defasagem negativa persistida): a carteira não zera no mês da venda e CARTEIRA_NAO_ZERA continua acusando', () => {
+  // `ultimoMes` nasce no mês da safra; sem parcela nele, o grampo de N_s = 1
+  // não pode valer — o principal não foi pago no mês da venda.
+  const c: ComponentePagamento = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 1, defasagemMeses: -1,
+    taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'parcela antecipada',
+  };
+  assert.deepEqual(carteiraSaldoSafra(c, 10, 100_000), [{ safra: 10, mes: 10, saldo: 100_000 }]);
+  const r = validarComponentesSafra([c], 10, 100_000);
+  assert.equal(r.filter((d) => d.codigo === 'CARTEIRA_NAO_ZERA').length, 1);
 });
 
 // ── validarSafrasReceita: não mascara mais ────────────────────────────────
@@ -168,6 +198,31 @@ test('#789 validarSafrasReceita reporta a 1ª divergência de CADA componente, n
   assert.equal(invalido.length, 1, 'antes, o break na safra 2 escondia esta');
   assert.equal(invalido[0].safra, 6);
   assert.equal(invalido[0].linha, 'Torre M / repasse');
+});
+
+test('#789 validarSafrasReceita: dois componentes do mesmo tipo e sem rótulo, inválidos pelo mesmo código em safras diferentes, saem os dois', () => {
+  // A identidade é a posição do componente no plano, não o rótulo: sem
+  // rótulo, os dois concentrados viram "concentrado" — e uma chave por rótulo
+  // escondia o defeito do segundo atrás do do primeiro.
+  const linhas = [{
+    nome: 'Torre N',
+    absorcao: ABSORCAO_2_A_8,
+    tipologias: [{ tipologia_id: 1, quantidade: 7, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: {
+      componentes: [
+        { tipo: 'imediato', participacaoPct: 20, descontoPct: 0 },
+        // pago no mês 3: inválido para as safras 4 a 8.
+        { tipo: 'concentrado', participacaoPct: 40, mesPagamento: 3, taxaMensal: 0 },
+        // pago no mês 5: inválido para as safras 6 a 8.
+        { tipo: 'concentrado', participacaoPct: 40, mesPagamento: 5, taxaMensal: 0 },
+      ],
+    },
+  }];
+  const r = validarSafrasReceita(linhas, CRONO_LONGO, 40, undefined, [], 0);
+  const invalido = r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  assert.deepEqual(invalido.map((d) => d.safra), [4, 6]);
+  assert.ok(invalido.every((d) => d.linha === 'Torre N / concentrado'), 'os dois têm o mesmo rótulo exibido');
+  assert.deepEqual(r.filter((d) => d.codigo === 'SOMA_COMPONENTES_DIVERGE'), [], 'a soma fecha 100%');
 });
 
 test('#789/#749 caso equivalente ao estudo 15: plano de 25/09 com vendas até o mês do marco, reconciliação limpa', () => {

@@ -47,6 +47,15 @@ linha; agora coleta a primeira divergência de cada código **por componente**, 
   de `porMes.get(safra)` (2 vermelhos), tirar a isenção do `concentrado` (4), devolver o `break` por
   linha (1), tirar a repartição de juros da 1ª parcela (1, depois de acrescentar o teste que faltava
   — a primeira medição desta mutação deu verde).
+- Rodada 1 de revisão (App do Codex + lentes nativas), consertos: o grampo de N_s = 1 só vale com
+  parcela no mês da venda (parcela única antes da venda, por defasagem negativa persistida, voltava a
+  esconder o `CARTEIRA_NAO_ZERA`); a chave do aviso por componente é a POSIÇÃO no plano, não o
+  rótulo (dois componentes homônimos colapsavam); o teste da `CARTEIRA_RESSURGE` passou a provar que
+  ela segue ativa para `prazo_fixo` e `ate_marco`. Mutações medidas na suíte inteira, uma por vez:
+  grampo sem a condição da parcela (1 vermelho), chave por rótulo (1), `RESSURGE` desligada para todos
+  os tipos (1), e a leitura de `porMes.get(safra)` apagada de novo, sobre o código final (3).
+- Achado de passagem, fora do escopo: `CARTEIRA_RESSURGE` falso no parcelamento trimestral do legado
+  com juros > 0 (o saldo capitaliza na carência antes do 1º vencimento) — registrado como issue nova.
 - Efeito visível: em planos com 1ª parcela no mês da venda, a carteira e a carteira máxima ficam
   abaixo do que saíam antes; registrado em `docs/avancado.md` e `docs/formulas.md`.
 - Endereços `arquivo:linha` deslocados pelo diff no motor, consertados: `frontend/proforma-avancado.ts`,
