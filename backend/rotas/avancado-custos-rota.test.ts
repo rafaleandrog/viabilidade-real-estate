@@ -685,3 +685,38 @@ test('#792 reduzir: permuta legada não inteira (o motor não reserva) não trav
     assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
   });
 });
+
+test('#792 catálogo: estudo legado com permuta acima do alocado não deixa reduzir o catálogo abaixo da permuta', async () => {
+  const dados = new DadosFake();
+  semearEstudoPermuta(dados, 0);   // 0 alocadas, 20 permutadas (regra antiga)
+  await comServidor(criarApp(dados), async (base) => {
+    const barra = await enviar(base, 'PATCH', '/estudos/1/avancado/tipologias/11', { quantidade: 19 });
+    assert.equal(barra.status, 422, `esperava 422, veio ${barra.status}: ${JSON.stringify(barra.corpo)}`);
+    assert.equal(barra.corpo.codigo, 'SALDO_EXCEDIDO');
+    assert.match(barra.corpo.mensagem, /20 unidade/);
+    const ok = await enviar(base, 'PATCH', '/estudos/1/avancado/tipologias/11', { quantidade: 20 });
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
+    // Alocar continua livre: é o caminho de saída do estado legado.
+    const aloca = await enviar(base, 'POST', '/estudos/1/avancado/fases/21/alocacoes', { tipologia_id: 11, unidades: 20 });
+    assert.equal(aloca.status, 201, `esperava 201, veio ${aloca.status}: ${JSON.stringify(aloca.corpo)}`);
+  });
+});
+
+test('#792 GET receitas devolve TODOS os grupos de receita (o mesmo recorte do saldo da permuta), não uma página de 100', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 500, area_privativa_m2: 25, preco_m2: 12_000 });
+  for (let i = 0; i < 120; i++) {
+    const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: `G${i}`, ordem: 119 - i });
+    dados.semear('avancado_alocacoes', { estudo_id: 1, fase_id: fid, tipologia_id: 11, unidades: 1, ordem: 0 });
+  }
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/1/avancado/receitas`);
+    const corpo = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(corpo.total, 120);
+    assert.equal(corpo.dados.length, 120);
+    // A ordem continua sendo a de `ordem`, não a do id.
+    assert.equal(corpo.dados[0].nome ?? corpo.dados[0].fase_label, 'G119');
+  });
+});

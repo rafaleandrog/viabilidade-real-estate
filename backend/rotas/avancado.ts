@@ -972,7 +972,7 @@ rotasAvancado.patch('/estudos/:id/avancado/tipologias/:tid', async (req: Request
     const tip = await tipologiaDoEstudo(req, res, estudo.id);
     if (!tip) return;
 
-    const decisao = await montarPatchTipologia(req.body, tip, () => saldoTipologiaNoEstudo(req, tip));
+    const decisao = await montarPatchTipologia(req.body, tip, () => saldoCatalogoNoEstudo(req, tip));
     if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
 
     const atualizada = await req.dados!.atualizar('avancado_tipologias', tip.id, decisao.dados);
@@ -1204,6 +1204,25 @@ async function saldoTipologiaNoEstudo(
 ): Promise<number> {
   const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologia.id } });
   return saldoTipologia(tipologia.quantidade, alocacoes, ignorarAlocId);
+}
+
+/**
+ * Saldo que o PATCH da tipologia protege: catálogo − max(alocado, permutado).
+ * Num estudo válido a permuta cabe no alocado e isto é o mesmo que
+ * `saldoTipologiaNoEstudo`. Num estudo gravado na regra antiga com permuta
+ * ACIMA do alocado (ex.: 0 alocadas, 20 permutadas), reduzir o catálogo abaixo
+ * das 20 apagaria unidades já prometidas fisicamente — então a permuta que o
+ * motor reserva também é piso. Alocar continua lendo `saldoTipologiaNoEstudo`:
+ * alocar o restante é justamente o caminho de saída desse estado.
+ */
+async function saldoCatalogoNoEstudo(req: Request, tipologia: any): Promise<number> {
+  const [alocacoes, custos] = await Promise.all([
+    req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologia.id } }),
+    req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: Number(tipologia.estudo_id) } }),
+  ]);
+  const alocado = (Number(tipologia.quantidade) || 0) - saldoTipologia(tipologia.quantidade, alocacoes);
+  const permutado = -saldoPermutaDisponivel([], custos, tipologia.id);
+  return (Number(tipologia.quantidade) || 0) - Math.max(alocado, permutado);
 }
 
 /** Decisão pura do saldo de `saldoTipologiaNoEstudo`: catálogo − alocado. */
@@ -1452,14 +1471,18 @@ rotasAvancado.get('/estudos/:id/avancado/receitas', async (req: Request, res: Re
     // Só fases de receita (#168) — as fases do Cronograma são marcadores do
     // gantt, sem alocação, e não devem virar "linhas de receita" vazias no motor.
     const [fases, alocacoes, tipologias] = await Promise.all([
-      req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo: 'receita' }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+      // Todos os grupos, não uma página: `alocacoesDeReceita` (saldo da permuta)
+      // conta todos, e o motor tem que receber o mesmo recorte — senão uma
+      // permuta lastreada por grupo além da página seria aceita no backend e
+      // nunca reservada no motor.
+      req.dados!.varrerTudo('avancado_fases', { filtros: { estudo_id: estudo.id, tipo: 'receita' } }).then(porOrdem),
       // Varre em `id asc` (default) e ordena em memória: `ordenar` numa varredura
       // paginada com a app no ar pode repetir ou pular linha (doc do SDK).
       req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id } }).then(porOrdem),
       req.dados!.listar('avancado_tipologias', { filtros: { estudo_id: estudo.id }, por_pagina: 500 }),
     ]);
-    const linhas = montarLinhasReceita(fases.dados, alocacoes, tipologias.dados);
-    res.json({ dados: linhas, total: fases.total });
+    const linhas = montarLinhasReceita(fases, alocacoes, tipologias.dados);
+    res.json({ dados: linhas, total: fases.length });
   } catch (e: any) {
     console.error('Erro em GET /avancado/receitas:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);

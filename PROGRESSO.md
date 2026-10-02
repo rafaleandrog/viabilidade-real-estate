@@ -32,7 +32,10 @@ novo: R$ 6 mi de VGV vendável sumiam no estado da issue, sem aviso. Agora:
   acima do que sobra (`permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO`), achado da revisão —
   só quando a escrita piora a folga, para estudo já gravado em violação não travar operação neutra;
   as duas guardas contam só alocação de grupo de receita (de onde o motor reserva) e só linha de
-  permuta que o motor reserva (inteira e >= 1), achado do App do Codex;
+  permuta que o motor reserva (inteira e >= 1), achado do App do Codex; `GET .../receitas` passou a
+  varrer todos os grupos (era uma página de 100), para o motor ver o mesmo recorte; e o PATCH do
+  catálogo tem piso em max(alocado, permutado), para estudo legado com permuta acima do alocado não
+  perder unidades já prometidas;
 - invariantes (`validarProduto`): `PRODUTO_EXCEDE_ESTOQUE` só com alocado > catálogo;
   `PRODUTO_SUBALOCADO` = catálogo − alocado; erro novo `PERMUTA_FISICA_EXCEDE_ALOCADO` (só sobre linha
   que o motor reserva — inteira e >= 1); o estoque

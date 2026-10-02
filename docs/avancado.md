@@ -69,7 +69,7 @@ física ou financeira) continua sendo uma linha nova.
 A **permuta física** aponta uma tipologia do catálogo e a quantidade entregue, e essas unidades
 saem das que já estão **alocadas** em Viabilidade → Receitas — não se somam a elas. O saldo de uma
 tipologia para alocar é o catálogo menos o alocado, e o catálogo não pode ser reduzido abaixo do
-alocado. A quantidade permutada não pode passar do alocado: nem ao gravar a permuta, nem depois, ao
+alocado nem abaixo da quantidade permutada. A quantidade permutada não pode passar do alocado: nem ao gravar a permuta, nem depois, ao
 reduzir ou excluir uma alocação ou um grupo de Receitas. Com um catálogo de 200 unidades e 20
 permutadas, alocam-se as 200 em Receitas: o VGV total conta as 200, o VGV da permuta física as 20 e
 o VGV vendável as 180. Enquanto sobrar catálogo sem alocar, a reconciliação e a aba Tipologias
