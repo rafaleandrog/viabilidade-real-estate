@@ -18,6 +18,43 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-01 — Custos: a semeadura das linhas obrigatórias é idempotente
+
+Duas execuções concorrentes da semeadura de Custos (duas abas, remontagem do componente) criavam
+duas linhas "Preço" no Terreno — e podiam duplicar Construção ou Corretagem de vendas, que o motor
+soma. Decisão do autor: idempotência no servidor + single-flight na tela, sem índice único e sem
+migração.
+
+- **Catálogo único.** `LINHAS_OBRIGATORIAS` saiu de `tela-fluxo-custos.ts` para
+  `frontend/fluxo-shared.ts` (módulo sem dependências), com `eSemeaduraObrigatoria`; o backend o
+  importa, em vez de manter um espelho à mão.
+- **Servidor.** `POST /estudos/:id/avancado/custos` com `semeadura: true` no corpo, categoria
+  obrigatória do grupo e sem subcategoria confere `avancado_linhas_custo` do estudo e devolve a
+  existente (`200`, menor `id`) em vez de criar. A marca explícita existe porque, sem ela, um POST
+  comum de uma 2ª Construção com orçamento teria os campos descartados em silêncio (achado do App
+  do Codex na revisão); sem a marca a rota cria como sempre. Conferência e criação correm em fila por `(estudo, grupo, categoria)` — sem a fila as
+  duas requisições conferem antes de qualquer uma criar. A fila é do processo: com mais de uma
+  réplica do backend a janela volta entre réplicas, e a tela é a primeira defesa.
+- **Tela.** `_garantirLinhasObrigatorias` guarda a semeadura em voo por estudo (no módulo) e
+  reconsulta o servidor antes de criar, quando a lista local diz que falta alguma.
+- Linha com subcategoria (permuta física/financeira) continua criando; subcategoria só com espaços
+  conta como ausente (a mesma regra da validação de subcategoria do Preço); duplicata legada não é
+  apagada nem renumerada (a autocura ficou fora). A tela mescla o resultado da semeadura por `id`
+  em vez de substituir a lista.
+- Fora do escopo, registrado: o `PATCH` que troca a categoria de outra linha para uma das três
+  continua podendo criar a duplicata (o alerta de duplicata segue acusando).
+- Testes: sete casos em `backend/rotas/avancado-custos-rota.test.ts` (Express real, `DadosFake`
+  com `criar` atrasado para a corrida existir) e o caso de render `custos-semeadura` (duas instâncias
+  no mesmo estudo, remontagem e carga com lista velha, contra um servidor falso que cria sempre).
+  Prova de fiação medida, 7 de 7 mutações vermelhas: sem a fila do servidor, sem a guarda do
+  servidor, sem o `trim` da subcategoria, servidor ignorando a marca `semeadura`, sem o
+  single-flight da tela, sem a reconsulta da tela, tela sem mandar a marca.
+- `docs/avancado.md`: Custos diz que cada uma das três linhas é criada uma única vez por estudo,
+  mesmo em duas abas, e que a removida volta na abertura seguinte (a semeadura recria a categoria
+  que faltar — comportamento anterior, mantido); Instruções para não humanos descreve o `200`
+  idempotente.
+- Sem migração; `versao` do `manifesto.json` mantida.
+
 ## 2026-10-01 — Rodada 15 aberta: conferência EVI Urbitá em sessões filhas
 
 Fechado o registro da conferência de QA da EVI Urbitá (estudos 14 e 15 da Pinguim, índice #800):

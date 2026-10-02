@@ -1108,3 +1108,75 @@ export function dinheiroParaRotulo(custo: any, calcLinhas: Array<{ id: any; tota
   if (bruto === null || bruto === undefined || bruto === '' || !Number.isFinite(Number(bruto))) return null;
   return Number(bruto);
 }
+
+// ─────────────────────────────────────────────────────────────────
+// Linhas obrigatórias (semeadura) — catálogo ÚNICO, lido pela tela E pelo
+// backend
+// ─────────────────────────────────────────────────────────────────
+
+export interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
+
+/**
+ * Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
+ * posições ao abrir a aba Custos pela primeira vez — a linha inexistente é
+ * criada automaticamente (`_garantirLinhasObrigatorias` em
+ * `tela-fluxo-custos.ts`), com `unidade` fixando a unidade de orçamento na
+ * criação. #335: não travam categoria/remoção depois de criadas — são só a
+ * semeadura inicial.
+ *
+ * Mora aqui, e não na tela, porque o `POST /estudos/:id/avancado/custos` usa o
+ * MESMO catálogo para ser idempotente na semeadura (#802): duas execuções
+ * concorrentes da semeadura (duas abas, remontagem do componente) criavam duas
+ * linhas "Preço". Um espelho no backend teria de ser mantido à mão; importando
+ * daqui (módulo sem dependências), o CATÁLOGO é um só. O predicado não é
+ * idêntico: a tela confere a existência só por grupo + categoria (qualquer
+ * subcategoria), o servidor só conta como ocupante a linha sem subcategoria.
+ * A tela é a mais exigente para CRIAR: só pede a linha quando não existe
+ * nenhuma da categoria no grupo, e aí o servidor também não acha ocupante.
+ *
+ * A migração 002 moveu "Gestão da obra" de `obra` para `diretos` — este mapa
+ * só declara o que hoje é exigido em cada grupo. Não redeclarar "Gestão da
+ * obra" aqui: fazia a semeadura recriar, em `obra`, uma linha que a migração
+ * já tinha movido para `diretos` — a origem da duplicação indeletável do #178
+ * (a categoria existia, só que no grupo errado, então a checagem de
+ * existência falhava sempre).
+ */
+export const LINHAS_OBRIGATORIAS: Readonly<Record<string, readonly LinhaObrigatoria[]>> = {
+  // Preço: 1ª linha de Custos do Terreno — todo estudo tem aquisição do
+  // terreno (#180; renomeada de "Compra" no #193).
+  terreno: [
+    { categoria: 'Preço', posicao: 0 },
+  ],
+  obra: [
+    { categoria: CATEGORIA_CONSTRUCAO, posicao: 0 },
+  ],
+  // Corretagem de vendas: 1ª linha de Custos Diretos, sempre em % VGV (#121).
+  diretos: [
+    { categoria: CATEGORIA_CORRETAGEM, posicao: 0, unidade: 'pct_vgv' },
+  ],
+};
+
+/**
+ * Subcategoria ausente: `null`, `undefined` ou texto em branco — a mesma regra
+ * de `subcategoriaPrecoValida` no backend, que aceita só-espaços como "sem
+ * subcategoria". Sem o `trim`, dois POSTs com `subcategoria: '   '` passavam
+ * pela guarda de idempotência e criavam duas linhas equivalentes à semeadura.
+ */
+function semSubcategoria(subcategoria: unknown): boolean {
+  return subcategoria === null || subcategoria === undefined || String(subcategoria).trim() === '';
+}
+
+/**
+ * A linha é a SEMEADURA de uma obrigatória: categoria do catálogo no grupo
+ * dela, e sem subcategoria. Linha com subcategoria (a 2ª "Preço" de permuta
+ * física/financeira, #444) não é semeadura e não entra na chave de
+ * idempotência. A chave é PARECIDA com a `grupo::categoria::subcategoria` de
+ * `validarCustosDuplicados`, mas não idêntica: aqui subcategoria só com espaços
+ * conta como ausente (o `trim`), lá ela é uma chave própria. Uma linha legada
+ * com `'   '` e outra sem subcategoria são a mesma semeadura para o servidor
+ * (que devolve a mais antiga) e duas chaves distintas para o alerta.
+ */
+export function eSemeaduraObrigatoria(linha: any): boolean {
+  const doGrupo = LINHAS_OBRIGATORIAS[linha?.grupo] ?? [];
+  return semSubcategoria(linha?.subcategoria) && doGrupo.some((o) => o.categoria === linha?.categoria);
+}
