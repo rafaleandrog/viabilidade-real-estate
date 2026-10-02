@@ -4,6 +4,70 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-02 — Rodada 15 encerrada: conferência EVI Urbitá em sessões filhas
+
+Fechamento da rodada aberta em 2026-10-01 (`historico/rodada-15/planejamento.md`): as 14 issues
+da fila fechadas por 13 PRs mergeados entre 2026-10-01 e 2026-10-02, cada um revisado até zero
+bloqueantes; o índice #800 fecha neste PR.
+
+| PR | Issues | Sessão |
+|---|---|---|
+| #803 | plano da rodada | orquestradora |
+| #804 | #790 | `[viab - 1]` |
+| #805 | #793 | `[viab - 5]` |
+| #807 | #789, #749 (porte do PR #751 do fork) | `[viab - 2]` |
+| #806 | #802 | `[viab - 6]` |
+| #809 | #801 | `[viab - 3]` |
+| #817 | #726 | `[viab - 8]` |
+| #818 | #796 | `[viab - 9]` |
+| #810 | #794 (a), #797 (a), #799 (a) — documentação | `[viab - 10]` |
+| #821 | #798 | `[viab - 13]` |
+| #819 | #792 (b) | `[viab - 7]` |
+| #820 | #791, #816 | `[viab - 4]` |
+| #822 | #795 itens 1 e 3 (2 e 4 mantidos) | `[viab - 11]` (absorveu a 12) |
+
+A sessão de QA (`[viab - QA]`, ambiente `QA Apps`) entregou na Pinguim o gêmeo congelado do
+estudo 15 (estudo 16, estado de 30/09 restaurado e conferido), apagou a linha 78 do estudo 15 e
+criou os estudos de Loteamento 17 (Preliminar, zero divergências) e 18 (Avançado), com o
+`conferir-estudo` rodado em todos e o resultado registrado no #800.
+
+**O que a rodada mediu, para a próxima não redescobrir:**
+
+- O App do Codex respondeu em todos os PRs enquanto teve cota e achou defeitos reais que as lentes
+  nativas não acharam: a carteira zerada mesmo sem parcela no mês da venda (#807), o POST comum de
+  uma segunda Construção deduplicado como se fosse semeadura (#806), o atalho de mês único ignorado
+  pelo ramo legado de recebíveis (#821). Esgotou a cota ("usage limits") em vários heads do fim da
+  fila, e isso está declarado em cada relatório. O Kimi não alcançou `api.moonshot.ai` em nenhum
+  container da rodada (403 no CONNECT do proxy de saída, credenciais corretas), então toda fan-out
+  saiu nativa, declarada como menos adversarial.
+- A fila deixou de ser estritamente serial no meio do dia por decisão do autor ("autorizo todas as
+  sessões a mergear os próprios PRs"). O custo foi previsível: cada merge sujou os PRs em revisão,
+  e cada um deles sincronizou de novo, repetiu CI e uma rodada delta. O `merge=union` do
+  `PROGRESSO.md` aguentou todas as sincronizações (três medidas conferidas em cada uma), mas o
+  GitHub marca o PR `dirty` mesmo quando o git local resolve — sincronizar é obrigatório.
+- Duas sessões filhas recusaram mergear por autorização transmitida entre sessões ("não chegou a
+  mim por canal do autor") e entregaram o PR verde para a orquestradora mergear. É comportamento
+  correto pelo `CLAUDE.md` e vale saber que acontece.
+- Os itens 1 e 3 da #795 mexem na mesma linha do `schema.json`; o plano os separava em dois PRs e a
+  sessão 11 parou antes de codar, com razão. Foram fundidos num PR só.
+
+**Fica para o autor:**
+
+- `distribuicao.md` do SDK 57.0.0 lista mudança de `opcoes` de enum como gatilho de bump da
+  `versao` mesmo sem migração; o guard deste repositório recusa bump sem migração. O PR 822 seguiu
+  o repositório e a release correspondente sai como upgrade de build. Decidir qual regra vale e
+  registrar no `CLAUDE.md`.
+- Reconfigurar o estudo 15 pela tela depois de publicar o #798 (Residencial: lançamento 25%, obra
+  40%, janela de 3 meses; Não Residencial: mês único).
+- Sincronização do `schema.json` pelo SDK no ambiente autenticado (CHECK das `opcoes` alargado).
+- Nove issues novas, todas P3, abertas pelas filhas durante revisão e QA e citadas no #800: #808
+  (CARTEIRA_RESSURGE no trimestral legado), #811 (duplicata pelo PATCH de categoria), #812 (500 em
+  `tipo` inválido no Preliminar), #813 (API não semeia obrigatórias), #814 (guia do Avançado sem
+  Loteamento), #815 (resíduo do ate_marco com 2+ concentrados), #823 (nota A9 vencida), #824
+  (resíduo de R$ 0,28 com permuta e juros) e a sobreposição #816 já fechada pelo #820.
+
+---
+
 ## 2026-10-02 — Custos em %: bases "receita recebida" e "custo de construção"
 
 Decisão do autor (itens 1 e 3 da issue das bases de custo; 2 e 4 mantidos): duas unidades novas,

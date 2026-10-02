@@ -4,6 +4,11 @@
 > registro da conferência de QA da EVI Urbitá (índice: issue #800). Fotografia datada: descreve a
 > fila prevista e as decisões no momento da abertura; o estado corrente de cada PR está no
 > `PROGRESSO.md`, no #800 e na tabela de rodadas do `CLAUDE.md`.
+>
+> **Encerrada em 2026-10-02.** As 14 issues da fila fecharam por 13 PRs mergeados; o placar, os
+> desvios do plano (sessões 11 e 12 fundidas; ordem de merge alterada por decisão do autor) e o que
+> ficou para o autor estão na seção de 2026-10-02 do `PROGRESSO.md` e na linha da Rodada 15 do
+> `CLAUDE.md`. O resto deste arquivo é a fotografia da abertura e envelhece de propósito.
 
 ## Contexto
 
