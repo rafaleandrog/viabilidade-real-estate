@@ -297,10 +297,10 @@ export class ViabFluxoCronograma extends LitElement {
             ${EVENTO_LABEL[ev.evento] || ev.evento}
           </span>
           <!-- #430: "Pós-obras" é a fase de CUSTO. A janela COMERCIAL depois da
-               entrega chama-se "Pós-chaves", tem 12 meses fixos (#226) e não
-               sai daqui: esticar esta duração NÃO amplia a janela de venda. -->
+               entrega chama-se "Pós-chaves", tem de 1 a 12 meses definidos na
+               Absorção de cada Grupo (padrão 12) e não sai daqui: esticar esta duração NÃO amplia a janela de venda. -->
           ${ev.evento === 'pos_obra' ? html`
-            <span class="sec nota-pos-obras" title="A janela de vendas e de pagamento depois da entrega é o Pós-chaves, de 12 meses fixos (#226) — ela não muda com esta duração.">duração de custos</span>` : nothing}
+            <span class="sec nota-pos-obras" title="A janela de vendas e de pagamento depois da entrega é o Pós-chaves, de 1 a 12 meses definidos na Absorção de vendas de cada Grupo — ela não muda com esta duração.">duração de custos</span>` : nothing}
         </td>
         <td>
           <span class="campo-mes">

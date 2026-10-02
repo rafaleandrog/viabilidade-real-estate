@@ -52,6 +52,30 @@ igual e passa a mostrar `PRODUTO_SUBALOCADO` (alerta). Sem migração, `versao` 
 `fluxo-invariantes.test.ts` e requisições HTTP reais em `backend/rotas/avancado-custos-rota.test.ts`;
 cada mutação (saldo voltar a descontar, teto voltar ao catálogo, invariante voltar a somar, estoque
 voltar a baixar a quantidade bruta) deixa testes vermelhos.
+## 2026-10-02 — Receitas do Avançado: janela Pós-chaves de 1 a 12 meses e "à vista, mês único"
+
+Desenho aprovado pelo autor na issue: a janela comercial depois da entrega deixa de ser 12 meses
+fixos e passa a ser do Grupo.
+
+- **Dado.** `absorcao.pos_chaves_meses` (opcional, inteiro de 1 a 12; ausente = 12), só no modo
+  `distribuido` — curva `personalizado`/`linear` legada segue com 12. Sem coluna nova nem migração: o
+  JSON de absorção já é livre, e a `versao` não bumpa. `validarAbsorcao` recusa valor fora da faixa,
+  não numérico ou em outro modo; `mesesPosChaves` aplica a mesma regra, fail-closed.
+- **Motor.** `mesesPosChaves` em `frontend/fluxo-shared.ts`; `faixasAbsorcao`/`periodoAbsorcao`
+  recebem a janela como parâmetro OBRIGATÓRIO (omitir é TS2554); `absorcaoMensal` e
+  `ultimoMesRecebivelLinha` leem a janela do Grupo. Estudo sem o campo dá resultado idêntico (teste
+  de regressão).
+- **Mês único.** Atalho do formulário, sem flag gravada: 0% nos três períodos e janela de 1 mês
+  (`ehMesUnico`/`alternarMesUnico` em `frontend/fluxo-absorcao-editor.ts`). Venda depois da entrega já
+  é à vista no contrato canônico (`componentesEfetivosSafra`); o ramo legado de recebíveis não aplica
+  essa regra (achado P1 do App do Codex), então num Grupo com "Plano não migrado" o atalho fica
+  indisponível, com nota na tela, até o Fluxo de Pagamento ser aplicado. O ramo legado não foi tocado:
+  mudá-lo mudaria estudos existentes.
+- **Tela.** Modal de Absorção com o campo "Janela Pós-chaves" e o par Não/Sim de "mês único"; o aviso
+  do Cronograma deixou de dizer "12 meses fixos".
+- **Prova de fiação.** Caso de render `modal-absorcao-janela`: trocar a janela do formulário pela
+  constante, tirar `alternarMesUnico` do clique ou tirar a trava dos campos deixa o render vermelho.
+- Guias `docs/avancado.md` e `docs/modelo-de-dados.md` atualizados.
 ## 2026-10-02 — Custos do Avançado: categoria canônica "Manutenção pós-obra"
 
 Decisão do autor (ramo a da issue): a manutenção pós-obra deixa de ser um "Outro" sem descrição na

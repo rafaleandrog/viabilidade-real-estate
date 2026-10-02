@@ -48,6 +48,10 @@ export const caso = {
     // #431: o aviso da curva não representável. Sem esta linha, o banner podia
     // sumir do template e nenhuma medida acusaria.
     { seletor: 'urbi-banner[variante="alerta"]', minimo: 1 },
+    // Sem `componentes` no fluxo de pagamento (plano não migrado), o atalho
+    // "À vista, mês único" fica indisponível e a tela diz por quê: o ramo
+    // legado de recebíveis não recebe à vista a venda posterior à entrega.
+    { seletor: 'div.mes-unico .nota-legado', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     'urbi-badge.ativo',
@@ -76,5 +80,17 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
+  },
+  // Plano não migrado: clicar "Sim" em "mês único" NÃO pode mudar o formulário
+  // — o ramo legado não receberia à vista. Lê a janela antes e depois do clique.
+  async medir(raiz: HTMLElement): Promise<{ janelaAntes: number | null; janelaDepois: number | null }> {
+    const el = raiz.querySelector('viab-fluxo-receitas') as any;
+    await el.updateComplete;
+    const sr = el.shadowRoot!;
+    const janela = () => (sr.querySelector('tr.janela-pos-chaves viab-num') as any)?.valor ?? null;
+    const janelaAntes = janela();
+    (sr.querySelectorAll('div.mes-unico urbi-badge')[1] as HTMLElement).click(); // "Sim"
+    await el.updateComplete;
+    return { janelaAntes, janelaDepois: janela() };
   },
 };
