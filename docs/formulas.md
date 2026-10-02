@@ -164,6 +164,23 @@ crescer depois da última parcela.
   funding. São visões diferentes de propósito.
 - **Investimento total e ROI** são a mesma fórmula do Preliminar, somando todo o custo do motor.
 
+### Conversão para a planilha EVI
+
+Os indicadores do Avançado têm três definições que diferem das da planilha EVI Urbitá. A conversão é
+sempre feita por quem compara; o app não publica as duas versões.
+
+```text
+Resultado da planilha = Resultado do app − juros do financiamento à produção
+VPL na origem do lançamento = VPL do app × (1 + tm)^(n + 1)
+Exposição máxima da planilha = mín.(Fluxo de Caixa Acumulado do funding), meses ≥ lançamento
+```
+
+`tm` é a taxa de desconto mensal, `(1 + taxa a.a.)^(1/12) − 1`, e `n` o número de meses entre o início
+do planejamento e o lançamento. A diferença que sobra depois da conversão do VPL é efeito dos fluxos,
+não da convenção. A exposição máxima do app, por sua vez, olha o fluxo livre de todo o período; a
+da planilha olha o caixa depois do funding, só a partir do lançamento, e por isso os custos feitos
+antes do lançamento (marketing, registro) pesam em uma e não na outra.
+
 ### O fecho de três linhas
 
 A tabela fecha com três leituras do mesmo projeto, cada uma com a sua base — a base acompanha a

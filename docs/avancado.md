@@ -82,6 +82,31 @@ financiável; é a única operação com o interruptor **Ativo**. As regras de c
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
 | **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
 
+### Comparar com a planilha EVI
+
+Quem põe um estudo ao lado da planilha EVI Urbitá (aba **Incorp Individual**) encontra quatro
+indicadores com definições diferentes das do app. Nenhum é defeito: o app usa as definições abaixo, e
+a tabela traz o caminho para chegar ao número da planilha. A conversão do VPL e do Resultado está em
+[Fórmulas da Proforma](formulas).
+
+| Indicador | No app | Na planilha | Para comparar |
+|---|---|---|---|
+| **Resultado** | Desalavancado: não deduz os juros do financiamento à produção, que aparecem na linha informativa **Serviço da dívida do funding** e na aba Fluxo de Caixa. | Deduz esses juros no Resultado. | Subtraia do Resultado do app os juros do financiamento à produção. |
+| **Exposição máxima** | O pior ponto do fluxo acumulado **livre** (desalavancado), em todo o período — inclusive nos meses anteriores ao lançamento. | O pior ponto do caixa **alavancado**, só nos meses a partir do lançamento. | Na tabela do Fluxo de Caixa, leia o menor valor da linha **Fluxo de Caixa Acumulado** (a do funding) a partir do mês do lançamento. |
+| **VPL** | O mês 1 do estudo é o início do planejamento: cada fluxo é descontado `(1 + tm)^(mês + 1)`. | A origem do tempo é o lançamento (mês 0). | Multiplique o VPL do app por `(1 + tm)^(n + 1)`, com `n` o número de meses entre o início do planejamento e o lançamento. A **TIR** não depende da origem. |
+| **Séries mensais** | Só o VPL total e por linha; o endividamento máximo não é calculado. | **FC descontado** mês a mês e **Endividamento total**. | Não há equivalente na tela. |
+
+Duas convenções do fluxo de recebíveis também diferem da versão mais recente da planilha, e o app
+mantém as suas:
+
+- **Juros do repasse.** O app capitaliza o saldo concentrado por `mês do pagamento − mês da venda`
+  períodos: os juros começam no mês **seguinte** ao da venda. A planilha capitaliza um mês a mais, e já
+  rende juros no próprio mês da venda. Um estudo com repasse a juros maior que zero recebe, no app,
+  um mês de juros a menos do que na planilha.
+- **Primeira parcela da tabela longa.** O app paga a primeira parcela no mês seguinte ao da venda; a
+  planilha paga no mês da venda. O componente de pagamento tem o campo `defasagemMeses`, e `0` o
+  alinha à planilha.
+
 ### Cenários
 
 Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** e compare a
