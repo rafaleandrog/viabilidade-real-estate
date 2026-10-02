@@ -1242,6 +1242,11 @@ export function saldoPermutaDisponivel(alocacoes: any[], custos: any[], tipologi
  * aqui. `ajustar` devolve as unidades que a alocação terá depois da escrita
  * (0 para a que sai). Responde o 422 e devolve `false` quando a escrita deve
  * ser recusada.
+ *
+ * Só recusa quando a escrita PIORA a folga até ficar negativa: um estudo já
+ * gravado com permuta acima do alocado não fica travado em operação que não
+ * reduz nada daquela tipologia (apagar um grupo cuja alocação tem 0 unidades);
+ * quem acusa esse estado é a reconciliação (`PERMUTA_FISICA_EXCEDE_ALOCADO`).
  */
 async function permutaCabeAposReducao(
   req: Request, res: Response, estudoId: number, tipologiaIds: number[], ajustar: (a: any) => number,
@@ -1253,7 +1258,7 @@ async function permutaCabeAposReducao(
     const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tid } });
     const ajustadas = alocacoes.map((a: any) => ({ ...a, unidades: ajustar(a) }));
     const folga = saldoPermutaDisponivel(ajustadas, custos, tid);
-    if (folga < 0) {
+    if (folga < 0 && folga < saldoPermutaDisponivel(alocacoes, custos, tid)) {
       const restante = saldoPermutaDisponivel(ajustadas, [], tid);
       erro(res, 422, 'PERMUTA_EXCEDE_ALOCADO',
         `A permuta física desta tipologia usa ${restante - folga} unidade(s) e só ${restante} ficariam alocadas em Receitas — `

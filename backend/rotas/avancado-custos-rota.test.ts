@@ -642,3 +642,18 @@ test('#792 reduzir: DELETE de alocação e DELETE de grupo (cascata) recusam dei
     assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
   });
 });
+
+test('#792 reduzir: estudo já gravado com permuta acima do alocado não trava operação que não reduz (grupo de 0 unidades)', async () => {
+  const dados = new DadosFake();
+  semearEstudoPermuta(dados, 10);   // 10 alocadas, 20 permutadas: violação já gravada
+  dados.semear('avancado_fases', { id: 22, estudo_id: 1, tipo: 'receita', nome: 'Vazio' });
+  dados.semear('avancado_alocacoes', { estudo_id: 1, fase_id: 22, tipologia_id: 11, unidades: 0, ordem: 0 });
+  await comServidor(criarApp(dados), async (base) => {
+    const ok = await enviar(base, 'DELETE', '/estudos/1/avancado/fases/22', {});
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
+    // Reduzir de verdade continua recusado.
+    const barra = await enviar(base, 'DELETE', '/estudos/1/avancado/fases/21', {});
+    assert.equal(barra.status, 422);
+    assert.equal(barra.corpo.codigo, 'PERMUTA_EXCEDE_ALOCADO');
+  });
+});

@@ -805,7 +805,7 @@ Cada Grupo é um card ou bloco comercial que reúne:
 > seguinte: o `Total` de cada linha é a quantidade do catálogo menos o que as linhas acima já
 > venderam (#170).
 >
-> São **quatro** as portas que gravam contra esse saldo, e a #433 fechou a última:
+> São **quatro** as portas que gravam contra esse saldo (catálogo − alocado; as três que reduzem o alocado conferem a outra relação, permutadas ≤ alocadas), e a #433 fechou a última:
 > `POST` e `PATCH` de alocação, a permuta física, e o **`PATCH` da própria tipologia** — reduzir o
 > catálogo por baixo do comprometido chegava ao mesmo estado impossível sem `422` nenhum. O portão
 > do `PATCH` de tipologia recusa a redução com `422 SALDO_EXCEDIDO`, e recusa `quantidade`
