@@ -793,6 +793,31 @@ test('#792 validarProduto: permuta acima do ALOCADO (dentro do catálogo) é err
     .find((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO'), undefined);
 });
 
+test('#792 validarProduto: permuta repartida entre dois grupos da mesma tipologia fecha o livro (o motor reserva em cascata)', () => {
+  const doisGrupos = [
+    { ...RECEITA_PRODUTO[0], id: 1, nome: 'G1', tipologias: [{ id: 1, tipologia_id: 1, quantidade: 3 }] },
+    { ...RECEITA_PRODUTO[0], id: 2, nome: 'G2', tipologias: [{ id: 2, tipologia_id: 1, quantidade: 17 }] },
+  ];
+  const custos = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 }];
+  assert.deepEqual(validarProduto(doisGrupos, custos, TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('#792 validarProduto: permuta legada (`unidades_permutadas` na alocação, sem linha de custo) fecha o livro', () => {
+  const legado = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 20, unidades_permutadas: 4 }] }];
+  assert.deepEqual(validarProduto(legado, [], TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('#792 validarProduto: permuta não inteira (o motor não reserva) não vira PERMUTA_FISICA_EXCEDE_ALOCADO', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 2 }] }];
+  const custos = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 2.5 }];
+  const r = validarProduto(receitaParcial, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  assert.equal(r.find((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO'), undefined);
+  // Ruído de casa decimal em torno de um inteiro conta como o inteiro, como no motor.
+  const ruido = [{ ...custos[0], permuta_quantidade: 3.004 }];
+  assert.equal(validarProduto(receitaParcial, ruido, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4)
+    .filter((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO').length, 1);
+});
+
 test('#340/#792 unidadesNaoAlocadasPorTipologia: catálogo − alocado (a permuta física não desconta)', () => {
   const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 12 }] }];
   const r = unidadesNaoAlocadasPorTipologia(receitaParcial, TIPOLOGIAS.slice(0, 1));

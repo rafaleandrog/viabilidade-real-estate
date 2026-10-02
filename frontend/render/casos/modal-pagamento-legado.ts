@@ -68,7 +68,6 @@ export const caso = {
       tipologias: [{ id: 1, nome: 'Tipo 62', quantidade: 80, area_privativa_m2: 62 }],
       crono: CRONO,
       dataInicio: DATA_INICIO,
-      custosPermuta: [],
       modalPag: FASE,
       pagForm: formularioPagamento(FASE.fluxo_pagamento),
     });

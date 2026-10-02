@@ -1163,6 +1163,11 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
     if (!(await exigirEscrita(req, res, estudo))) return;
     const fase = await faseDoEstudo(req, res, estudo.id);
     if (!fase) return;
+    // As alocações caem por cascata: a permuta física não pode ficar acima do
+    // que sobra alocado em cada tipologia do grupo.
+    const doGrupo = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { fase_id: fase.id } });
+    if (!(await permutaCabeAposReducao(req, res, estudo.id, doGrupo.map((a: any) => Number(a.tipologia_id)),
+      (a: any) => (Number(a.fase_id) === Number(fase.id) ? 0 : Number(a.unidades) || 0)))) return;
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
     res.json({ ok: true });
   } catch (e: any) {
@@ -1190,7 +1195,9 @@ function porOrdem<T extends { ordem?: unknown }>(linhas: T[]): T[] {
  * (`reservarPermutasFisicas`, `frontend/fluxo-caixa-motor.ts`). Subtraí-las de
  * novo deixava alocar só `catálogo − permutadas`, e o motor tirava as
  * permutadas uma segunda vez dessas alocações: VGV vendável perdido sem aviso.
- * Quem limita a permuta é `saldoPermutaDisponivel` (permutadas ≤ alocadas).
+ * Quem limita a permuta é `saldoPermutaDisponivel` (permutadas ≤ alocadas), na
+ * escrita da permuta e — por `permutaCabeAposReducao` — nas portas que reduzem
+ * o alocado.
  */
 async function saldoTipologiaNoEstudo(
   req: Request, tipologia: any, ignorarAlocId?: number,
@@ -1223,6 +1230,38 @@ export function saldoPermutaDisponivel(alocacoes: any[], custos: any[], tipologi
       && Number(c.permuta_tipologia_id) === Number(tipologiaId))
     .reduce((sum: number, c: any) => sum + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
   return alocado - reservada;
+}
+
+/**
+ * A outra metade de "permutadas ≤ alocadas": reduzir ou apagar alocação não
+ * pode deixar a permuta física de uma tipologia acima do que sobra alocado.
+ * Na regra antiga (permuta somada ao alocado contra o catálogo) baixar a
+ * alocação nunca quebrava a permuta; agora quebra, então as portas que
+ * REDUZEM o alocado — PATCH (unidades ou troca de tipologia), DELETE de
+ * alocação e DELETE de grupo, que leva as alocações em cascata — conferem
+ * aqui. `ajustar` devolve as unidades que a alocação terá depois da escrita
+ * (0 para a que sai). Responde o 422 e devolve `false` quando a escrita deve
+ * ser recusada.
+ */
+async function permutaCabeAposReducao(
+  req: Request, res: Response, estudoId: number, tipologiaIds: number[], ajustar: (a: any) => number,
+): Promise<boolean> {
+  const ids = [...new Set(tipologiaIds.map(Number).filter(Number.isFinite))];
+  if (ids.length === 0) return true;
+  const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
+  for (const tid of ids) {
+    const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tid } });
+    const ajustadas = alocacoes.map((a: any) => ({ ...a, unidades: ajustar(a) }));
+    const folga = saldoPermutaDisponivel(ajustadas, custos, tid);
+    if (folga < 0) {
+      const restante = saldoPermutaDisponivel(ajustadas, [], tid);
+      erro(res, 422, 'PERMUTA_EXCEDE_ALOCADO',
+        `A permuta física desta tipologia usa ${restante - folga} unidade(s) e só ${restante} ficariam alocadas em Receitas — `
+        + 'a permuta sai das unidades alocadas; reduza a permuta em Custos antes');
+      return false;
+    }
+  }
+  return true;
 }
 
 async function alocacaoDaFase(req: Request, res: Response, faseId: number): Promise<any | null> {
@@ -1304,6 +1343,15 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (re
       dados.unidades = unidades;
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    // Reduzir as unidades, ou levar a alocação para outra tipologia, tira
+    // unidades da tipologia de ORIGEM: a permuta dela não pode passar do resto.
+    const tipOrigem = Number(aloc.tipologia_id);
+    const tipDestino = Number(dados.tipologia_id ?? aloc.tipologia_id);
+    const unidadesDepois = dados.unidades ?? (Number(aloc.unidades) || 0);
+    if (tipDestino !== tipOrigem || unidadesDepois < (Number(aloc.unidades) || 0)) {
+      if (!(await permutaCabeAposReducao(req, res, estudo.id, [tipOrigem],
+        (a: any) => (Number(a.id) === Number(aloc.id) ? (tipDestino === tipOrigem ? unidadesDepois : 0) : Number(a.unidades) || 0)))) return;
+    }
     const atualizada = await req.dados!.atualizar('avancado_alocacoes', aloc.id, dados);
     res.json(atualizada);
   } catch (e: any) {
@@ -1321,6 +1369,8 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (r
     if (!fase) return;
     const aloc = await alocacaoDaFase(req, res, Number(fase.id));
     if (!aloc) return;
+    if (!(await permutaCabeAposReducao(req, res, estudo.id, [Number(aloc.tipologia_id)],
+      (a: any) => (Number(a.id) === Number(aloc.id) ? 0 : Number(a.unidades) || 0)))) return;
     await req.dados!.deletar('avancado_alocacoes', aloc.id);
     res.json({ ok: true });
   } catch (e: any) {

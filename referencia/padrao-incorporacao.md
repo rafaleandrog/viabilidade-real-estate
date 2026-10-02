@@ -796,7 +796,9 @@ Cada Grupo é um card ou bloco comercial que reúne:
 > tipologia — as alocações em **todos** os Grupos — não pode exceder a `quantidade`. A permuta
 > física **não soma** a esse comprometido: as unidades permutadas são **parte** das alocadas, que é
 > como o motor as lê (`reservarPermutasFisicas` as reserva de dentro das alocações de Receitas), e o
-> teto dela é o alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO`). Até a decisão da
+> teto dela é o alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO` na escrita da
+> permuta; `permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO` no PATCH e no DELETE de alocação
+> e no DELETE de grupo, que reduzem o alocado). Até a decisão da
 > #792 (opção b, 2026-10-01) backend e invariantes somavam permuta ao alocado contra o catálogo: a
 > tela deixava alocar só `catálogo − permutadas` e o motor tirava as permutadas de novo, perdendo
 > VGV vendável sem aviso. Na tela, as unidades **cascateiam** de um Grupo para o

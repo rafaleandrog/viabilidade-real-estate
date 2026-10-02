@@ -273,6 +273,25 @@ function quantidadesPermutadas(linhasCusto: any[]): Map<number, number> {
 }
 
 /**
+ * As quantidades que o motor de fato RESERVA por tipologia: só linha completa
+ * (tipologia presente e quantidade inteira >= 1, com o mesmo ruído de 0,01 que
+ * `reservarPermutasFisicas` tolera). Linha incompleta já tem o alerta
+ * `PERMUTA_FISICA_INCOMPLETA`; somá-la crua faria `PERMUTA_FISICA_EXCEDE_ALOCADO`
+ * acusar como erro uma permuta que o motor nunca reserva.
+ */
+function quantidadesPermutadasReservaveis(linhasCusto: any[]): Map<number, number> {
+  const porTipologia = new Map<number, number>();
+  for (const c of linhasCusto) {
+    if (!ePermutaFisica(c) || c.permuta_tipologia_id == null || c.permuta_tipologia_id === '') continue;
+    const bruta = Number(c.permuta_quantidade ?? 0) || 0;
+    if (Math.abs(bruta - Math.round(bruta)) > 0.01 || Math.round(bruta) < 1) continue;
+    const id = Number(c.permuta_tipologia_id);
+    porTipologia.set(id, (porTipologia.get(id) ?? 0) + Math.round(bruta));
+  }
+  return porTipologia;
+}
+
+/**
  * #335: reverte a #179/#256 — a categoria de uma linha de Custos não trava
  * mais renomeação/remoção nem some do combo das outras linhas. Sem essa
  * trava, nada impede o usuário de criar uma 2ª linha com a mesma categoria
@@ -421,7 +440,7 @@ export function validarProduto(
   tol: number = TOLERANCIA_PADRAO,
 ): Divergencia[] {
   const out: Divergencia[] = [...divergenciasAbsorcao(linhasReceita, cronograma, tol)];
-  const permutas = quantidadesPermutadas(linhasCusto);
+  const permutas = quantidadesPermutadasReservaveis(linhasCusto);
   // A mesma reserva de permuta que o motor aplica (`calcularFluxo`): o estoque
   // mensal baixa só as unidades VENDÁVEIS de cada alocação, e as reservadas
   // saem do estoque de uma vez, como entrega física.
@@ -451,8 +470,9 @@ export function validarProduto(
     }
     // A permuta física sai de dentro das alocações: o que passar delas o motor
     // não tem de onde reservar (nem VGV de permuta nem baixa de estoque). Erro,
-    // como o 422 `PERMUTA_SALDO_EXCEDIDO` do backend — que só barra a ESCRITA
-    // da permuta; reduzir as alocações depois chega aqui. Quando a permuta já
+    // como os 422 do backend (`PERMUTA_SALDO_EXCEDIDO` na escrita da permuta,
+    // `PERMUTA_EXCEDE_ALOCADO` nas portas que reduzem a alocação) — aqui pega o
+    // dado que já está gravado assim, ou que chegou por outro caminho. Quando a permuta já
     // excede o próprio catálogo, quem acusa é `PERMUTA_FISICA_EXCEDE_ESTOQUE`
     // (`validarPermutaFisica`), e esta não repete o mesmo estado.
     if (permutado > alocado + tol && permutado <= total + tol) {
@@ -495,10 +515,10 @@ export function validarProduto(
     let estoque = total - alocacoes.reduce((s, a) => s + a.reservada, 0);
     // #457: dimensão m² do MESMO livro — reusa `estoque`/`vendas` já
     // calculados acima (não duplica o laço de absorção), só escala pela área
-    // privativa da tipologia. Nasce como 'alerta': o pré-requisito de dado da
-    // #433 (`quantidade < alocadas + permutadas`) ainda não foi saneado em
-    // produção (Pinguim: 234 + 42 > 234), e essa violação já dispara
-    // PRODUTO_EXCEDE_ESTOQUE/ESTOQUE_MENSAL_NEGATIVO em 'erro' acima — a
+    // privativa da tipologia. Nasce como 'alerta': o estoque que fica negativo
+    // (alocado acima do catálogo, estado que a #433 fechou na escrita mas que
+    // pode existir gravado) já dispara PRODUTO_EXCEDE_ESTOQUE/
+    // ESTOQUE_MENSAL_NEGATIVO em 'erro' acima — a
     // versão em m² promove a 'erro' só depois que a varredura de saneamento
     // (#464, `GET /estudos/:id/avancado/tipologias`) confirmar vazio para
     // todo estudo em violação.

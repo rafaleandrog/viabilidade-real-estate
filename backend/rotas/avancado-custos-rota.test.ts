@@ -70,6 +70,10 @@ class DadosFake {
     const id = this.semear(tabela, dados);
     return this.buscar(tabela, id);
   }
+
+  async deletar(tabela: string, id: number) {
+    this.tabelas.get(tabela)?.delete(Number(id));
+  }
 }
 
 function criarApp(dados: DadosFake) {
@@ -586,5 +590,55 @@ test('#792 catálogo: reduzir a quantidade vai até o ALOCADO (permuta inclusa),
     assert.equal(barra.status, 422);
     assert.equal(barra.corpo.codigo, 'SALDO_EXCEDIDO');
     assert.match(barra.corpo.mensagem, /180 unidade/);
+  });
+});
+
+// A outra metade de "permutadas ≤ alocadas": as portas que REDUZEM o alocado.
+// Na regra antiga, baixar a alocação nunca quebrava a permuta (as duas somavam
+// contra o catálogo); na nova, quebraria — e só a reconciliação acusaria.
+test('#792 reduzir: PATCH de alocação abaixo da permuta é 422 PERMUTA_EXCEDE_ALOCADO; até a permuta passa', async () => {
+  const dados = new DadosFake();
+  const { aid } = semearEstudoPermuta(dados, 30);   // 30 alocadas, 20 permutadas
+  await comServidor(criarApp(dados), async (base) => {
+    const barra = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, { unidades: 19 });
+    assert.equal(barra.status, 422, `esperava 422, veio ${barra.status}: ${JSON.stringify(barra.corpo)}`);
+    assert.equal(barra.corpo.codigo, 'PERMUTA_EXCEDE_ALOCADO');
+    assert.match(barra.corpo.mensagem, /usa 20 unidade.*só 19/);
+    assert.equal(Number((await dados.buscar('avancado_alocacoes', aid!)).unidades), 30, 'o 422 não grava');
+    const passa = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, { unidades: 20 });
+    assert.equal(passa.status, 200, `esperava 200, veio ${passa.status}: ${JSON.stringify(passa.corpo)}`);
+    // Editar o preço não reduz nada e não é barrado.
+    const preco = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, { preco_m2: 13_000 });
+    assert.equal(preco.status, 200);
+  });
+});
+
+test('#792 reduzir: levar a alocação para outra tipologia tira unidades da ORIGEM — 422 se a permuta dela não cabe', async () => {
+  const dados = new DadosFake();
+  const { aid } = semearEstudoPermuta(dados, 30);
+  dados.semear('avancado_tipologias', { id: 12, estudo_id: 1, nome: '2Q', quantidade: 100, area_privativa_m2: 60, preco_m2: 9_000 });
+  await comServidor(criarApp(dados), async (base) => {
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, { tipologia_id: 12 });
+    assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    assert.equal(r.corpo.codigo, 'PERMUTA_EXCEDE_ALOCADO');
+  });
+});
+
+test('#792 reduzir: DELETE de alocação e DELETE de grupo (cascata) recusam deixar a permuta sem alocação', async () => {
+  const dados = new DadosFake();
+  const { aid } = semearEstudoPermuta(dados, 30);
+  await comServidor(criarApp(dados), async (base) => {
+    const delAloc = await enviar(base, 'DELETE', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, {});
+    assert.equal(delAloc.status, 422, `esperava 422, veio ${delAloc.status}: ${JSON.stringify(delAloc.corpo)}`);
+    assert.equal(delAloc.corpo.codigo, 'PERMUTA_EXCEDE_ALOCADO');
+    const delFase = await enviar(base, 'DELETE', '/estudos/1/avancado/fases/21', {});
+    assert.equal(delFase.status, 422, `esperava 422, veio ${delFase.status}: ${JSON.stringify(delFase.corpo)}`);
+    assert.equal(delFase.corpo.codigo, 'PERMUTA_EXCEDE_ALOCADO');
+    assert.ok(await dados.buscar('avancado_alocacoes', aid!), 'nada foi apagado');
+    // Controle: com outro grupo segurando as 20 permutadas, apagar este passa.
+    dados.semear('avancado_fases', { id: 22, estudo_id: 1, tipo: 'receita', nome: 'G2' });
+    dados.semear('avancado_alocacoes', { estudo_id: 1, fase_id: 22, tipologia_id: 11, unidades: 20, ordem: 0 });
+    const ok = await enviar(base, 'DELETE', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, {});
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
   });
 });

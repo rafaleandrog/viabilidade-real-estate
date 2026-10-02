@@ -27,12 +27,16 @@ novo: R$ 6 mi de VGV vendável sumiam no estado da issue, sem aviso. Agora:
 
 - backend (`backend/rotas/avancado.ts`): `saldoTipologiaNoEstudo` = catálogo − alocado (as três
   portas — POST/PATCH de alocação e PATCH de tipologia — herdam); o teto da permuta física é o
-  alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO`), não o catálogo;
+  alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO`), não o catálogo; e as portas
+  que reduzem o alocado — PATCH e DELETE de alocação, DELETE de grupo — recusam deixar a permuta
+  acima do que sobra (`permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO`), achado da revisão;
 - invariantes (`validarProduto`): `PRODUTO_EXCEDE_ESTOQUE` só com alocado > catálogo;
-  `PRODUTO_SUBALOCADO` = catálogo − alocado; erro novo `PERMUTA_FISICA_EXCEDE_ALOCADO`; o estoque
+  `PRODUTO_SUBALOCADO` = catálogo − alocado; erro novo `PERMUTA_FISICA_EXCEDE_ALOCADO` (só sobre linha
+  que o motor reserva — inteira e >= 1); o estoque
   mensal baixa só as vendáveis (a reserva do motor), e as reservadas saem na entrega;
   `unidadesNaoAlocadasPorTipologia` perdeu o parâmetro de custos;
-- telas: `_saldo` de Receitas e o banner de Tipologias deixaram de descontar permuta.
+- telas: `_saldo` de Receitas e o banner de Tipologias deixaram de descontar permuta;
+  `scripts/conferir-estudo.ts` confere unidades contra o alocado e a permuta contra o alocado.
 
 Nenhum número publicado muda. Estudo montado na regra antiga (alocado + permutado = catálogo) calcula
 igual e passa a mostrar `PRODUTO_SUBALOCADO` (alerta). Sem migração, `versao` não bumpa. Testes:
