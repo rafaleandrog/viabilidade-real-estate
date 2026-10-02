@@ -738,7 +738,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > O que mudou é que `absorcaoMensal` devolve `pctTotal`/`pctDescartado`/`mesesDescartados` ao lado
 > de `pcts` (`frontend/fluxo-shared.ts:365-376`, acumulados em `:424-432` no modo `personalizado`
 > e em `:439-457` no `distribuido`), `calcularFluxo` emite `console.warn`
-> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2428-2446`) e o painel de Reconciliação acusa
+> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2435-2453`) e o painel de Reconciliação acusa
 > **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
 > ou o total que a curva declarou quando houve descarte —
 > `frontend/fluxo-invariantes.ts:343-376` (`divergenciasAbsorcao`), chamada por `validarProduto:418`).
@@ -1866,7 +1866,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2148`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2155`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2230,7 +2230,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2457`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2464`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`

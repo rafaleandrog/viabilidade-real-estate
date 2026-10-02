@@ -94,6 +94,21 @@ test('#789 concentrado pago no próprio mês da safra: zera em s, sem CARTEIRA_N
   assert.deepEqual(validarComponentesSafra([c], 10, 500_000), []);
 });
 
+test('#789 parcelas antes E depois da venda (defasagem negativa, N > 1): nenhum grampo esconde o saldo que a parcela antecipada deixa', () => {
+  // A parcela antes da venda nunca é abatida do saldo (a série começa no mês
+  // da venda), então o que sobra no fim não é resíduo de arredondamento.
+  for (const prazoMeses of [2, 3]) {
+    const c: ComponentePagamento = {
+      tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses, defasagemMeses: -1,
+      taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'parcelas antecipadas',
+    };
+    const saldos = carteiraSaldoSafra(c, 10, 100_000);
+    assert.ok(saldos.at(-1)!.saldo > 1_000, `prazo ${prazoMeses}: o saldo final não pode ser grampeado em 0`);
+    const r = validarComponentesSafra([c], 10, 100_000);
+    assert.equal(r.filter((d) => d.codigo === 'CARTEIRA_NAO_ZERA').length, 1, `prazo ${prazoMeses}`);
+  }
+});
+
 // ── #749: CARTEIRA_RESSURGE no plano real (COMPONENTES_EVI) ────────────────
 
 const EVI = COMPONENTES_EVI as ComponentePagamento[];

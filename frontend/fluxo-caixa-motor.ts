@@ -1270,7 +1270,8 @@ export interface SaldoSafra {
  * convenção da #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
  * (1+taxa) − pagamentos_s(t)`, nunca negativo — o último mês da safra é
  * grampeado em zero (liquidação exata; resíduo de ponto flutuante não é
- * saldo real). `imediato` não tem saldo (paga e encerra no mesmo mês).
+ * saldo real), exceto quando alguma parcela vence ANTES da venda: essa nunca
+ * é abatida da série, e o que sobra no fim é saldo, não resíduo. `imediato` não tem saldo (paga e encerra no mesmo mês).
  *
  * Parcela que vence NO PRÓPRIO mês da contratação (`defasagemMeses = 0`, o
  * plano da EVI de 25/09 e a entrada parcelada do legado): ela abate o saldo
@@ -1323,11 +1324,18 @@ export function carteiraSaldoSafra(
   const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
   let ultimoMes = safra;
+  let pagouAntesDaVenda = false;
   for (const p of pagamentos) {
     if (p.tipo === 'sinal') continue;
     porMes.set(p.mes, (porMes.get(p.mes) ?? 0) + p.valor);
     ultimoMes = Math.max(ultimoMes, p.mes);
+    if (p.mes < safra) pagouAntesDaVenda = true;
   }
+  // Os grampos abaixo zeram o resíduo de ARREDONDAMENTO do último vencimento.
+  // Parcela antes da venda (defasagem negativa persistida) nunca é abatida do
+  // saldo — a série começa em `s` —, então o que sobra no fim não é resíduo, e
+  // zerar esconderia o `CARTEIRA_NAO_ZERA` que a carteira deve acusar.
+  const grampear = !pagouAntesDaVenda;
 
   // #789: a parcela que vence no mês da contratação (defasagem 0) abate o
   // saldo já em `s` — ver a convenção no comentário da função.
@@ -1335,14 +1343,13 @@ export function carteiraSaldoSafra(
     ? round2(principal * (1 + c.taxaMensal) - (porMes.get(safra) ?? 0))
     : principal;
   // Grampo só quando o último vencimento É o mês da contratação (N_s = 1).
-  // `ultimoMes` nasce em `safra`; sem parcela nele (parcela única antes da
-  // venda, por defasagem negativa persistida) o principal NÃO foi pago aqui, e
-  // zerar esconderia o `CARTEIRA_NAO_ZERA` que a carteira deve acusar.
-  if (safra === ultimoMes && porMes.has(safra)) saldo = 0;
+  // `ultimoMes` nasce em `safra`; sem parcela nele, o principal NÃO foi pago
+  // aqui.
+  if (grampear && safra === ultimoMes && porMes.has(safra)) saldo = 0;
   const out: SaldoSafra[] = [{ safra, mes: safra, saldo: Math.max(0, saldo) }];
   for (let mes = safra + 1; mes <= ultimoMes; mes++) {
     saldo = round2(saldo * (1 + c.taxaMensal) - (porMes.get(mes) ?? 0));
-    if (mes === ultimoMes) saldo = 0;
+    if (grampear && mes === ultimoMes) saldo = 0;
     out.push({ safra, mes, saldo: Math.max(0, saldo) });
   }
   return out;

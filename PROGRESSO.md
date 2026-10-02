@@ -60,12 +60,16 @@ linha; agora coleta a primeira divergência de cada código **por componente**, 
   mutações dão 1 vermelho cada. Achado de passagem, fora do escopo: com dois ou mais concentrados o
   resíduo é somado a CADA um (participações somam mais de 100%; medido 120%), e a reconciliação
   acusa `SOMA_COMPONENTES_DIVERGE`.
+- Rodada 3 (App do Codex): com parcelas antes E depois da venda (defasagem negativa, N > 1) o grampo
+  ainda zerava o saldo — a parcela antecipada nunca é abatida da série, então o que sobra não é
+  resíduo. Agora nenhum grampo vale quando há parcela antes da venda; com N = 2 a `main` acusava e
+  este PR passara a esconder, com N = 3 as duas escondiam. Mutação (grampear sempre): 1 vermelho.
 - Achado de passagem, fora do escopo: `CARTEIRA_RESSURGE` falso no parcelamento trimestral do legado
   com juros > 0 (o saldo capitaliza na carência antes do 1º vencimento) — registrado como issue nova.
 - Efeito visível: em planos com 1ª parcela no mês da venda, a carteira e a carteira máxima ficam
   abaixo do que saíam antes; registrado em `docs/avancado.md` e `docs/formulas.md`.
 - Endereços `arquivo:linha` deslocados pelo diff no motor, consertados: `frontend/proforma-avancado.ts`,
-  `referencia/fluxo-investidor-formulas.md` e `referencia/padrao-incorporacao.md` (dois).
+  `referencia/fluxo-investidor-formulas.md` e `referencia/padrao-incorporacao.md` (quatro, dois deles já vencidos na `main`).
 - Sem migração; `versao` do `manifesto.json` mantida.
 
 ## 2026-10-01 — Rodada 15 aberta: conferência EVI Urbitá em sessões filhas
