@@ -1614,8 +1614,9 @@ planilha com diferença de R$ 6,43 em R$ 95,7 milhões; a receita bruta recebida
 935.012,60 (0,45%) abaixo. **Decisão do autor (01/10/2026): manter a convenção do app.** Os documentos
 EVI são consultivos, e alinhar o motor mudaria o número publicado em todo estudo com repasse a juros
 maiores que zero. O alinhamento fica em aberto para o dia em que o autor confirmar que a planilha
-atual é a verdade; ele pediria o expoente `+ 1` em `pagamentosConcentrado`, na carteira do ramo
-concentrado (`carteiraSaldoSafra`) e em `jurosSafra`, e viria depois do ajuste da carteira com
+atual é a verdade; ele pediria o expoente `+ 1` em `pagamentosConcentrado` e na carteira do ramo
+concentrado (`carteiraSaldoSafra`); `jurosSafra` não tem expoente próprio, ele deriva o valor de
+`pagamentosConcentrado` e acompanha a mudança sozinho. Viria depois do ajuste da carteira com
 `defasagemMeses: 0`.
 
 A outra convenção que mudou na planilha, a primeira parcela da tabela longa no mês da venda (30
