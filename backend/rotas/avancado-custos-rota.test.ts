@@ -720,3 +720,22 @@ test('#792 GET receitas devolve TODOS os grupos de receita (o mesmo recorte do s
     assert.equal(corpo.dados[0].nome ?? corpo.dados[0].fase_label, 'G119');
   });
 });
+
+test('#792 GET fases (a tela de Receitas) devolve TODOS os grupos, o mesmo recorte do motor', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  for (let i = 0; i < 120; i++) dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: `G${i}`, ordem: 119 - i });
+  dados.semear('avancado_fases', { estudo_id: 1, tipo: 'cronograma', nome: 'Fase 1', ordem: 0 });
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/1/avancado/fases?tipo=receita`);
+    const corpo = await res.json();
+    assert.equal(res.status, 200, JSON.stringify(corpo));
+    assert.equal(corpo.total, 120);
+    assert.equal(corpo.dados.length, 120);
+    assert.equal(corpo.dados[0].nome, 'G119');
+    // E o próximo grupo criado numera e ordena depois dos 120, não do 100º.
+    const novo = await enviar(base, 'POST', '/estudos/1/avancado/fases', { tipo: 'receita' });
+    assert.equal(novo.status, 201, JSON.stringify(novo.corpo));
+    assert.equal(novo.corpo.ordem, 120);
+  });
+});

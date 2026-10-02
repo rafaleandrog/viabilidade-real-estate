@@ -33,7 +33,9 @@ novo: R$ 6 mi de VGV vendável sumiam no estado da issue, sem aviso. Agora:
   só quando a escrita piora a folga, para estudo já gravado em violação não travar operação neutra;
   as duas guardas contam só alocação de grupo de receita (de onde o motor reserva) e só linha de
   permuta que o motor reserva (inteira e >= 1), achado do App do Codex; `GET .../receitas` passou a
-  varrer todos os grupos (era uma página de 100), para o motor ver o mesmo recorte; e o PATCH do
+  varrer todos os grupos (era uma página de 100), para o motor ver o mesmo recorte — e também o
+  `GET .../fases` da tela de Receitas e a numeração do POST de grupo, para a tela mostrar e editar o
+  que o motor conta; e o PATCH do
   catálogo tem piso em max(alocado, permutado), para estudo legado com permuta acima do alocado não
   perder unidades já prometidas;
 - invariantes (`validarProduto`): `PRODUTO_EXCEDE_ESTOQUE` só com alocado > catálogo;

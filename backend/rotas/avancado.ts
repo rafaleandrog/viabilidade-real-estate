@@ -1042,7 +1042,10 @@ rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Respo
     const filtrosFases: Record<string, any> = { estudo_id: estudo.id };
     if (tipo) filtrosFases.tipo = tipo;
     const [fases, alocacoes] = await Promise.all([
-      req.dados!.listar('avancado_fases', { filtros: filtrosFases, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+      // Todos os grupos, como `GET .../receitas`: o motor e o saldo da permuta
+      // contam todos, e a tela que os edita não pode esconder os que passarem
+      // de uma página.
+      req.dados!.varrerTudo('avancado_fases', { filtros: filtrosFases }).then(porOrdem),
       // Varre em `id asc` (default) e ordena em memória: `ordenar` numa varredura
       // paginada com a app no ar pode repetir ou pular linha (doc do SDK).
       req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id } }).then(porOrdem),
@@ -1054,8 +1057,8 @@ rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Respo
       porFase.get(chave)!.push(a);
     }
     res.json({
-      dados: fases.dados.map((f) => ({ ...f, alocacoes: porFase.get(Number(f.id)) ?? [] })),
-      total: fases.total,
+      dados: fases.map((f: any) => ({ ...f, alocacoes: porFase.get(Number(f.id)) ?? [] })),
+      total: fases.length,
     });
   } catch (e: any) {
     console.error('Erro em GET /avancado/fases:', e);
@@ -1097,14 +1100,14 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
       erro(res, 400, 'TIPO_INVALIDO', `tipo deve ser um de: ${TIPOS_FASE.join(', ')}`);
       return;
     }
-    const existentes = await req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo }, por_pagina: 100 });
-    const n = proximoNumeroFase(existentes.dados.map((f: any) => f.nome), tipo);
+    const existentes = await req.dados!.varrerTudo('avancado_fases', { filtros: { estudo_id: estudo.id, tipo } });
+    const n = proximoNumeroFase(existentes.map((f: any) => f.nome), tipo);
     const nomePadrao = tipo === 'receita' ? `${n}º Grupo` : `Fase ${n}`;
     const dados: Record<string, any> = {
       estudo_id: estudo.id,
       tipo,
       nome: String(req.body.nome || nomePadrao).trim() || nomePadrao,
-      ordem: existentes.total,
+      ordem: existentes.length,
     };
     if (req.body.inicio_mes !== undefined) dados.inicio_mes = Math.max(0, Number(req.body.inicio_mes) || 0);
     if (req.body.duracao_meses !== undefined) dados.duracao_meses = Math.max(1, Number(req.body.duracao_meses) || 1);
