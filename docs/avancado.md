@@ -113,6 +113,33 @@ repassar fica fora desta última, porque capitaliza até o repasse. Cada aviso a
 componente, na primeira safra em que acontece, e um aviso numa safra não esconde os das safras
 seguintes.
 
+### Comparar com a planilha EVI
+
+Quem põe um estudo ao lado da planilha EVI Urbitá (aba **Incorp Individual**) encontra quatro
+indicadores com definições diferentes das do app. Nenhum é defeito: o app usa as definições abaixo, e
+a tabela traz o caminho para chegar ao número da planilha. A conversão do VPL e do Resultado está em
+[Fórmulas da Proforma](formulas).
+
+| Indicador | No app | Na planilha | Para comparar |
+|---|---|---|---|
+| **Resultado** | Desalavancado: não deduz os juros do financiamento à produção. A linha informativa **Serviço da dívida do funding** é o total das saídas de todas as operações de funding (principal, juros e retorno), não só os juros; o valor dos juros está no **Total de juros** do resumo do Financiamento à produção, na página Funding. | Deduz esses juros no Resultado. | Subtraia do Resultado do app o **Total de juros** do financiamento à produção. |
+| **Exposição máxima** | O pior ponto do fluxo acumulado **livre** (desalavancado), em todo o período — inclusive nos meses anteriores ao lançamento. | O pior ponto do caixa **alavancado**, só nos meses a partir do lançamento. | Na tabela mensal da sub-aba Fluxo de Caixa, leia o menor valor da linha **Fluxo de Caixa Acumulado** (a última linha da tabela, depois do funding) a partir do mês do lançamento. Os KPIs e gráficos de fluxo livre não servem para esta comparação. |
+| **VPL** | O início do planejamento é o mês de índice 0: o fluxo do mês de índice `i` é descontado `(1 + tm)^(i + 1)`. | A origem do tempo é o lançamento (mês 0). | Multiplique o VPL do app por `(1 + tm)^(n + 1)`, com `n` o número de meses entre o início do planejamento e o lançamento. A **TIR** não depende da origem. |
+| **Séries mensais** | O VPL total e por linha, sem a série de FC descontado mês a mês. Não há um endividamento total consolidado de todas as operações de funding; para o financiamento à produção, o resumo da página Funding traz o **Pico do saldo devedor** e o mês em que ocorre. | **FC descontado** mês a mês e **Endividamento total**. | Para um estudo cuja única dívida é o financiamento à produção, leia o **Pico do saldo devedor** na página Funding; fora disso não há equivalente. |
+
+Duas convenções do fluxo de recebíveis também diferem da versão mais recente da planilha, e o app
+mantém as suas:
+
+- **Juros do repasse.** O app capitaliza o saldo concentrado por `mês do pagamento − mês da venda`
+  períodos: os juros começam no mês **seguinte** ao da venda. A planilha capitaliza um mês a mais, e já
+  rende juros no próprio mês da venda. Um estudo com repasse a juros maior que zero recebe, no app,
+  um mês de juros a menos do que na planilha.
+- **Primeira parcela da tabela longa.** O app paga a primeira parcela no mês seguinte ao da venda; a
+  planilha paga no mês da venda. O motor aceita a primeira parcela no mês da venda (`defasagemMeses`
+  igual a `0` no componente de pagamento), que reproduz o valor e o mês do recebimento da planilha; a
+  tela de Receitas não tem controle para isso. A carteira de clientes já abate essa parcela
+  no mês da venda (ver acima).
+
 ### Cenários
 
 Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** e compare a

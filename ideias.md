@@ -12,6 +12,9 @@ Ideia que não cabe numa linha deixou de ser ideia — abra a issue.
 - **Exportar a Proforma do Avançado**: PDF e Excel, como a do Preliminar.
 - **Uma só leitura do resultado em todas as superfícies**: decidir se o Painel e os KPIs mostram `= Resultado` ou uma das leituras com permutas, e aplicar a decisão em todo lugar.
 - **Copiar os documentos ao duplicar um estudo**: levar as fontes do apelo comercial e os anexos do empreendimento junto com a cópia.
+- **Exposição máxima após funding, a partir do lançamento**: um KPI ao lado da exposição máxima atual, igual ao da planilha EVI (mínimo do fluxo acumulado alavancado nos meses a partir do lançamento).
+- **VPL com data-base escolhível e séries de FC descontado e endividamento**: origem do tempo no início do projeto ou no lançamento, e as séries mensais que a planilha EVI mostra.
+- **Resultado após funding na Análise Financeira**: uma linha ao lado do Resultado desalavancado, deduzindo os juros do financiamento à produção.
 
 ## Aprovadas
 

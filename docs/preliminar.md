@@ -45,7 +45,11 @@ e a **Área média** (área total ÷ unidades) são calculadas, e o **VGV** é a
 Como a área vem da base, mudar a Terreno & Áreas recalcula área média e VGV sem tocar nos
 percentuais. A soma dos percentuais tem que ser **100% da base**: o indicador abaixo da tabela
 mostra quanto está alocado e quanto resta, o produto novo já nasce com o que falta, e com a soma
-diferente de 100% o app recusa **Salvar premissas** e **Submeter para análise**. Catálogo vazio não
+diferente de 100% o app recusa **Salvar premissas** e **Submeter para análise**.
+Uma linha só compõe o catálogo, e só entra no VGV, com **área, preço e unidades** maiores que zero:
+com **Unidades** vazio ou zero a linha é ignorada no cálculo, e o estudo pode ficar com VGV zerado. Para reproduzir uma planilha que traz só áreas e preços, lance **1 unidade** por
+produto — o VGV não muda, porque ele é a base × o percentual × o preço, mas os indicadores por
+unidade (**Nº de unidades**, **Preço médio/unid.**) deixam de ter sentido. Catálogo vazio não
 bloqueia, e sem base (Terreno & Áreas ainda em branco) a regra também não se aplica. O salvamento
 espera o catálogo terminar de carregar. Numa linha antiga, a primeira edição de qualquer campo fixa
 a área total dela: mudar as unidades passa então a mudar a área média, não o VGV. Estudos
@@ -79,6 +83,13 @@ permuta, **Receita bruta (VGV)** quando não há) e os três totais de grupo sã
 mostram ou escondem as linhas do grupo, e linha de grupo zerada não aparece. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
 **Unidades e preço médio por tipo** resume o catálogo. Os botões **Exportar Excel** e **Exportar PDF** geram a mesma
 tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [Fórmulas da Proforma](formulas).
+
+**Comparar com a Proforma da EVI.** A Proforma do Preliminar não tem as linhas **Outorga** e
+**Marketing global**, que a Proforma da EVI Urbitá traz: elas existem só no Avançado, como categorias
+de custo. Para comparar os dois resultados, some essas duas linhas à parte ao custo do Preliminar.
+Outras diferenças vêm da natureza estática do nível, e não são defeito: o VGV do Preliminar não tem
+juros de tabela (não há tempo) e o resultado não deduz despesas financeiras (não há funding). As
+áreas abertas ficam fora da base do catálogo, como descrito em Produtos.
 
 **Cenários.** Três blocos que respondem "o que derruba este resultado?":
 
