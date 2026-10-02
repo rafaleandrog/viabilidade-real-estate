@@ -27,12 +27,73 @@ import {
 
 test('#230: contrato canônico exige componentes válidos fechando 100%', () => {
   assert.equal(validarFluxoPagamento({ componentes: [
-    { tipo: 'imediato', participacaoPct: 20 },
-    { tipo: 'prazo_fixo', participacaoPct: 80, prazoMeses: 36 },
+    { tipo: 'imediato', participacaoPct: 20, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 80, prazoMeses: 36, sinalPct: 0, defasagemMeses: 1 },
   ] }), null);
-  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'imediato', participacaoPct: 90 }] })!, /100%/);
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'imediato', participacaoPct: 90, descontoPct: 0 }] })!, /100%/);
   assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'desconhecido', participacaoPct: 100 }] })!, /tipo inválido/);
   assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 0 }] })!, /prazoMeses/);
+});
+
+// O backend recusa o componente que o motor não consegue ler: campo lido sem
+// default ausente, do tipo errado ou fora da faixa. Antes o PATCH respondia 200
+// e o motor devolvia receita NaN ou lançava RangeError.
+test('validarFluxoPagamento recusa componente que o motor não consegue calcular', () => {
+  // os dois corpos da issue
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'ate_marco', participacaoPct: 100, marcoMes: 41 }] })!, /sinalPct|defasagemMeses/);
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'ate_marco', participacaoPct: 100, marcoMes: 41, sinalPct: 0 }] })!, /defasagemMeses/);
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12 }] })!, /sinalPct|defasagemMeses/);
+  // a reprodução da QA no Loteamento: prazo_fixo só com prazoMeses e taxaMensal
+  const qa = (pf: Record<string, unknown>) => validarFluxoPagamento({ componentes: [
+    { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, taxaMensal: 0.0098636, ...pf },
+  ] });
+  assert.match(qa({})!, /prazo_fixo requer sinalPct/);
+  assert.match(qa({ defasagemMeses: 1 })!, /prazo_fixo requer sinalPct/);
+  assert.match(qa({ sinalPct: 0 })!, /prazo_fixo requer defasagemMeses/);
+  assert.equal(qa({ sinalPct: 0, defasagemMeses: 1 }), null);
+  // desconto do imediato, por prevenção
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'imediato', participacaoPct: 100 }] })!, /descontoPct/);
+});
+
+test('validarFluxoPagamento: defasagemMeses é inteiro não negativo nos dois tipos de parcela', () => {
+  const pf = (d: unknown) => validarFluxoPagamento({ componentes: [
+    { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, sinalPct: 0, defasagemMeses: d }] });
+  const am = (d: unknown) => validarFluxoPagamento({ componentes: [
+    { tipo: 'ate_marco', participacaoPct: 100, marcoMes: 40, sinalPct: 0, defasagemMeses: d }] });
+  for (const valida of [pf, am]) {
+    assert.match(valida(-1)!, /defasagemMeses inteiro não negativo/);
+    assert.match(valida(1.5)!, /defasagemMeses/);
+    assert.match(valida('1')!, /defasagemMeses/); // texto: o motor concatenaria
+    assert.match(valida(null)!, /defasagemMeses/);
+    assert.equal(valida(0), null);
+    assert.equal(valida(1), null);
+  }
+});
+
+test('validarFluxoPagamento: sinalPct e descontoPct são percentuais numéricos', () => {
+  const pf = (sinal: unknown) => validarFluxoPagamento({ componentes: [
+    { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, sinalPct: sinal, defasagemMeses: 1 }] });
+  assert.match(pf(-5)!, /sinalPct/);
+  assert.match(pf(101)!, /sinalPct/);
+  assert.match(pf('')!, /sinalPct/); // Number('') valeria 0
+  assert.equal(pf(10), null);
+  const im = (d: unknown) => validarFluxoPagamento({ componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: d }] });
+  assert.match(im(-1)!, /descontoPct/);
+  assert.match(im('5')!, /descontoPct/);
+  assert.equal(im(5), null);
+});
+
+test('validarFluxoPagamento: o plano completo que a tela grava continua aceito', () => {
+  // o shape de `componentesDoLegado` — os quatro tipos, com os campos que ele produz
+  assert.equal(validarFluxoPagamento({ componentes: [
+    { tipo: 'imediato', participacaoPct: 15, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 10, sinalPct: 0, prazoMeses: 6, defasagemMeses: 0,
+      taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)' },
+    { tipo: 'ate_marco', participacaoPct: 15, sinalPct: 0, marcoMes: 40, defasagemMeses: 1,
+      taxaMensal: 0.0098636, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)' },
+    { tipo: 'concentrado', participacaoPct: 60, mesPagamento: 41, taxaMensal: 0, jurosNoMesDaContratacao: false },
+  ] }), null);
 });
 
 // ── Cronograma: travamento (spec Etapa 1/3) ──

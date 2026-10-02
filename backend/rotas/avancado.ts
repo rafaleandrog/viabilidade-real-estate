@@ -4,6 +4,7 @@ import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estud
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
+import { erroComponentePagamento } from '../../frontend/fluxo-pagamento-contrato.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -260,24 +261,16 @@ export function validarFluxoPagamento(fp: any): string | null {
     if (!Array.isArray(fp.componentes) || fp.componentes.length === 0) {
       return 'fluxo_pagamento.componentes deve ser uma lista não vazia';
     }
-    const tipos = ['imediato', 'prazo_fixo', 'ate_marco', 'concentrado'];
+    // O que o motor lê de cada componente — sinal, defasagem, desconto e as
+    // âncoras — é conferido por `erroComponentePagamento`, a mesma regra que o
+    // inventário usa para contar o que já está gravado. Antes só as âncoras
+    // eram exigidas, e um plano sem `sinalPct` ou `defasagemMeses` era gravado
+    // com 200 e calculado como receita `NaN` (ou derrubava o fluxo).
     let soma = 0;
     for (const c of fp.componentes) {
-      if (!c || typeof c !== 'object' || !tipos.includes(c.tipo)) return 'componente de pagamento tem tipo inválido';
-      const pct = Number(c.participacaoPct);
-      if (!Number.isFinite(pct) || pct < 0 || pct > 100) return 'participacaoPct deve ser um percentual entre 0 e 100';
-      soma += pct;
-      if (c.tipo === 'prazo_fixo'
-        && (!Number.isInteger(Number(c.prazoMeses)) || Number(c.prazoMeses) < 1)) {
-        return 'prazo_fixo requer prazoMeses inteiro maior que zero';
-      }
-      if (c.tipo === 'ate_marco'
-        && (!Number.isInteger(Number(c.marcoMes)) || Number(c.marcoMes) < 0)) {
-        return 'ate_marco requer marcoMes inteiro não negativo';
-      }
-      if (c.tipo === 'concentrado' && (!Number.isInteger(Number(c.mesPagamento)) || Number(c.mesPagamento) < 0)) {
-        return 'concentrado requer mesPagamento inteiro não negativo';
-      }
+      const invalido = erroComponentePagamento(c);
+      if (invalido) return invalido;
+      soma += c.participacaoPct;
     }
     if (Math.abs(soma - 100) > 0.01) return `a soma dos componentes deve ser 100% (atual: ${soma.toFixed(2)}%)`;
     return null;
