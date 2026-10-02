@@ -46,8 +46,8 @@ Como a área vem da base, mudar a Terreno & Áreas recalcula área média e VGV 
 percentuais. A soma dos percentuais tem que ser **100% da base**: o indicador abaixo da tabela
 mostra quanto está alocado e quanto resta, o produto novo já nasce com o que falta, e com a soma
 diferente de 100% o app recusa **Salvar premissas** e **Submeter para análise**.
-Uma linha só compõe o catálogo com **área, preço e unidades** maiores que zero: o app não aceita
-**Unidades** vazio. Para reproduzir uma planilha que traz só áreas e preços, lance **1 unidade** por
+Uma linha só compõe o catálogo, e só entra no VGV, com **área, preço e unidades** maiores que zero:
+com **Unidades** vazio ou zero a linha é ignorada no cálculo, e o estudo pode ficar com VGV zerado. Para reproduzir uma planilha que traz só áreas e preços, lance **1 unidade** por
 produto — o VGV não muda, porque ele é a base × o percentual × o preço, mas os indicadores por
 unidade (**Nº de unidades**, **Preço médio/unid.**) deixam de ter sentido. Catálogo vazio não
 bloqueia, e sem base (Terreno & Áreas ainda em branco) a regra também não se aplica. O salvamento
