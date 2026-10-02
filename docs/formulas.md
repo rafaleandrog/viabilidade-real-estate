@@ -170,9 +170,9 @@ Os indicadores do Avançado têm três definições que diferem das da planilha 
 sempre feita por quem compara; o app não publica as duas versões.
 
 ```text
-Resultado da planilha = Resultado do app − juros do financiamento à produção
+Resultado da planilha = Resultado do app − Total de juros do financiamento à produção
 VPL na origem do lançamento = VPL do app × (1 + tm)^(n + 1)
-Exposição máxima da planilha = mín.(Fluxo de Caixa Acumulado do funding), meses ≥ lançamento
+Exposição máxima da planilha = mín.(Fluxo de Caixa Acumulado, após o funding), meses ≥ lançamento
 ```
 
 `tm` é a taxa de desconto mensal, `(1 + taxa a.a.)^(1/12) − 1`, e `n` o número de meses entre o início

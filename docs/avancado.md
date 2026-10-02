@@ -91,9 +91,9 @@ a tabela traz o caminho para chegar ao número da planilha. A conversão do VPL 
 
 | Indicador | No app | Na planilha | Para comparar |
 |---|---|---|---|
-| **Resultado** | Desalavancado: não deduz os juros do financiamento à produção, que aparecem na linha informativa **Serviço da dívida do funding** e na aba Fluxo de Caixa. | Deduz esses juros no Resultado. | Subtraia do Resultado do app os juros do financiamento à produção. |
-| **Exposição máxima** | O pior ponto do fluxo acumulado **livre** (desalavancado), em todo o período — inclusive nos meses anteriores ao lançamento. | O pior ponto do caixa **alavancado**, só nos meses a partir do lançamento. | Na tabela do Fluxo de Caixa, leia o menor valor da linha **Fluxo de Caixa Acumulado** (a do funding) a partir do mês do lançamento. |
-| **VPL** | O mês 1 do estudo é o início do planejamento: cada fluxo é descontado `(1 + tm)^(mês + 1)`. | A origem do tempo é o lançamento (mês 0). | Multiplique o VPL do app por `(1 + tm)^(n + 1)`, com `n` o número de meses entre o início do planejamento e o lançamento. A **TIR** não depende da origem. |
+| **Resultado** | Desalavancado: não deduz os juros do financiamento à produção. A linha informativa **Serviço da dívida do funding** é o total das saídas de todas as operações de funding (principal, juros e retorno), não só os juros; o valor dos juros está no **Total de juros** do resumo do Financiamento à produção, na página Funding. | Deduz esses juros no Resultado. | Subtraia do Resultado do app o **Total de juros** do financiamento à produção. |
+| **Exposição máxima** | O pior ponto do fluxo acumulado **livre** (desalavancado), em todo o período — inclusive nos meses anteriores ao lançamento. | O pior ponto do caixa **alavancado**, só nos meses a partir do lançamento. | Na tabela mensal da sub-aba Fluxo de Caixa, leia o menor valor da linha **Fluxo de Caixa Acumulado** (a última linha da tabela, depois do funding) a partir do mês do lançamento. Os KPIs e gráficos de fluxo livre não servem para esta comparação. |
+| **VPL** | O início do planejamento é o mês de índice 0: o fluxo do mês de índice `i` é descontado `(1 + tm)^(i + 1)`. | A origem do tempo é o lançamento (mês 0). | Multiplique o VPL do app por `(1 + tm)^(n + 1)`, com `n` o número de meses entre o início do planejamento e o lançamento. A **TIR** não depende da origem. |
 | **Séries mensais** | Só o VPL total e por linha; o endividamento máximo não é calculado. | **FC descontado** mês a mês e **Endividamento total**. | Não há equivalente na tela. |
 
 Duas convenções do fluxo de recebíveis também diferem da versão mais recente da planilha, e o app
@@ -104,8 +104,9 @@ mantém as suas:
   rende juros no próprio mês da venda. Um estudo com repasse a juros maior que zero recebe, no app,
   um mês de juros a menos do que na planilha.
 - **Primeira parcela da tabela longa.** O app paga a primeira parcela no mês seguinte ao da venda; a
-  planilha paga no mês da venda. O componente de pagamento tem o campo `defasagemMeses`, e `0` o
-  alinha à planilha.
+  planilha paga no mês da venda. O motor aceita a primeira parcela no mês da venda (`defasagemMeses`
+  igual a `0` no componente de pagamento), que reproduz a planilha; a tela de Receitas não tem controle
+  para isso.
 
 ### Cenários
 
