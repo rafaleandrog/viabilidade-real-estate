@@ -86,7 +86,7 @@ Receita líquida = VGV − deduções
 ## Custos diretos
 
 Terreno (`custo por m² × área do terreno`, zerável pela caixa **Considerar custo de aquisição do
-terreno**), projetos,
+terreno**), projetos (% do VGV, R$ fixo ou % do **custo de obras**, abaixo),
 manutenção pós-obra e contingências (% do VGV) e, por tipo:
 
 - **Loteamento** — infraestrutura, em uma de três unidades: % do VGV, R$ fixo ou
@@ -96,6 +96,14 @@ manutenção pós-obra e contingências (% do VGV) e, por tipo:
 No Loteamento a gestão da construção não incide, e construção, decoração e incorporação e
 registro saem zerados: o produto de obra ali é a infraestrutura, que é sozinha o **custo de obras**
 (o numerador de **Custo obras / VGV**).
+
+```text
+Custo obras                 = construção + decoração + gestão da construção   (Loteamento: infraestrutura)
+Projetos em % da construção = custo obras × %
+```
+
+Como todo campo multiunidade, o percentual digitado vira um valor canônico em R$ (ver **Valor
+canônico dos campos multiunidade**, abaixo).
 
 ## Custos indiretos
 
@@ -216,6 +224,27 @@ dívida negativo, dívida que não zera no horizonte e caixa acumulado negativo 
 **funding nunca integra a Receita bruta (VGV)**: liberações e aportes aparecem só no bloco de
 funding, e o repasse continua sendo recebimento do cliente.
 
+## Bases dos custos em % do Avançado
+
+Nos Custos do Avançado, cada unidade percentual aplica o % sobre uma base própria:
+
+| Unidade | Base |
+|---|---|
+| % VGV | VGV de tabela, somado das linhas de receita |
+| % Receita | receita líquida do RET sobre o VGV vendável, sem juros |
+| % Obra | o grupo Obras inteiro (construção, outorga, decoração, gestão da obra, contingência e outros), menos as linhas em % Obra |
+| % Recebido | receita **recebida**: a soma do recebimento bruto do fluxo, com os juros de tabela — a mesma Receita Bruta da Proforma |
+| % Construção | custo de construção: as linhas de Construção, Decoração e Gestão da obra, em qualquer grupo (a gestão já resolvida sobre o grupo Obras), sem Outorga, Contingência ou Outro |
+
+```text
+Marketing em % Recebido  = Σ recebimento bruto (com juros) × %
+Projetos em % Construção = (construção + decoração + gestão da obra) × %
+```
+
+% Recebido é oferecido no marketing e publicidade, na manutenção pós-obra, no marketing global, na
+gestão e em Outro dos Diretos e Indiretos; % Construção, em Projetos. Sem juros de tabela, a receita
+recebida é o VGV vendável contratado no horizonte, líquido dos descontos comerciais.
+
 ## Valor canônico dos campos multiunidade
 
 Todo campo que aceita mais de uma unidade (R$, R$/m², % do VGV; m² ou % da área nas permutas
@@ -273,7 +302,8 @@ valor é de fato negativo.
 
 Onde a especificação original era ambígua, o app segue o protótipo e o bom senso: o custo do
 terreno incide sobre a área do terreno; "obras" é infraestrutura no Loteamento e construção,
-decoração e gestão na Incorporação; projetos em % incidem sobre o VGV. (A especificação previa
+decoração e gestão na Incorporação; projetos em % incidem sobre o VGV, ou sobre o custo de obras
+quando a unidade é % da construção. (A especificação previa
 uma linha de licenciamento ao lado de projetos; ela nunca foi construída — ver as colunas
 aposentadas em [Modelo de Dados](modelo-de-dados).)
 

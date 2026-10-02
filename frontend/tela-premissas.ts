@@ -88,7 +88,7 @@ export function modoEfetivo(cu: CustoUnidade, valorForm: unknown): string {
   return cu.opcoes.some((o) => o.valor === bruto) ? bruto : cu.padrao;
 }
 
-const CUSTOS_UNIDADE: CustoUnidade[] = [
+export const CUSTOS_UNIDADE: CustoUnidade[] = [
   {
     // #5: infraestrutura do loteamento tem 3 unidades — % VGV, R$ (fixo) ou R$/m².
     modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv', campoCanonico: 'infra_valor_canonico',
@@ -110,6 +110,10 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
     opcoes: [
       { valor: 'pct_vgv', rotulo: '% VGV', campo: 'projetos_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgv' } },
       { valor: 'valor_fixo', rotulo: 'R$ (fixo)', campo: 'projetos_valor_fixo', sufixo: 'R$', conv: { tipo: 'identidade' } },
+      // % do custo de obras (construção + decoração + gestão da obra; no
+      // Loteamento, a infraestrutura). Divide `projetos_pct` com o `% VGV` —
+      // o modo diz a base, e `proforma.ts` lê a coluna conforme o modo.
+      { valor: 'pct_constr', rotulo: '% Construção', campo: 'projetos_pct', sufixo: '% construção', conv: { tipo: 'pct', link: 'custoObras' } },
     ],
   },
 ];

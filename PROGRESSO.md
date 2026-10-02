@@ -4,6 +4,28 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-02 — Custos em %: bases "receita recebida" e "custo de construção"
+
+Decisão do autor (itens 1 e 3 da issue das bases de custo; 2 e 4 mantidos): duas unidades novas,
+num PR só porque as duas mexem na mesma linha do `schema.json`.
+
+- **`pct_recebido` (Avançado).** Base = Σ `recebimentoBrutoMensal` com juros de tabela — a mesma
+  `receitaBruta` que o motor publica. Oferecida em marketing, manutenção pós-obra, marketing global,
+  gestão e Outro (Diretos/Indiretos).
+- **`pct_constr` (Avançado e Preliminar).** Avançado: `totalConstrucaoCustos` (Construção + Decoração +
+  Gestão da obra, sem Outorga/Contingência), oferecida em Projetos. Preliminar: `projetos_modo` ganha
+  `pct_constr` sobre `custoObras`, e divide a coluna `projetos_pct` com o `% VGV` (o modo diz a base).
+  Reproduz a EVI: 1,6% × (96.000.000 + 6% de gestão) = R$ 1.628.160,00.
+- **Schema.** Só valores novos em `opcoes` (`estudos.projetos_modo`, `avancado_linhas_custo.orcamento_unidade`)
+  e na allowlist `UNIDADES_ORCAMENTO`. Sem migração, `versao` mantida pela regra deste repo — o
+  `distribuicao.md` do SDK lista mudança de `opcoes` como gatilho de bump; divergência registrada no PR.
+- **Contrato canônico preservado.** Valor digitado vira R$ canônico, como em toda unidade; a base só
+  é reaplicada em linha legada (sem canônico).
+- **Testes.** `frontend/bases-custo-pct.test.ts` (motor e Proforma), `frontend/premissas-projetos-construcao.test.ts`
+  (fiação da tela de Premissas) e o caso de render `custos-bases-pct` (tela de Custos) — cada atribuição
+  de base apagada deixa um deles vermelho.
+- Guias `docs/avancado.md`, `docs/preliminar.md` e `docs/formulas.md` atualizados.
+
 
 
 

@@ -676,6 +676,12 @@ export interface ContextoCusto {
   vgvTotal: number;           // VGV somado das linhas de receita
   receitaTotal?: number;      // receita líquida (VGL) — para pct_receita
   totalObra?: number;         // total do grupo Obra (excl. linhas pct_obra) — para pct_obra
+  /** Receita RECEBIDA: Σ do recebimento bruto, com juros de tabela — a mesma
+   * grandeza que o motor publica como `receitaBruta`. Base de `pct_recebido`. */
+  receitaRecebida?: number;
+  /** Custo de construção: linhas das categorias de `CATEGORIAS_BASE_CONSTRUCAO`,
+   * em qualquer grupo — ver `totalConstrucaoCustos`. Base de `pct_constr`. */
+  totalConstrucao?: number;
   /**
    * #473: base da Corretagem de vendas quanto à permuta física. `true`
    * (default — preserva todo estudo existente) = VGV BRUTO, permuta física
@@ -724,8 +730,36 @@ export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
     case 'pct_vgv': return (valor / 100) * n(ctx.vgvTotal);
     case 'pct_receita': return (valor / 100) * n(ctx.receitaTotal ?? ctx.vgvTotal);
     case 'pct_obra': return (valor / 100) * n(ctx.totalObra);
+    case 'pct_recebido': return (valor / 100) * n(ctx.receitaRecebida);
+    case 'pct_constr': return (valor / 100) * n(ctx.totalConstrucao);
     default: return valor; // 'rs'
   }
+}
+
+/**
+ * Categorias que formam o CUSTO DE CONSTRUÇÃO — a base de `pct_constr`. É a
+ * mesma composição do KPI "Custo obras" do Preliminar (construção + decoração
+ * + gestão da obra) e deixa de fora o resto do grupo Obras (Outorga,
+ * Contingência, Outro), que `pct_obra` inclui.
+ */
+export const CATEGORIAS_BASE_CONSTRUCAO: readonly string[] = ['Construção', 'Decoração', 'Gestão da obra'];
+
+/**
+ * Total do custo de construção (base de `pct_constr`), resolvido com `ctx` —
+ * que precisa já trazer `totalObra`, porque a Gestão da obra costuma estar em
+ * `pct_obra`. Casa só pela CATEGORIA, em qualquer grupo, como os buckets da
+ * Proforma do Avançado: a migração `002` moveu Decoração e Gestão da obra de
+ * `obra` para `diretos`, e um estudo dessa época as tem lá. Linhas em `pct_constr` ficam de fora (seriam base de si mesmas),
+ * e `excluirId` tira a linha que está sendo convertida PARA `pct_constr`
+ * enquanto ela ainda carrega a unidade antiga — o mesmo cuidado do `pct_obra`.
+ * Única fonte da base: motor e tela de Custos chamam esta função.
+ */
+export function totalConstrucaoCustos(linhasCusto: any[], ctx: ContextoCusto, excluirId?: number): number {
+  return (linhasCusto ?? [])
+    .filter((c) => c && c.id !== excluirId
+      && CATEGORIAS_BASE_CONSTRUCAO.includes(c.categoria)
+      && (c.orcamento_unidade || 'rs') !== 'pct_constr')
+    .reduce((s, c) => s + resolverCustoTotal(c, ctx), 0);
 }
 
 // ─────────────────────────────────────────────────────────────────

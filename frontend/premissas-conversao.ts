@@ -13,7 +13,11 @@ export type LinkKey =
   // Grandezas adicionais usadas pelos custos do Avançado (tela-fluxo-custos):
   // R$/m² de terreno, % da receita e % do total do grupo Obra. As de cima
   // seguem servindo o Preliminar.
-  | 'areaTerreno' | 'receita' | 'obra';
+  | 'areaTerreno' | 'receita' | 'obra'
+  // Receita recebida (com juros de tabela) e custo de construção — bases de
+  // `pct_recebido` e `pct_constr` no Avançado; `custoObras` é a base de
+  // Projetos em `pct_constr` no Preliminar.
+  | 'recebido' | 'construcao' | 'custoObras';
 
 // identidade: o valor já é a base (R$ fixo, R$ total, m²).
 // pct: o valor é % da grandeza de ligação (ex.: % do VGV, % da área de venda).
@@ -50,6 +54,7 @@ export function ctxConversaoPreliminar(p: Proforma): CtxConversao {
     areaVendavelR: p.areaBasePermutaResidencial,
     areaVendavelNR: p.areaBasePermutaNaoResidencial,
     areaPrivativa: p.areaPrivativa,
+    custoObras: p.custoObras,
   };
 }
 
@@ -152,7 +157,7 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:745`).
+// (`_valorUnidade`, `tela-premissas.ts:749`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
 // `_trocarUnidade` (`tela-premissas.ts:695-708`) **não escreve coluna nenhuma**,

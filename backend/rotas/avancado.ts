@@ -334,7 +334,7 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
 // IGUALDADE EXATA (entrada a mais ou a menos reprova) — não é comentário
 // pedindo sincronia, é teste que reprova quando ela quebra.
 export const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
-export const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita', 'pct_obra'];
+export const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita', 'pct_obra', 'pct_recebido', 'pct_constr'];
 export const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado']; // #339
 // `unit_delivery`/`sales_revenue` (#194): só a linha de Preço do Terreno usa —
 // o motor (fluxo-caixa-motor.ts) ignora o campo em qualquer outra linha.
