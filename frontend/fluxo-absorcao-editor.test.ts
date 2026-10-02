@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   absorcaoParaSalvar,
   absorcaoSubstituiCurva,
+  alternarMesUnico,
   curvaNaoRepresentavel,
+  ehMesUnico,
   formularioAbsorcao,
 } from './fluxo-absorcao-editor.js';
 import { absorcaoMensal, pctPosChavesDerivado } from './fluxo-shared.js';
@@ -67,6 +69,7 @@ test('#431: o modal abre zerado numa linha personalizada — e isso não é edi�
     [form.pre_lancamento_pct, form.lancamento_pct, form.obra_pct], [0, 0, 0]);
   assert.deepEqual(form.lido, {
     correcao_estoque: false, pre_lancamento_pct: 0, lancamento_pct: 0, obra_pct: 0,
+    pos_chaves_meses: 12,
   });
 });
 
@@ -195,4 +198,77 @@ test('#452: pos_obra grava o percentual EFETIVO (pctPosChavesDerivado), não 0',
     pctPosChavesDerivado(salvo.blocos.slice(0, 3)),
     'o valor gravado tem de bater com a função, não com um literal congelado',
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Janela Pós-chaves por Grupo e "à vista, mês único"
+// ─────────────────────────────────────────────────────────────────────────
+
+test('janela: estudo sem o campo abre com 12 e o no-op não acrescenta a chave', () => {
+  const abs = ABS_DISTRIBUIDO();
+  const form = formularioAbsorcao(abs, true);
+  assert.equal(form.pos_chaves_meses, 12);
+  const salvo = absorcaoParaSalvar(form, abs);
+  assert.equal(JSON.stringify(salvo), JSON.stringify(abs));
+  assert.equal('pos_chaves_meses' in salvo, false);
+});
+
+test('janela: editar SÓ a janela é edição de curva — grava pos_chaves_meses e mantém os blocos', () => {
+  const abs = ABS_DISTRIBUIDO();
+  const form = formularioAbsorcao(abs, true);
+  const salvo = absorcaoParaSalvar({ ...form, pos_chaves_meses: 3 }, abs);
+  assert.equal(salvo.modo, 'distribuido');
+  assert.equal(salvo.pos_chaves_meses, 3);
+  assert.deepEqual(salvo.blocos.map((b: any) => b.pct), [10, 20, 40, 30]);
+  // Reabrir o que foi gravado lê a janela de volta, e aplicar de novo é no-op.
+  const reaberto = formularioAbsorcao(salvo, true);
+  assert.equal(reaberto.pos_chaves_meses, 3);
+  assert.deepEqual(absorcaoParaSalvar(reaberto, salvo), salvo);
+  // Voltar a 12 remove a chave (ausente = 12).
+  const volta = absorcaoParaSalvar({ ...reaberto, pos_chaves_meses: 12 }, salvo);
+  assert.equal('pos_chaves_meses' in volta, false);
+});
+
+test('janela: mudar a janela de uma curva personalizada pede a mesma confirmação de substituição', () => {
+  const abs = ABS_PERSONALIZADO();
+  const form = formularioAbsorcao(abs, true);
+  assert.equal(absorcaoSubstituiCurva(form, abs), null);
+  assert.deepEqual(absorcaoSubstituiCurva({ ...form, pos_chaves_meses: 3 }, abs), { modo: 'personalizado', pontos: 43 });
+});
+
+test('mês único: ligar zera os três períodos e põe a janela em 1 — o motor vende 100% no 1º mês das chaves', () => {
+  const abs = ABS_DISTRIBUIDO();
+  const form = formularioAbsorcao(abs, true);
+  assert.equal(ehMesUnico(form), false);
+  const ligado = alternarMesUnico(form, true);
+  assert.equal(ehMesUnico(ligado), true);
+  const salvo = absorcaoParaSalvar(ligado, abs);
+  assert.equal(salvo.pos_chaves_meses, 1);
+  assert.deepEqual(salvo.blocos.map((b: any) => b.pct), [0, 0, 0, 100]);
+  const crono = [
+    { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 3 },
+    { evento: 'lancamento', inicio_mes: 3, duracao_meses: 3 },
+    { evento: 'obra', inicio_mes: 0, duracao_meses: 36 },
+    { evento: 'pos_obra', inicio_mes: 36, duracao_meses: 12 },
+  ];
+  const r = absorcaoMensal(salvo, crono)!;
+  assert.equal(r.pcts[36 - r.inicio], 100);
+  assert.equal(r.pcts.length, 36 - r.inicio + 1);
+  // Reabrir reconhece o mês único (sem flag gravada: é derivado do dado).
+  assert.equal(ehMesUnico(formularioAbsorcao(salvo, true)), true);
+});
+
+test('mês único: desligar devolve o que foi lido; se o lido já era mês único, volta à janela de 12', () => {
+  const abs = ABS_DISTRIBUIDO();
+  const form = formularioAbsorcao(abs, true);
+  const desligado = alternarMesUnico(alternarMesUnico(form, true), false);
+  assert.deepEqual(
+    [desligado.pre_lancamento_pct, desligado.lancamento_pct, desligado.obra_pct, desligado.pos_chaves_meses],
+    [10, 20, 40, 12]);
+  assert.deepEqual(absorcaoParaSalvar(desligado, abs), abs); // voltou ao lido: no-op
+  const mesUnico = absorcaoParaSalvar(alternarMesUnico(form, true), abs);
+  const reaberto = formularioAbsorcao(mesUnico, true);
+  const saiu = alternarMesUnico(reaberto, false);
+  assert.equal(saiu.pos_chaves_meses, 12);
+  assert.equal(ehMesUnico(saiu), false);
 });

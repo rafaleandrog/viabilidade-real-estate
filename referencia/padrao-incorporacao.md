@@ -988,7 +988,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > Pré-lançamento que desative a fase passa a vender 80%.
 >
 > ✅ **Desde a #429, "e ninguém é avisado" deixou de valer.** O percentual da faixa vazia entra em
-> `pctDescartado` (`frontend/fluxo-shared.ts:579`, o incremento dentro de `espalhar`) e o
+> `pctDescartado` (`frontend/fluxo-shared.ts:617`, o incremento dentro de `espalhar`) e o
 > painel de Reconciliação acusa
 > `ABSORCAO_NAO_FECHA`. O comportamento **não** mudou: o percentual continua não sendo computado e
 > continua não sendo redistribuído — a camada denuncia, não corrige.
@@ -1824,7 +1824,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:88`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:780`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:791`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
