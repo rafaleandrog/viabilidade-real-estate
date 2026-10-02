@@ -646,12 +646,18 @@ export function validarFunding(
     for (let t = 0; t < meses; t++) {
       const somaSaidas = equityProgressivo.reduce((s, op) => s + Number(op.saidas[t] ?? 0), 0);
       const receita = Number(receitaLiquidaMensal[t] ?? 0);
+      // Sem retorno a pagar não há o que "exceder": a receita líquida do mês
+      // fica negativa nos meses de lançamento (corretagem > recebimento) e,
+      // comparada com zero, acusaria um equity zerado. Com retorno positivo o
+      // aviso segue válido mesmo contra teto negativo — e a mensagem diz isso.
+      if (somaSaidas <= tol) continue;
       if (somaSaidas <= receita + tol) continue;
       out.push({
         codigo: 'RETORNO_EQUITY_EXCEDE_RECEITA', severidade: 'alerta', mes: t,
         esperado: receita, encontrado: somaSaidas, diferenca: somaSaidas - receita,
         mensagem: `Mês ${t + 1}: retorno de equity (permuta financeira) soma `
-          + `${somaSaidas.toFixed(2)}, acima da receita líquida do mês (${receita.toFixed(2)}).`,
+          + `${somaSaidas.toFixed(2)}, acima da receita líquida do mês (${receita.toFixed(2)}`
+          + `${receita < 0 ? ' — negativa: a corretagem do mês supera o recebimento' : ''}).`,
       });
     }
   }
