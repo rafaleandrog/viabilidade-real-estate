@@ -36,7 +36,8 @@ default novo —, e o inventário do `conferir-estudo.ts inventario` ganhou a co
 medir na instância as linhas já gravadas fora do contrato (pendência do autor/QA: rodar).
 
 Motor: `componentesEfetivosSafra` aplica `Math.max(mesPagamento, safra)` no `concentrado` — o
-repasse anterior à venda é recebido no mês da venda, sem juros, em vez de `pagamentosConcentrado`
+repasse anterior à venda é recebido no mês da venda, sem juros e como recebimento à vista (fora
+da série de repasse, que segue sendo pagamento único), em vez de `pagamentosConcentrado`
 lançar e a tela do estudo quebrar. A reconciliação acusa o caso como alerta
 `REPASSE_ANTES_DA_VENDA`; os três testes de identidade por componente que usavam esse caso como
 veículo de `COMPONENTE_INVALIDO` passaram a usar o alerta novo. Sem migração, `versao` intacta.

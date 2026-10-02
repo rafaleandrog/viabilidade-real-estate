@@ -98,8 +98,8 @@ máxima**. Quando o plano paga a 1ª parcela no próprio mês da venda, essa par
 carteira daquele mês: os juros dela são reconhecidos nesse mês e só a amortização sai do saldo. O
 que entra em caixa é o mesmo; a carteira e a carteira máxima desses planos já descontam essa
 parcela. Uma venda contratada depois do mês do repasse do Grupo (e antes da entrega) recebe o
-repasse no próprio mês da venda, sem juros, e a reconciliação avisa, porque o mês configurado não é
-o que o fluxo usa.
+repasse no próprio mês da venda, sem juros, como recebimento à vista (fora da série de repasse), e
+a reconciliação avisa, porque o mês configurado não é o que o fluxo usa.
 
 A **reconciliação** confere o fluxo contra regras que o cálculo deve respeitar: a venda bruta
 contratada recomposta linha a linha, mês a mês, com o mesmo arredondamento do fluxo; os

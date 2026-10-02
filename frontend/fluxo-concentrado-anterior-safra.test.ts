@@ -38,9 +38,11 @@ test('repasse anterior à safra é pago no mês da venda, sem juros, e a receita
     { tipo: 'imediato', participacaoPct: 50, descontoPct: 0 },
     { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 5 },
   ]));
-  // VGV = 100 × 50 m² × 10.000 = 50.000.000, todo vendido no mês 12.
-  assert.equal(r.repasseMensal[12], 25_000_000);
-  assert.equal(r.repasseMensal[5] ?? 0, 0);
+  // VGV = 100 × 50 m² × 10.000 = 50.000.000, todo vendido no mês 12. O
+  // repasse antecipado entra à vista no mês da venda — não na série de
+  // repasse, que é o pagamento único que liquida a carteira.
+  assert.equal(r.receitaBrutaMensal[12], 50_000_000);
+  assert.equal(r.repasseMensal.reduce((a, b) => a + b, 0), 0);
   assert.equal(r.receitaBruta, 50_000_000);
   // nenhuma invariante de erro: a carteira do repasse nasce e zera no mês 12
   const cfg = config([
@@ -74,4 +76,21 @@ test('componentesEfetivosSafra devolve cópia e não muta o persistido', () => {
   assert.equal((persistido[0] as any).mesPagamento, 5);
   // repasse na própria safra ou depois: o array volta intacto (mesma referência)
   assert.equal(componentesEfetivosSafra(persistido, 5, 40), persistido);
+});
+
+test('vendas em meses diferentes depois do repasse configurado não viram repasse em vários meses', () => {
+  // absorção distribuída: metade no lançamento (mês 12), metade na obra; o
+  // repasse do Grupo está no mês 5. Cada safra recebe a sua parte no mês da
+  // venda, e o invariante do repasse único não acusa falso erro.
+  const cfg = config([
+    { tipo: 'imediato', participacaoPct: 50, descontoPct: 0 },
+    { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 5 },
+  ]);
+  (cfg.linhasReceita[0] as any).absorcao = { modo: 'distribuido', blocos: [
+    { evento: 'lancamento', pct: 50 }, { evento: 'obra', pct: 50 }] };
+  const r = calcularFluxo(cfg);
+  assert.ok(r.receitaBrutaMensal.filter((v) => v > 0).length > 1, 'o cenário precisa de vendas em mais de um mês');
+  assert.deepEqual(validarFluxoCalc(r).filter((d) => d.codigo === 'REPASSE_EM_MULTIPLOS_MESES'), []);
+  // centavos de arredondamento mensal da absorção distribuída
+  assert.ok(Math.abs(r.receitaBruta - 50_000_000) < 1);
 });

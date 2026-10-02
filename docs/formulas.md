@@ -150,7 +150,8 @@ parcela_s,s` — a parcela é a de uma tabela com juros entre vencimentos, entã
 juros, e só a sua amortização sai do saldo (com taxa zero, `principal_s − parcela_s,s`). O repasse
 (concentrado) é a exceção à monotonicidade: ele capitaliza até o pagamento único, e o seu saldo
 cresce por desenho. Uma venda contratada depois do mês do repasse configurado (e antes da entrega)
-recebe o repasse no próprio mês da venda, sem juros — o pagamento nunca cai antes da contratação.
+recebe o repasse no próprio mês da venda, sem juros e como recebimento à vista — o pagamento nunca
+cai antes da contratação, e o repasse do Grupo continua sendo um pagamento único.
 
 - **Itemizada por linha de custo, em blocos canônicos.** Cada linha cadastrada em Custos aparece
   pelo nome que o usuário deu (fora do Terreno, o nome é a categoria escolhida), na ordem: Terreno
