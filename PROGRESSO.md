@@ -18,6 +18,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-02 — Custos do Avançado: categoria canônica "Manutenção pós-obra"
+
+Decisão do autor (ramo a da issue): a manutenção pós-obra deixa de ser um "Outro" sem descrição na
+Proforma do Avançado e vira categoria do grupo Diretos.
+
+- **Categoria.** `CATEGORIA_MANUTENCAO_POS_OBRA` em `frontend/fluxo-shared.ts`; entra no catálogo de
+  Diretos (R$ ou % VGV) em `frontend/tela-fluxo-custos.ts`.
+- **Distribuição.** Escolher a categoria grava `cronograma_evento: 'pos_obra'` e solta a âncora de fase;
+  o deslocamento de um mês continua sendo Customizado.
+- **Proforma.** Bucket próprio em `frontend/proforma-avancado.ts`, depois de Decoração e antes de
+  Despesas Financeiras. Sem backend, schema ou migração: a `versao` não bumpa.
+- **Teste.** `frontend/manutencao-pos-obra.test.ts` mede a Proforma e a fiação da tela (apagar a
+  atribuição do evento deixa o teste vermelho).
+- Guias `docs/avancado.md` e `docs/formulas.md` atualizados.
+
 ## 2026-10-01 — Custos: a semeadura das linhas obrigatórias é idempotente
 
 Duas execuções concorrentes da semeadura de Custos (duas abas, remontagem do componente) criavam

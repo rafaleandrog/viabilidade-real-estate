@@ -149,7 +149,7 @@ crescer depois da última parcela.
 - **Itemizada por linha de custo, em blocos canônicos.** Cada linha cadastrada em Custos aparece
   pelo nome que o usuário deu (fora do Terreno, o nome é a categoria escolhida), na ordem: Terreno
   → Projetos e aprovações → Outorga → Incorporação e registro → Construção → Gestão da construção →
-  Decoração → Despesas Financeiras → Contingências no bloco direto; Marketing global → Stand e
+  Decoração → Manutenção pós-obra → Despesas Financeiras → Contingências no bloco direto; Marketing global → Stand e
   estrutura de vendas → Gestão e outros custos indiretos no bloco indireto — independentemente do
   grupo em que a linha foi classificada na aba Custos. Corretagem de vendas e Marketing &
   Publicidade saem do custo direto para a dedução de receita, ao lado do imposto e da permuta
