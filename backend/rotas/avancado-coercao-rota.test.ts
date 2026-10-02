@@ -235,3 +235,38 @@ test('coerção /avancado: `null` em coluna opcional continua passando (limpar u
     assert.equal(r.status, 200, JSON.stringify(r.corpo));
   });
 });
+
+// O contrato de leitura dos componentes pela porta real: o PATCH de fase recusa
+// com 400 o plano que o motor não consegue ler, e não grava nada.
+test('PATCH /avancado/fases/:fid recusa componente sem os campos que o motor lê, e não grava', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise', tipo_empreendimento: 'incorporacao' });
+  const original = { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] };
+  const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0, fluxo_pagamento: original });
+  const caminho = `/estudos/1/avancado/fases/${fid}`;
+  await comServidor(criarApp(dados), async (base) => {
+    // o corpo da QA: prazo_fixo só com prazoMeses e taxaMensal
+    const r = await enviar(base, 'PATCH', caminho, { fluxo_pagamento: { componentes: [
+      { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+      { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, taxaMensal: 0.0098636 },
+    ] } });
+    assert.equal(r.status, 400);
+    assert.equal(r.corpo.codigo, 'FLUXO_PAGAMENTO_INVALIDO');
+    assert.match(JSON.stringify(r.corpo), /sinalPct/);
+    // defasagem negativa
+    const neg = await enviar(base, 'PATCH', caminho, { fluxo_pagamento: { componentes: [
+      { tipo: 'ate_marco', participacaoPct: 100, marcoMes: 40, sinalPct: 0, defasagemMeses: -1 },
+    ] } });
+    assert.equal(neg.status, 400);
+    assert.match(JSON.stringify(neg.corpo), /defasagemMeses/);
+    assert.deepEqual((await dados.buscar('avancado_fases', fid)).fluxo_pagamento, original);
+    // o plano completo passa e grava
+    const completo = { componentes: [
+      { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+      { tipo: 'prazo_fixo', participacaoPct: 90, prazoMeses: 48, sinalPct: 0, defasagemMeses: 1 },
+    ] };
+    const ok = await enviar(base, 'PATCH', caminho, { fluxo_pagamento: completo });
+    assert.equal(ok.status, 200);
+    assert.deepEqual((await dados.buscar('avancado_fases', fid)).fluxo_pagamento, completo);
+  });
+});

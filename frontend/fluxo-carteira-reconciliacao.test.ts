@@ -200,14 +200,14 @@ test('#789 validarSafrasReceita reporta a 1ª divergência de CADA componente, n
       componentes: [
         // 50% + 40% = 90%: SOMA_COMPONENTES_DIVERGE em toda safra (relatada uma vez).
         { tipo: 'imediato', participacaoPct: 50, descontoPct: 0, rotulo: 'à vista' },
-        // pago no mês 5: inválido só para as safras 6 a 8.
+        // pago no mês 5: antes da venda nas safras 6 a 8.
         { tipo: 'concentrado', participacaoPct: 40, mesPagamento: 5, taxaMensal: 0, rotulo: 'repasse' },
       ],
     },
   }];
   const r = validarSafrasReceita(linhas, CRONO_LONGO, 40, undefined, [], 0);
   const soma = r.filter((d) => d.codigo === 'SOMA_COMPONENTES_DIVERGE');
-  const invalido = r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  const invalido = r.filter((d) => d.codigo === 'REPASSE_ANTES_DA_VENDA');
   assert.equal(soma.length, 1, 'a mesma divergência do mesmo componente sai uma vez só');
   assert.equal(soma[0].safra, 2);
   assert.equal(invalido.length, 1, 'antes, o break na safra 2 escondia esta');
@@ -226,15 +226,15 @@ test('#789 validarSafrasReceita: dois componentes do mesmo tipo e sem rótulo, i
     fluxo_pagamento: {
       componentes: [
         { tipo: 'imediato', participacaoPct: 20, descontoPct: 0 },
-        // pago no mês 3: inválido para as safras 4 a 8.
+        // pago no mês 3: antes da venda nas safras 4 a 8.
         { tipo: 'concentrado', participacaoPct: 40, mesPagamento: 3, taxaMensal: 0 },
-        // pago no mês 5: inválido para as safras 6 a 8.
+        // pago no mês 5: antes da venda nas safras 6 a 8.
         { tipo: 'concentrado', participacaoPct: 40, mesPagamento: 5, taxaMensal: 0 },
       ],
     },
   }];
   const r = validarSafrasReceita(linhas, CRONO_LONGO, 40, undefined, [], 0);
-  const invalido = r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  const invalido = r.filter((d) => d.codigo === 'REPASSE_ANTES_DA_VENDA');
   assert.deepEqual(invalido.map((d) => d.safra), [4, 6]);
   assert.ok(invalido.every((d) => d.linha === 'Torre N / concentrado'), 'os dois têm o mesmo rótulo exibido');
   assert.deepEqual(r.filter((d) => d.codigo === 'SOMA_COMPONENTES_DIVERGE'), [], 'a soma fecha 100%');
@@ -259,16 +259,18 @@ test('#789 validarSafrasReceita: o concentrado que recebe o resíduo de um ate_m
           tipo: 'ate_marco', participacaoPct: 20, sinalPct: 0, marcoMes: 5, defasagemMeses: 1,
           taxaMensal: 0, jurosNoMesDaContratacao: false,
         },
-        // A, pago no mês 3: inválido da safra 4 em diante (a 1ª, ainda sem cópia).
+        // A, pago no mês 3: antes da venda da safra 4 em diante.
         { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 3, taxaMensal: 0 },
-        // B, pago no mês 6: inválido da safra 7 em diante (já como cópia).
+        // B, pago no mês 6: antes da venda da safra 7 em diante.
         { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 6, taxaMensal: 0 },
       ],
     },
   }];
   const r = validarSafrasReceita(linhas, CRONO_LONGO, 40, undefined, [], 0);
-  const invalido = r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  const invalido = r.filter((d) => d.codigo === 'REPASSE_ANTES_DA_VENDA');
   assert.deepEqual(invalido.map((d) => d.safra), [4, 7]);
+  // o repasse antes da venda é recebido, não derruba a safra
+  assert.deepEqual(r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO'), []);
 });
 
 test('#789/#749 caso equivalente ao estudo 15: plano de 25/09 com vendas até o mês do marco, reconciliação limpa', () => {

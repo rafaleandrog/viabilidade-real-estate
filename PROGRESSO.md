@@ -40,6 +40,29 @@ num PR só porque as duas mexem na mesma linha do `schema.json`.
 
 
 
+## 2026-10-02 — Fluxo de pagamento: a escrita recusa o componente que o motor não lê, e o repasse antes da venda não derruba o cálculo
+
+Contrato de leitura de um componente de `fluxo_pagamento.componentes` numa fonte única,
+`frontend/fluxo-pagamento-contrato.ts` (`erroComponentePagamento`): `participacaoPct` em todos,
+`descontoPct` no `imediato`, `sinalPct` e `defasagemMeses` (inteiro ≥ 0) no `prazo_fixo` e no
+`ate_marco`, além das âncoras que já eram exigidas — sempre `typeof number`, porque o motor soma
+sem converter. `validarFluxoPagamento` (`backend/rotas/avancado.ts`) usa essa função, então o PATCH
+de fase passa a responder `400 FLUXO_PAGAMENTO_INVALIDO` aos corpos da QA (prazo_fixo sem
+`sinalPct`/`defasagemMeses`, ate_marco sem defasagem, defasagem negativa). Inventário antes de
+endurecer: o único caminho de escrita validado é o PATCH de fase; a tela grava pelo
+`componentesDoLegado`, que produz todos os campos, ou devolve o persistido verbatim. Passam a ser
+recusados o plano gravado incompleto pela API e o sinal ou desconto fora de 0–100 digitado no
+modal — e o modal (`erroFormularioPagamento`) confere o mesmo `erroComponentePagamento` sobre o
+array que vai gravar, então o usuário vê a mensagem antes do Aplicar. A leitura **não** mudou — nenhum
+default novo —, e o inventário do `conferir-estudo.ts inventario` ganhou a coluna `ilegivel` para
+medir na instância as linhas já gravadas fora do contrato (pendência do autor/QA: rodar).
+
+Motor: `componentesEfetivosSafra` aplica `Math.max(mesPagamento, safra)` no `concentrado` — o
+repasse anterior à venda é recebido no mês da venda, sem juros e como recebimento à vista (fora
+da série de repasse, que segue sendo pagamento único), em vez de `pagamentosConcentrado`
+lançar e a tela do estudo quebrar. A reconciliação acusa o caso como alerta
+`REPASSE_ANTES_DA_VENDA`; os três testes de identidade por componente que usavam esse caso como
+veículo de `COMPONENTE_INVALIDO` passaram a usar o alerta novo. Sem migração, `versao` intacta.
 ## 2026-10-02 — Permuta física é parte das unidades alocadas: backend e invariantes alinhados ao motor
 
 Decisão do autor na #792, opção (b): o motor (`reservarPermutasFisicas`, sem mudança) lê as unidades

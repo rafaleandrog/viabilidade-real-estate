@@ -368,25 +368,30 @@ async function inventario(ids: number[]): Promise<void> {
   const col = (s: string, w: number) => s.padEnd(w).slice(0, w);
   console.log(
     col('id', 6) + col('nome', 30) + col('total', 7) + col('comTaxa', 9)
-    + col('comSinal', 10) + col('comJuros', 10) + col('absPers', 9) + col('legado', 8),
+    + col('comSinal', 10) + col('comJuros', 10) + col('absPers', 9) + col('legado', 8)
+    + col('ilegivel', 9),
   );
   const soma: ContagemConfiguracoesAvancadas = {
     total: 0, comTaxa: 0, comSinal: 0, comJurosNaContratacao: 0, absorcaoPersonalizada: 0, ramoLegado: 0,
+    comComponenteIlegivel: 0,
   };
   for (const { id, nome, c } of linhas) {
     console.log(
       col(String(id), 6) + col(nome, 30) + col(String(c.total), 7) + col(String(c.comTaxa), 9)
       + col(String(c.comSinal), 10) + col(String(c.comJurosNaContratacao), 10)
-      + col(String(c.absorcaoPersonalizada), 9) + col(String(c.ramoLegado), 8),
+      + col(String(c.absorcaoPersonalizada), 9) + col(String(c.ramoLegado), 8)
+      + col(String(c.comComponenteIlegivel), 9),
     );
     soma.total += c.total; soma.comTaxa += c.comTaxa; soma.comSinal += c.comSinal;
     soma.comJurosNaContratacao += c.comJurosNaContratacao;
     soma.absorcaoPersonalizada += c.absorcaoPersonalizada; soma.ramoLegado += c.ramoLegado;
+    soma.comComponenteIlegivel += c.comComponenteIlegivel;
   }
   console.log(
     col('TOTAL', 6) + col('', 30) + col(String(soma.total), 7) + col(String(soma.comTaxa), 9)
     + col(String(soma.comSinal), 10) + col(String(soma.comJurosNaContratacao), 10)
-    + col(String(soma.absorcaoPersonalizada), 9) + col(String(soma.ramoLegado), 8),
+    + col(String(soma.absorcaoPersonalizada), 9) + col(String(soma.ramoLegado), 8)
+    + col(String(soma.comComponenteIlegivel), 9),
   );
 }
 

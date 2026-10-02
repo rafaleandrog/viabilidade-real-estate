@@ -801,6 +801,9 @@ export type ComponentePagamento =
       mesPagamento: number;
       taxaMensal: number;           // #234: juros entre a safra e o pagamento (0 = repasse legado)
       rotulo?: string;
+      // Só em cópia de cálculo, nunca persistido: o repasse estava configurado
+      // antes desta venda e é pago no mês dela (`componentesEfetivosSafra`).
+      antecipadoParaVenda?: true;
     };
 
 // ─────────────────────────────────────────────────────────────────
@@ -1215,9 +1218,10 @@ export function pagamentosAteMarco(
 
 /**
  * #234: pagamento único (concentrado) de uma safra — repasse ou liquidação
- * final, num mês fixo (`mesPagamento`, independente da safra — quem chama já
- * aplica `Math.max(mesPagamento, safra)` se precisar garantir não pagar antes
- * da venda). Convenção de juros explícita: **juros começam DEPOIS da
+ * final, num mês fixo (`mesPagamento`, independente da safra). Repasse
+ * anterior à safra lança: o `Math.max(mesPagamento, safra)` é aplicado antes,
+ * em `componentesEfetivosSafra`, por onde todo caminho do motor passa — o
+ * lançamento aqui é a defesa de quem chamar esta função direto. Convenção de juros explícita: **juros começam DEPOIS da
  * contratação** — `saldo_s,s = principal_s` (a própria emenda da #234) — ou
  * seja, o principal só passa a capitalizar a partir do mês SEGUINTE à safra,
  * não no mês da venda. Com `taxaMensal = 0` (o repasse legado, #230), o
@@ -1445,13 +1449,38 @@ export function ehVendaAposChaves(safra: number, mesEntrega: number): boolean {
   return safra > mesEntrega;
 }
 
+/**
+ * Os componentes que valem para UMA safra. Duas regras, as duas por safra:
+ *
+ *  1. venda Após-chaves → 100% à vista (ver `ehVendaAposChaves`);
+ *  2. repasse (`concentrado`) com `mesPagamento` ANTERIOR à safra → pago no
+ *     próprio mês da venda: `Math.max(mesPagamento, safra)`. Receber antes de
+ *     vender não existe, e `pagamentosConcentrado` lança nesse caso — a
+ *     promessa da função é que quem chama já aplica o `Math.max`, e é AQUI que
+ *     ele mora, porque todo caminho do motor (`componentesIntegradosSafra`,
+ *     `consolidarCarteiraClientes`, os invariantes) passa por esta função. O
+ *     caso surge da tela: o repasse é uma âncora fixa do plano do Grupo, e
+ *     uma venda contratada depois dela (mas antes da entrega) cai antes do
+ *     repasse configurado. Sem juros: o repasse é pago na contratação, como o
+ *     `concentrado` cujo `mesPagamento` é a própria safra. A cópia leva
+ *     `antecipadoParaVenda`, e o fluxo a conta como recebimento à vista: ela
+ *     não é o repasse do Grupo (que liquida a carteira num mês só — o
+ *     invariante `REPASSE_EM_MULTIPLOS_MESES`), é dinheiro que entra na venda.
+ *
+ * Nunca muta o componente persistido — o ajuste devolve uma cópia.
+ */
 export function componentesEfetivosSafra(
   componentes: ComponentePagamento[],
   safra: number,
   mesEntrega: number,
 ): ComponentePagamento[] {
-  if (!ehVendaAposChaves(safra, mesEntrega)) return componentes;
-  return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+  if (ehVendaAposChaves(safra, mesEntrega)) {
+    return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+  }
+  if (!componentes.some((c) => c.tipo === 'concentrado' && c.mesPagamento < safra)) return componentes;
+  return componentes.map((c) => (c.tipo === 'concentrado' && c.mesPagamento < safra
+    ? { ...c, mesPagamento: safra, antecipadoParaVenda: true as const }
+    : c));
 }
 
 /** Uma contratação mensal usada para consolidar a carteira econômica (#236). */
@@ -1635,13 +1664,16 @@ export function calcularRecebiveisComponentes(
     const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega, residuoAteMarco);
     const aposChaves = ehVendaAposChaves(contratacao.safra, mesEntrega);
     for (const componente of efetivos) {
+      // Repasse antecipado para a venda (`componentesEfetivosSafra`): entra à
+      // vista, fora da série de repasse e da carteira a repassar.
+      const antecipado = componente.tipo === 'concentrado' && componente.antecipadoParaVenda === true;
       const chaveReceita: keyof SeriesComponentesReceita = aposChaves ? 'aposChaves'
-        : componente.tipo === 'imediato' ? 'aVista'
+        : componente.tipo === 'imediato' || antecipado ? 'aVista'
           : componente.tipo === 'prazo_fixo' ? 'tabelaCurta'
             : componente.tipo === 'ate_marco' ? 'tabelaLongaObra' : 'repasse';
       const chaveCarteira: keyof SeriesComponentesCarteira | null = componente.tipo === 'prazo_fixo'
         ? 'tabelaCurta' : componente.tipo === 'ate_marco'
-          ? 'tabelaLongaObra' : componente.tipo === 'concentrado' ? 'saldoARepassar' : null;
+          ? 'tabelaLongaObra' : componente.tipo === 'concentrado' && !antecipado ? 'saldoARepassar' : null;
       const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado);
       const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado);
       const pagamentosComJuros = pagamentos.filter((p) => p.tipo !== 'sinal');
@@ -1677,7 +1709,7 @@ export function calcularRecebiveisComponentes(
         deposita(receitaPorComponenteMensal[chaveReceita], pagamento.mes, pagamento.valor);
         deposita(principal, pagamento.mes, principalPagamento);
         deposita(juros, pagamento.mes, jurosPagamento);
-        if (componente.tipo === 'concentrado') deposita(repasse, pagamento.mes, pagamento.valor);
+        if (componente.tipo === 'concentrado' && !antecipado) deposita(repasse, pagamento.mes, pagamento.valor);
       }
 
       if (componente.tipo !== 'imediato') {

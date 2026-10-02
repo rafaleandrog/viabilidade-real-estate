@@ -14,7 +14,14 @@
  * seguinte: `scripts/conferir-estudo.ts` está sob edição concorrente nesta
  * rodada (#446) e esta função não depende dele — importar dele SERIA a
  * colisão; ser importado por ele não é.
+ *
+ * `comComponenteIlegivel` é o sétimo contador: linhas JÁ GRAVADAS com algum
+ * componente que a escrita hoje recusaria (`erroComponentePagamento`, a mesma
+ * regra do backend). Ele mede na instância o que o endurecimento da escrita
+ * deixou de fora — a leitura não muda, então essas linhas seguem calculando
+ * como antes até alguém regravar o plano.
  */
+import { erroComponentePagamento } from './fluxo-pagamento-contrato.js';
 
 /** Um componente de `fluxo_pagamento.componentes` — shape mínimo que este inventário lê. */
 export interface ComponenteAuditavel {
@@ -47,6 +54,12 @@ export interface ContagemConfiguracoesAvancadas {
    * (`frontend/fluxo-caixa-motor.ts`) só é acionado no primeiro caso.
    */
   ramoLegado: number;
+  /**
+   * Linhas com ao menos um componente que `erroComponentePagamento` recusa —
+   * campo que o motor lê ausente, do tipo errado ou fora da faixa. Só conta
+   * no ramo canônico (array de componentes).
+   */
+  comComponenteIlegivel: number;
 }
 
 /** `Number(v)` é finito e diferente de zero — trata `null`/`undefined`/`''`/NaN como "ausente", não como zero explícito nem como valor. */
@@ -61,7 +74,7 @@ export function contarConfiguracoesAvancadas(
 ): ContagemConfiguracoesAvancadas {
   const r: ContagemConfiguracoesAvancadas = {
     total: 0, comTaxa: 0, comSinal: 0, comJurosNaContratacao: 0,
-    absorcaoPersonalizada: 0, ramoLegado: 0,
+    absorcaoPersonalizada: 0, ramoLegado: 0, comComponenteIlegivel: 0,
   };
   for (const linha of linhas ?? []) {
     r.total++;
@@ -73,6 +86,7 @@ export function contarConfiguracoesAvancadas(
       if (lista.some((c) => numeroNaoZero(c?.taxaMensal))) r.comTaxa++;
       if (lista.some((c) => numeroNaoZero(c?.sinalPct))) r.comSinal++;
       if (lista.some((c) => c?.jurosNoMesDaContratacao === true)) r.comJurosNaContratacao++;
+      if (lista.some((c) => erroComponentePagamento(c) !== null)) r.comComponenteIlegivel++;
     }
     if (linha?.absorcao?.modo === 'personalizado') r.absorcaoPersonalizada++;
   }
