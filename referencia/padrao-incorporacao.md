@@ -738,7 +738,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > O que mudou é que `absorcaoMensal` devolve `pctTotal`/`pctDescartado`/`mesesDescartados` ao lado
 > de `pcts` (`frontend/fluxo-shared.ts:365-376`, acumulados em `:424-432` no modo `personalizado`
 > e em `:439-457` no `distribuido`), `calcularFluxo` emite `console.warn`
-> (`frontend/fluxo-caixa-motor.ts:1782-1800`) e o painel de Reconciliação acusa
+> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2428-2446`) e o painel de Reconciliação acusa
 > **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
 > ou o total que a curva declarou quando houve descarte —
 > `frontend/fluxo-invariantes.ts:343-376` (`divergenciasAbsorcao`), chamada por `validarProduto:418`).

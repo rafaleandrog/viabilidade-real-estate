@@ -249,7 +249,7 @@ retorno.
 > **Decisão do autor, 2026-08-22.** Não é restauração do clamp que existia em
 > `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
 > déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
-> `frontend/fluxo-caixa-motor.ts:2179`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
+> o `Math.max(0, …)` de `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2148`, a que `permutaFinanceiraLiquidaMensal` delega). Implementação:
 > `simularEquity` (`funding-motor.ts:543`).
 
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de

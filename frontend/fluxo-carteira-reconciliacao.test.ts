@@ -225,6 +225,37 @@ test('#789 validarSafrasReceita: dois componentes do mesmo tipo e sem rótulo, i
   assert.deepEqual(r.filter((d) => d.codigo === 'SOMA_COMPONENTES_DIVERGE'), [], 'a soma fecha 100%');
 });
 
+test('#789 validarSafrasReceita: o concentrado que recebe o resíduo de um ate_marco vem como CÓPIA e mantém a identidade do persistido', () => {
+  // `residuoAteMarco: 'concentrado'`: da safra do marco em diante, o
+  // `ate_marco` sai e a participação dele é somada aos concentrados, que
+  // chegam como cópias. Sem mapear a cópia de volta à posição persistida, o
+  // concentrado A ganha uma identidade nova na safra 5 (aviso duplicado) e o
+  // B herda uma identidade já vista (aviso escondido).
+  const linhas = [{
+    nome: 'Torre R',
+    absorcao: ABSORCAO_2_A_8,
+    tipologias: [{ tipologia_id: 1, quantidade: 7, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: {
+      residuoAteMarco: 'concentrado',
+      componentes: [
+        { tipo: 'imediato', participacaoPct: 20, descontoPct: 0 },
+        // marco no mês 5: N_s ≤ 0 da safra 5 em diante → resíduo vai para os concentrados.
+        {
+          tipo: 'ate_marco', participacaoPct: 20, sinalPct: 0, marcoMes: 5, defasagemMeses: 1,
+          taxaMensal: 0, jurosNoMesDaContratacao: false,
+        },
+        // A, pago no mês 3: inválido da safra 4 em diante (a 1ª, ainda sem cópia).
+        { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 3, taxaMensal: 0 },
+        // B, pago no mês 6: inválido da safra 7 em diante (já como cópia).
+        { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 6, taxaMensal: 0 },
+      ],
+    },
+  }];
+  const r = validarSafrasReceita(linhas, CRONO_LONGO, 40, undefined, [], 0);
+  const invalido = r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  assert.deepEqual(invalido.map((d) => d.safra), [4, 7]);
+});
+
 test('#789/#749 caso equivalente ao estudo 15: plano de 25/09 com vendas até o mês do marco, reconciliação limpa', () => {
   // VGV fracionário (7 meses de absorção) — é o que fazia a soma dos
   // percentuais divergir do `round2` mensal do motor por centavos.

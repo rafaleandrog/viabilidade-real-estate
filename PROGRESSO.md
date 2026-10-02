@@ -44,7 +44,7 @@ linha; agora coleta a primeira divergência de cada código **por componente**, 
   o mesmo plano com 1ª parcela no mês da venda (incluindo a safra do marco), o não-mascaramento e um
   caso equivalente ao estudo 15 por `calcularFluxo`.
 - Prova de fiação medida contra a suíte de frontend inteira, uma mutação por vez: apagar a leitura
-  de `porMes.get(safra)` (2 vermelhos), tirar a isenção do `concentrado` (4), devolver o `break` por
+  de `porMes.get(safra)` (2 vermelhos no 1º commit; 3 sobre o código final, abaixo), tirar a isenção do `concentrado` (4), devolver o `break` por
   linha (1), tirar a repartição de juros da 1ª parcela (1, depois de acrescentar o teste que faltava
   — a primeira medição desta mutação deu verde).
 - Rodada 1 de revisão (App do Codex + lentes nativas), consertos: o grampo de N_s = 1 só vale com
@@ -54,6 +54,12 @@ linha; agora coleta a primeira divergência de cada código **por componente**, 
   ela segue ativa para `prazo_fixo` e `ate_marco`. Mutações medidas na suíte inteira, uma por vez:
   grampo sem a condição da parcela (1 vermelho), chave por rótulo (1), `RESSURGE` desligada para todos
   os tipos (1), e a leitura de `porMes.get(safra)` apagada de novo, sobre o código final (3).
+- Rodada 2: o `concentrado` que recebe o resíduo de um `ate_marco` sem prazo chega como cópia, e o
+  mapeamento dela de volta à posição persistida não tinha teste — usar a cópia direto, ou a posição
+  entre os efetivos, ficava verde. Caso novo com dois concentrados e o resíduo transferido: as duas
+  mutações dão 1 vermelho cada. Achado de passagem, fora do escopo: com dois ou mais concentrados o
+  resíduo é somado a CADA um (participações somam mais de 100%; medido 120%), e a reconciliação
+  acusa `SOMA_COMPONENTES_DIVERGE`.
 - Achado de passagem, fora do escopo: `CARTEIRA_RESSURGE` falso no parcelamento trimestral do legado
   com juros > 0 (o saldo capitaliza na carência antes do 1º vencimento) — registrado como issue nova.
 - Efeito visível: em planos com 1ª parcela no mês da venda, a carteira e a carteira máxima ficam
