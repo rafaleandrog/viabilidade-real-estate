@@ -1265,11 +1265,32 @@ export interface SaldoSafra {
  * quem quiser a carteira total do estudo SOMA as séries desta função, nunca
  * substitui por um único acumulador recorrente.
  *
- * `saldo_{s,s} = principal_s` (após o sinal, se houver — mesma convenção da
- * #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
+ * Sem parcela no mês da contratação (1º vencimento no mês seguinte ou
+ * depois): `saldo_{s,s} = principal_s` (após o sinal, se houver — mesma
+ * convenção da #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
  * (1+taxa) − pagamentos_s(t)`, nunca negativo — o último mês da safra é
  * grampeado em zero (liquidação exata; resíduo de ponto flutuante não é
- * saldo real). `imediato` não tem saldo (paga e encerra no mesmo mês).
+ * saldo real), exceto quando alguma parcela vence ANTES da venda: essa nunca
+ * é abatida da série, e o que sobra no fim é saldo, não resíduo. `imediato` não tem saldo (paga e encerra no mesmo mês).
+ *
+ * Parcela que vence NO PRÓPRIO mês da contratação (`defasagemMeses = 0`, o
+ * plano da EVI de 25/09 e a entrada parcelada do legado): ela abate o saldo
+ * já no mês `s`. A convenção, escolhida porque é a única em que a carteira
+ * espelha os pagamentos que o motor já gera (o recebimento não muda):
+ *
+ *   saldo_{s,s} = principal_s × (1+taxa) − parcela_s(s)
+ *
+ * — a PMT do plano é a de uma anuidade postecipada, então a 1ª parcela, ainda
+ * que paga no mês da venda, carrega um período de juros (`principal × taxa`)
+ * e só a sua AMORTIZAÇÃO sai do saldo. A parcela quita esse juro no próprio
+ * mês: nada dele sobra acumulado no saldo da contratação. Com taxa 0
+ * a fórmula se reduz a `principal − parcela`. Assim o saldo decresce até o
+ * último vencimento e zera nele — inclusive com N_s = 1 (venda no mês do
+ * marco: uma parcela só, paga no próprio mês, saldo 0). Antes, `porMes` nunca
+ * era lido no mês `s`: com N_s = 1 a carteira terminava com o principal
+ * inteiro (`CARTEIRA_NAO_ZERA` falso) e, com N_s > 1, ficava superestimada
+ * pela 1ª parcela até o grampo final (#789). O `concentrado` pago no próprio
+ * mês da safra segue a mesma regra: zera em `s`.
  */
 export function carteiraSaldoSafra(
   c: ComponentePagamento,
@@ -1282,6 +1303,8 @@ export function carteiraSaldoSafra(
     const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
     if (pagamentos.length === 0) return [];
     const principal = round2(valorContratado * (c.participacaoPct / 100));
+    // Repasse no próprio mês da safra: pago e liquidado em `s`, sem saldo.
+    if (c.mesPagamento === safra) return [{ safra, mes: safra, saldo: 0 }];
     const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
     let saldo = principal;
     for (let mes = safra + 1; mes <= c.mesPagamento; mes++) {
@@ -1301,17 +1324,32 @@ export function carteiraSaldoSafra(
   const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
   let ultimoMes = safra;
+  let pagouAntesDaVenda = false;
   for (const p of pagamentos) {
     if (p.tipo === 'sinal') continue;
     porMes.set(p.mes, (porMes.get(p.mes) ?? 0) + p.valor);
     ultimoMes = Math.max(ultimoMes, p.mes);
+    if (p.mes < safra) pagouAntesDaVenda = true;
   }
+  // Os grampos abaixo zeram o resíduo de ARREDONDAMENTO do último vencimento.
+  // Parcela antes da venda (defasagem negativa persistida) nunca é abatida do
+  // saldo — a série começa em `s` —, então o que sobra no fim não é resíduo, e
+  // zerar esconderia o `CARTEIRA_NAO_ZERA` que a carteira deve acusar.
+  const grampear = !pagouAntesDaVenda;
 
-  const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
-  let saldo = principal;
+  // #789: a parcela que vence no mês da contratação (defasagem 0) abate o
+  // saldo já em `s` — ver a convenção no comentário da função.
+  let saldo = porMes.has(safra)
+    ? round2(principal * (1 + c.taxaMensal) - (porMes.get(safra) ?? 0))
+    : principal;
+  // Grampo só quando o último vencimento É o mês da contratação (N_s = 1).
+  // `ultimoMes` nasce em `safra`; sem parcela nele, o principal NÃO foi pago
+  // aqui.
+  if (grampear && safra === ultimoMes && porMes.has(safra)) saldo = 0;
+  const out: SaldoSafra[] = [{ safra, mes: safra, saldo: Math.max(0, saldo) }];
   for (let mes = safra + 1; mes <= ultimoMes; mes++) {
     saldo = round2(saldo * (1 + c.taxaMensal) - (porMes.get(mes) ?? 0));
-    if (mes === ultimoMes) saldo = 0;
+    if (grampear && mes === ultimoMes) saldo = 0;
     out.push({ safra, mes, saldo: Math.max(0, saldo) });
   }
   return out;
@@ -1612,6 +1650,13 @@ export function calcularRecebiveisComponentes(
         : new Map(carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)
           .map((p) => [p.mes, p.saldo]));
       let jurosAlocados = 0;
+      // #789: a parcela que vence no próprio mês da contratação (defasagem 0)
+      // incide sobre o principal financiado — é o mesmo período de juros que
+      // `carteiraSaldoSafra` reconhece em `saldo_{s,s}`. Sem isso o juro dela
+      // saía 0 e o período inteiro caía como resíduo na última parcela.
+      const principalFinanciado = round2(
+        pagamentosComJuros.reduce((soma, p) => soma + p.valor, 0) - jurosTotal,
+      );
 
       for (const pagamento of pagamentos) {
         let jurosPagamento = 0;
@@ -1620,7 +1665,9 @@ export function calcularRecebiveisComponentes(
           if (ultimo) {
             jurosPagamento = round2(jurosTotal - jurosAlocados);
           } else {
-            const saldoAnterior = saldos.get(pagamento.mes - 1) ?? 0;
+            const saldoAnterior = pagamento.mes === contratacao.safra
+              ? principalFinanciado
+              : saldos.get(pagamento.mes - 1) ?? 0;
             jurosPagamento = round2(Math.min(pagamento.valor, saldoAnterior * componente.taxaMensal));
             jurosAlocados = round2(jurosAlocados + jurosPagamento);
           }
@@ -2405,13 +2452,23 @@ function avisarAbsorcaoDescartada(linhasReceita: any[], crono: EventoCrono[]): v
   }
 }
 
+/** Taxa de desconto % a.a.: ausente (null/undefined/vazio/não numérico) → 12; `0` fica 0. */
+export function taxaDescontoOuPadrao(v: unknown): number {
+  // Fail-closed: só número ou texto não vazio chegam ao `Number()`, que converteria
+  // `' '`, `false` e `[]` em 0 — taxa válida — onde antes o valor caía em 12.
+  if (typeof v === 'string' ? v.trim() === '' : typeof v !== 'number') return 12;
+  const t = Number(v);
+  return Number.isFinite(t) ? t : 12;
+}
+
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const crono = config.cronograma ?? [];
   const linhasReceitaOriginal = config.linhasReceita ?? [];
   // #429: antes de qualquer conta — a absorção que não fecha deixa rastro.
   avisarAbsorcaoDescartada(linhasReceitaOriginal, crono);
   const linhasCusto = config.linhasCusto ?? [];
-  const taxa = n(config.taxaDescontoAa) || 12;
+  // `0` é taxa válida (VPL = soma do fluxo); o 12 vale só para valor ausente.
+  const taxa = taxaDescontoOuPadrao(config.taxaDescontoAa);
 
   // Horizonte: cobre TODO mês em que algo entra ou sai (#446 — decisão do
   // autor, 2026-08-22: "o fluxo vai até o último mês que é enquanto alguma

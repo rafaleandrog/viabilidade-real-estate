@@ -8,7 +8,7 @@ import {
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   listarFundingOperacoes, criarFundingOperacao, atualizarFundingOperacao, removerFundingOperacao,
 } from './viabilidade-api.js';
-import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { calcularFluxo, taxaDescontoOuPadrao, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao,
@@ -238,7 +238,7 @@ export class ViabFunding extends LitElement {
       this.custos = custos?.erro ? [] : (custos.dados || []);
       this.crono = crono?.erro ? [] : (crono.dados || []);
       this.dataInicio = params?.erro ? null : (params.data_inicio_projeto ?? null);
-      this.taxaDescontoAa = params?.erro ? 12 : (Number(params.taxa_desconto_aa) || 12);
+      this.taxaDescontoAa = params?.erro ? 12 : taxaDescontoOuPadrao(params.taxa_desconto_aa);
 
       const config: FluxoConfig = {
         dataInicio: this.dataInicio,

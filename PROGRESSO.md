@@ -18,6 +18,120 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+## 2026-10-01 — Reconciliação da carteira de recebíveis: parcela no mês da venda e dois falsos positivos
+
+`carteiraSaldoSafra` (`frontend/fluxo-caixa-motor.ts`) nunca lia o pagamento do próprio mês da
+safra: com `defasagemMeses = 0` (1ª parcela no mês da venda — o plano da EVI de 25/09) a carteira
+ficava superestimada pela 1ª parcela até o grampo final e, com N_s = 1, terminava com o principal
+inteiro (`CARTEIRA_NAO_ZERA` falso, safra 41 do estudo 15 da Pinguim). Convenção escolhida e
+documentada: `saldo_s,s = principal × (1 + taxa) − parcela_s,s` — a PMT é postecipada, a 1ª parcela
+carrega um período de juros e só a amortização sai do saldo. É a única leitura em que a carteira
+espelha os pagamentos que o motor já gerava; o recebimento não muda (nenhuma linha de pagamento foi
+tocada). `calcularRecebiveisComponentes` reparte a 1ª parcela pela mesma convenção (juros =
+principal × taxa), em vez de juro 0 com o período inteiro caindo como resíduo na última parcela. O
+`concentrado` pago no próprio mês da safra também zera em `s`.
+
+Validador (`frontend/fluxo-invariantes.ts`), porte do conserto do PR 751 (fork, parado desde 16/09;
+refeito aqui por decisão do autor): `validarContratacao` recompõe o esperado por
+`vendaBrutaContratadaMensal`, com o `round2` mensal do motor (o arredondamento único no fim divergia
+por centavos e acusava `VENDA_BRUTA_NAO_RECONCILIA`); `CARTEIRA_RESSURGE` isenta o `concentrado`,
+que capitaliza por desenho, e `CARTEIRA_NAO_ZERA` continua valendo para todos. E o que escondia o
+defeito da carteira: `validarSafrasReceita` dava `break` na primeira safra com divergência de cada
+linha; agora coleta a primeira divergência de cada código **por componente**, em todas as safras.
+
+- Teste novo: `frontend/fluxo-carteira-reconciliacao.test.ts` — os três casos da issue da carteira,
+  `COMPONENTES_EVI` em todas as safras até o fim da obra (antes: `CARTEIRA_RESSURGE` em toda safra),
+  o mesmo plano com 1ª parcela no mês da venda (incluindo a safra do marco), o não-mascaramento e um
+  caso equivalente ao estudo 15 por `calcularFluxo`.
+- Prova de fiação medida contra a suíte de frontend inteira, uma mutação por vez: apagar a leitura
+  de `porMes.get(safra)` (2 vermelhos no 1º commit; 3 sobre o código final, abaixo), tirar a isenção do `concentrado` (4), devolver o `break` por
+  linha (1), tirar a repartição de juros da 1ª parcela (1, depois de acrescentar o teste que faltava
+  — a primeira medição desta mutação deu verde).
+- Rodada 1 de revisão (App do Codex + lentes nativas), consertos: o grampo de N_s = 1 só vale com
+  parcela no mês da venda (parcela única antes da venda, por defasagem negativa persistida, voltava a
+  esconder o `CARTEIRA_NAO_ZERA`); a chave do aviso por componente é a POSIÇÃO no plano, não o
+  rótulo (dois componentes homônimos colapsavam); o teste da `CARTEIRA_RESSURGE` passou a provar que
+  ela segue ativa para `prazo_fixo` e `ate_marco`. Mutações medidas na suíte inteira, uma por vez:
+  grampo sem a condição da parcela (1 vermelho), chave por rótulo (1), `RESSURGE` desligada para todos
+  os tipos (1), e a leitura de `porMes.get(safra)` apagada de novo, sobre o código final (3).
+- Rodada 2: o `concentrado` que recebe o resíduo de um `ate_marco` sem prazo chega como cópia, e o
+  mapeamento dela de volta à posição persistida não tinha teste — usar a cópia direto, ou a posição
+  entre os efetivos, ficava verde. Caso novo com dois concentrados e o resíduo transferido: as duas
+  mutações dão 1 vermelho cada. Achado de passagem, fora do escopo: com dois ou mais concentrados o
+  resíduo é somado a CADA um (participações somam mais de 100%; medido 120%), e a reconciliação
+  acusa `SOMA_COMPONENTES_DIVERGE`.
+- Rodada 3 (App do Codex): com parcelas antes E depois da venda (defasagem negativa, N > 1) o grampo
+  ainda zerava o saldo — a parcela antecipada nunca é abatida da série, então o que sobra não é
+  resíduo. Agora nenhum grampo vale quando há parcela antes da venda; com N = 2 a `main` acusava e
+  este PR passara a esconder, com N = 3 as duas escondiam. Mutação (grampear sempre): 1 vermelho.
+- Achado de passagem, fora do escopo: `CARTEIRA_RESSURGE` falso no parcelamento trimestral do legado
+  com juros > 0 (o saldo capitaliza na carência antes do 1º vencimento) — registrado como issue nova.
+- Efeito visível: em planos com 1ª parcela no mês da venda, a carteira e a carteira máxima ficam
+  abaixo do que saíam antes; registrado em `docs/avancado.md` e `docs/formulas.md`.
+- Endereços `arquivo:linha` deslocados pelo diff no motor, consertados: `frontend/proforma-avancado.ts`,
+  `referencia/fluxo-investidor-formulas.md` e `referencia/padrao-incorporacao.md` (quatro, dois deles já vencidos na `main`).
+## 2026-10-01 — Custos: a semeadura das linhas obrigatórias é idempotente
+
+Duas execuções concorrentes da semeadura de Custos (duas abas, remontagem do componente) criavam
+duas linhas "Preço" no Terreno — e podiam duplicar Construção ou Corretagem de vendas, que o motor
+soma. Decisão do autor: idempotência no servidor + single-flight na tela, sem índice único e sem
+migração.
+
+- **Catálogo único.** `LINHAS_OBRIGATORIAS` saiu de `tela-fluxo-custos.ts` para
+  `frontend/fluxo-shared.ts` (módulo sem dependências), com `eSemeaduraObrigatoria`; o backend o
+  importa, em vez de manter um espelho à mão.
+- **Servidor.** `POST /estudos/:id/avancado/custos` com `semeadura: true` no corpo, categoria
+  obrigatória do grupo e sem subcategoria confere `avancado_linhas_custo` do estudo e devolve a
+  existente (`200`, menor `id`) em vez de criar. A marca explícita existe porque, sem ela, um POST
+  comum de uma 2ª Construção com orçamento teria os campos descartados em silêncio (achado do App
+  do Codex na revisão); sem a marca a rota cria como sempre. Conferência e criação correm em fila por `(estudo, grupo, categoria)` — sem a fila as
+  duas requisições conferem antes de qualquer uma criar. A fila é do processo: com mais de uma
+  réplica do backend a janela volta entre réplicas, e a tela é a primeira defesa.
+- **Tela.** `_garantirLinhasObrigatorias` guarda a semeadura em voo por estudo (no módulo) e
+  reconsulta o servidor antes de criar, quando a lista local diz que falta alguma.
+- Linha com subcategoria (permuta física/financeira) continua criando; subcategoria só com espaços
+  conta como ausente (a mesma regra da validação de subcategoria do Preço); duplicata legada não é
+  apagada nem renumerada (a autocura ficou fora). A tela mescla o resultado da semeadura por `id`
+  em vez de substituir a lista.
+- Fora do escopo, registrado: o `PATCH` que troca a categoria de outra linha para uma das três
+  continua podendo criar a duplicata (o alerta de duplicata segue acusando).
+- Testes: sete casos em `backend/rotas/avancado-custos-rota.test.ts` (Express real, `DadosFake`
+  com `criar` atrasado para a corrida existir) e o caso de render `custos-semeadura` (duas instâncias
+  no mesmo estudo, remontagem e carga com lista velha, contra um servidor falso que cria sempre).
+  Prova de fiação medida, 7 de 7 mutações vermelhas: sem a fila do servidor, sem a guarda do
+  servidor, sem o `trim` da subcategoria, servidor ignorando a marca `semeadura`, sem o
+  single-flight da tela, sem a reconsulta da tela, tela sem mandar a marca.
+- `docs/avancado.md`: Custos diz que cada uma das três linhas é criada uma única vez por estudo,
+  mesmo em duas abas, e que a removida volta na abertura seguinte (a semeadura recria a categoria
+  que faltar — comportamento anterior, mantido); Instruções para não humanos descreve o `200`
+  idempotente.
+- Sem migração; `versao` do `manifesto.json` mantida.
+
+## 2026-10-01 — Rodada 15 aberta: conferência EVI Urbitá em sessões filhas
+
+Fechado o registro da conferência de QA da EVI Urbitá (estudos 14 e 15 da Pinguim, índice #800):
+criadas as issues #801 (`RETORNO_EQUITY_EXCEDE_RECEITA` acusa equity de R$ 0 quando a receita
+líquida do mês é negativa) e #802 (semeadura das linhas obrigatórias cria "Preço" em duplicidade
+por concorrência — o servidor não tem unicidade), comentários em #791 e #798 com o que o estado de
+01/10 do estudo 15 mostrou, e a nota de estado no #800: o estudo 15 **mudou depois da conferência**
+(Curva S, funding vazio, absorção dos dois grupos, tudo pela tela), as medições das issues são de
+30/09 e a referência passa a ser um gêmeo congelado. Os testes "que falham hoje" das #789, #790,
+#791 e #801 foram reconferidos numa worktree limpa da `main` (`c4e7d0c`), inclusive o esboço de
+backend da #791, que nunca tinha rodado e falha como esperado.
+
+O autor respondeu às dez perguntas do fechamento aceitando as recomendações; cada decisão está em
+comentário na própria issue (#792 b, #794 a, #795 itens 1 e 3, #796 a, #797 a, #798 aprovado,
+#799 a, #726 a). A rodada executa em **sessões filhas** orquestradas; fila, ondas, modelos e riscos
+em `historico/rodada-15/planejamento.md`. Este PR é o PR 0 da fila: só documentação.
+## 2026-10-01 — Taxa de desconto 0% deixa de virar 12% no motor do Avançado
+
+- `calcularFluxo` lia a taxa com `n(config.taxaDescontoAa) || 12`, e o `||` engolia o `0`: o backend aceita 0 a 100, mas o VPL a 0% saía igual ao de 12%. Agora `taxaDescontoOuPadrao` (`frontend/fluxo-caixa-motor.ts`) devolve 12 só para valor ausente (`null`, `undefined`, vazio ou não numérico) e preserva o `0`.
+- Mesma classe em `frontend/tela-funding.ts` (`Number(params.taxa_desconto_aa) || 12`): trocado pelo mesmo helper. As demais telas já liam com `?? 12`. A tela Financeiro não barra 0 na taxa de desconto (só valida juros de tabela), então não mudou.
+- Teste novo `frontend/fluxo-taxa-desconto-zero.test.ts`: VPL a 0% = soma do fluxo, controle a 12%, taxa ausente = 12 e regressão de 10% e 12% contra o VPL medido no motor anterior (29.248.604,99 e 29.054.009,82). Voltar ao `|| 12` no motor deixa o primeiro teste vermelho (medido); a fiação da tela Funding, que só importa o helper, é travada por um teste que lê o texto da tela (também medido com a mutação).
+- A citação de `proforma-avancado.ts` para `fluxoMensal` foi reajustada à nova linha. Guia `docs/avancado.md` atualizado. Sem migração: `versao` não bumpa.
+- `validar-frontend.sh` verde.
+
+---
 ## 2026-10-01 — Rotas `/avancado/*`: entrada numérica inválida volta 400, não 500
 
 Entrada não numérica numa escrita de tipologia, linha de custo, operação de funding ou cenário
