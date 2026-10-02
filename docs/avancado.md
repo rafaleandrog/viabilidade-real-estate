@@ -44,7 +44,7 @@ Cinco sub-abas, uma por grupo: **Terreno**, **Obras**, **Diretos**, **Indiretos*
 Cada linha de custo tem uma **categoria** — no Terreno, o preço e o registro; nas Obras, construção,
 outorga, decoração, gestão da obra e contingência; nos Diretos, marketing e publicidade, corretagem
 de vendas, projetos, licenças e aprovações e manutenção pós-obra (que já nasce ancorada no
-evento Pós-obras); nos Indiretos, marketing global, stand de vendas e
+evento Pós-obras: escolher a categoria substitui o início que a linha já tinha); nos Indiretos, marketing global, stand de vendas e
 gestão; no Financeiro, juros de financiamento, taxas bancárias, estruturação de dívida e
 investidores; e em todo grupo a categoria **Outro**. Só o Terreno tem a coluna **Subcategoria**:
 para o preço, à vista, parcelado, permuta física ou permuta financeira; para Outro, o texto de
