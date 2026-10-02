@@ -5,7 +5,7 @@ import { fmtNum } from './viab-format.js';
 import {
   urbiVerso,
   listarTipologiasCatalogo, criarTipologia, atualizarTipologia, removerTipologia,
-  listarReceitasAvancado, listarCustosAvancado,
+  listarReceitasAvancado,
 } from './viabilidade-api.js';
 import { unidadesNaoAlocadasPorTipologia } from './fluxo-invariantes.js';
 import './viab-num.js';
@@ -46,7 +46,6 @@ export class ViabEmpreendimentoTipologias extends LitElement {
   // #340: só para calcular o aviso de unidades não alocadas — a tela não
   // edita nem exibe estes dados de outra forma.
   @state() private receitas: any[] = [];
-  @state() private custosPermuta: any[] = [];
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -165,25 +164,24 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     if (this.estudo?.nivel_analise !== 'avancado') { this.carregando = false; return; }
     this.carregando = true;
     try {
-      const [r, receitas, custos] = await Promise.all([
+      const [r, receitas] = await Promise.all([
         listarTipologiasCatalogo(this.estudo.id),
         listarReceitasAvancado(this.estudo.id),
-        listarCustosAvancado(this.estudo.id),
       ]);
       if (!r?.erro) this.tipologias = r.dados || [];
       if (!receitas?.erro) this.receitas = receitas.dados || [];
-      if (!custos?.erro) this.custosPermuta = custos.dados || [];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar tipologias', 'erro');
     }
     this.carregando = false;
   }
 
-  // #340: unidades do catálogo ainda não alocadas em Receitas nem
-  // reservadas para permuta física — mesma conta do alerta PRODUTO_SUBALOCADO
-  // da Reconciliação (fluxo-invariantes.ts), aqui como aviso local.
+  // #340: unidades do catálogo ainda não alocadas em Receitas — mesma conta do
+  // alerta PRODUTO_SUBALOCADO da Reconciliação (fluxo-invariantes.ts), aqui
+  // como aviso local. A permuta física sai de dentro das alocações e não
+  // desconta.
   private get _naoAlocadas() {
-    return unidadesNaoAlocadasPorTipologia(this.receitas, this.custosPermuta, this.tipologias);
+    return unidadesNaoAlocadasPorTipologia(this.receitas, this.tipologias);
   }
 
   render(): TemplateResult {
@@ -211,7 +209,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
   }
 
   // #340: aviso, por tipologia, de quantas unidades ainda faltam ser
-  // alocadas em grupos de Receitas — já descontando a permuta física.
+  // alocadas em grupos de Receitas (a permuta física é parte das alocadas).
   private _renderAvisoNaoAlocadas(): TemplateResult {
     const naoAlocadas = this._naoAlocadas;
     if (naoAlocadas.length === 0) return html`${nothing}`;

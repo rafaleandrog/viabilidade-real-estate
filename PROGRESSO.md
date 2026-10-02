@@ -41,6 +41,64 @@ da série de repasse, que segue sendo pagamento único), em vez de `pagamentosCo
 lançar e a tela do estudo quebrar. A reconciliação acusa o caso como alerta
 `REPASSE_ANTES_DA_VENDA`; os três testes de identidade por componente que usavam esse caso como
 veículo de `COMPONENTE_INVALIDO` passaram a usar o alerta novo. Sem migração, `versao` intacta.
+## 2026-10-02 — Permuta física é parte das unidades alocadas: backend e invariantes alinhados ao motor
+
+Decisão do autor na #792, opção (b): o motor (`reservarPermutasFisicas`, sem mudança) lê as unidades
+permutadas como PARTE das alocadas; backend, invariantes e a tela de Receitas as liam como
+ADICIONAIS. Com catálogo 200 e 20 permutadas a tela só deixava alocar 180, e o motor tirava as 20 de
+novo: R$ 6 mi de VGV vendável sumiam no estado da issue, sem aviso. Agora:
+
+- backend (`backend/rotas/avancado.ts`): `saldoTipologiaNoEstudo` = catálogo − alocado (as três
+  portas — POST/PATCH de alocação e PATCH de tipologia — herdam); o teto da permuta física é o
+  alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO`), não o catálogo; e as portas
+  que reduzem o alocado — PATCH e DELETE de alocação, DELETE de grupo — recusam deixar a permuta
+  acima do que sobra (`permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO`), achado da revisão —
+  só quando a escrita piora a folga, para estudo já gravado em violação não travar operação neutra;
+  as duas guardas contam só alocação de grupo de receita (de onde o motor reserva) e só linha de
+  permuta que o motor reserva (inteira e >= 1), achado do App do Codex; `GET .../receitas` passou a
+  varrer todos os grupos (era uma página de 100), para o motor ver o mesmo recorte — e também o
+  `GET .../fases` da tela de Receitas e a numeração do POST de grupo, para a tela mostrar e editar o
+  que o motor conta; e o PATCH do
+  catálogo tem piso em max(alocado, permutado), para estudo legado com permuta acima do alocado não
+  perder unidades já prometidas;
+- invariantes (`validarProduto`): `PRODUTO_EXCEDE_ESTOQUE` só com alocado > catálogo;
+  `PRODUTO_SUBALOCADO` = catálogo − alocado; erro novo `PERMUTA_FISICA_EXCEDE_ALOCADO` (só sobre linha
+  que o motor reserva — inteira e >= 1); o estoque
+  mensal baixa só as vendáveis (a reserva do motor), e as reservadas saem na entrega;
+  `unidadesNaoAlocadasPorTipologia` perdeu o parâmetro de custos;
+- telas: `_saldo` de Receitas e o banner de Tipologias deixaram de descontar permuta;
+  `scripts/conferir-estudo.ts` confere unidades contra o alocado e a permuta contra o alocado.
+
+Nenhum número publicado muda. Estudo montado na regra antiga (alocado + permutado = catálogo) calcula
+igual e passa a mostrar `PRODUTO_SUBALOCADO` (alerta). Sem migração, `versao` não bumpa. Testes:
+`frontend/fluxo-permuta-semantica.test.ts` (os da issue, ajustados à opção b), casos em
+`fluxo-invariantes.test.ts` e requisições HTTP reais em `backend/rotas/avancado-custos-rota.test.ts`;
+cada mutação (saldo voltar a descontar, teto voltar ao catálogo, invariante voltar a somar, estoque
+voltar a baixar a quantidade bruta) deixa testes vermelhos.
+## 2026-10-02 — Receitas do Avançado: janela Pós-chaves de 1 a 12 meses e "à vista, mês único"
+
+Desenho aprovado pelo autor na issue: a janela comercial depois da entrega deixa de ser 12 meses
+fixos e passa a ser do Grupo.
+
+- **Dado.** `absorcao.pos_chaves_meses` (opcional, inteiro de 1 a 12; ausente = 12), só no modo
+  `distribuido` — curva `personalizado`/`linear` legada segue com 12. Sem coluna nova nem migração: o
+  JSON de absorção já é livre, e a `versao` não bumpa. `validarAbsorcao` recusa valor fora da faixa,
+  não numérico ou em outro modo; `mesesPosChaves` aplica a mesma regra, fail-closed.
+- **Motor.** `mesesPosChaves` em `frontend/fluxo-shared.ts`; `faixasAbsorcao`/`periodoAbsorcao`
+  recebem a janela como parâmetro OBRIGATÓRIO (omitir é TS2554); `absorcaoMensal` e
+  `ultimoMesRecebivelLinha` leem a janela do Grupo. Estudo sem o campo dá resultado idêntico (teste
+  de regressão).
+- **Mês único.** Atalho do formulário, sem flag gravada: 0% nos três períodos e janela de 1 mês
+  (`ehMesUnico`/`alternarMesUnico` em `frontend/fluxo-absorcao-editor.ts`). Venda depois da entrega já
+  é à vista no contrato canônico (`componentesEfetivosSafra`); o ramo legado de recebíveis não aplica
+  essa regra (achado P1 do App do Codex), então num Grupo com "Plano não migrado" o atalho fica
+  indisponível, com nota na tela, até o Fluxo de Pagamento ser aplicado. O ramo legado não foi tocado:
+  mudá-lo mudaria estudos existentes.
+- **Tela.** Modal de Absorção com o campo "Janela Pós-chaves" e o par Não/Sim de "mês único"; o aviso
+  do Cronograma deixou de dizer "12 meses fixos".
+- **Prova de fiação.** Caso de render `modal-absorcao-janela`: trocar a janela do formulário pela
+  constante, tirar `alternarMesUnico` do clique ou tirar a trava dos campos deixa o render vermelho.
+- Guias `docs/avancado.md` e `docs/modelo-de-dados.md` atualizados.
 ## 2026-10-02 — Custos do Avançado: categoria canônica "Manutenção pós-obra"
 
 Decisão do autor (ramo a da issue): a manutenção pós-obra deixa de ser um "Outro" sem descrição na

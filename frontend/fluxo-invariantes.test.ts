@@ -725,12 +725,12 @@ test('validarSafrasReceita: repasse sem participação antes da venda não alert
   assert.deepEqual(r.filter((d) => d.codigo === 'REPASSE_ANTES_DA_VENDA'), []);
 });
 
-test('validarProduto: alocação + permuta acima do catálogo identifica tipologia e mês negativo', () => {
-  const custos = [{
-    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
-    permuta_tipologia_id: 1, permuta_quantidade: 2,
-  }];
-  const r = validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+// #792: a permuta física é PARTE das unidades alocadas (como o motor a lê),
+// então quem excede o catálogo é a ALOCAÇÃO. 22 alocadas sobre 20 no catálogo.
+const RECEITA_SOBREALOCADA = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 22 }] }];
+
+test('validarProduto: alocação acima do catálogo identifica tipologia e mês negativo', () => {
+  const r = validarProduto(RECEITA_SOBREALOCADA, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
   assert.equal(r.find((d) => d.codigo === 'PRODUTO_EXCEDE_ESTOQUE')?.linha, 'Studio');
   assert.equal(r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO')?.mes, 1);
   // #457: sem `area_privativa_m2` no catálogo (caso de `TIPOLOGIAS`), a
@@ -745,11 +745,7 @@ test('validarProduto: alocação + permuta acima do catálogo identifica tipolog
 // acima, trocando `TIPOLOGIAS` (sem área) por `TIPOLOGIAS_COM_AREA`.
 
 test('#457 validarProduto: ESTOQUE_MENSAL_NEGATIVO tem par em m² como alerta (mesma violação, escalada por área)', () => {
-  const custos = [{
-    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
-    permuta_tipologia_id: 1, permuta_quantidade: 2,
-  }];
-  const r = validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4);
+  const r = validarProduto(RECEITA_SOBREALOCADA, [], TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4);
   const erroUnidades = r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO');
   const alertaM2 = r.find((d) => d.codigo === 'ESTOQUE_M2_MENSAL_NEGATIVO');
   assert.equal(erroUnidades?.severidade, 'erro');
@@ -786,37 +782,94 @@ test('#340 validarProduto: sub-alocação vira PRODUTO_SUBALOCADO, alerta não e
   assert.equal(div!.diferenca, 5);
 });
 
-test('#340 validarProduto: sub-alocação descontando permuta física não dispara se cobre o resto', () => {
+test('#792 validarProduto: estudo na regra antiga (alocado + permutado = catálogo) vira PRODUTO_SUBALOCADO — a permuta não completa o catálogo', () => {
+  // 15 alocadas + 5 permutadas sobre 20: as 5 permutadas saem de DENTRO das
+  // 15 (é como o motor as reserva), então sobram 5 do catálogo sem alocar.
   const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 15 }] }];
   const custosPermuta = [
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 },
   ];
   const r = validarProduto(receitaParcial, custosPermuta, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
-  assert.equal(r.find((d) => d.codigo === 'PRODUTO_SUBALOCADO'), undefined);
+  const div = r.find((d) => d.codigo === 'PRODUTO_SUBALOCADO');
+  assert.ok(div);
+  assert.equal(div!.severidade, 'alerta');
+  assert.equal(div!.diferenca, 5);
+  // Alerta, não erro: o estado calcula, e nenhuma outra divergência aparece.
+  assert.deepEqual(r.filter((d) => d.severidade === 'erro'), []);
 });
 
-test('#340 unidadesNaoAlocadasPorTipologia: desconta alocação e permuta física corretamente', () => {
-  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 12 }] }];
-  const custosPermuta = [
-    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 3 },
+test('#792 validarProduto: catálogo inteiro alocado com parte permutada fecha sem divergência (estoque mensal baixa só as vendáveis)', () => {
+  // 20 alocadas, 2 permutadas: 18 vendidas pela absorção + 2 entregues = 20.
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 2,
+  }];
+  assert.deepEqual(validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('#792 validarProduto: permuta acima do ALOCADO (dentro do catálogo) é erro PERMUTA_FISICA_EXCEDE_ALOCADO', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 3 }] }];
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 5,
+  }];
+  const r = validarProduto(receitaParcial, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  const div = r.find((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO');
+  assert.ok(div);
+  assert.equal(div!.severidade, 'erro');
+  assert.equal(div!.esperado, 3);
+  assert.equal(div!.encontrado, 5);
+  assert.equal(div!.linha, 'Studio');
+  // O estoque não fica negativo: o motor só reserva o que foi alocado (3).
+  assert.equal(r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO'), undefined);
+  // Permuta acima do próprio catálogo é o `PERMUTA_FISICA_EXCEDE_ESTOQUE` de
+  // `validarPermutaFisica` — esta não repete o mesmo estado.
+  const acimaDoCatalogo = [{ ...custos[0], permuta_quantidade: 25 }];
+  assert.equal(validarProduto(receitaParcial, acimaDoCatalogo, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4)
+    .find((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO'), undefined);
+});
+
+test('#792 validarProduto: permuta repartida entre dois grupos da mesma tipologia fecha o livro (o motor reserva em cascata)', () => {
+  const doisGrupos = [
+    { ...RECEITA_PRODUTO[0], id: 1, nome: 'G1', tipologias: [{ id: 1, tipologia_id: 1, quantidade: 3 }] },
+    { ...RECEITA_PRODUTO[0], id: 2, nome: 'G2', tipologias: [{ id: 2, tipologia_id: 1, quantidade: 17 }] },
   ];
-  const r = unidadesNaoAlocadasPorTipologia(receitaParcial, custosPermuta, TIPOLOGIAS.slice(0, 1));
+  const custos = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 }];
+  assert.deepEqual(validarProduto(doisGrupos, custos, TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('#792 validarProduto: permuta legada (`unidades_permutadas` na alocação, sem linha de custo) fecha o livro', () => {
+  const legado = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 20, unidades_permutadas: 4 }] }];
+  assert.deepEqual(validarProduto(legado, [], TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('#792 validarProduto: permuta não inteira (o motor não reserva) não vira PERMUTA_FISICA_EXCEDE_ALOCADO', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 2 }] }];
+  const custos = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 2.5 }];
+  const r = validarProduto(receitaParcial, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  assert.equal(r.find((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO'), undefined);
+  // Ruído de casa decimal em torno de um inteiro conta como o inteiro, como no motor.
+  const ruido = [{ ...custos[0], permuta_quantidade: 3.004 }];
+  assert.equal(validarProduto(receitaParcial, ruido, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4)
+    .filter((d) => d.codigo === 'PERMUTA_FISICA_EXCEDE_ALOCADO').length, 1);
+});
+
+test('#340/#792 unidadesNaoAlocadasPorTipologia: catálogo − alocado (a permuta física não desconta)', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 12 }] }];
+  const r = unidadesNaoAlocadasPorTipologia(receitaParcial, TIPOLOGIAS.slice(0, 1));
   assert.equal(r.length, 1);
   assert.equal(r[0].nome, 'Studio');
   assert.equal(r[0].quantidadeTotal, 20);
-  assert.equal(r[0].naoAlocado, 5); // 20 - 12 - 3
+  assert.equal(r[0].naoAlocado, 8); // 20 - 12
 });
 
 test('#340 unidadesNaoAlocadasPorTipologia: totalmente alocada não aparece', () => {
-  const r = unidadesNaoAlocadasPorTipologia(RECEITA_PRODUTO, [], TIPOLOGIAS.slice(0, 1));
+  const r = unidadesNaoAlocadasPorTipologia(RECEITA_PRODUTO, TIPOLOGIAS.slice(0, 1));
   assert.deepEqual(r, []);
 });
 
 test('#340 unidadesNaoAlocadasPorTipologia: sobre-alocada (excede estoque) também não aparece — diferença negativa', () => {
-  const custosPermuta = [
-    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 },
-  ];
-  const r = unidadesNaoAlocadasPorTipologia(RECEITA_PRODUTO, custosPermuta, TIPOLOGIAS.slice(0, 1));
+  const r = unidadesNaoAlocadasPorTipologia(RECEITA_SOBREALOCADA, TIPOLOGIAS.slice(0, 1));
   assert.deepEqual(r, []);
 });
 
