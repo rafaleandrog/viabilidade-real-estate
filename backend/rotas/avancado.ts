@@ -1224,12 +1224,32 @@ export function saldoPermutaDisponivel(alocacoes: any[], custos: any[], tipologi
   const alocado = (alocacoes ?? [])
     .filter((a: any) => Number(a.tipologia_id) === Number(tipologiaId))
     .reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
+  // Só a linha que o motor de fato reserva (`reservarPermutasFisicas`): inteira
+  // e >= 1, com o ruído de 0,01 que ele tolera. Linha incompleta ou não inteira
+  // (só existe em dado legado — o PATCH barra quantidade não inteira) não
+  // reserva nada, então não pode travar alocação nem consumir saldo.
   const reservada = (custos ?? [])
     .filter((c: any) => Number(c.id) !== Number(ignorarCustoId)
       && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
       && Number(c.permuta_tipologia_id) === Number(tipologiaId))
-    .reduce((sum: number, c: any) => sum + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
+    .reduce((sum: number, c: any) => {
+      const bruta = Number(c.permuta_quantidade) || 0;
+      const inteira = Math.abs(bruta - Math.round(bruta)) <= 0.01 && Math.round(bruta) >= 1;
+      return sum + (inteira ? Math.round(bruta) : 0);
+    }, 0);
   return alocado - reservada;
+}
+
+/**
+ * Só as alocações de grupos de RECEITA lastreiam permuta física: é deles que o
+ * motor reserva (`GET .../receitas` monta as linhas só com `tipo = 'receita'`).
+ * Alocação pendurada numa fase de cronograma — dado legado, ou cliente de API —
+ * não pode deixar passar uma permuta que o motor não tem de onde tirar.
+ */
+async function alocacoesDeReceita(req: Request, estudoId: number, alocacoes: any[]): Promise<any[]> {
+  const fases = await req.dados!.varrerTudo('avancado_fases', { filtros: { estudo_id: estudoId, tipo: 'receita' } });
+  const ids = new Set(fases.map((f: any) => Number(f.id)));
+  return (alocacoes ?? []).filter((a: any) => ids.has(Number(a.fase_id)));
 }
 
 /**
@@ -1255,7 +1275,8 @@ async function permutaCabeAposReducao(
   if (ids.length === 0) return true;
   const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
   for (const tid of ids) {
-    const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tid } });
+    const alocacoes = await alocacoesDeReceita(req, estudoId,
+      await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tid } }));
     const ajustadas = alocacoes.map((a: any) => ({ ...a, unidades: ajustar(a) }));
     const folga = saldoPermutaDisponivel(ajustadas, custos, tid);
     if (folga < 0 && folga < saldoPermutaDisponivel(alocacoes, custos, tid)) {
@@ -1602,7 +1623,8 @@ async function validarPermutaFisica(
   // "Todas as linhas" é `varrerTudo`, nunca um `por_pagina` grande: com mais
   // de uma página de alocações ou de linhas de custo, `listar` subcontava o
   // já reservado, `disponivel` inflava e a guarda 422 falhava ABERTA.
-  const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId } });
+  const alocacoes = await alocacoesDeReceita(req, estudoId,
+    await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId } }));
   const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
   const disponivel = saldoPermutaDisponivel(alocacoes, custos, tipologiaId, atual?.id);
   if (Number(quantidade) > disponivel) {

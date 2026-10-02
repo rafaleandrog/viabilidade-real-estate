@@ -233,7 +233,8 @@ test('#753 fiação: subcategoria → tipologia → quantidade, cada uma num PAT
   // rota comparam por `===`/`Number()`), com 10 unidades, 2 alocadas em
   // Receitas → saldo 2 para permuta (a permuta sai das unidades ALOCADAS).
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 10, area_privativa_m2: 30, preco_m2: 10_000 });
-  dados.semear('avancado_alocacoes', { id: 501, tipologia_id: 11, unidades: 2 });
+  dados.semear('avancado_fases', { id: 21, estudo_id: 1, tipo: 'receita', nome: 'G' });
+  dados.semear('avancado_alocacoes', { id: 501, fase_id: 21, tipologia_id: 11, unidades: 2 });
   const cid = dados.semear('avancado_linhas_custo', precoTerrenoBase(1));
 
   await comServidor(criarApp(dados), async (base) => {
@@ -276,7 +277,8 @@ test('#753 fiação: a quantidade pode vir ANTES da tipologia — a ordem dos ca
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 10 });
-  dados.semear('avancado_alocacoes', { id: 501, tipologia_id: 11, unidades: 10 });
+  dados.semear('avancado_fases', { id: 21, estudo_id: 1, tipo: 'receita', nome: 'G' });
+  dados.semear('avancado_alocacoes', { id: 501, fase_id: 21, tipologia_id: 11, unidades: 10 });
   const cid = dados.semear('avancado_linhas_custo', precoTerrenoBase(1, { subcategoria: 'Permuta física', orcamento_valor: null, orcamento_valor_canonico: null }));
 
   await comServidor(criarApp(dados), async (base) => {
@@ -337,7 +339,8 @@ test('#756 saldo de permuta com 1200 alocações (mais de uma página): a guarda
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 1500, area_privativa_m2: 30, preco_m2: 10_000 });
-  for (let i = 0; i < 1200; i++) dados.semear('avancado_alocacoes', { tipologia_id: 11, unidades: 1 });
+  dados.semear('avancado_fases', { id: 21, estudo_id: 1, tipo: 'receita', nome: 'G' });
+  for (let i = 0; i < 1200; i++) dados.semear('avancado_alocacoes', { fase_id: 21, tipologia_id: 11, unidades: 1 });
   const cid = dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11 });
 
   await comServidor(criarApp(dados), async (base) => {
@@ -356,7 +359,8 @@ test('#756 saldo de permuta com 1100 linhas de custo reservando (mais de uma pá
   const dados = new DadosFake();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('avancado_tipologias', { id: 11, estudo_id: 1, nome: 'Studio', quantidade: 1200, area_privativa_m2: 30, preco_m2: 10_000 });
-  dados.semear('avancado_alocacoes', { tipologia_id: 11, unidades: 1200 });
+  dados.semear('avancado_fases', { id: 21, estudo_id: 1, tipo: 'receita', nome: 'G' });
+  dados.semear('avancado_alocacoes', { fase_id: 21, tipologia_id: 11, unidades: 1200 });
   for (let i = 0; i < 1100; i++) {
     dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1), subcategoria: 'Permuta física', permuta_tipologia_id: 11, permuta_quantidade: 1 });
   }
@@ -655,5 +659,29 @@ test('#792 reduzir: estudo já gravado com permuta acima do alocado não trava o
     const barra = await enviar(base, 'DELETE', '/estudos/1/avancado/fases/21', {});
     assert.equal(barra.status, 422);
     assert.equal(barra.corpo.codigo, 'PERMUTA_EXCEDE_ALOCADO');
+  });
+});
+
+test('#792 permuta: alocação pendurada em fase de CRONOGRAMA não lastreia permuta (o motor só reserva de grupo de receita)', async () => {
+  const dados = new DadosFake();
+  const { cid } = semearEstudoPermuta(dados, 5);
+  dados.semear('avancado_fases', { id: 31, estudo_id: 1, tipo: 'cronograma', nome: 'Fase 1' });
+  dados.semear('avancado_alocacoes', { estudo_id: 1, fase_id: 31, tipologia_id: 11, unidades: 50, ordem: 0 });
+  await comServidor(criarApp(dados), async (base) => {
+    // 5 alocadas em receita + 50 na fase de cronograma: o teto da permuta é 5.
+    const r = await patch(base, cid, { permuta_quantidade: 6 });
+    assert.equal(r.status, 422, `esperava 422, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    assert.equal(r.corpo.codigo, 'PERMUTA_SALDO_EXCEDIDO');
+    assert.match(r.corpo.mensagem, /Só há 5 unidade/);
+  });
+});
+
+test('#792 reduzir: permuta legada não inteira (o motor não reserva) não trava apagar a alocação', async () => {
+  const dados = new DadosFake();
+  const { aid, cid } = semearEstudoPermuta(dados, 3);
+  await dados.atualizar('avancado_linhas_custo', cid, { permuta_quantidade: 2.5 });
+  await comServidor(criarApp(dados), async (base) => {
+    const ok = await enviar(base, 'DELETE', `/estudos/1/avancado/fases/21/alocacoes/${aid}`, {});
+    assert.equal(ok.status, 200, `esperava 200, veio ${ok.status}: ${JSON.stringify(ok.corpo)}`);
   });
 });

@@ -29,7 +29,10 @@ novo: R$ 6 mi de VGV vendável sumiam no estado da issue, sem aviso. Agora:
   portas — POST/PATCH de alocação e PATCH de tipologia — herdam); o teto da permuta física é o
   alocado (`saldoPermutaDisponivel`, `422 PERMUTA_SALDO_EXCEDIDO`), não o catálogo; e as portas
   que reduzem o alocado — PATCH e DELETE de alocação, DELETE de grupo — recusam deixar a permuta
-  acima do que sobra (`permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO`), achado da revisão;
+  acima do que sobra (`permutaCabeAposReducao`, `422 PERMUTA_EXCEDE_ALOCADO`), achado da revisão —
+  só quando a escrita piora a folga, para estudo já gravado em violação não travar operação neutra;
+  as duas guardas contam só alocação de grupo de receita (de onde o motor reserva) e só linha de
+  permuta que o motor reserva (inteira e >= 1), achado do App do Codex;
 - invariantes (`validarProduto`): `PRODUTO_EXCEDE_ESTOQUE` só com alocado > catálogo;
   `PRODUTO_SUBALOCADO` = catálogo − alocado; erro novo `PERMUTA_FISICA_EXCEDE_ALOCADO` (só sobre linha
   que o motor reserva — inteira e >= 1); o estoque
