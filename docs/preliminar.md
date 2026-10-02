@@ -96,7 +96,8 @@ juros de tabela (não há tempo) e o resultado não deduz despesas financeiras (
 - **Alavancas do resultado** — o tornado: cada alavanca (**Preço de venda** — **Preço/m² de venda** no Loteamento —, **Permuta física**,
   **Permuta financeira**, **Custo de obra** ou **Custo de infraestrutura**, **Custo indireto**) é
   variada em ±5, ±10 ou ±15 % (o passo é escolhido no card) e ranqueada pela amplitude do impacto
-  no resultado. A barra mais longa é a premissa que mais merece atenção. O custo do terreno não
+  no resultado. A barra mais longa é a premissa que mais merece atenção. Na Incorporação, **Custo de obra** estressa construção e decoração, e a gestão da
+  construção acompanha por incidir sobre as duas: o custo de obras do estudo (construção, decoração e gestão) varia exatamente o percentual escolhido. O custo do terreno não
   entra no tornado: ele tem o próprio cartão ao lado. No topo da lista fica o **Cenário composto**:
   as três alavancas de maior amplitude (as de base circular ficam fora; com só duas elegíveis, as
   duas) estressadas juntas — todas no sentido desfavorável no Bear, todas no favorável no Bull —,

@@ -749,7 +749,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const construcaoLegada = lot ? 0
     : (e.construcao_modo === 'valor_total' ? n(e.construcao_valor_total) : n(e.custo_construcao_m2) * areaPrivativa);
   const construcao = canonico(e.construcao_valor_canonico, construcaoLegada) * fatorSens('custo_obras');
-  const decoracao = lot ? 0 : n(e.custo_decoracao_m2) * areaPrivativa;
+  // Decoração é obra: leva o MESMO fator de `custo_obras` que a construção, para
+  // estressar ±X% mover o KPI "Custo obras" (construção + decoração + gestão) em
+  // exatamente ±X% — a gestão escala por carona, porque incide sobre a soma.
+  const decoracao = lot ? 0 : n(e.custo_decoracao_m2) * areaPrivativa * fatorSens('custo_obras');
   const custoTotalConstrucao = lot ? infraestrutura : (construcao + decoracao);
   const gestaoConstrucao = lot ? 0 : custoTotalConstrucao * n(e.taxa_gestao_pct) / 100;
 
