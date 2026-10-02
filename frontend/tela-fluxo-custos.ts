@@ -218,6 +218,9 @@ async function semearObrigatorias(estudoId: number, locais: any[]): Promise<any[
         ordem: obrig.posicao,
       };
       if (obrig.unidade) dados.orcamento_unidade = obrig.unidade;
+      // Declara o pedido como semeadura: só assim o servidor devolve a linha
+      // existente em vez de criar outra (o POST comum cria sempre).
+      dados.semeadura = true;
       const res = await criarCustoAvancado(estudoId, dados);
       // O servidor devolve a linha EXISTENTE quando outra aba já semeou —
       // não a acrescente duas vezes à lista.

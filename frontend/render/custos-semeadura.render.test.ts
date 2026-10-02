@@ -38,4 +38,8 @@ test('#802: duas instâncias de Custos no mesmo estudo sem obrigatórias semeiam
   // servidor antes de criar é o que impede a 2ª semeadura.
   assert.deepEqual(m!.porCategoriaListaVelha, UMA_DE_CADA, 'a tela semeou de novo a partir de uma lista velha' + relato(a));
   assert.equal(m!.postsListaVelha, 3, 'com lista velha a tela tem de reconsultar, não mandar POST' + relato(a));
+
+  // Sem a marca o servidor trata o pedido como POST comum e cria sempre — a
+  // guarda de idempotência dele não entraria em ação.
+  assert.equal(m!.postsSemMarca, 0, 'a semeadura tem de mandar `semeadura: true` em todo POST' + relato(a));
 });

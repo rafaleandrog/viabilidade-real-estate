@@ -126,11 +126,12 @@ usuário do app, escrita e `semear` só para o `admin` do app.
 | Curvas (catálogo do app) | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` |
 | Anexos do empreendimento | `GET`/`POST /estudos/:id/empreendimento/documentos` · `DELETE …/documentos/:docId` |
 
-O `POST /estudos/:id/avancado/custos` é idempotente para as três linhas semeadas: com `categoria`
-`Preço` em `terreno`, `Construção` em `obra` ou `Corretagem de vendas` em `diretos`, **sem**
-`subcategoria`, e o estudo já tendo uma linha assim, a rota devolve a existente (`200`, a de menor
-`id`) em vez de criar outra; a criação de verdade responde `201`. Qualquer outra combinação — inclusive
-a mesma categoria com subcategoria — cria sempre.
+O `POST /estudos/:id/avancado/custos` com `"semeadura": true` no corpo é idempotente para as três
+linhas semeadas: com `categoria` `Preço` em `terreno`, `Construção` em `obra` ou `Corretagem de
+vendas` em `diretos`, **sem** `subcategoria` (ausente, vazia ou só com espaços), e o estudo já tendo
+uma linha assim, a rota devolve a existente (`200`, a de menor `id`) em vez de criar outra; a criação
+de verdade responde `201`. É o que a aba Custos manda ao semear. Sem `"semeadura": true`, ou com
+qualquer outra combinação — inclusive a mesma categoria com subcategoria —, a rota cria sempre.
 
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.

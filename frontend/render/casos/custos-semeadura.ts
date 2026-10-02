@@ -33,6 +33,8 @@ export interface MedidaSemeadura {
    */
   porCategoriaListaVelha: Record<string, number>;
   postsListaVelha: number;
+  /** POSTs que NÃO se declararam semeadura (`semeadura: true`) — tem de ser 0. */
+  postsSemMarca: number;
   /** A lista que cada instância mostra — as duas têm de ver as 3 linhas, sem repetir. */
   custosPorInstancia: number[];
 }
@@ -41,6 +43,7 @@ export interface MedidaSemeadura {
 // mesma página.
 const linhas: any[] = [];
 let posts = 0;
+let postsSemMarca = 0;
 let proximoId = 1;
 // Quando ligado, o PRÓXIMO GET de custos devolve a lista vazia de antes da
 // semeadura — e só ele.
@@ -103,6 +106,7 @@ export const caso = {
       if (rota === `/estudos/${ESTUDO_ID}/avancado/custos`) {
         if ((opts.method ?? 'GET') === 'POST') {
           posts++;
+          if (JSON.parse(opts.body || '{}').semeadura !== true) postsSemMarca++;
           await new Promise((r) => setTimeout(r, 40));
           const linha = { id: proximoId++, estudo_id: ESTUDO_ID, subcategoria: null, ...JSON.parse(opts.body || '{}') };
           linhas.push(linha);
@@ -151,6 +155,7 @@ export const caso = {
       postsRemontado,
       porCategoriaListaVelha: contar(),
       postsListaVelha: posts,
+      postsSemMarca,
       custosPorInstancia,
     };
   },

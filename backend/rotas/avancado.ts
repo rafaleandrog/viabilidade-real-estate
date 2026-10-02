@@ -1569,6 +1569,12 @@ async function validarPermutaTipologia(
 // ele quebraria as duplicatas legadas e a 2ª "Preço" com subcategoria (#444),
 // que segue aceita porque a chave só vale para linha SEM subcategoria.
 //
+// A guarda só vale para o pedido que se DECLARA semeadura (`semeadura: true`
+// no corpo, que só a semeadura da tela manda). Um POST comum — um cliente da
+// API criando uma 2ª Construção com orçamento, unidade e calendário — cria
+// como sempre: devolver a linha existente ali descartaria os campos enviados
+// em silêncio, o que é pior que a duplicata (que o alerta acusa).
+//
 // A conferência e a criação correm em série por chave
 // `(estudo_id, grupo, categoria)` — sem isso as duas requisições conferem
 // antes de qualquer uma criar, e as duas criam. A fila é deste processo: com
@@ -1653,7 +1659,7 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
       }
     }
 
-    if (eSemeaduraObrigatoria(dados)) {
+    if (req.body?.semeadura === true && eSemeaduraObrigatoria(dados)) {
       const r = await emSerie(`${estudo.id}::${dados.grupo}::${dados.categoria}`, async () => {
         const existente = await semeaduraExistente(req, estudo.id, dados);
         if (existente) return { linha: existente, criada: false };

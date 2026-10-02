@@ -28,9 +28,11 @@ migração.
 - **Catálogo único.** `LINHAS_OBRIGATORIAS` saiu de `tela-fluxo-custos.ts` para
   `frontend/fluxo-shared.ts` (módulo sem dependências), com `eSemeaduraObrigatoria`; o backend o
   importa, em vez de manter um espelho à mão.
-- **Servidor.** `POST /estudos/:id/avancado/custos` com categoria obrigatória do grupo e sem
-  subcategoria confere `avancado_linhas_custo` do estudo e devolve a existente (`200`, menor `id`) em
-  vez de criar. Conferência e criação correm em fila por `(estudo, grupo, categoria)` — sem a fila as
+- **Servidor.** `POST /estudos/:id/avancado/custos` com `semeadura: true` no corpo, categoria
+  obrigatória do grupo e sem subcategoria confere `avancado_linhas_custo` do estudo e devolve a
+  existente (`200`, menor `id`) em vez de criar. A marca explícita existe porque, sem ela, um POST
+  comum de uma 2ª Construção com orçamento teria os campos descartados em silêncio (achado do App
+  do Codex na revisão); sem a marca a rota cria como sempre. Conferência e criação correm em fila por `(estudo, grupo, categoria)` — sem a fila as
   duas requisições conferem antes de qualquer uma criar. A fila é do processo: com mais de uma
   réplica do backend a janela volta entre réplicas, e a tela é a primeira defesa.
 - **Tela.** `_garantirLinhasObrigatorias` guarda a semeadura em voo por estudo (no módulo) e
@@ -41,11 +43,12 @@ migração.
   em vez de substituir a lista.
 - Fora do escopo, registrado: o `PATCH` que troca a categoria de outra linha para uma das três
   continua podendo criar a duplicata (o alerta de duplicata segue acusando).
-- Testes: seis casos em `backend/rotas/avancado-custos-rota.test.ts` (Express real, `DadosFake`
+- Testes: sete casos em `backend/rotas/avancado-custos-rota.test.ts` (Express real, `DadosFake`
   com `criar` atrasado para a corrida existir) e o caso de render `custos-semeadura` (duas instâncias
   no mesmo estudo, remontagem e carga com lista velha, contra um servidor falso que cria sempre).
-  Prova de fiação medida, 4 de 4 mutações vermelhas: sem a fila do servidor, sem a guarda do
-  servidor, sem o single-flight da tela, sem a reconsulta da tela.
+  Prova de fiação medida, 7 de 7 mutações vermelhas: sem a fila do servidor, sem a guarda do
+  servidor, sem o `trim` da subcategoria, servidor ignorando a marca `semeadura`, sem o
+  single-flight da tela, sem a reconsulta da tela, tela sem mandar a marca.
 - `docs/avancado.md`: Custos diz que cada uma das três linhas é criada uma única vez por estudo,
   mesmo em duas abas, e que a removida volta na abertura seguinte (a semeadura recria a categoria
   que faltar — comportamento anterior, mantido); Instruções para não humanos descreve o `200`

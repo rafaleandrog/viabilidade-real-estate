@@ -400,14 +400,14 @@ test('#802 duas criações CONCORRENTES de Preço/terreno num estudo sem Preço 
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
 
   await comServidor(criarApp(dados), async (base) => {
-    const corpo = { grupo: 'terreno', categoria: 'Preço', cronograma_evento: 'customizado', ordem: 0 };
+    const corpo = { grupo: 'terreno', categoria: 'Preço', cronograma_evento: 'customizado', ordem: 0, semeadura: true };
     const [a, b] = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, corpo)]);
     assert.deepEqual([a.status, b.status].sort(), [200, 201], `status: ${a.status}, ${b.status}`);
     assert.equal(a.corpo.id, b.corpo.id, 'as duas respostas têm de ser a MESMA linha');
     assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 1);
 
     // A 2ª linha legítima de "Preço" — com subcategoria (#444) — continua aceita.
-    const permuta = await postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física' });
+    const permuta = await postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', semeadura: true });
     assert.equal(permuta.status, 201, JSON.stringify(permuta.corpo));
     assert.notEqual(permuta.corpo.id, a.corpo.id);
     assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 2);
@@ -425,7 +425,7 @@ test('#802 cada linha do catálogo LINHAS_OBRIGATORIAS (o mesmo que a tela semei
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   await comServidor(criarApp(dados), async (base) => {
     for (const e of entradas) {
-      const corpo: Record<string, any> = { grupo: e.grupo, categoria: e.categoria, ordem: e.posicao };
+      const corpo: Record<string, any> = { grupo: e.grupo, categoria: e.categoria, ordem: e.posicao, semeadura: true };
       if (e.unidade) corpo.orcamento_unidade = e.unidade;
       const rs = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, corpo), postCusto(base, 1, corpo)]);
       assert.deepEqual(rs.map((r) => r.status).sort(), [200, 200, 201], `${e.categoria}: ${JSON.stringify(rs)}`);
@@ -439,13 +439,13 @@ test('#802 a guarda é por estudo e só para a semeadura: outro estudo cria a su
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('estudos', { id: 2, nivel_analise: 'avancado', status: 'em_analise' });
   await comServidor(criarApp(dados), async (base) => {
-    const preco = { grupo: 'terreno', categoria: 'Preço' };
+    const preco = { grupo: 'terreno', categoria: 'Preço', semeadura: true };
     const [a, b] = await Promise.all([postCusto(base, 1, preco), postCusto(base, 2, preco)]);
     assert.deepEqual([a.status, b.status], [201, 201]);
     assert.equal((await linhasDe(dados, 2, 'terreno', 'Preço')).length, 1);
 
     // "Preço" em OUTRO grupo não é a semeadura do terreno.
-    const fora = { grupo: 'indireto', categoria: 'Preço' };
+    const fora = { grupo: 'indireto', categoria: 'Preço', semeadura: true };
     await Promise.all([postCusto(base, 1, fora), postCusto(base, 1, fora)]);
     assert.equal((await linhasDe(dados, 1, 'indireto', 'Preço')).length, 2);
   });
@@ -456,7 +456,7 @@ test('#802 a busca da existente é filtrada por estudo: Preço do estudo 1 já s
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   dados.semear('estudos', { id: 2, nivel_analise: 'avancado', status: 'em_analise' });
   await comServidor(criarApp(dados), async (base) => {
-    const preco = { grupo: 'terreno', categoria: 'Preço' };
+    const preco = { grupo: 'terreno', categoria: 'Preço', semeadura: true };
     const um = await postCusto(base, 1, preco);
     const dois = await postCusto(base, 2, preco);
     assert.equal(um.status, 201);
@@ -469,8 +469,8 @@ test('#802 subcategoria só com espaços conta como "sem subcategoria" (a mesma 
   const dados = new DadosFakeLento();
   dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
   await comServidor(criarApp(dados), async (base) => {
-    const corpo = { grupo: 'terreno', categoria: 'Preço', subcategoria: '   ' };
-    const rs = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço' })]);
+    const corpo = { grupo: 'terreno', categoria: 'Preço', subcategoria: '   ', semeadura: true };
+    const rs = await Promise.all([postCusto(base, 1, corpo), postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço', semeadura: true })]);
     assert.deepEqual(rs.map((r) => r.status).sort(), [200, 201], JSON.stringify(rs));
     assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 1);
   });
@@ -482,9 +482,24 @@ test('#802 estudo com duplicata LEGADA não muda de número: a criação devolve
   dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1, { subcategoria: null, orcamento_valor: null, orcamento_valor_canonico: null }), id: 78 });
   dados.semear('avancado_linhas_custo', { ...precoTerrenoBase(1, { subcategoria: null, orcamento_valor: null, orcamento_valor_canonico: null }), id: 77 });
   await comServidor(criarApp(dados), async (base) => {
-    const r = await postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço' });
+    const r = await postCusto(base, 1, { grupo: 'terreno', categoria: 'Preço', semeadura: true });
     assert.equal(r.status, 200);
     assert.equal(r.corpo.id, 77);
     assert.equal((await linhasDe(dados, 1, 'terreno', 'Preço')).length, 2);
+  });
+});
+
+test('#802 POST comum (sem `semeadura: true`) cria como sempre, mesmo com a obrigatória já existente — os campos enviados não são descartados', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  const existente = dados.semear('avancado_linhas_custo', custoObraBase(1, { categoria: 'Construção' }));
+  await comServidor(criarApp(dados), async (base) => {
+    const r = await postCusto(base, 1, {
+      grupo: 'obra', categoria: 'Construção', orcamento_valor: 2_500_000, orcamento_unidade: 'rs', duracao_meses: 12,
+    });
+    assert.equal(r.status, 201, JSON.stringify(r.corpo));
+    assert.notEqual(r.corpo.id, existente);
+    assert.equal(Number(r.corpo.orcamento_valor), 2_500_000, 'o valor enviado tem de ser gravado, não descartado');
+    assert.equal((await linhasDe(dados, 1, 'obra', 'Construção')).length, 2);
   });
 });
