@@ -44,6 +44,20 @@ igual e passa a mostrar `PRODUTO_SUBALOCADO` (alerta). Sem migração, `versao` 
 `fluxo-invariantes.test.ts` e requisições HTTP reais em `backend/rotas/avancado-custos-rota.test.ts`;
 cada mutação (saldo voltar a descontar, teto voltar ao catálogo, invariante voltar a somar, estoque
 voltar a baixar a quantidade bruta) deixa testes vermelhos.
+## 2026-10-02 — Custos do Avançado: categoria canônica "Manutenção pós-obra"
+
+Decisão do autor (ramo a da issue): a manutenção pós-obra deixa de ser um "Outro" sem descrição na
+Proforma do Avançado e vira categoria do grupo Diretos.
+
+- **Categoria.** `CATEGORIA_MANUTENCAO_POS_OBRA` em `frontend/fluxo-shared.ts`; entra no catálogo de
+  Diretos (R$ ou % VGV) em `frontend/tela-fluxo-custos.ts`.
+- **Distribuição.** Escolher a categoria grava `cronograma_evento: 'pos_obra'` e solta a âncora de fase;
+  o deslocamento de um mês continua sendo Customizado.
+- **Proforma.** Bucket próprio em `frontend/proforma-avancado.ts`, depois de Decoração e antes de
+  Despesas Financeiras. Sem backend, schema ou migração: a `versao` não bumpa.
+- **Teste.** `frontend/manutencao-pos-obra.test.ts` mede a Proforma e a fiação da tela (apagar a
+  atribuição do evento deixa o teste vermelho).
+- Guias `docs/avancado.md` e `docs/formulas.md` atualizados.
 ## 2026-10-02 — Cenários: o estresse de "custo de obras" move o KPI inteiro
 
 Decisão do autor (ramo a da issue 726): o fator da variável `custo_obras` passa a incidir também na

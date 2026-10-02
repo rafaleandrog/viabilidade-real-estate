@@ -5,7 +5,7 @@ import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtNum } from './viab-format.js';
 import { permutaFisicaPorTipologia } from './fluxo-invariantes.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
-  CATEGORIA_CONSTRUCAO, eConstrucao, regimeCronogramaLinha, LINHAS_OBRIGATORIAS, type LinhaObrigatoria,
+  CATEGORIA_CONSTRUCAO, CATEGORIA_MANUTENCAO_POS_OBRA, eConstrucao, regimeCronogramaLinha, LINHAS_OBRIGATORIAS, type LinhaObrigatoria,
   vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
@@ -76,6 +76,7 @@ const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
     { nome: 'Corretagem de vendas', subs: [] },
     { nome: 'Projetos', subs: [] },
     { nome: 'Licenças e Aprovações', subs: [] },
+    { nome: CATEGORIA_MANUTENCAO_POS_OBRA, subs: [] },
     { nome: 'Outro', subs: [] },
   ],
   indireto: [
@@ -140,6 +141,7 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
     'Corretagem de vendas':    ['pct_vgv'],
     'Projetos':                ['rs', 'rs_m2_priv'],
     'Licenças e Aprovações':   ['rs', 'rs_m2_priv'],
+    [CATEGORIA_MANUTENCAO_POS_OBRA]: ['rs', 'pct_vgv'],
     'Outro':                   ['rs', 'pct_vgv'],
   },
   indireto: {
@@ -1118,6 +1120,13 @@ export class ViabFluxoCustos extends LitElement {
   // Salva mudança de categoria e corrige a unidade se necessário.
   private _salvarCategoria(c: any, grupo: GrupoId, novaCategoria: string) {
     const dados: Record<string, any> = { categoria: novaCategoria, subcategoria: null };
+    // A manutenção pós-obra só existe depois das chaves: a categoria já nasce
+    // ancorada no evento Pós-obras. O deslocamento fino (ex.: um mês depois)
+    // continua sendo Customizado, escolhido pelo usuário.
+    if (novaCategoria === CATEGORIA_MANUTENCAO_POS_OBRA) {
+      dados.cronograma_evento = 'pos_obra';
+      dados.fase_ancora_id = null;
+    }
     const unidAtual = c.orcamento_unidade || 'rs';
     const perm = this._unidsPerm(grupo, novaCategoria);
     // #442: este é o SEGUNDO escritor de `orcamento_unidade`, e tinha o mesmo

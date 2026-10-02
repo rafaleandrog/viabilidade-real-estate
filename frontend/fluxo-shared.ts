@@ -806,6 +806,9 @@ export function ePermutaFisica(custo: any): boolean {
 /** Categoria da linha obrigatória do grupo Obra (#115/#120). */
 export const CATEGORIA_CONSTRUCAO = 'Construção';
 
+/** Categoria canônica do grupo `diretos`: manutenção depois das chaves (bucket próprio na Proforma do Avançado). */
+export const CATEGORIA_MANUTENCAO_POS_OBRA = 'Manutenção pós-obra';
+
 /**
  * Linha "Construção" (obrigatória, 1ª do grupo Obra): além da categoria travada
  * (#115), o Cronograma fica fixo em "Obra" e Início/Duração são derivados do
