@@ -39,7 +39,7 @@ import {
 } from '../frontend/funding-motor.js';
 import { proformaAvancado } from '../frontend/proforma-avancado.js';
 import {
-  mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado,
+  mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado, ePermutaFisica,
   type EventoCrono,
 } from '../frontend/fluxo-shared.js';
 import {
@@ -193,14 +193,19 @@ export async function conferir(id: number): Promise<Conferencia> {
   conta('VGV Σ tipologias do catálogo → vgvTotal do motor', vgvCatalogo, calc.vgvTotal);
   conta('VGV Σ alocações nas linhas → vgvTotal do motor', vgvLinhas, calc.vgvTotal);
 
-  // Unidades: catálogo × alocado + permutado
+  // Unidades: catálogo × alocado. A permuta física sai de DENTRO das unidades
+  // alocadas (é como o motor a lê), então não soma contra o catálogo — ela é
+  // conferida contra o alocado (permutado ≤ alocado).
   for (const t of d.tipologias) {
     const alocado = d.receitas.reduce((s: number, l: any) =>
       s + (l.tipologias ?? []).filter((a: any) => Number(a.tipologia_id) === Number(t.id))
         .reduce((a: number, x: any) => a + n(x.quantidade), 0), 0);
-    const permutado = d.custos.filter((c: any) => Number(c.permuta_tipologia_id) === Number(t.id))
+    const permutado = d.custos.filter((c: any) => ePermutaFisica(c) && Number(c.permuta_tipologia_id) === Number(t.id))
       .reduce((s: number, c: any) => s + n(c.permuta_quantidade), 0);
-    conta(`unidades "${t.nome}" (alocado ${alocado} + permutado ${permutado}) vs estoque`, n(t.quantidade), alocado + permutado);
+    conta(`unidades "${t.nome}" (alocado ${alocado}) vs estoque`, n(t.quantidade), alocado);
+    if (permutado > 0) {
+      conta(`permuta física "${t.nome}" (${permutado}) dentro do alocado (${alocado})`, 0, Math.max(0, permutado - alocado));
+    }
   }
 
   // Absorção: cada linha tem que fechar 100% no calendário efetivo do motor
