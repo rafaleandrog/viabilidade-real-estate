@@ -7,16 +7,17 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ## 2026-10-02 — Rodada 15 encerrada: conferência EVI Urbitá em sessões filhas
 
 Fechamento da rodada aberta em 2026-10-01 (`historico/rodada-15/planejamento.md`): as 14 issues
-da fila fechadas por 13 PRs mergeados entre 2026-10-01 e 2026-10-02, cada um revisado até zero
-bloqueantes; o índice #800 fecha neste PR.
+da fila fechadas por 13 PRs mergeados entre 2026-10-01 e 2026-10-02 (10 fecham as 14; o #817
+fecha a #726, incorporada; o #803 é o plano), cada um revisado até zero bloqueantes, na ordem de
+merge da tabela; o índice #800 fecha neste PR.
 
 | PR | Issues | Sessão |
 |---|---|---|
 | #803 | plano da rodada | orquestradora |
 | #804 | #790 | `[viab - 1]` |
 | #805 | #793 | `[viab - 5]` |
-| #807 | #789, #749 (porte do PR #751 do fork) | `[viab - 2]` |
 | #806 | #802 | `[viab - 6]` |
+| #807 | #789, #749 (porte do PR #751 do fork) | `[viab - 2]` |
 | #809 | #801 | `[viab - 3]` |
 | #817 | #726 | `[viab - 8]` |
 | #818 | #796 | `[viab - 9]` |
@@ -60,11 +61,14 @@ criou os estudos de Loteamento 17 (Preliminar, zero divergências) e 18 (Avança
 - Reconfigurar o estudo 15 pela tela depois de publicar o #798 (Residencial: lançamento 25%, obra
   40%, janela de 3 meses; Não Residencial: mês único).
 - Sincronização do `schema.json` pelo SDK no ambiente autenticado (CHECK das `opcoes` alargado).
-- Nove issues novas, todas P3, abertas pelas filhas durante revisão e QA e citadas no #800: #808
-  (CARTEIRA_RESSURGE no trimestral legado), #811 (duplicata pelo PATCH de categoria), #812 (500 em
-  `tipo` inválido no Preliminar), #813 (API não semeia obrigatórias), #814 (guia do Avançado sem
-  Loteamento), #815 (resíduo do ate_marco com 2+ concentrados), #823 (nota A9 vencida), #824
-  (resíduo de R$ 0,28 com permuta e juros) e a sobreposição #816 já fechada pelo #820.
+- Oito issues novas abertas, todas P3, abertas pelas filhas durante revisão e QA e citadas no #800:
+  #808 (CARTEIRA_RESSURGE no trimestral legado), #811 (duplicata pelo PATCH de categoria), #812
+  (500 em `tipo` inválido no Preliminar), #813 (API não semeia obrigatórias), #814 (guia do
+  Avançado sem Loteamento), #815 (resíduo do ate_marco com 2+ concentrados), #823 (nota A9
+  vencida) e #824 (resíduo de R$ 0,28 com permuta e juros). Uma nona, a #816 (defasagem negativa),
+  foi aberta e fechada dentro da rodada, pelo PR 820.
+- O PR #751 do fork (`maximilian-ia`) continua aberto e ficou obsoleto: o conserto foi portado pelo
+  PR 807 em PR próprio, por decisão do autor. Fechar o #751 com essa nota.
 
 ---
 
