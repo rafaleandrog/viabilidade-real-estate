@@ -142,9 +142,14 @@ As fórmulas do fluxo por safras — contratação bruta, desconto e líquido, o
 pagamento (imediato, prazo fixo, até marco, concentrado), a parcela, o primeiro vencimento, a
 carteira e o repasse — estão descritas, com os cenários de referência, nos documentos consultivos
 do repositório: `referencia/padrao-incorporacao.md` (seções 11 a 14 e o anexo G, os cenários
-dourados) e `referencia/inteligencia-evi-incorporacao.md` (o significado econômico). A recorrência da carteira é por safra: `saldo_s,s = principal_s` e
-`saldo_s,t = saldo_s,t−1 + juros_s,t − pagamento_s,t`; o saldo nunca fica negativo nem volta a
-crescer depois da última parcela.
+dourados) e `referencia/inteligencia-evi-incorporacao.md` (o significado econômico). A recorrência da carteira é por safra: com o 1º vencimento no mês seguinte à venda ou depois,
+`saldo_s,s = principal_s`, e `saldo_s,t = saldo_s,t−1 + juros_s,t − pagamento_s,t`; o saldo nunca fica negativo e zera no último
+vencimento, e a reconciliação acusa quando o saldo de um componente que amortiza volta a crescer. Quando a 1ª parcela vence no
+próprio mês da venda, ela já abate o saldo desse mês: `saldo_s,s = principal_s × (1 + taxa) −
+parcela_s,s` — a parcela é a de uma tabela com juros entre vencimentos, então leva um período de
+juros, e só a sua amortização sai do saldo (com taxa zero, `principal_s − parcela_s,s`). O repasse
+(concentrado) é a exceção à monotonicidade: ele capitaliza até o pagamento único, e o seu saldo
+cresce por desenho.
 
 - **Itemizada por linha de custo, em blocos canônicos.** Cada linha cadastrada em Custos aparece
   pelo nome que o usuário deu (fora do Terreno, o nome é a categoria escolhida), na ordem: Terreno
