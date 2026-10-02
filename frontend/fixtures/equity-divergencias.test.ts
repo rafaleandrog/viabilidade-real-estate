@@ -67,20 +67,15 @@ test('#469 E1 · a Reconciliação não acusa RETORNO_EQUITY_NEGATIVO (#445 sobr
   assert.equal(codigos(c.divergencias).filter((k) => k === 'RETORNO_EQUITY_NEGATIVO').length, 0);
 });
 
-// ⚠️ OBSERVAÇÃO REGISTRADA, NÃO CONSERTO (2026-08-24, #469).
-//
-// `RETORNO_EQUITY_EXCEDE_RECEITA` (#445) compara `Σ saídas <= receita + tol`.
-// Num mês de receita líquida NEGATIVA isso é falso mesmo pagando ZERO — a
-// operação não excede coisa nenhuma, ela simplesmente não paga. O E1 congela
-// esse estado porque ele é a interação, não prevista, entre o carry-forward da
-// #432 e a leitura mensal da #445; mudar a checagem é decisão do autor e teria
-// de virar issue própria.
-test('#469 E1 · o mês negativo dispara EXCEDE_RECEITA mesmo pagando zero — comportamento de hoje', () => {
+// Num mês de receita líquida NEGATIVA (corretagem > recebimento) a operação
+// que paga ZERO não excede coisa nenhuma: a checagem pula o mês sem retorno.
+// (Estado antes congelado aqui como observação; a decisão foi tomada e o E1
+// passou a exigir o silêncio.)
+test('#469 E1 · o mês negativo NÃO dispara EXCEDE_RECEITA quando o equity paga zero', () => {
   const c = cenarioEquity(CONFIG_E1, OPS_E1);
   const excede = c.divergencias.filter((d) => d.codigo === 'RETORNO_EQUITY_EXCEDE_RECEITA');
-  assert.equal(excede.length, 1);
-  assert.equal(excede[0].mes, MES_LANCAMENTO);
-  assert.equal(c.saidasEquityPorMes[MES_LANCAMENTO], 0, 'e o valor pago no mês acusado é zero');
+  assert.equal(c.saidasEquityPorMes[MES_LANCAMENTO], 0, 'o valor pago no mês de lançamento é zero');
+  assert.equal(excede.some((d) => d.mes === MES_LANCAMENTO), false);
 });
 
 // ── E2 · teto de 100% (#435 nominal, #445 mensal) ───────────────────────────
@@ -102,10 +97,10 @@ test('#469 E2 · a Reconciliação ACUSA o excesso mensal (#445 inverteu o "não
   const c = cenarioEquity(CONFIG_E2, OPS_E2);
 
   const excede = c.divergencias.filter((d) => d.codigo === 'RETORNO_EQUITY_EXCEDE_RECEITA');
-  // 11 meses: o do lançamento (receita negativa, ver a observação do E1), os
-  // nove meses de parcela em que os três já voltaram a pagar (índices 10 a 18)
-  // e o do repasse.
-  assert.equal(excede.length, 11);
+  // 10 meses: os nove meses de parcela em que os três já voltaram a pagar
+  // (índices 10 a 18) e o do repasse. O mês de lançamento (receita negativa,
+  // retorno zero) não conta — ver o E1.
+  assert.equal(excede.length, 10);
   assert.ok(excede.some((d) => d.mes === 19), 'o mês do repasse está entre os acusados');
   assert.equal(excede.every((d) => d.severidade === 'alerta'), true);
 });
