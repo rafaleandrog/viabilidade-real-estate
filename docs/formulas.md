@@ -213,7 +213,7 @@ Nos Custos do Avançado, cada unidade percentual aplica o % sobre uma base próp
 | % Receita | receita líquida do RET sobre o VGV vendável, sem juros |
 | % Obra | o grupo Obras inteiro (construção, outorga, decoração, gestão da obra, contingência e outros), menos as linhas em % Obra |
 | % Recebido | receita **recebida**: a soma do recebimento bruto do fluxo, com os juros de tabela — a mesma Receita Bruta da Proforma |
-| % Construção | custo de construção: as linhas de Construção, Decoração e Gestão da obra do grupo Obras (a gestão já resolvida sobre o grupo), sem Outorga, Contingência ou Outro |
+| % Construção | custo de construção: as linhas de Construção, Decoração e Gestão da obra, em qualquer grupo (a gestão já resolvida sobre o grupo Obras), sem Outorga, Contingência ou Outro |
 
 ```text
 Marketing em % Recebido  = Σ recebimento bruto (com juros) × %
@@ -222,7 +222,7 @@ Projetos em % Construção = (construção + decoração + gestão da obra) × %
 
 % Recebido é oferecido no marketing e publicidade, na manutenção pós-obra, no marketing global, na
 gestão e em Outro dos Diretos e Indiretos; % Construção, em Projetos. Sem juros de tabela, a receita
-recebida é o VGV vendido, líquido dos descontos comerciais.
+recebida é o VGV vendável contratado no horizonte, líquido dos descontos comerciais.
 
 ## Valor canônico dos campos multiunidade
 

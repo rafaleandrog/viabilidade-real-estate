@@ -326,7 +326,7 @@ export class ViabFluxoCustos extends LitElement {
   // pelos insumos: `_ctxConversao` e `_ctx` são chamados por linha no render.
   private _memoRecebida: { chave: unknown[]; valor: number | undefined } | null = null;
   private _receitaRecebida(): number | undefined {
-    const chave = [this.custos, this.linhasReceita, this.crono, this.dataInicio, this.estudo?.juros_tabela_aa_padrao];
+    const chave = [this.custos, this.linhasReceita, this.crono, this.curvas, this.dataInicio, this.estudo?.juros_tabela_aa_padrao];
     if (this._memoRecebida && this._memoRecebida.chave.every((v, i) => v === chave[i])) return this._memoRecebida.valor;
     const valor = this._calcObra()?.receitaBruta;
     this._memoRecebida = { chave, valor };

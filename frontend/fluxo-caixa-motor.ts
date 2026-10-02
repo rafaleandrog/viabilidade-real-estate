@@ -2576,12 +2576,18 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   }).map((linha) => quantizarLinhaMonetaria(linha, taxa));
   const calcReceitasBrutas = montarLinhasReceita((l, c, p) => recebimentoBrutoMensal(l, c, p, config.jurosTabelaAaEstudo));
   // Bases dos custos que dependem do recebimento ou de outros custos — antes de
-  // qualquer custo ser resolvido. `receitaRecebida` é a mesma Σ de
-  // `recebimentoBrutoMensal` que vira `receitaBruta`, com juros de tabela;
-  // `totalConstrucao` vem depois de `totalObra` porque a Gestão da obra costuma
-  // estar em `pct_obra`.
-  ctxCusto.receitaRecebida = linhasReceita.reduce((s, l) =>
-    s + recebimentoBrutoMensal(l, crono, prazo, config.jurosTabelaAaEstudo).reduce((a, v) => a + v, 0), 0);
+  // qualquer custo ser resolvido. `receitaRecebida` é a Σ de
+  // `recebimentoBrutoMensal`, com juros de tabela, agregada com o MESMO
+  // arredondamento de `receitaBrutaMensal`/`receitaBruta` (centavo por mês, e no
+  // total) — é o número que a tela de Custos lê de `receitaBruta`, e os dois
+  // têm de bater ao centavo. `totalConstrucao` vem depois de `totalObra` porque
+  // a Gestão da obra costuma estar em `pct_obra`.
+  const recebidoMensal = new Array<number>(prazo).fill(0);
+  for (const l of linhasReceita) {
+    const bruto = recebimentoBrutoMensal(l, crono, prazo, config.jurosTabelaAaEstudo);
+    for (let mes = 0; mes < prazo; mes++) recebidoMensal[mes] = round2(recebidoMensal[mes] + (bruto[mes] ?? 0));
+  }
+  ctxCusto.receitaRecebida = round2(recebidoMensal.reduce((s, v) => s + v, 0));
   ctxCusto.totalObra = linhasCusto
     .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
     .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
