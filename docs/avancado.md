@@ -90,6 +90,22 @@ financiável; é a única operação com o interruptor **Ativo**. As regras de c
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
 | **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
 
+A **carteira de clientes** é o saldo a receber das vendas já contratadas, somado safra a safra
+(cada mês de venda decai isolado, com a sua taxa e o seu principal): ela sobe com as parcelas da
+tabela e o saldo a repassar e zera no último vencimento de cada safra; o pico é a **carteira
+máxima**. Quando o plano paga a 1ª parcela no próprio mês da venda, essa parcela já abate a
+carteira daquele mês: os juros dela são reconhecidos nesse mês e só a amortização sai do saldo. O
+que entra em caixa é o mesmo; a carteira e a carteira máxima desses planos já descontam essa
+parcela.
+
+A **reconciliação** confere o fluxo contra regras que o cálculo deve respeitar: a venda bruta
+contratada recomposta linha a linha, mês a mês, com o mesmo arredondamento do fluxo; os
+componentes de pagamento somando 100% em cada safra; a carteira de cada componente zerando no
+último vencimento; e a carteira dos componentes que amortizam nunca voltando a crescer — o saldo a
+repassar fica fora desta última, porque capitaliza até o repasse. Cada aviso aparece uma vez por
+componente, na primeira safra em que acontece, e um aviso numa safra não esconde os das safras
+seguintes.
+
 ### Comparar com a planilha EVI
 
 Quem põe um estudo ao lado da planilha EVI Urbitá (aba **Incorp Individual**) encontra quatro
@@ -114,8 +130,8 @@ mantém as suas:
 - **Primeira parcela da tabela longa.** O app paga a primeira parcela no mês seguinte ao da venda; a
   planilha paga no mês da venda. O motor aceita a primeira parcela no mês da venda (`defasagemMeses`
   igual a `0` no componente de pagamento), que reproduz o valor e o mês do recebimento da planilha; a
-  tela de Receitas não tem controle para isso. Com `0`, a série de **carteira** de clientes ainda não
-  desconta a parcela paga no mês da venda, e o saldo da carteira fica acima do da planilha.
+  tela de Receitas não tem controle para isso. A carteira de clientes já abate essa parcela
+  no mês da venda (ver acima).
 
 ### Cenários
 
