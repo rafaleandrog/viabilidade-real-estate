@@ -25,6 +25,15 @@
 // já usada pelos dois goldens de `#428` em `fluxo-caixa-motor.test.ts`, para
 // que os três arquivos fiquem cruzáveis entre si.
 
+// ⚠️ Este oráculo descreve a versão ANTERIOR da planilha. A `20260925_EVI_Urbit_.xlsx`
+// (aba `Incorp Individual`) mudou duas convenções, e o app mantém as dele — decisão do autor de
+// 2026-10-01 na #794, registro em `referencia/padrao-incorporacao.md` §13.5:
+//   · repasse: a planilha capitaliza o saldo concentrado um mês a mais (`Saldo Para Repasse` já
+//     rende juros no mês da venda); este golden e o motor capitalizam `mesPagamento − safra`;
+//   · 1ª parcela da tabela longa: a planilha paga no mês da venda (30 parcelas); este golden usa
+//     `defasagemMeses: 1` (29 parcelas). O motor expressa a da planilha com `defasagemMeses: 0`.
+// Nenhum número deste arquivo foi alterado.
+
 /** Base contratada da safra do mês 0 (`cfINC!AH19`/coluna de contratação). */
 export const BASE_CONTRATADA = 7_603_022.19;
 
