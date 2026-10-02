@@ -79,6 +79,19 @@ física ou financeira) continua sendo uma linha nova.
 | **Receitas** | A **absorção de vendas** — quanto do estoque se vende em cada mês, em percentual acumulado, a partir de uma curva que pode ser substituída — e o **fluxo de pagamento** de cada safra de vendas: **Sinal**, **Nº parcelas**, o que é pago **Ao longo da obra**, o **Desconto** e o **Resíduo sem prazo** (o saldo nas chaves: caixa imediato, o padrão, ou rolando para o repasse). |
 | **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL; `0` é uma taxa válida e não desconta nada, de modo que o VPL iguala a soma do fluxo; estudo sem taxa gravada usa 12% a.a.) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota de imposto aparece aqui só para leitura. |
 
+A **Absorção de vendas** de cada Grupo distribui o percentual vendido em até quatro períodos que vêm
+do Cronograma: **Pré-lançamento** (quando o estudo tem essa fase), **Lançamento**, **Durante a
+obra** e **Pós-chaves** — este último é o que sobra para fechar 100% e é calculado sozinho. Cada
+período espalha o seu percentual por igual pelos meses que tem. O Pós-chaves começa no mês seguinte
+à entrega e dura o que o Grupo definir em **Janela Pós-chaves**, de 1 a 12 meses (12 é o padrão);
+ele não depende da duração da fase Pós-obras do Cronograma, que é de custo. Uma janela curta
+concentra as vendas das chaves em poucos meses. O atalho **À vista, mês único (1º mês das chaves)**
+vende o Grupo inteiro no primeiro mês depois da entrega: ele zera os três primeiros períodos e põe
+a janela em 1 mês. Com o plano de pagamento do Grupo já aplicado, toda venda feita depois da entrega
+é recebida à vista, qualquer que seja o plano. Num Grupo com **Plano não migrado** o atalho fica
+indisponível até o **Fluxo de Pagamento** ser aplicado, porque o plano antigo não recebe à vista a
+venda posterior à entrega.
+
 ### Funding
 
 As operações que financiam o projeto, cada uma independente das outras: **Dívida** (ou capital de

@@ -122,9 +122,9 @@ export const EVENTO_LABEL: Record<string, string> = {
   obra: 'Obra',
   // BUG7-20: rótulo do evento do Cronograma (fase de custos) — id interno
   // pos_obra intacto. Não confundir com "Pós-chaves"/APOS_CHAVES_MESES logo
-  // abaixo, a janela comercial fixa de 12 meses da Absorção (#348) — nomes
+  // abaixo, a janela comercial da Absorção, de 1 a 12 meses por Grupo (#348) — nomes
   // parecidos, conceitos diferentes (fase de custo livre × janela de vendas
-  // travada em 12 meses).
+  // do Grupo, de 1 a 12 meses).
   pos_obra: 'Pós-obras',
 };
 
@@ -361,6 +361,35 @@ export function receitaLiquidaLinha(vgv: number, ret: { ativo: boolean; pct: num
 // a fase de CUSTO do Cronograma — nomes parecidos, conceitos diferentes.
 export const APOS_CHAVES_MESES = 12;
 
+/** Menor duração aceita para a janela Pós-chaves de um Grupo. */
+export const POS_CHAVES_MESES_MIN = 1;
+
+/**
+ * Duração da janela Pós-chaves de UM Grupo, lida do JSON de absorção
+ * (`absorcao.pos_chaves_meses`). O Grupo escolhe de 1 a 12 meses
+ * (`APOS_CHAVES_MESES` passa a ser o TETO e o padrão, não mais a duração
+ * única); ausente ou fora da faixa → 12, que é a janela de todo estudo
+ * anterior a este campo — eles mantêm absorção e resultado idênticos.
+ *
+ * Continua sem relação com a duração do evento `pos_obra` do Cronograma (a
+ * fase de CUSTO): o que muda é só de onde vem a duração da janela comercial.
+ * Só o modo `distribuido` tem janela configurável: é o único que a tela
+ * escreve, e uma curva `personalizado` traz meses ABSOLUTOS que uma janela mais
+ * curta descartaria. Nos outros modos vale 12, como sempre.
+ *
+ * Fail-closed, com a MESMA regra do backend (`validarAbsorcao`): só um `number`
+ * inteiro de 1 a 12 vale. `Number()` cru aceitaria `true` (= 1) e `'6'` — dois
+ * validadores do mesmo campo com regras diferentes. Qualquer outra coisa → 12.
+ */
+export function mesesPosChaves(absorcao: any): number {
+  if (absorcao?.modo !== 'distribuido') return APOS_CHAVES_MESES;
+  const v = absorcao?.pos_chaves_meses;
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < POS_CHAVES_MESES_MIN || v > APOS_CHAVES_MESES) {
+    return APOS_CHAVES_MESES;
+  }
+  return v;
+}
+
 /**
  * As 4 faixas de tempo da absorção Distribuída (#108), em meses RELATIVOS do
  * projeto, derivadas do Cronograma:
@@ -374,14 +403,14 @@ export const APOS_CHAVES_MESES = 12;
  *    em ou depois do fim da Obra — ver `problemaJanelaDuranteObra`.
  *  - `pos_chaves`     (período 4, "Pós-chaves"): início no fim da Obra + 1
  *    (herdado do evento `pos_obra` do Cronograma — dele vem só o INÍCIO),
- *    duração FIXA de `APOS_CHAVES_MESES` — #226, ignora
- *    `pos_obra.duracao_meses`.
+ *    duração da janela do Grupo (`mesesPosChaves`: 1 a `APOS_CHAVES_MESES`,
+ *    padrão 12) — #226, ignora `pos_obra.duracao_meses`.
  *
  *    #430: a chave se chama `pos_chaves`, não `pos_obra`, porque é outro
  *    conceito. "Pós-obras" é a fase de CUSTO do Cronograma, com duração
  *    digitada pelo usuário e consumida pela ancoragem de custo; "Pós-chaves"
  *    é a janela COMERCIAL — em que ainda se vende e o cliente termina de
- *    pagar —, de 12 meses fixos. Compartilhar o nome fazia o usuário esticar
+ *    pagar —, de 1 a 12 meses por Grupo (padrão 12). Compartilhar o nome fazia o usuário esticar
  *    o campo de custo achando que ganhava janela de venda, e vender MENOS.
  * Retorna null se faltar Lançamento, Obra ou Pós-obra no cronograma.
  * Quando não há Pré-lançamento, `pre_lancamento` tem fim < inicio (faixa vazia,
@@ -389,6 +418,10 @@ export const APOS_CHAVES_MESES = 12;
  */
 export function faixasAbsorcao(
   crono: EventoCrono[],
+  // Duração da janela Pós-chaves do Grupo (`mesesPosChaves`). OBRIGATÓRIO de
+  // propósito: com default, um chamador que esquecesse de repassar a janela do
+  // Grupo cairia calado nos 12 meses — a omissão vira TS2554.
+  posChavesMeses: number,
 ): {
   pre_lancamento: { inicio: number; fim: number };
   lancamento: { inicio: number; fim: number };
@@ -411,7 +444,7 @@ export function faixasAbsorcao(
     obra: { inicio: n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)), fim: n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1 },
     // #226: início herdado do Cronograma (fim da Obra + 1, travado por
     // recalcularTravados); duração é a CONSTANTE, não `pos.duracao_meses`.
-    pos_chaves: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + APOS_CHAVES_MESES - 1 },
+    pos_chaves: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + posChavesMeses - 1 },
   };
 }
 
@@ -436,13 +469,14 @@ export function problemaJanelaDuranteObra(crono: EventoCrono[]): string | null {
 
 /**
  * Período total de absorção de uma linha/fase: do início do Pré-lançamento até
- * o fim do Pós-chaves (12 meses fixos — #226). Retorna null se o cronograma
+ * o fim do Pós-chaves (a janela do Grupo, 1 a 12 meses). Retorna null se o cronograma
  * não tiver os eventos necessários.
  */
 export function periodoAbsorcao(
   crono: EventoCrono[],
+  posChavesMeses: number,
 ): { inicio: number; fim: number } | null {
-  const f = faixasAbsorcao(crono);
+  const f = faixasAbsorcao(crono, posChavesMeses);
   if (!f) return null;
   return { inicio: f.pre_lancamento.inicio, fim: f.pos_chaves.fim };
 }
@@ -480,10 +514,18 @@ export function ramoLegadoDeRecebiveis(fluxoPagamento: any): boolean {
  */
 export function erroFormularioAbsorcao(f: {
   pre_lancamento_pct: number; lancamento_pct: number; obra_pct: number;
+  /** Duração da janela Pós-chaves digitada (1 a 12); ausente = não validada. */
+  pos_chaves_meses?: number;
 }): string | null {
   const soma = n(f.pre_lancamento_pct) + n(f.lancamento_pct) + n(f.obra_pct);
   if (soma > 100.01) {
     return `Pré-lançamento + Lançamento + Obra somam ${soma.toFixed(2)}%; o total não pode superar 100%.`;
+  }
+  if (f.pos_chaves_meses !== undefined) {
+    const m = Number(f.pos_chaves_meses);
+    if (!Number.isInteger(m) || m < POS_CHAVES_MESES_MIN || m > APOS_CHAVES_MESES) {
+      return `A janela Pós-chaves deve ter de ${POS_CHAVES_MESES_MIN} a ${APOS_CHAVES_MESES} meses inteiros.`;
+    }
   }
   return null;
 }
@@ -540,9 +582,11 @@ export function absorcaoMensal(
 ): AbsorcaoMensal | null {
   const modo = absorcao?.modo ?? 'linear';
   const blocos = Array.isArray(absorcao?.blocos) ? absorcao.blocos : [];
-  // #226: a duração do Pós-chaves não é mais lida do bloco de absorção nem do
-  // evento pos_obra — periodoAbsorcao/faixasAbsorcao usam a constante fixa.
-  const periodo = periodoAbsorcao(crono);
+  // #226: a duração do Pós-chaves não é lida do evento pos_obra nem do
+  // `duracao_meses` legado de um bloco — vem de `pos_chaves_meses` do próprio
+  // Grupo (1 a 12; ausente = 12, a janela de sempre).
+  const posChaves = mesesPosChaves(absorcao);
+  const periodo = periodoAbsorcao(crono, posChaves);
   if (!periodo) return null;
   const tamanho = periodo.fim - periodo.inicio + 1;
   const pcts = new Array<number>(tamanho).fill(0);
@@ -570,7 +614,7 @@ export function absorcaoMensal(
   }
 
   if (modo === 'distribuido') {
-    const faixas = faixasAbsorcao(crono);
+    const faixas = faixasAbsorcao(crono, posChaves);
     if (!faixas) return null;
     const espalhar = (faixa: { inicio: number; fim: number }, pct: number) => {
       pctTotal += pct;

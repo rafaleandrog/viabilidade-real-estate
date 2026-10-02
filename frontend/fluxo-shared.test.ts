@@ -4,6 +4,7 @@ import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
   faixasAbsorcao, pctPosChavesDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
+  mesesPosChaves,
   ramoLegadoDeRecebiveis,
   pctAbsorcaoEfetivo, fimJanelaAbsorcao,
   areaPrivativaTotalLinhas, areaVendavelTotalLinhas, resolverCustoTotal,
@@ -222,9 +223,9 @@ test('receitaLiquidaLinha: só RET deduz, quando ativo', () => {
   assert.equal(receitaLiquidaLinha(1_000_000, undefined), 1_000_000);
 });
 
-test('periodoAbsorcao vai do Pré-lançamento ao fim do Pós-chaves (12m fixos — #226)', () => {
-  assert.deepEqual(periodoAbsorcao(CRONO), { inicio: 6, fim: 52 });     // começa no pré-lançamento
-  assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }]), null);
+test('periodoAbsorcao vai do Pré-lançamento ao fim do Pós-chaves (janela padrão de 12m — #226)', () => {
+  assert.deepEqual(periodoAbsorcao(CRONO, APOS_CHAVES_MESES), { inicio: 6, fim: 52 });     // começa no pré-lançamento
+  assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }], APOS_CHAVES_MESES), null);
 });
 
 // #348: renomeado de "Após-chaves" para "Pós-chaves" na UI — o teste já
@@ -236,20 +237,20 @@ test('#226/#348: a janela Pós-chaves ignora pos_obra.duracao_meses — é const
     { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },
     { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 24 }, // manutenção de 24m — âncora de custo
   ];
-  const f = faixasAbsorcao(cronoPosLongo)!;
+  const f = faixasAbsorcao(cronoPosLongo, APOS_CHAVES_MESES)!;
   assert.equal(APOS_CHAVES_MESES, 12);
-  // A absorção usa 12 meses fixos, não os 24 do evento pos_obra.
+  // A absorção usa a janela padrão de 12 meses, não os 24 do evento pos_obra.
   assert.deepEqual(f.pos_chaves, { inicio: 31, fim: 31 + APOS_CHAVES_MESES - 1 });
   // Alterar pos_obra.duracao_meses não muda mais o período total de absorção.
   const cronoPosCurto: EventoCrono[] = [
     ...cronoPosLongo.slice(0, 2),
     { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 3 },
   ];
-  assert.deepEqual(periodoAbsorcao(cronoPosLongo), periodoAbsorcao(cronoPosCurto));
+  assert.deepEqual(periodoAbsorcao(cronoPosLongo, APOS_CHAVES_MESES), periodoAbsorcao(cronoPosCurto, APOS_CHAVES_MESES));
 });
 
 test('faixasAbsorcao: 4 períodos contíguos sem sobreposição (#225)', () => {
-  const f = faixasAbsorcao(CRONO)!;
+  const f = faixasAbsorcao(CRONO, APOS_CHAVES_MESES)!;
   assert.deepEqual(f.pre_lancamento, { inicio: 6, fim: 11 });  // pré (6, dur 6) → fim = 11
   assert.deepEqual(f.lancamento, { inicio: 12, fim: 12 });     // lançamento (12, dur 1)
   // #225: "Durante a obra" começa no mês seguinte ao fim do Lançamento (13),
@@ -278,7 +279,7 @@ test('faixasAbsorcao sem pré-lançamento: faixa pre_lancamento vazia (fim < ini
     { evento: 'obra', inicio_mes: 12, duracao_meses: 24 },
     { evento: 'pos_obra', inicio_mes: 36, duracao_meses: 12 },
   ];
-  const f = faixasAbsorcao(cronoSemPre)!;
+  const f = faixasAbsorcao(cronoSemPre, APOS_CHAVES_MESES)!;
   assert.ok(f.pre_lancamento.fim < f.pre_lancamento.inicio, 'faixa pré deve ser vazia');
   assert.deepEqual(f.lancamento, { inicio: 6, fim: 6 });
 });
@@ -488,7 +489,7 @@ test('absorcaoMensal personalizado (legado) usa os meses relativos informados', 
 // ── #429: conservação da absorção ───────────────────────────────────────
 
 test('#429 absorcaoMensal personalizado: ponto fora da janela NÃO é computado, mas é CONTABILIZADO', () => {
-  // periodoAbsorcao(CRONO) = { inicio: 6, fim: 52 } (travado acima), então o
+  // periodoAbsorcao(CRONO, APOS_CHAVES_MESES) = { inicio: 6, fim: 52 } (travado acima), então o
   // mês 53 é o primeiro ponto fora da janela derivada.
   const abs = {
     modo: 'personalizado',
@@ -731,7 +732,7 @@ test('#430: a janela comercial se chama pos_chaves, e o evento de custo segue po
     { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },
     { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 13 },
   ];
-  const f = faixasAbsorcao(crono)! as Record<string, { inicio: number; fim: number }>;
+  const f = faixasAbsorcao(crono, APOS_CHAVES_MESES)! as Record<string, { inicio: number; fim: number }>;
   // A chave comercial existe sob o nome novo...
   assert.deepEqual(f.pos_chaves, { inicio: 31, fim: 42 });
   // ...e o nome antigo nao sobrevive como apelido silencioso.
@@ -777,4 +778,92 @@ test('#465 eMarketing reconhece as duas categorias, cada uma só no grupo certo'
   assert.equal(eMarketing({ grupo: 'diretos', categoria: 'Outro' }), false);
   assert.equal(eMarketing(null), false);
   assert.equal(eMarketing(undefined), false);
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Janela Pós-chaves por Grupo (1 a 12 meses, padrão 12) e "mês único"
+// ─────────────────────────────────────────────────────────────────
+
+test('mesesPosChaves: ausente, nulo ou fora da faixa → 12; inteiro de 1 a 12 → ele mesmo', () => {
+  const d = (v: unknown) => ({ modo: 'distribuido', pos_chaves_meses: v });
+  assert.equal(mesesPosChaves(undefined), 12);
+  assert.equal(mesesPosChaves({ modo: 'distribuido' }), 12);
+  assert.equal(mesesPosChaves(d(null)), 12);
+  assert.equal(mesesPosChaves(d(0)), 12);
+  assert.equal(mesesPosChaves(d(13)), 12);
+  assert.equal(mesesPosChaves(d(2.5)), 12);
+  assert.equal(mesesPosChaves(d(1)), 1);
+  assert.equal(mesesPosChaves(d(3)), 3);
+  assert.equal(mesesPosChaves(d(12)), 12);
+});
+
+test('mesesPosChaves é fail-closed como o backend: só number inteiro, só no modo distribuido', () => {
+  // `Number()` cru aceitaria os dois — e a janela encolheria em silêncio.
+  assert.equal(mesesPosChaves({ modo: 'distribuido', pos_chaves_meses: true }), 12);
+  assert.equal(mesesPosChaves({ modo: 'distribuido', pos_chaves_meses: '6' }), 12);
+  // Curva personalizada (meses absolutos) e linear ignoram o campo: janela de 12.
+  assert.equal(mesesPosChaves({ modo: 'personalizado', pos_chaves_meses: 3 }), 12);
+  assert.equal(mesesPosChaves({ modo: 'linear', pos_chaves_meses: 3 }), 12);
+  assert.equal(mesesPosChaves({ pos_chaves_meses: 3 }), 12); // sem modo = linear
+  // E a curva personalizada não perde ponto por causa de um campo que não lhe pertence.
+  const r = absorcaoMensal({ modo: 'personalizado', pos_chaves_meses: 3, meses: [{ mes: 50, pct: 100 }] }, CRONO)!;
+  assert.equal(r.pctDescartado, 0);
+});
+
+test('faixasAbsorcao: a janela Pós-chaves tem a duração pedida, começando no 1º mês das chaves', () => {
+  const f3 = faixasAbsorcao(CRONO, 3)!;
+  assert.deepEqual(f3.pos_chaves, { inicio: 41, fim: 43 });
+  // Os outros três períodos não dependem da janela.
+  const f12 = faixasAbsorcao(CRONO, APOS_CHAVES_MESES)!;
+  assert.deepEqual(f3.obra, f12.obra);
+  assert.deepEqual(f3.lancamento, f12.lancamento);
+  assert.deepEqual(periodoAbsorcao(CRONO, 1), { inicio: 6, fim: 41 });
+});
+
+test('absorcaoMensal: sem pos_chaves_meses o resultado é idêntico ao de pos_chaves_meses 12 (regressão)', () => {
+  const blocos = [
+    { evento: 'pre_lancamento', pct: 10 }, { evento: 'lancamento', pct: 20 },
+    { evento: 'obra', pct: 35 }, { evento: 'pos_obra', pct: 35 },
+  ];
+  const semCampo = absorcaoMensal({ modo: 'distribuido', blocos }, CRONO)!;
+  const com12 = absorcaoMensal({ modo: 'distribuido', blocos, pos_chaves_meses: 12 }, CRONO)!;
+  assert.deepEqual(semCampo, com12);
+  assert.equal(semCampo.pcts.length, 52 - 6 + 1);
+});
+
+test('absorcaoMensal: janela de 3 meses concentra o Pós-chaves em 3 meses e fecha 100%', () => {
+  const blocos = [
+    { evento: 'pre_lancamento', pct: 0 }, { evento: 'lancamento', pct: 25 },
+    { evento: 'obra', pct: 40 }, { evento: 'pos_obra', pct: 35 },
+  ];
+  const r = absorcaoMensal({ modo: 'distribuido', blocos, pos_chaves_meses: 3 }, CRONO)!;
+  assert.equal(r.inicio, 6);
+  assert.equal(r.pcts.length, 43 - 6 + 1); // a janela termina no mês 43
+  for (const m of [41, 42, 43]) assert.ok(perto(r.pcts[m - r.inicio], 35 / 3), `mês ${m}`);
+  assert.ok(perto(r.pcts.reduce((s, p) => s + p, 0), 100));
+  assert.equal(r.pctDescartado, 0);
+  assert.ok(perto(pctAbsorcaoEfetivo(r), 100));
+});
+
+test('absorcaoMensal: "mês único" (0% nos três períodos, janela de 1 mês) vende 100% no 1º mês das chaves', () => {
+  const r = absorcaoMensal({
+    modo: 'distribuido', pos_chaves_meses: 1,
+    blocos: [
+      { evento: 'pre_lancamento', pct: 0 }, { evento: 'lancamento', pct: 0 },
+      { evento: 'obra', pct: 0 }, { evento: 'pos_obra', pct: 100 },
+    ],
+  }, CRONO)!;
+  assert.equal(fimJanelaAbsorcao(r), 41);
+  assert.equal(r.pcts[41 - r.inicio], 100);
+  assert.equal(r.pcts.filter((p) => p !== 0).length, 1);
+  assert.equal(r.pctDescartado, 0);
+});
+
+test('erroFormularioAbsorcao: janela Pós-chaves fora de 1..12 ou fracionária é recusada', () => {
+  const base = { pre_lancamento_pct: 0, lancamento_pct: 30, obra_pct: 40 };
+  assert.equal(erroFormularioAbsorcao({ ...base, pos_chaves_meses: 1 }), null);
+  assert.equal(erroFormularioAbsorcao({ ...base, pos_chaves_meses: 12 }), null);
+  assert.ok(erroFormularioAbsorcao({ ...base, pos_chaves_meses: 0 }));
+  assert.ok(erroFormularioAbsorcao({ ...base, pos_chaves_meses: 13 }));
+  assert.ok(erroFormularioAbsorcao({ ...base, pos_chaves_meses: 2.5 }));
 });
