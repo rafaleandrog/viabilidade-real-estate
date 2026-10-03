@@ -152,12 +152,13 @@ tipo de empreendimento e o identificador não muda quando o estudo é renomeado.
 ## Núcleo
 
 O app declara, no bloco `dependencias` do manifesto, uma dependência do módulo imobiliário da
-plataforma (`urbiverso/urbiverso::imobiliario`), com leitura de `imoveis` e `parcelamentos`: glebas
-e lotes vêm de `imoveis`, e `parcelamentos` serve só para excluir do seletor de terreno da
-Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um setor
-habitacional. O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
+plataforma (`urbiverso/urbiverso::imobiliario`), com leitura de `imoveis`, `parcelamentos` e
+`setores_habitacionais`: glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de
+terreno da Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um
+setor habitacional; e, junto com `setores_habitacionais`, restringe a aba Terrenos do Painel aos
+lotes do setor Urbitá (o lote herda o setor pelo parcelamento). O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
 `modulos/imobiliario/*` do app e o frontend as chama pelo cliente de módulo, com os caminhos
-relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não consulta o
+relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/setores-habitacionais`, `/imoveis/:id`). O app não consulta o
 banco do módulo: guarda o id e o tipo do imóvel como referência lógica, sem FK, e a área somada no
 próprio estudo (abaixo). A permissão é ligada pelo
 administrador da instância, na aba Núcleo do app; sem ela os endpoints respondem 403 e

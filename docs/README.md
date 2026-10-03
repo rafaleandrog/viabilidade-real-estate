@@ -36,8 +36,7 @@ monitoradas**. A aba **Estudos** lista os estudos aos quais você tem acesso, co
 status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV, Margem, ROI e
 Criador. Na linha de cada estudo ficam as ações que a sua função permite: os botões de transição
 de status, **Duplicar** e **Remover**; clicar na linha abre o estudo, e é no cabeçalho do estudo
-aberto que se **renomeia**. A aba **Terrenos** mostra os imóveis do Núcleo disponíveis para
-vincular. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
+aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e só os lotes do setor Urbitá. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
 (curvas de distribuição de custos no tempo, usadas pelo estudo Avançado) e **Regiões monitoradas**
 ([Análise de Mercado](analise-mercado)).
 
@@ -100,7 +99,7 @@ tem exportação própria. Ver [Exportação](exportacao).
 
 ## Para administradores
 
-Antes do primeiro estudo: conceda ao app a leitura de **imóveis** e **parcelamentos** do Núcleo em
+Antes do primeiro estudo: conceda ao app a leitura de **imóveis**, **parcelamentos** e **setores habitacionais** do Núcleo em
 *Admin → Apps → viabilidade → Núcleo* (sem isso, só o terreno manual funciona); crie os
 **benchmarks** de cada tipo de empreendimento; revise os **parâmetros** do app (alíquotas e
 percentuais padrão, prazo de arquivamento, limite da coleta de mercado) em *Admin → Apps →

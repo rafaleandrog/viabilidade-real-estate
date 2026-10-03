@@ -11,7 +11,8 @@
       "versao_min": "1.0.0",
       "entidades": {
         "imoveis": ["ler"],
-        "parcelamentos": ["ler"]
+        "parcelamentos": ["ler"],
+        "setores_habitacionais": ["ler"]
       }
     }
   },
