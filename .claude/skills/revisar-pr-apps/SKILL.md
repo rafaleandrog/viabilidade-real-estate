@@ -123,7 +123,9 @@ superfície usou**, sempre.
    >   publique `contratos=ok` quando as duas lentes de fato rodaram naquela revisão.
    >   ⚠️ E `contratos=ok` vale contra o SDK **fixado**, não contra o da instância: o catálogo de
    >   obsolescências que a lente lê é o do pin. Com o pin atrás da instância, obsolescência mais
-   >   nova que ele fica invisível à lente — diga no relatório a versão do pin e a da instância
+   >   nova que ele fica invisível à lente — diga no relatório a versão do pin e, **se o autor a
+   >   tiver informado**, a da instância; sem essa informação, escreva "versão da instância não
+   >   informada" — nunca a deduza nem a busque na instância, que é superfície proibida (§ 10)
    >   (`CLAUDE.md` § A revisão em si).
    >
    > ⚠️ **A versão que vale é a que o `package.json` FIXA**, não o `latest` do registry. Conferir
