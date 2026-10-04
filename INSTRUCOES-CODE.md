@@ -67,12 +67,15 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
 - **Sem `instanceof` cruzando shell↔app** — matching por propriedade (`erro?.name`/`codigo`), `import type`.
 - **Seed fora de migração** — `schema.json` é o genesis; semente idempotente no boot; migração só
   transforma dados de instâncias que já têm a app.
-- **`shell_min` = `0.53.20`** (formato `x.y.z`), SDK alvo `57.0.0`. Subiu de `0.53.8` em
-  2026-09-04: os 7 parâmetros do manifesto migraram de `inicial` para `padrao`, e `padrao` só é
-  reconhecido a partir de `0.53.20`. O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19,
-  issue #422) veio da migração `003`, que saiu do retorno declarativo `remover_colunas` — que
-  virou **gate** da plataforma em 2026-08-23 — para o fluxo canônico, que usa `dados.limparColuna`
-  (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). O `sdk_min` **não** foi declarado: ele exige
+- **`shell_min` = `0.56.23`** (formato `x.y.z`), SDK alvo `57.0.0`. Subiu de `0.53.20` em
+  2026-10-04: a dependência do módulo imobiliário passou a ser declarada pela identidade nova,
+  `urbiverso/modulos-urbiverso::imobiliario`, que só o catálogo do shell `0.56.23` conhece. Antes,
+  subiu de `0.53.8` para `0.53.20` em 2026-09-04: os 7 parâmetros do manifesto migraram de
+  `inicial` para `padrao`, e `padrao` só é reconhecido a partir de `0.53.20`. O degrau anterior
+  (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio da migração `003`, que saiu do retorno
+  declarativo `remover_colunas` — que virou **gate** da plataforma em 2026-08-23 — para o fluxo
+  canônico, que usa `dados.limparColuna` (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). O
+  `sdk_min` **não** foi declarado: ele exige
   `shell_min ≥ 0.53.10` pareado e um SDK em versionamento inteiro ("SDK N"), e o alvo aqui ainda é
   o `0.50.3`.
   > ⚠️ **Superado em 2026-10-01.** O manifesto declara **`sdk_min: 87`**, exigido pelo bloco
@@ -125,9 +128,11 @@ component Lit) e `recrutamento/` (IA + exportação).
 - Manifesto: `appId=viabilidade`, roles (leitor/editor/aprovador), nav, `ia`, eventos (§6.9),
   `dependencias_nucleo:["imoveis","parcelamentos"]` + `permissoes_nucleo:{imoveis:["ler"],parcelamentos:["ler"]}`, params configuráveis (§6.5).
   > ⚠️ **Superado em 2026-10-01** — hoje é o bloco `dependencias` com
-  > `urbiverso/urbiverso::imobiliario` (`imoveis` e `parcelamentos`, `ler`). Não reintroduza os
-  > campos antigos: o manifesto com eles reprova no empacotamento e na instalação a partir de
-  > 2026-10-06.
+  > `urbiverso/modulos-urbiverso::imobiliario` (`imoveis`, `parcelamentos` e
+  > `setores_habitacionais`, `ler`). Não reintroduza os campos antigos: a instalação recusa o
+  > manifesto com eles a partir de 2026-10-06 (o empacotador do SDK fixado não conhece essa
+  > obsolescência e não a acusa). A chave `urbiverso/urbiverso::imobiliario`, usada de 2026-10-01 a
+  > 2026-10-04, é a identidade anterior do módulo: entrou em obsolescência com gate em 2026-10-09.
 - Done: schema valida, manifesto valida, `urbi-empacotar` aceita.
 
 ### Etapa 2 — Backend núcleo

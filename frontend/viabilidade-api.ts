@@ -335,7 +335,7 @@ export function removerCenario(estudoId: number, cid: number): Promise<any> {
 // ── Módulo imobiliário (glebas/lotes/imóveis/parcelamentos) ──
 // Consumo via urbiVerso.modulo('imobiliario', …) → /api/viabilidade/modulos/
 // imobiliario/... — o shell monta essas rotas para a dependência
-// `urbiverso/urbiverso::imobiliario` declarada no bloco `dependencias` do
+// `urbiverso/modulos-urbiverso::imobiliario` declarada no bloco `dependencias` do
 // manifesto. No imobiliário os caminhos são os mesmos do antigo contrato do
 // núcleo (`/glebas`, `/lotes`, `/imoveis/:id`); só o prefixo mudou.
 // Loteamento usa glebas; Incorporação usa lotes. Só leitura (flag "ler").
