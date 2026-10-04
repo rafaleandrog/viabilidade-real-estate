@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v15-8c46447f -->
+<!-- corpus=v15-6e94560a -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -67,6 +67,24 @@ diff "parece" certo:
   autoridade é o bundle do SDK instalado (`node_modules/@urbiverso/sdk/dist/index.d.ts`), na versão
   que o `package.json` fixa — nunca o monorepo, nunca a memória.
 - **`var(--token)` que não existe.** O fallback vira cor literal disfarçada de token.
+- **Fallback em token de tema `--cor-*`** (`var(--cor-texto, #fff)`) é achado: o `guard-tokens-css`
+  o reprova. Hook próprio (`--urbi-*`, `--x` declarado pelo app) pode manter fallback **desde que o
+  valor do fallback não seja literal de cor**: `var(--urbi-x, var(--cor-borda))` não é achado, mas
+  `var(--urbi-x, #7c5cff)` é — o `guard-tokens-css` aceita, e o guard do bundle conta o literal.
+- **Literal de cor solto, fora de `var()`** — `color: #abc`, `fill="#13a98d"`, `rgba(...)` —, em
+  código que **chega ao bundle** (o que `frontend/index.ts` importa), **inclusive o CSS de impressão
+  de `frontend/exportar.ts`**. O `guard-tokens-css.mjs` confere os `var()` e não procura literal
+  solto; o auditor do `urbi-empacotar` conta esses literais no bundle, e o `CLAUDE.md` registra que
+  a instância os mostra como aviso na tela de Upgrades. Quem barra aqui é
+  `guard-literais-cor-bundle.mjs`, sobre o bundle. Os documentos de impressão pintam com token e
+  levam o tema claro da página (`cssTemaClaro`); literal ali é achado. **Arquivo de teste não chega
+  ao bundle** e cita cor de propósito (fixture, asserção sobre a própria regra): não é achado.
+  ⚠️ **Guard verde não prova ausência de literal.** O contador, herdado da plataforma, só conta
+  duas formas: hex que não seja só de dígitos e função de cor (`rgb()`, `hsl()`, `oklch()`…).
+  Qualquer outra forma de cor fixa passa verde — cor nomeada (`red`, `white`), hex só de dígitos de
+  três a cinco (`#111`, que ele confunde com número de issue), inclusive dentro de fallback de
+  hook. Continua sendo cor fora de token, e quem a pega é a lente: não enumere formas, pergunte se
+  o valor vem de `var(--cor-*)`.
 - **Comentário `//` em `schema.json` ou `manifesto.json`.** JSON não tem comentário; o pacote é
   reprovado na instalação, antes de olhar qualquer tabela.
 - **Glob de teste que não alcança subdiretório.** `frontend/*.test.ts` sozinho não pega
@@ -145,9 +163,5 @@ de string não mede comportamento de comando.
 
 ## 11. O que NÃO é achado aqui
 
-- Cor literal no CSS de impressão/PDF de `frontend/exportar.ts`: roda em janela própria, onde
-  `var(--cor-*)` não resolve. É exceção declarada.
-- Aviso de "N literais de cor fora de token" do empacotador: a heurística conta o **fallback** de
-  `var(--token, #hex)`, que é o uso correto.
 - Estilo, preferência, nomenclatura, e qualquer código que o diff **não toca**.
 - O que já está em `retirados.md`. Leia-o antes de escrever o achado.
