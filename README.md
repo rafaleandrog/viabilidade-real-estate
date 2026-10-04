@@ -186,7 +186,9 @@ esbuild frontend/index.ts --bundle --external:@urbiverso/ui --format=esm --outfi
 > contra um catálogo velho — e isso não é teoria: medido por controle no pin antigo, com a chave
 > obsoleta `inicial` reposta de propósito no `manifesto.json`, o `urbi-empacotar` **empacotava sem
 > uma linha de aviso**. Era por isso que nada alertou antes de a app cair. Com o pin novo o bundle
-> traz `docs/` e `obsolescencias.json`, e o empacotamento passa a acusar de verdade.
+> traz `docs/` e `obsolescencias.json`, e o empacotamento passa a acusar de verdade — contra o
+> catálogo do SDK fixado. Obsolescência publicada depois do pin não existe para ele: aparece
+> primeiro na instância, até o pin subir.
 >
 > Continua valendo o limite estrutural: fora do monorepo, `shell_min` e `sdk_min` só têm o
 > **formato** validado — a versão real da instância é desconhecida no empacotamento.

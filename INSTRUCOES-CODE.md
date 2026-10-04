@@ -128,9 +128,10 @@ component Lit) e `recrutamento/` (IA + exportação).
 - Manifesto: `appId=viabilidade`, roles (leitor/editor/aprovador), nav, `ia`, eventos (§6.9),
   `dependencias_nucleo:["imoveis","parcelamentos"]` + `permissoes_nucleo:{imoveis:["ler"],parcelamentos:["ler"]}`, params configuráveis (§6.5).
   > ⚠️ **Superado em 2026-10-01** — hoje é o bloco `dependencias` com
-  > `urbiverso/modulos-urbiverso::imobiliario` (`imoveis` e `parcelamentos`, `ler`). Não
-  > reintroduza os campos antigos: o manifesto com eles reprova no empacotamento e na instalação a
-  > partir de 2026-10-06. A chave `urbiverso/urbiverso::imobiliario`, usada de 2026-10-01 a
+  > `urbiverso/modulos-urbiverso::imobiliario` (`imoveis`, `parcelamentos` e
+  > `setores_habitacionais`, `ler`). Não reintroduza os campos antigos: a instalação recusa o
+  > manifesto com eles a partir de 2026-10-06 (o empacotador do SDK fixado não conhece essa
+  > obsolescência e não a acusa). A chave `urbiverso/urbiverso::imobiliario`, usada de 2026-10-01 a
   > 2026-10-04, é a identidade anterior do módulo: entrou em obsolescência com gate em 2026-10-09.
 - Done: schema valida, manifesto valida, `urbi-empacotar` aceita.
 

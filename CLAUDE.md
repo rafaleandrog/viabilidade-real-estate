@@ -1095,8 +1095,8 @@ Git Bash — ver PROGRESSO).
   (obsolescência `identidade-imobiliario-antiga`, que **gateia** a partir de 2026-10-09), e só o
   catálogo do shell **0.56.23** conhece essa identidade. Num shell anterior a chave nova não
   resolve, e a instalação ou a atualização seria recusada (`422`) na conferência de dependências,
-  com a causa atribuída à dependência; o piso faz a recusa sair pelo `shell_min`, nomeando a causa
-  verdadeira — a versão do shell. O piso é o `shell_min`, e não o `sdk_min`, porque a troca é de
+  com a causa atribuída à dependência; com o piso, a recusa nomeia a causa verdadeira — a versão
+  do shell. O piso é o `shell_min`, e não o `sdk_min`, porque a troca é de
   valor no manifesto e não muda a superfície do SDK — o `sdk_min` segue `87`, o que o bloco
   `dependencias` exige.
   O degrau anterior (`0.53.8` → `0.53.20`, 2026-09-04) veio dos 7 parâmetros do manifesto, que

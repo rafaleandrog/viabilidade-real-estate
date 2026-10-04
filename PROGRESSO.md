@@ -18,8 +18,8 @@ segue carregando até a remoção do compat, autorizada após 2026-11-08.
 - `manifesto.json`: a chave de `dependencias` passa a `urbiverso/modulos-urbiverso::imobiliario`,
   com o mesmo `versao_min` e as mesmas `entidades`. O slug segue `imobiliario`, então
   `urbiVerso.modulo('imobiliario', …)` e o resto do código não mudam. As permissões ligadas na aba
-  Núcleo seguem valendo: cada toggle é um só por app, entidade e flag, e a troca de chave não muda
-  nenhum dos dois.
+  Núcleo seguem valendo: a troca é só da chave, com as mesmas entidades e flags, e a plataforma
+  registra que, com a identidade nova, os toggles ficam iguais.
 - `shell_min` `0.53.20` → **`0.56.23`**: a chave nova só resolve contra o catálogo do shell
   `0.56.23`. Num shell anterior a instalação seria recusada (`422`) por dependência não resolvida;
   o piso faz a recusa nomear a causa verdadeira, a versão do shell. É `shell_min`, e não `sdk_min`,
@@ -31,6 +31,9 @@ segue carregando até a remoção do compat, autorizada após 2026-11-08.
   `scripts/guard-tabelas-obsoletas.mjs`, `referencia/funding-capital-stack.md` e o da migração
   `037`, só no comentário) passam a dizer só que ele está acima dos pisos que citam, para não
   envelhecerem no próximo degrau.
+- Sincronizado com a `main` depois do PR 828 (aba Terrenos só com lotes do setor Urbitá), que
+  acrescentou `setores_habitacionais` às entidades do mesmo bloco: as três entidades (`imoveis`,
+  `parcelamentos` e `setores_habitacionais`, todas `ler`) ficam sob a chave nova.
 - `frontend/api-caminho-relativo.test.ts` passa a ler o manifesto: a chave de `dependencias` tem de
   ser a identidade atual, e o slug dela, o mesmo que o frontend passa a `urbiVerso.modulo()`. Sem
   isso nada no CI ficaria vermelho se a chave antiga voltasse, porque o empacotador do SDK fixado não
@@ -49,8 +52,8 @@ do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitari
   que a instância recusa instalar a partir de 2026-10-09;
 - conferir que a produção roda shell ≥ `0.56.23` antes de homologar — abaixo disso a instalação é
   recusada pelo `shell_min`, e a versão atual segue no ar;
-- depois da instalação, conferir na aba Núcleo que a leitura de imóveis e parcelamentos segue
-  liberada.
+- depois da instalação, conferir na aba Núcleo que a leitura de imóveis, parcelamentos e setores
+  habitacionais segue liberada.
 
 Recomendação, fora deste PR: subir o pin do `@urbiverso/sdk` (`57.0.0` → `93.0.0`), para o
 empacotador do CI auditar contra o catálogo de obsolescências atual — hoje é a instância que avisa
