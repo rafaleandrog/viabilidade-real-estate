@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v15-73839a0a -->
+<!-- corpus=v15-6e94560a -->
 
 # Achados retirados — não levante de novo sem evidência nova
 

@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v15-73839a0a -->
+<!-- corpus=v15-6e94560a -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -79,9 +79,12 @@ diff "parece" certo:
   `guard-literais-cor-bundle.mjs`, sobre o bundle. Os documentos de impressão pintam com token e
   levam o tema claro da página (`cssTemaClaro`); literal ali é achado. **Arquivo de teste não chega
   ao bundle** e cita cor de propósito (fixture, asserção sobre a própria regra): não é achado.
-  ⚠️ **Ponto cego do guard, herdado da plataforma:** hex só de dígitos, de três a cinco (`#111`,
-  `#1234`), não é contado — o contador o confunde com número de issue. Ele continua sendo cor fora
-  de token, e com o guard verde: a lente é quem o pega.
+  ⚠️ **Guard verde não prova ausência de literal.** O contador, herdado da plataforma, só conta
+  duas formas: hex que não seja só de dígitos e função de cor (`rgb()`, `hsl()`, `oklch()`…).
+  Qualquer outra forma de cor fixa passa verde — cor nomeada (`red`, `white`), hex só de dígitos de
+  três a cinco (`#111`, que ele confunde com número de issue), inclusive dentro de fallback de
+  hook. Continua sendo cor fora de token, e quem a pega é a lente: não enumere formas, pergunte se
+  o valor vem de `var(--cor-*)`.
 - **Comentário `//` em `schema.json` ou `manifesto.json`.** JSON não tem comentário; o pacote é
   reprovado na instalação, antes de olhar qualquer tabela.
 - **Glob de teste que não alcança subdiretório.** `frontend/*.test.ts` sozinho não pega
