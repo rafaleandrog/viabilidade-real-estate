@@ -29,7 +29,7 @@ export function montarCaso(modo: ModoSetor) {
       if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
       const pag = (dados: any[]) => ({ dados, total: dados.length, pagina: 1, por_pagina: 200, paginas: 1 });
       // Servidor que clampeia a página em 1 item (o pedido é 200) — o lote do setor Urbitá fica na
-      // 2ª página. Só a paginação de verdade (`paginas` + `pagina`) enxerga os dois; trocar
+      // 3ª página. Só a paginação de verdade (`paginas` + `pagina`) enxerga os dois; trocar
       // `coletarPaginas` por uma chamada única esconde o lote do Urbitá.
       const emPaginas = (todos: any[]) => {
         const pagina = Number(new URLSearchParams(rota.split('?')[1] ?? '').get('pagina')) || 1;
