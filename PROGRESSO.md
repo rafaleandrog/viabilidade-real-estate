@@ -71,7 +71,8 @@ segue carregando até a remoção do compat, autorizada após 2026-11-08.
 Medido nesta sessão, com controle primeiro: o `urbi-empacotar` do SDK **93.0.0** publicado (o nível
 da instância), sobre uma cópia da árvore com o manifesto da `main`, reproduziu os dois avisos da
 instância — `identidade-imobiliario-antiga` e os 15 literais de cor. Sobre a branch, a obsolescência
-some e o pacote é gerado; os 15 literais de cor, que este PR não toca, continuam. O `urbi-empacotar`
+some e o pacote é gerado; os 15 literais de cor, que este PR não tocou, continuavam (zerados pelo PR
+seguinte, na seção acima). O `urbi-empacotar`
 do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitaria a chave antiga.
 `validar-frontend.sh` e `validar-backend.sh` verdes.
 
@@ -89,6 +90,9 @@ do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitari
 Recomendação, fora deste PR: subir o pin do `@urbiverso/sdk` (`57.0.0` → `93.0.0`), para o
 empacotador do CI auditar contra o catálogo de obsolescências atual — hoje é a instância que avisa
 primeiro.
+
+---
+
 ## 2026-10-03 — Aba Terrenos do Painel: só lotes do setor Urbitá
 
 Pedido direto do autor, sem issue: na aba **Terrenos** do Painel de estudos, lotes só aparecem se o
