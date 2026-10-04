@@ -19,7 +19,8 @@ segue carregando até a remoção do compat, autorizada após 2026-11-08.
   com o mesmo `versao_min` e as mesmas `entidades`. O slug segue `imobiliario`, então
   `urbiVerso.modulo('imobiliario', …)` e o resto do código não mudam. As permissões ligadas na aba
   Núcleo seguem valendo: a troca é só da chave, com as mesmas entidades e flags, e a plataforma
-  registra que, com a identidade nova, os toggles ficam iguais.
+  registra que, com a identidade nova, os toggles ficam iguais (SDK 93: o `migrar_para` da
+  obsolescência e a nota do SDK 93 em `compatibilidade.md`).
 - `shell_min` `0.53.20` → **`0.56.23`**: a chave nova só resolve contra o catálogo do shell
   `0.56.23`. Num shell anterior a instalação seria recusada (`422`) por dependência não resolvida;
   o piso faz a recusa nomear a causa verdadeira, a versão do shell. É `shell_min`, e não `sdk_min`,
@@ -52,8 +53,10 @@ do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitari
   que a instância recusa instalar a partir de 2026-10-09;
 - conferir que a produção roda shell ≥ `0.56.23` antes de homologar — abaixo disso a instalação é
   recusada pelo `shell_min`, e a versão atual segue no ar;
-- depois da instalação, conferir na aba Núcleo que a leitura de imóveis, parcelamentos e setores
-  habitacionais segue liberada.
+- depois da instalação, em Admin → Apps → viabilidade → Núcleo: **ligar** a leitura de setores
+  habitacionais, que é flag nova (veio com a aba Terrenos e nenhuma release publicada a pedia) e
+  por isso entra desligada no upgrade — a aba Terrenos esconde os lotes até lá —, e conferir que a
+  de imóveis e a de parcelamentos seguem ligadas.
 
 Recomendação, fora deste PR: subir o pin do `@urbiverso/sdk` (`57.0.0` → `93.0.0`), para o
 empacotador do CI auditar contra o catálogo de obsolescências atual — hoje é a instância que avisa
