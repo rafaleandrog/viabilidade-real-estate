@@ -4,6 +4,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-04 — PDFs nas cores do tema claro: zero literais de cor no bundle
+
+Pedido direto do autor, sem issue: a tela de Upgrades da instância avisava *"15 literais de cor
+fora de token no bundle — frontend/index.js"* a cada release. Os 15 eram todos do CSS e dos SVG dos
+dois documentos de impressão de `frontend/exportar.ts` (PDF da Proforma e PDF do Fluxo de Caixa),
+que o `CLAUDE.md` tratava como exceção permanente. O autor autorizou reverter a exceção.
+
+- **Como:** a janela de impressão recebe as regras `:root[data-theme="light"]` das folhas da página
+  (`cssTemaClaro`, síncrona, sem rede) e fixa `<html data-theme="light">`. O CSS de impressão passa
+  a usar só `var(--cor-*)`: token só em `color`, e `currentColor` para borda, `fill` e `stroke`; os
+  SVG ganham classes (`pos`, `neg`, `eixo`, `rotulo`, `linha`, `payback`) no lugar de cor por
+  atributo. O documento do fluxo foi extraído para `htmlFluxo`, puro, como já era `htmlProforma`;
+  `exportarPDF` e `exportarFluxoPDF` viraram invólucros que passam o tema da página.
+- **Sem a regra do tema** (folha de outra origem, seletor que mudou), o documento cai no texto preto
+  do navegador, com bordas e linhas visíveis, e o console avisa. Medido no Chromium: origem em
+  dark, cyberpunk e sem folha nenhuma.
+- **Rede:** `scripts/guard-literais-cor-bundle.mjs` faz a conta da plataforma sobre o bundle
+  buildado (etapa 7/8 do `validar-frontend.sh`), régua zero; o contador
+  (`scripts/lib/literais-cor.mjs`) é cópia do auditor do `urbi-empacotar`, com bateria própria.
+  Controle: com o `exportar.ts` da `main`, o guard acusa exatamente os 15 literais que a instância
+  listou.
+- **Fica para o autor:** publicar a release e conferir na Pinguim que a etapa "tokens de tema" do
+  upgrade saiu do aviso. O corpo de conhecimento das lentes (`.claude/revisao/aprendizados.md`,
+  `.claude/skills/revisar-pr-apps/SKILL.md`) ainda descreve a exceção antiga e é corrigido num PR
+  só de processo (regra R1).
+
+---
+
 ## 2026-10-03 — Aba Terrenos do Painel: só lotes do setor Urbitá
 
 Pedido direto do autor, sem issue: na aba **Terrenos** do Painel de estudos, lotes só aparecem se o

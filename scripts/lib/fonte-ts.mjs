@@ -535,9 +535,11 @@ export function superficies(txt, nome = 'arquivo.ts') {
   // a superficie CSS de verdade: aqui a superficie CSS e que nascia larga demais.
   //
   // O preco: CSS dentro de template SEM TAG nao e analisado. O unico lugar assim
-  // e o documento de impressao de `frontend/exportar.ts` — que roda em janela
-  // propria, fora do escopo das variaveis do shell (o `CLAUDE.md` ja o trata como
-  // excecao), nao usa nenhum `urbi-*` e nao declara custom property nenhuma.
+  // e o documento de impressao de `frontend/exportar.ts`, que nao usa nenhum
+  // `urbi-*` e nao declara custom property nenhuma. Ele USA `var(--cor-*)` — e
+  // quem confere que esses tokens existem no espelho e o teste
+  // `frontend/exportar-impressao.test.ts`, nao este lexer; o literal de cor
+  // que escapasse dali e pego no bundle por `guard-literais-cor-bundle.mjs`.
   const naoCss = analise.templates.filter((t) => ehMarcacao(t.tag));
   const brutoMarcacao = recortar(txt, naoCss.flatMap((t) => t.textos), true, branco);
   const deHtml = [];

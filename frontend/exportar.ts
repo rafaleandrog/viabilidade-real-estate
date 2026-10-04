@@ -240,13 +240,83 @@ export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
   baixar(nome, csvProforma(estudo, p, lot), 'text/csv;charset=utf-8');
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Tema dos documentos de impressão
+// ─────────────────────────────────────────────────────────────────
+
+/** O mínimo de `CSSRule` que `cssTemaClaro` lê — estrutural, para o teste montar folhas falsas. */
+export interface RegraCssLida {
+  readonly cssText: string;
+  readonly selectorText?: string;
+  readonly cssRules?: ArrayLike<RegraCssLida>;
+}
+
+/** O mínimo de `Document` que `cssTemaClaro` lê. */
+export interface DocumentoComFolhas {
+  readonly styleSheets: ArrayLike<{ readonly cssRules: ArrayLike<RegraCssLida> }>;
+  readonly adoptedStyleSheets?: ArrayLike<{ readonly cssRules: ArrayLike<RegraCssLida> }>;
+}
+
+/** O seletor do tema claro, contrato do design system (`ui.md` § Temas do SDK). */
+const SELETOR_TEMA_CLARO = ':root[data-theme="light"]';
+
+function ehRegraTemaClaro(seletor: string): boolean {
+  return seletor.split(',').some((parte) => parte.replace(/\s+/g, '').replace(/'/g, '"') === SELETOR_TEMA_CLARO);
+}
+
+function coletarTemaClaro(regras: ArrayLike<RegraCssLida>, saida: string[]): void {
+  for (let i = 0; i < regras.length; i++) {
+    const regra = regras[i];
+    if (regra.selectorText !== undefined) {
+      if (ehRegraTemaClaro(regra.selectorText)) saida.push(regra.cssText);
+    } else if (regra.cssRules && regra.cssText.trimStart().startsWith('@layer')) {
+      // Só `@layer` é atravessado: copiar uma regra de dentro de `@media` ou
+      // `@supports` sem o bloco em volta mudaria quando ela vale.
+      coletarTemaClaro(regra.cssRules, saida);
+    }
+  }
+}
+
+/**
+ * As regras `:root[data-theme="light"]` das folhas de estilo da página, prontas
+ * para embutir num `<style>` da janela de impressão.
+ *
+ * A janela de impressão é um documento à parte: as variáveis `--cor-*` do shell
+ * não chegam lá sozinhas. Os documentos (`htmlProforma`, `htmlFluxo`) pintam
+ * tudo com token e fixam `data-theme="light"`; esta função leva junto os
+ * valores que o tema claro da instância dá a esses tokens — o papel é claro
+ * qualquer que seja o tema que o usuário escolheu na tela.
+ *
+ * Folha que não deixa ler as regras (outra origem) é pulada. Sem regra
+ * encontrada, devolve `''`: os tokens ficam indefinidos e o documento cai no
+ * texto preto do navegador, com bordas e linhas na cor do texto
+ * (`currentColor`) — legível, só sem as cores.
+ */
+export function cssTemaClaro(doc: DocumentoComFolhas): string {
+  const saida: string[] = [];
+  const folhas = [...Array.from(doc.styleSheets), ...Array.from(doc.adoptedStyleSheets ?? [])];
+  for (const folha of folhas) {
+    try {
+      coletarTemaClaro(folha.cssRules, saida);
+    } catch {
+      // folha de outra origem: `cssRules` lança SecurityError
+    }
+  }
+  if (saida.length === 0) {
+    console.warn('[viabilidade] tema claro não encontrado nas folhas da página; o PDF sai sem cores.');
+    return '';
+  }
+  // `<` não tem uso legítimo nessas regras; escapado, nenhum valor fecha o `<style>`.
+  return saida.join('\n').replace(/</g, '\\3c ');
+}
+
 /**
  * O documento HTML da Proforma que vira PDF — separado de `exportarPDF` pelo
  * mesmo motivo que `csvProforma`: `window.open`/`print` não existem fora do
  * navegador, e sem esta separação nenhum teste conseguia afirmar o que sai no
  * arquivo.
  */
-export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
+export function htmlProforma(estudo: any, p: Proforma, lot: boolean, temaCss = ''): string {
   const linhas = linhasProforma(p, lot);
   const linhasHtml = linhas.map((r) => {
     // Linha de nota: uma célula só, atravessando as três colunas — não há
@@ -264,17 +334,18 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
     ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Vendável / gleba', fmtPctOuIndef(p.eficienciaPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]]
     : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPctOuIndef(p.custoObrasVgvPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]];
 
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome}</title>
+  const html = `<!doctype html><html lang="pt-BR" data-theme="light"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome}</title>
+  <style>${temaCss}</style>
   <style>
-    body { font-family: 'Inter', system-ui, sans-serif; color: #111; margin: 32px; }
-    h1 { font-size: 18px; margin: 0 0 2px; } .sub-h { color: #666; font-size: 12px; margin-bottom: 18px; }
+    body { font-family: 'Inter', system-ui, sans-serif; color: var(--cor-texto-forte); margin: 32px; }
+    h1 { font-size: 18px; margin: 0 0 2px; } .sub-h { color: var(--cor-texto-sec); font-size: 12px; margin-bottom: 18px; }
     .kpis { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
-    .kpi { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; }
-    .kpi .r { font-size: 10px; color: #666; text-transform: uppercase; } .kpi .v { font-size: 15px; font-weight: 700; }
+    .kpi { border: 1px solid; border-color: var(--cor-borda); border-radius: 8px; padding: 8px 12px; }
+    .kpi .r { font-size: 10px; color: var(--cor-texto-sec); text-transform: uppercase; } .kpi .v { font-size: 15px; font-weight: 700; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    td { padding: 5px 8px; border-bottom: 1px solid #eee; } td.v { text-align: right; font-variant-numeric: tabular-nums; }
-    tr.sub td { font-weight: 700; border-top: 1px solid #bbb; }
-    tr.nota td { font-size: 11px; font-style: italic; color: #8a5a00; background: #fdf5e3; }
+    td { padding: 5px 8px; border-bottom: 1px solid; border-bottom-color: var(--cor-borda-sutil); } td.v { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.sub td { font-weight: 700; border-top: 1px solid; border-top-color: var(--cor-borda-forte); }
+    tr.nota td { font-size: 11px; font-style: italic; color: var(--cor-texto); background: var(--cor-alerta-fundo); }
     @media print { button { display: none; } }
   </style></head><body>
     <h1>${estudo.nome_exibicao || estudo.nome}</h1>
@@ -290,7 +361,7 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
 export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
   const w = window.open('', '_blank');
   if (!w) return false;
-  w.document.write(htmlProforma(estudo, p, lot)); w.document.close();
+  w.document.write(htmlProforma(estudo, p, lot, cssTemaClaro(document))); w.document.close();
   setTimeout(() => w.print(), 400);
   return true;
 }
@@ -543,7 +614,7 @@ export function exportarFluxoCSV(
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
 
-/** SVG (string) de barras do fluxo mensal para o PDF (tema claro). */
+/** SVG (string) de barras do fluxo mensal para o PDF. As cores vêm das classes, no CSS de `htmlFluxo`. */
 function svgFluxoMensal(c: FluxoCalc): string {
   const W = 1000; const H = 240; const padL = 70; const padR = 8; const padT = 12; const padB = 22;
   const gw = W - padL - padR; const gh = H - padT - padB;
@@ -552,16 +623,16 @@ function svgFluxoMensal(c: FluxoCalc): string {
   const bw = Math.max(1, gw / c.prazo - 1);
   const y = (v: number) => padT + (1 - (v + maxAbs) / (2 * maxAbs)) * gh;
   const barras = c.fluxoMensal.map((v, i) =>
-    `<rect x="${x(i).toFixed(1)}" y="${Math.min(y(v), y(0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(Math.abs(y(v) - y(0)), 0.5).toFixed(1)}" fill="${v >= 0 ? '#13a98d' : '#d45a3a'}"/>`).join('');
+    `<rect x="${x(i).toFixed(1)}" y="${Math.min(y(v), y(0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(Math.abs(y(v) - y(0)), 0.5).toFixed(1)}" class="${v >= 0 ? 'pos' : 'neg'}"/>`).join('');
   const passo = Math.max(3, Math.round(c.prazo / 10));
-  let eixo = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" stroke="#999"/>`;
+  let eixo = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" class="eixo"/>`;
   for (let i = 0; i < c.prazo; i += passo) {
-    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" fill="#666" text-anchor="middle">${c.meses[i]}</text>`;
+    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" class="rotulo" text-anchor="middle">${c.meses[i]}</text>`;
   }
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${eixo}${barras}</svg>`;
 }
 
-/** SVG (string) do acumulado (linha) para o PDF (tema claro). */
+/** SVG (string) do acumulado (linha) para o PDF. As cores vêm das classes, no CSS de `htmlFluxo`. */
 function svgFluxoAcumulado(c: FluxoCalc): string {
   const W = 1000; const H = 240; const padL = 70; const padR = 8; const padT = 12; const padB = 22;
   const gw = W - padL - padR; const gh = H - padT - padB;
@@ -571,23 +642,25 @@ function svgFluxoAcumulado(c: FluxoCalc): string {
   const y = (v: number) => padT + (1 - (v - min) / (max - min || 1)) * gh;
   const linha = c.fluxoAcumulado.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const passo = Math.max(3, Math.round(c.prazo / 10));
-  let eixo = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" stroke="#999" stroke-dasharray="4,3"/>`;
+  let eixo = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" class="eixo" stroke-dasharray="4,3"/>`;
   for (let i = 0; i < c.prazo; i += passo) {
-    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" fill="#666" text-anchor="middle">${c.meses[i]}</text>`;
+    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" class="rotulo" text-anchor="middle">${c.meses[i]}</text>`;
   }
   const payback = c.paybackMes !== null
-    ? `<line x1="${x(c.paybackMes)}" y1="${padT}" x2="${x(c.paybackMes)}" y2="${H - padB}" stroke="#13a98d" stroke-dasharray="2,2"/>` +
-      `<text x="${(x(c.paybackMes) + 3).toFixed(1)}" y="${padT + 10}" font-size="8" fill="#13a98d">Payback ${c.paybackData}</text>`
+    ? `<line x1="${x(c.paybackMes)}" y1="${padT}" x2="${x(c.paybackMes)}" y2="${H - padB}" class="payback" stroke-dasharray="2,2"/>` +
+      `<text x="${(x(c.paybackMes) + 3).toFixed(1)}" y="${padT + 10}" font-size="8" class="payback">Payback ${c.paybackData}</text>`
     : '';
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${eixo}<path d="${linha}" fill="none" stroke="#111" stroke-width="1.5"/>${payback}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${eixo}<path d="${linha}" class="linha" stroke-width="1.5"/>${payback}</svg>`;
 }
 
 /**
- * PDF do fluxo. `rotuloColunas` nomeia a unidade das colunas no rodapé de cada
+ * O documento HTML do PDF do fluxo — separado de `exportarFluxoPDF` pelo mesmo
+ * motivo que `htmlProforma`: sem esta separação nenhum teste lê o que sai no
+ * arquivo. `rotuloColunas` nomeia a unidade das colunas no rodapé de cada
  * página — "Meses" na view mensal, "Anos" quando o fluxo vem agregado por ano
  * (#127). As colunas Início/Duração e os KPIs são sempre em meses.
  */
-export function exportarFluxoPDF(
+export function htmlFluxo(
   estudo: any,
   c: FluxoCalc,
   dataInicio: string | null,
@@ -595,7 +668,8 @@ export function exportarFluxoPDF(
   funding: FundingNoFluxo | null = null,
   divergencias: Divergencia[] = [],
   permutaFisica: PermutaFisicaTipologia[] = [],
-): boolean {
+  temaCss = '',
+): string {
   const POR_PAGINA = 18; // colunas por página (paisagem)
   const linhas = linhasFluxo(c, funding);
   const kpis: [string, string][] = [
@@ -679,26 +753,34 @@ export function exportarFluxoPDF(
     </section>`);
   }
 
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome} — Fluxo de Caixa</title>
+  return `<!doctype html><html lang="pt-BR" data-theme="light"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome} — Fluxo de Caixa</title>
+  <style>${temaCss}</style>
   <style>
     @page { size: A4 landscape; margin: 10mm; }
-    body { font-family: 'Inter', system-ui, sans-serif; color: #111; margin: 16px; }
+    body { font-family: 'Inter', system-ui, sans-serif; color: var(--cor-texto-forte); margin: 16px; }
     h1 { font-size: 15px; margin: 0 0 2px; } h2 { font-size: 12px; margin: 12px 0 6px; }
-    .sub-h { color: #666; font-size: 10px; margin-bottom: 8px; }
+    .sub-h { color: var(--cor-texto-sec); font-size: 10px; margin-bottom: 8px; }
     .kpis { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-    .kpi { border: 1px solid #ddd; border-radius: 6px; padding: 4px 10px; }
-    .kpi .r { font-size: 8px; color: #666; text-transform: uppercase; } .kpi .v { font-size: 11px; font-weight: 700; }
-    .faixa { font-size: 9px; color: #666; margin-bottom: 4px; }
+    .kpi { border: 1px solid; border-color: var(--cor-borda); border-radius: 6px; padding: 4px 10px; }
+    .kpi .r { font-size: 8px; color: var(--cor-texto-sec); text-transform: uppercase; } .kpi .v { font-size: 11px; font-weight: 700; }
+    .faixa { font-size: 9px; color: var(--cor-texto-sec); margin-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; font-size: 9px; }
-    th, td { padding: 2px 4px; border-bottom: 1px solid #eee; text-align: right; white-space: nowrap; }
+    th, td { padding: 2px 4px; border-bottom: 1px solid; border-bottom-color: var(--cor-borda-sutil); text-align: right; white-space: nowrap; }
     th.nome, td.nome { text-align: left; max-width: 190px; overflow: hidden; }
-    th { color: #666; border-bottom: 1px solid #bbb; }
-    tr.g0 td { font-weight: 700; border-top: 1px solid #bbb; }
+    th { color: var(--cor-texto-sec); border-bottom-color: var(--cor-borda-forte); }
+    tr.g0 td { font-weight: 700; border-top: 1px solid; border-top-color: var(--cor-borda-forte); }
     tr.g1 td { font-weight: 600; }
-    tr.g2 td { color: #444; }
-    tr.div-erro td { color: #a8321d; }
-    tr.div-alerta td { color: #8a6200; }
+    tr.g2 td { color: var(--cor-texto); }
+    tr.div-erro td { color: var(--cor-erro); }
+    tr.div-alerta td { color: var(--cor-alerta); }
     td.v { font-variant-numeric: tabular-nums; }
+    svg .pos { color: var(--cor-sucesso); fill: currentColor; }
+    svg .neg { color: var(--cor-erro); fill: currentColor; }
+    svg .eixo { color: var(--cor-borda-forte); stroke: currentColor; }
+    svg .rotulo { color: var(--cor-texto-sec); fill: currentColor; }
+    svg .linha { color: var(--cor-texto-forte); stroke: currentColor; fill: none; }
+    svg line.payback { color: var(--cor-sucesso); stroke: currentColor; }
+    svg text.payback { color: var(--cor-sucesso); fill: currentColor; }
     section.pagina { page-break-after: always; }
     section.pagina:last-child { page-break-after: auto; }
     svg { width: 100%; height: auto; }
@@ -707,10 +789,22 @@ export function exportarFluxoPDF(
     ${paginas.join('')}
     <button onclick="window.print()" style="margin-top:12px;padding:8px 16px">Imprimir / Salvar PDF</button>
   </body></html>`;
+}
 
+/** PDF do fluxo: abre `htmlFluxo` numa janela e imprime. Os parâmetros são os de `htmlFluxo`. */
+export function exportarFluxoPDF(
+  estudo: any,
+  c: FluxoCalc,
+  dataInicio: string | null,
+  rotuloColunas = 'Meses',
+  funding: FundingNoFluxo | null = null,
+  divergencias: Divergencia[] = [],
+  permutaFisica: PermutaFisicaTipologia[] = [],
+): boolean {
   const w = window.open('', '_blank');
   if (!w) return false;
-  w.document.write(html); w.document.close();
+  w.document.write(htmlFluxo(estudo, c, dataInicio, rotuloColunas, funding, divergencias, permutaFisica, cssTemaClaro(document)));
+  w.document.close();
   setTimeout(() => w.print(), 400);
   return true;
 }

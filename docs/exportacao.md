@@ -57,6 +57,14 @@ tela.
 
 A Proforma do Avançado não tem exportação própria.
 
+### Cores do PDF
+
+Os dois PDFs saem sempre nas cores do **tema claro** da instância (papel claro, texto escuro),
+qualquer que seja o tema escolhido na tela: escuro, sépia ou cyberpunk não mudam o documento
+impresso. As barras positivas e negativas do gráfico do fluxo e as linhas de erro e de alerta do
+relatório de reconciliação usam as cores de sucesso, erro e alerta desse tema. Se o navegador não
+deixar o app ler o tema, o PDF sai em preto e branco, com o mesmo conteúdo.
+
 ## Instruções para não humanos
 
 Não há rota de exportação: os arquivos são montados no cliente a partir dos mesmos dados que a
