@@ -138,8 +138,8 @@ test('#593: a ORDEM das regras sustenta a especificidade que o comentário prome
 });
 
 test('#593: nenhuma cor literal entrou junto — só token do design system', () => {
-  // O contrato do CLAUDE.md permite cor literal apenas como FALLBACK de
-  // `var(--token, …)`, e só isso: um `#hex` ou `rgb()` solto numa declaração de
+  // O contrato do CLAUDE.md é token sem fallback (`var(--token)`, nunca
+  // `var(--token, …)`): um `#hex` ou `rgb()` solto numa declaração de
   // cor seria violação — inclusive no CSS de impressão de `exportar.ts`, que
   // também é só token. `guard-tokens-css.mjs` confere que o token existe; o que ele
   // não confere é uma cor SEM token nenhum.

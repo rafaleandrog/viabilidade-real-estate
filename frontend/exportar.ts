@@ -293,8 +293,8 @@ function coletarTemaClaro(regras: ArrayLike<RegraCssLida>, saida: string[]): voi
  *
  * Folha que não deixa ler as regras (outra origem) é pulada. Sem regra
  * encontrada, devolve `''`: os tokens ficam indefinidos e o documento cai no
- * texto preto do navegador, com bordas e linhas na cor do texto
- * (`currentColor`) — legível, só sem as cores.
+ * texto preto do navegador, com bordas e linhas na cor do texto (a borda volta
+ * à cor inicial; o SVG pinta com `currentColor`) — legível, só sem as cores.
  */
 export function cssTemaClaro(doc: DocumentoComFolhas): string {
   const saida: string[] = [];
