@@ -364,6 +364,13 @@ export function listarParcelamentosNucleo(pagina = 1, porPagina = 200): Promise<
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   return imobiliario(`/parcelamentos?${qs}`);
 }
+// Setores habitacionais — a aba Terrenos do Painel só mostra lote do setor
+// Urbitá, e o nome do setor só existe nesta entidade (o parcelamento guarda só
+// o `setor_habitacional_id`). Exige a flag `setores_habitacionais: ["ler"]`.
+export function listarSetoresHabitacionaisNucleo(pagina = 1, porPagina = 200): Promise<any> {
+  const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
+  return imobiliario(`/setores-habitacionais?${qs}`);
+}
 export function buscarImovelNucleo(id: number): Promise<any> {
   return imobiliario(`/imoveis/${id}`);
 }

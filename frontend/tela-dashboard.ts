@@ -13,10 +13,13 @@ import {
 } from './estudo-status.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
-  listarGlebasNucleo, listarLotesNucleo,
+  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarSetoresHabitacionaisNucleo,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
 } from './viabilidade-api.js';
+import {
+  coletarPaginas, idsSetoresUrbita, idsParcelamentosDosSetores, loteDoSetor,
+} from './terrenos-setor.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
 import './viabilidade-config-mercado.js';
@@ -187,6 +190,8 @@ export class ViabTelaDashboard extends LitElement {
   @state() private terrenosCarregando = false;
   @state() private terrenosDisponivel = true;
   @state() private terrenosMotivo = '';
+  /** Vazio = setor Urbitá resolvido. Preenchido = lotes escondidos (fail-closed) e este é o motivo. */
+  @state() private terrenosAvisoSetor = '';
   private terrenosCarregados = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -227,19 +232,50 @@ export class ViabTelaDashboard extends LitElement {
 
   updated(changed: Map<string, unknown>) {
     if (changed.has('aba') && this.aba === 'estudos') this._carregar();
-    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados) this._carregarTerrenos();
+    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando) this._carregarTerrenos();
   }
 
+  // Glebas: todas. Lotes: só os do setor Urbitá (`frontend/terrenos-setor.ts`).
+  // Pagina tudo em 200 (teto do Núcleo) porque o corte por setor é no cliente — com
+  // a página única de 100 de antes, os lotes do setor podiam ficar fora da lista.
   private async _carregarTerrenos() {
     this.terrenosCarregando = true;
     this.terrenosDisponivel = true;
     this.terrenosMotivo = '';
+    this.terrenosAvisoSetor = '';
     try {
-      const [glebas, lotes] = await Promise.all([listarGlebasNucleo(), listarLotesNucleo()]);
-      const g = (glebas?.dados ?? []).map((o: any) => ({ ...o, _tipo: 'gleba' }));
-      const l = (lotes?.dados ?? []).map((o: any) => ({ ...o, _tipo: 'lote' }));
+      const POR = 200;
+      const [glebas, lotes] = await Promise.all([
+        coletarPaginas((p) => listarGlebasNucleo('', p, POR), POR),
+        coletarPaginas((p) => listarLotesNucleo('', p, POR), POR),
+      ]);
+      let idsParcelamento: Set<number> | null = null;
+      // Falha de leitura (flag ainda não concedida, rede) deixa `terrenosCarregados` falso: voltar
+      // à aba tenta de novo, e conceder a permissão passa a valer sem recarregar o app. "Setor
+      // não encontrado" é resposta, não falha — fica carregado, para não repetir a varredura toda.
+      let falhaTransitoria = false;
+      let etapa = 'os setores habitacionais';
+      try {
+        const setores = await coletarPaginas((p) => listarSetoresHabitacionaisNucleo(p, POR), POR);
+        const idsSetor = idsSetoresUrbita(setores);
+        if (idsSetor.size === 0) {
+          this.terrenosAvisoSetor = 'o setor Urbitá não foi encontrado no Núcleo.';
+        } else {
+          etapa = 'os parcelamentos';
+          const parcelamentos = await coletarPaginas((p) => listarParcelamentosNucleo(p, POR), POR);
+          idsParcelamento = idsParcelamentosDosSetores(parcelamentos, idsSetor);
+        }
+      } catch (e: any) {
+        falhaTransitoria = true;
+        this.terrenosAvisoSetor = `não foi possível ler ${etapa} (${e?.message || 'indisponível'}). `
+          + 'Um administrador pode liberar a leitura em Admin → Apps → viabilidade → Núcleo.';
+      }
+      const g = glebas.map((o: any) => ({ ...o, _tipo: 'gleba' }));
+      const l = lotes
+        .filter((o: any) => loteDoSetor(o, idsParcelamento))
+        .map((o: any) => ({ ...o, _tipo: 'lote' }));
       this.terrenos = [...g, ...l];
-      this.terrenosCarregados = true;
+      this.terrenosCarregados = !falhaTransitoria;
     } catch (e: any) {
       this.terrenosDisponivel = false;
       this.terrenosMotivo = e?.message || 'Indisponível';
@@ -738,6 +774,10 @@ export class ViabTelaDashboard extends LitElement {
       ? this.terrenos.filter((t) => t._tipo === this.filtroTerreno)
       : this.terrenos;
     return html`
+      ${this.terrenosAvisoSetor ? html`
+        <urbi-banner variante="alerta">
+          Lotes ocultos: só os lotes do setor Urbitá são exibidos, e ${this.terrenosAvisoSetor}
+        </urbi-banner>` : nothing}
       <div class="filtros-bar">
         <urbi-select
           label="Tipo de terreno"
@@ -754,7 +794,9 @@ export class ViabTelaDashboard extends LitElement {
         expandir
         .colunas=${colunas}
         .linhas=${linhas}
-        mensagem-vazio="Nenhuma gleba ou lote cadastrado no Núcleo."
+        mensagem-vazio=${this.terrenosAvisoSetor
+          ? 'Nenhuma gleba cadastrada no Núcleo (os lotes estão ocultos, veja o aviso acima).'
+          : 'Nenhuma gleba ou lote do setor Urbitá cadastrado no Núcleo.'}
       ></urbi-tabela>
     `;
   }

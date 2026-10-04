@@ -20,13 +20,22 @@ análise de mercado for usada, cadastrar as regiões monitoradas.
 
 ### Permissão do Núcleo
 
-Em *Admin → Apps → viabilidade → Núcleo*, conceda ao app a leitura de **imóveis** e
-**parcelamentos**. É o que permite vincular uma gleba (Loteamento) ou lotes (Incorporação) a um
-estudo e o que alimenta a aba **Terrenos** do Painel. A leitura de **parcelamentos** é a que
-sustenta o filtro do seletor de lotes da Incorporação: lotes de parcelamento em regularização
-fundiária ou vinculado a um setor habitacional ficam de fora. Sem ela, o seletor avisa que a lista
-não está filtrada e mostra todos os lotes. Enquanto a permissão de **imóveis** não existir, a
-criação de estudo avisa e só o terreno manual fica disponível.
+Em *Admin → Apps → viabilidade → Núcleo*, conceda ao app a leitura de **imóveis**,
+**parcelamentos** e **setores habitacionais**. Enquanto a de **imóveis** não existir, a criação de
+estudo avisa e só o terreno manual fica disponível. As outras duas têm efeitos separados:
+
+- **Parcelamentos** sustenta o filtro do seletor de lotes da Incorporação: lotes de parcelamento em
+  regularização fundiária ou vinculado a um setor habitacional ficam de fora. Sem ela, o seletor
+  avisa que a lista não está filtrada e mostra todos os lotes.
+- **Setores habitacionais** (junto com parcelamentos) alimenta a aba **Terrenos** do Painel, que lista
+  as glebas de qualquer origem e só os lotes cujo parcelamento pertence ao setor Urbitá — o setor
+  habitacional cujo nome ou *slug* contém "urbita", sem distinção de acento nem de maiúsculas. Sem
+  uma das duas leituras, ou sem um setor assim cadastrado, a aba esconde todos os lotes e avisa o
+  motivo, em vez de listá-los sem filtro; as glebas continuam. Conceder a permissão depois vale na
+  próxima vez que se abre a aba, sem recarregar o app.
+
+Um lote do setor Urbitá aparece na aba Terrenos, mas fica de fora do seletor de lotes da Incorporação,
+que exclui lotes de parcelamento vinculado a setor habitacional.
 
 ### Parâmetros
 
