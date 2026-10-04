@@ -4,6 +4,63 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-04 — Identidade nova do módulo imobiliário e `shell_min` 0.56.23
+
+Pedido direto do autor, sem issue: o boot da instância (shell `0.56.24`) acusou a obsolescência
+`identidade-imobiliario-antiga`. O módulo imobiliário trocou de identidade no shell `0.56.23`
+(SDK 93): `urbiverso/urbiverso::imobiliario` → `urbiverso/modulos-urbiverso::imobiliario`, porque
+vai sair do repositório da plataforma para o de módulos. A escada: aviso desde 2026-10-03, erro em
+2026-10-06, **gate em 2026-10-09** — a partir daí a instância recusa instalar uma release com a
+chave antiga. O empacotador do SDK fixado (`57.0.0`, o do CI e do `release.yml`) não conhece esta
+obsolescência e não a acusa: quem barra é a instalação. Não há data de quebra: a `0.1.40` instalada
+segue carregando até a remoção do compat, autorizada após 2026-11-08.
+
+- `manifesto.json`: a chave de `dependencias` passa a `urbiverso/modulos-urbiverso::imobiliario`,
+  com o mesmo `versao_min` e as mesmas `entidades`. O slug segue `imobiliario`, então
+  `urbiVerso.modulo('imobiliario', …)` e o resto do código não mudam. As permissões ligadas na aba
+  Núcleo seguem valendo: a troca é só da chave, com as mesmas entidades e flags, e a plataforma
+  registra que, com a identidade nova, os toggles ficam iguais (SDK 93: o `migrar_para` da
+  obsolescência e a nota do SDK 93 em `compatibilidade.md`).
+- `shell_min` `0.53.20` → **`0.56.23`**: a chave nova só resolve contra o catálogo do shell
+  `0.56.23`. Num shell anterior a instalação seria recusada (`422`) por dependência não resolvida;
+  o piso faz a recusa nomear a causa verdadeira, a versão do shell. É `shell_min`, e não `sdk_min`,
+  porque a troca não muda a superfície do SDK (o `sdk_min` segue `87`). Sem migração, a `versao`
+  segue `0.1.40`.
+- Menções atualizadas: `docs/modelo-de-dados.md`, o comentário de `frontend/viabilidade-api.ts`,
+  `README.md`, `INSTRUCOES-CODE.md` e o parágrafo do `shell_min` no `CLAUDE.md`. Quatro comentários
+  que citavam o número do piso como vigente (`backend/rotas/varrer-tudo.ts`,
+  `scripts/guard-tabelas-obsoletas.mjs`, `referencia/funding-capital-stack.md` e o da migração
+  `037`, só no comentário) passam a dizer só que ele está acima dos pisos que citam, para não
+  envelhecerem no próximo degrau.
+- Sincronizado com a `main` depois do PR 828 (aba Terrenos só com lotes do setor Urbitá), que
+  acrescentou `setores_habitacionais` às entidades do mesmo bloco: as três entidades (`imoveis`,
+  `parcelamentos` e `setores_habitacionais`, todas `ler`) ficam sob a chave nova.
+- `frontend/api-caminho-relativo.test.ts` passa a ler o manifesto: a chave de `dependencias` tem de
+  ser a identidade atual, e o slug dela, o mesmo que o frontend passa a `urbiVerso.modulo()`. Sem
+  isso nada no CI ficaria vermelho se a chave antiga voltasse, porque o empacotador do SDK fixado não
+  valida o bloco `dependencias`.
+
+Medido nesta sessão, com controle primeiro: o `urbi-empacotar` do SDK **93.0.0** publicado (o nível
+da instância), sobre uma cópia da árvore com o manifesto da `main`, reproduziu os dois avisos da
+instância — `identidade-imobiliario-antiga` e os 15 literais de cor. Sobre a branch, a obsolescência
+some e o pacote é gerado; os 15 literais de cor, que este PR não toca, continuam. O `urbi-empacotar`
+do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitaria a chave antiga.
+`validar-frontend.sh` e `validar-backend.sh` verdes.
+
+**Fica para o autor:**
+- publicar a release (Actions → release → Run workflow) **antes de 2026-10-09**;
+- homologar a release nova, e não a `viabilidade-a0.1.40_faebece6`: ela carrega a chave antiga,
+  que a instância recusa instalar a partir de 2026-10-09;
+- conferir que a produção roda shell ≥ `0.56.23` antes de homologar — abaixo disso a instalação é
+  recusada pelo `shell_min`, e a versão atual segue no ar;
+- depois da instalação, em Admin → Apps → viabilidade → Núcleo: **ligar** a leitura de setores
+  habitacionais, que é flag nova (veio com a aba Terrenos e nenhuma release publicada a pedia) e
+  por isso entra desligada no upgrade — a aba Terrenos esconde os lotes até lá —, e conferir que a
+  de imóveis e a de parcelamentos seguem ligadas.
+
+Recomendação, fora deste PR: subir o pin do `@urbiverso/sdk` (`57.0.0` → `93.0.0`), para o
+empacotador do CI auditar contra o catálogo de obsolescências atual — hoje é a instância que avisa
+primeiro.
 ## 2026-10-03 — Aba Terrenos do Painel: só lotes do setor Urbitá
 
 Pedido direto do autor, sem issue: na aba **Terrenos** do Painel de estudos, lotes só aparecem se o

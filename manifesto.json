@@ -2,12 +2,12 @@
   "identidade": "rafaleandrog/viabilidade-real-estate::viabilidade",
   "nome": "Estudo de Viabilidade",
   "versao": "0.1.40",
-  "shell_min": "0.53.20",
+  "shell_min": "0.56.23",
   "sdk_min": 87,
   "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e análise de mercado do imóvel por IA.",
   "rotas_publicas": [],
   "dependencias": {
-    "urbiverso/urbiverso::imobiliario": {
+    "urbiverso/modulos-urbiverso::imobiliario": {
       "versao_min": "1.0.0",
       "entidades": {
         "imoveis": ["ler"],

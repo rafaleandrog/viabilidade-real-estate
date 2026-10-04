@@ -199,7 +199,7 @@ export default async function ({ dados }) {
   // porque `avancado_fases` guarda TODA linha de receita de TODO estudo da
   // instância: um teto fixo truncaria a varredura em silêncio e deixaria parte
   // dos estudos sem backfill, sem nada ficar vermelho. Exige shell 0.53.8, e o
-  // `shell_min` vigente (`0.53.20`) está acima disso.
+  // `shell_min` do manifesto está acima disso.
   const estudos = await dados.varrerTudo('estudos');
   const alvos = estudos.filter(
     (e) => e.juros_tabela_aa_padrao === null || e.juros_tabela_aa_padrao === undefined,

@@ -152,7 +152,7 @@ tipo de empreendimento e o identificador não muda quando o estudo é renomeado.
 ## Núcleo
 
 O app declara, no bloco `dependencias` do manifesto, uma dependência do módulo imobiliário da
-plataforma (`urbiverso/urbiverso::imobiliario`), com leitura de `imoveis`, `parcelamentos` e
+plataforma (`urbiverso/modulos-urbiverso::imobiliario`), com leitura de `imoveis`, `parcelamentos` e
 `setores_habitacionais`: glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de
 terreno da Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um
 setor habitacional; e, junto com `setores_habitacionais`, restringe a aba Terrenos do Painel aos
