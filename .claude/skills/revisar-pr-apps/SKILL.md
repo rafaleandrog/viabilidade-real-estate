@@ -121,6 +121,10 @@ superfície usou**, sempre.
    >   Medido em 2026-09-16: `node_modules/@urbiverso/sdk` em `57.0.0`, `docs/` com 32 arquivos,
    >   `obsolescencias.json` com 7 chaves. ⚠️ Executável **não** é o mesmo que executada: só
    >   publique `contratos=ok` quando as duas lentes de fato rodaram naquela revisão.
+   >   ⚠️ E `contratos=ok` vale contra o SDK **fixado**, não contra o da instância: o catálogo de
+   >   obsolescências que a lente lê é o do pin. Com o pin atrás da instância, obsolescência mais
+   >   nova que ele fica invisível à lente — diga no relatório a versão do pin e a da instância
+   >   (`CLAUDE.md` § A revisão em si).
    >
    > ⚠️ **A versão que vale é a que o `package.json` FIXA**, não o `latest` do registry. Conferir
    > contrato numa versão publicada mais nova é a mesma classe de erro que conferir no `main` do
@@ -514,11 +518,13 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
 - **Precisão.** R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`. **Todo
   valor monetário resultado de fórmula tem 2 casas decimais.** Representações derivadas não
   monetárias (% e R$/m²) carregam precisão plena internamente e arredondam **só para exibir**.
-- **Tokens CSS do design system, nunca cor literal — sem exceção.** Inclui o CSS e os SVG dos
-  documentos de impressão em `frontend/exportar.ts`: a janela de impressão recebe o tema claro da
-  página (`cssTemaClaro`) e pinta só com `var(--cor-*)`. Literal solto em qualquer lugar do
-  frontend é achado; quem o barra é `guard-literais-cor-bundle.mjs`, sobre o bundle — o
-  `guard-tokens-css.mjs` confere os `var()`, não o literal solto.
+- **Tokens CSS do design system, nunca cor literal — sem exceção neste repositório.** É política
+  mais estrita que o registro de exceções do SDK (`docs/ui.md`, que admite o papel branco de
+  `@media print`): inclui o CSS e os SVG dos documentos de impressão em `frontend/exportar.ts`, cuja
+  janela recebe o tema claro da página (`cssTemaClaro`) e pinta só com `var(--cor-*)`. Literal solto
+  em código que **chega ao bundle** é achado; quem o barra é `guard-literais-cor-bundle.mjs`, sobre o
+  bundle — o `guard-tokens-css.mjs` confere os `var()`, não o literal solto. Arquivo de teste não
+  chega ao bundle e pode citar cor de propósito: não é achado.
 - **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.** Sem o
   primeiro, o default do GitHub é 6 horas e o job pendura em vez de ficar vermelho.
 - **O glob de teste precisa dos dois padrões** (`frontend/*.test.ts frontend/fixtures/*.test.ts`) —

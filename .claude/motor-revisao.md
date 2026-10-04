@@ -267,7 +267,7 @@ resolvido antes de despachar**:
 | `WT` — a árvore que as lentes leem | a seção *A árvore que o motor lê*, abaixo |
 | `BASE` — o merge-base, nunca o nome da branch | passo 2 da skill |
 | Lentes, com id, tier e esforço | passos 2.1, 3 e 4 da skill |
-| **Superfície de docs** do briefing de contratos | fixa: `node_modules/@urbiverso/sdk/docs/`. **ADAPTADO:** o bundle é baixado desde 2026-09-03 (`scripts/lib/sdk-auth.sh`) e, com o pin em `57.0.0`, traz `docs/` e `obsolescencias.json` — as **duas** lentes de contrato (doc e props de primitivo, esta lendo `dist/index.d.ts`) são despachadas. Só é `contratos=ok` quando as duas de fato rodaram naquela revisão; "o SDK está no disco" não é o predicado |
+| **Superfície de docs** do briefing de contratos | fixa: `node_modules/@urbiverso/sdk/docs/`. **ADAPTADO:** o bundle é baixado desde 2026-09-03 (`scripts/lib/sdk-auth.sh`) e, com o pin em `57.0.0`, traz `docs/` e `obsolescencias.json` — as **duas** lentes de contrato (doc e props de primitivo, esta lendo `dist/index.d.ts`) são despachadas. Só é `contratos=ok` quando as duas de fato rodaram naquela revisão; "o SDK está no disco" não é o predicado. E o `ok` vale contra o SDK **fixado**: obsolescência mais nova que o pin é invisível à lente (`CLAUDE.md` § A revisão em si) |
 | Faixas que sobem para `sol` | migração, `schema.json`, `manifesto.json`, permissões, contas, auditoria |
 
 ## Preflight — uma vez por sessão, antes de qualquer lente
