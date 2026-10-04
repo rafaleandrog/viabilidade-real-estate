@@ -531,7 +531,8 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
   (`var(--cor-texto, #fff)`) é achado; hook próprio (`--urbi-*`, `--x` declarado pelo app) pode
   manter fallback desde que o valor dele não seja literal de cor — `var(--urbi-x, #7c5cff)` é
   achado. E guard verde não prova ausência de literal: ele só conta hex não numérico e função de
-  cor, então cor nomeada e hex só de dígitos passam por ele e ficam com a lente.
+  cor, então cor nomeada e hex só de dígitos de três a cinco caracteres (o de seis ou oito é
+  contado) passam por ele e ficam com a lente.
 - **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.** Sem o
   primeiro, o default do GitHub é 6 horas e o job pendura em vez de ficar vermelho.
 - **O glob de teste precisa dos dois padrões** (`frontend/*.test.ts frontend/fixtures/*.test.ts`) —
