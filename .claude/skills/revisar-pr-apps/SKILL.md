@@ -526,8 +526,9 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
   em código que **chega ao bundle** é achado; quem o barra é `guard-literais-cor-bundle.mjs`, sobre o
   bundle — o `guard-tokens-css.mjs` confere os `var()`, não o literal solto. Arquivo de teste não
   chega ao bundle e pode citar cor de propósito: não é achado. Fallback em token de tema `--cor-*`
-  (`var(--cor-texto, #fff)`) é achado; hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém
-  fallback, e não é.
+  (`var(--cor-texto, #fff)`) é achado; hook próprio (`--urbi-*`, `--x` declarado pelo app) pode
+  manter fallback desde que o valor dele não seja literal de cor — `var(--urbi-x, #7c5cff)` é
+  achado, porque o guard do bundle conta o literal.
 - **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.** Sem o
   primeiro, o default do GitHub é 6 horas e o job pendura em vez de ficar vermelho.
 - **O glob de teste precisa dos dois padrões** (`frontend/*.test.ts frontend/fixtures/*.test.ts`) —

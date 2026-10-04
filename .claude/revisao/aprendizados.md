@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v15-e336318e -->
+<!-- corpus=v15-3d5ff58b -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -68,7 +68,9 @@ diff "parece" certo:
   que o `package.json` fixa — nunca o monorepo, nunca a memória.
 - **`var(--token)` que não existe.** O fallback vira cor literal disfarçada de token.
 - **Fallback em token de tema `--cor-*`** (`var(--cor-texto, #fff)`) é achado: o `guard-tokens-css`
-  o reprova. Hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém fallback, e **não** é achado.
+  o reprova. Hook próprio (`--urbi-*`, `--x` declarado pelo app) pode manter fallback **desde que o
+  valor do fallback não seja literal de cor**: `var(--urbi-x, var(--cor-borda))` não é achado, mas
+  `var(--urbi-x, #7c5cff)` é — o `guard-tokens-css` aceita, e o guard do bundle conta o literal.
 - **Literal de cor solto, fora de `var()`** — `color: #abc`, `fill="#13a98d"`, `rgba(...)` —, em
   código que **chega ao bundle** (o que `frontend/index.ts` importa), **inclusive o CSS de impressão
   de `frontend/exportar.ts`**. O `guard-tokens-css.mjs` confere os `var()` e não procura literal
