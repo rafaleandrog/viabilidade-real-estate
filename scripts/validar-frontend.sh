@@ -41,7 +41,9 @@
 #      guards de UI da etapa 4/8 também dependem do parser, então "os que
 #      dependem do parser" não são estes três;
 #   6. typecheck do frontend (tsconfig só-frontend);
-#   7. testes de frontend e build do bundle via esbuild;
+#   7. testes de frontend e build do bundle via esbuild, seguido da contagem de
+#      literais de cor NO BUNDLE (`guard-literais-cor-bundle.mjs`, a mesma conta
+#      que a instância faz na instalação) e da bateria desse guard;
 #   8. verificação de RENDER em Chromium: monta quatro telas de verdade e mede
 #      overflow, transbordo, sobreposição de caixas e cor efetiva por variante
 #      de tema. É a única etapa que toca DOM — as etapas anteriores são todas de
@@ -301,10 +303,25 @@ com_limite 300 node --import tsx/esm --test --test-timeout=60000 "${test_globs[@
 tst=$?
 [ $tst -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 
+# O bundle vai para um diretório temporário, e não para `/dev/null`, porque o
+# guard abaixo lê o ARTEFATO: a instância conta literais de cor no bundle do
+# pacote, a cada instalação, e avisa na tela de Upgrades. O `guard-tokens-css.mjs`
+# confere os `var()`, mas não procura literal de cor solto, e foi por aí que os
+# documentos de impressão guardaram 15 literais que só a instância via.
+bundle_dir="$(mktemp -d)" && [ -n "$bundle_dir" ] || { echo "  mktemp FALHOU"; exit 1; }
+trap 'rm -rf "$bundle_dir"' EXIT
 "$esbuild_bin" frontend/index.ts --bundle --external:@urbiverso/ui \
-  --format=esm --outfile=/dev/null --target=es2022 --minify --tsconfig=tsconfig.json
+  --format=esm --outfile="$bundle_dir/index.js" --target=es2022 --minify --tsconfig=tsconfig.json
 bd=$?
-[ $bd -eq 0 ] || { echo "  build FALHOU"; exit 1; }
+[ $bd -eq 0 ] || { rm -rf "$bundle_dir"; echo "  build FALHOU"; exit 1; }
+node scripts/guard-literais-cor-bundle.mjs "$bundle_dir"
+gl=$?
+rm -rf "$bundle_dir"
+[ $gl -eq 0 ] || { echo "  guard de literais de cor no bundle FALHOU"; exit 1; }
+com_limite 120 bash scripts/testar-guard-literais-cor.sh >/dev/null || {
+  echo "  bateria do guard de literais de cor FALHOU — rode: bash scripts/testar-guard-literais-cor.sh" >&2
+  exit 1
+}
 
 echo "== 8/8 verificação de render em Chromium =="
 # ⚠️ Este marcador é o que impede a ÚLTIMA LINHA de mentir. A versão anterior

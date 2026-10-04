@@ -540,9 +540,11 @@ TS
 # COMUM — prosa, exemplo, documentação —, e tratá-la como HTML deixava
 # `const doc = `<style>:root{--x:red}</style>`` registrar `--x` como token
 # conhecido do app, liberando um `var(--x)` real algumas linhas abaixo.
-# Preço aceito: o CSS de impressão de `exportar.ts` não é analisado. Ele roda em
-# janela própria (o `CLAUDE.md` já o trata como exceção), não usa `urbi-*` e não
-# declara custom property nenhuma.
+# Preço aceito: o CSS de impressão de `exportar.ts` não vira superfície de CSS.
+# Ele não usa `urbi-*` e não declara custom property nenhuma; os `var()` que ele
+# usa continuam conferidos pela passada de usos do guard-tokens-css (que lê todo
+# template), e literal de cor solto ali é pego no bundle por
+# `guard-literais-cor-bundle.mjs`.
 caso guard-box-model-urbi 0 "<style> de template SEM tag NÃO é superfície de CSS" <<'TS'
 const doc = `<!doctype html><style>
   .x urbi-arriscado { width: 100%; }

@@ -549,6 +549,19 @@ jobs:
             echo "::error title=Bateria dos guards de UI falhou::Um dos três guards não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
+      - name: Bateria do guard de literais de cor no bundle
+        if: always()
+        run: |
+          set -uo pipefail
+          # O guard em si roda sobre o bundle buildado, na etapa 7/8 do
+          # `validar-frontend.sh` (job pesado, `validation.yml`) — aqui não há
+          # build. A bateria não precisa de build: monta diretórios sintéticos
+          # e confere os dois sentidos, inclusive as exclusões que o contador
+          # copia do auditor da plataforma.
+          if ! bash scripts/testar-guard-literais-cor.sh; then
+            echo "::error title=Bateria do guard de literais de cor falhou::scripts/lib/literais-cor.mjs ou o guard não contam como o auditor da plataforma. Veja quais casos falharam no log."
+            exit 1
+          fi
 
   enderecos-doc:
     name: Endereço arquivo:linha citado em prosa ainda resolve

@@ -961,8 +961,9 @@ bash scripts/validar-frontend.sh
 Ele roda os **guards estáticos** (aspas curvas em posição de atributo + **JSON estrito** em
 `schema.json`/`manifesto.json` + ciclos de FK), depois autentica o SDK
 (`scripts/lib/sdk-auth.sh`) e roda `pnpm install`, linka os pacotes e executa **typecheck do
-frontend + testes de frontend + build do bundle (esbuild) + os guards de UI e de endereços + o
-render em Chromium**. Verde = mudança de frontend validada.
+frontend + testes de frontend + build do bundle (esbuild) + os guards de UI e de endereços + a
+contagem de literais de cor no bundle buildado + o render em Chromium**. Verde = mudança de
+frontend validada.
 
 > Este parágrafo dizia "5 etapas" e "ignorando o 401 do SDK". Hoje são **8**, e o 401 não acontece
 > mais quando o token está no ambiente. O `|| true` do install **fica**: sem token o 401 volta, e o
@@ -1136,7 +1137,7 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-fluxo-custos.ts:770-772`); `frontend/exportar.ts:16` importa `fmtR$` em
   > vez de definir formatador próprio; a tabela de sensibilidade da proforma usa `fmtR$(v, false)`
   > (`frontend/tela-proforma.ts:503`, #492). A #449 unificou a célula do Fluxo de Caixa: `celula`
-  > (`frontend/fluxo-tabela.ts:40`) e `celulaFx` (`frontend/exportar.ts:229`, CSV/PDF) chamam a
+  > (`frontend/fluxo-tabela.ts:40`) e `celulaFx` (`frontend/exportar.ts:416`, CSV/PDF) chamam a
   > mesma função (`celula` de `frontend/viab-format.ts`) — 2 casas, limiar de célula vazia
   > `< R$ 0,005`, mesma representação de negativo — e `_fmtContabil`
   > (`frontend/tela-proforma.ts:358`) e `precoUnit`/`precoTotal`
@@ -1194,9 +1195,20 @@ Git Bash — ver PROGRESSO).
   > versionado, e a rede de que `celulaProforma` e a Proforma do Avançado não voltaram a `celula`.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
-  - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa
-    janela própria, fora do escopo das variáveis do shell — lá `var(--cor-*)` não resolve e cor
-    literal é a única opção. Não "corrija" isso.
+  - **Sem exceção, inclusive nos documentos de impressão.** O CSS e os SVG dos PDFs de
+    `frontend/exportar.ts` (Proforma e Fluxo de Caixa) pintam tudo com `var(--cor-*)`, como o resto
+    do app. A janela de impressão é um documento à parte e não herda as variáveis do shell, então
+    ela recebe as regras `:root[data-theme="light"]` das folhas da página (`cssTemaClaro`) e fixa
+    `<html data-theme="light">`: o papel sai claro qualquer que seja o tema escolhido na tela, com
+    os valores que a instância dá aos tokens. As bordas são escritas como `border: 1px solid` mais
+    um `border-color: var(--cor-*)` à parte, e o SVG pinta com `fill`/`stroke: currentColor` sobre
+    um `color: var(--cor-*)` por classe (nunca cor por atributo): se a regra do tema não for
+    achada, o token fica inválido, a borda cai na cor do texto e o documento sai no preto do
+    navegador, com bordas e linhas visíveis.
+    > ⚠️ **Esta nota já mandou o contrário** — *"Exceção real… cor literal é a única opção. Não
+    > 'corrija' isso"* — e sustentou 15 literais que a instância avisava na tela de Upgrades a cada
+    > release. As duas premissas eram falsas: o tema pode ser levado à janela, e o tema claro já é a
+    > cor de papel. A troca foi decisão do autor, em 2026-10-04.
   - ⚠️ **`urbi-empacotar` avisa "N literais de cor fora de token no bundle" — e o aviso é ACIONÁVEL,
     não ruído.** Esta nota já disse o contrário ("não é o app violando o contrato… não persiga o
     número"), e estava errada: o SDK (`docs/ui.md` § Tokens e temas) manda consumir token de tema
@@ -1204,19 +1216,20 @@ Git Bash — ver PROGRESSO).
     `tokens.css` sempre carregado o fallback é peso morto, ancora o consumidor no tema escuro e
     esconde token inexistente. A exceção do SDK é só token **mais novo que o `shell_min`** do app,
     como ponte de degradação; o espelho `referencia/ui-urbiverso` é mais antigo que o piso, então
-    hoje não há caso. Tratar como ruído deixou o aviso na tela de Upgrades de toda instância, a cada
-    release. O `urbi-empacotar` passou de 343 para **15** literais, todos de `frontend/exportar.ts`
-    (medido antes e depois; a contagem dele é a heurística do bin, que ignora hex só de dígitos, e
-    por isso não é a mesma métrica do número de fallbacks que o guard acusava na base).
-    **Defesa:** `scripts/guard-tokens-css.mjs` reprova **qualquer** fallback em token `--cor-*` do
-    espelho — `#hex`, `rgba()`, `transparent`, cor nomeada ou outro `var()`; enumerar formas de
-    literal não converge. Hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém fallback.
-    Se o aviso voltar a crescer, o guard falha antes do empacotador — não "explique" o número.
-  - **Os 15 restantes são a exceção real e ficam:** o CSS e os SVG dos documentos de impressão/PDF em
-    `frontend/exportar.ts` rodam numa janela própria, fora do escopo das variáveis do shell, sobre
-    papel branco (exceção registrada no SDK). Injetar os tokens do tema ali pintaria texto claro
-    sobre papel no tema escuro. Não "corrija" isso; se o número mudar, reconte por
-    `urbi-empacotar` e confira que o que sobra é só o `exportar.ts`.
+    hoje não há caso. A mesma conta roda na **instalação**, sobre o bundle do pacote, e aparece na
+    tela de Upgrades da instância.
+    **Defesa, em duas camadas:**
+    - `scripts/guard-tokens-css.mjs` confere **todo** `var()` do fonte — em qualquer template ou
+      string, inclusive o CSS de impressão, que é template sem tag: o token tem de existir no
+      espelho e não pode ter fallback (`#hex`, `rgba()`, `transparent`, cor nomeada ou outro
+      `var()`; enumerar formas de literal não converge). Hook próprio (`--urbi-*`, `--x` declarado
+      pelo app) mantém fallback. O que ele **não** procura é literal de cor **solto**, fora de
+      `var()` — `color: #abc` passa nele, e foi assim que os 15 literais atravessaram.
+    - `scripts/guard-literais-cor-bundle.mjs` (etapa 7/8 do `validar-frontend.sh`) cobre exatamente
+      isso: faz a conta da plataforma **sobre o bundle buildado**, com régua **zero** e sem lista de
+      exceção. O contador é cópia do auditor embutido no `urbi-empacotar`
+      (`scripts/lib/literais-cor.mjs`).
+    Se o aviso voltar, um dos dois falha antes do empacotador — não "explique" o número.
 - Só usar primitivos `urbi-*` disponíveis no `ui.md` do shell — e **só as props que eles declaram**:
   atributo inexistente num primitivo não dá erro, ele simplesmente **não faz nada** (falha
   silenciosa). Na dúvida, leia `ui/src/urbi-<nome>.ts` no monorepo, não presuma a prop.

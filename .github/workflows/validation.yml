@@ -55,7 +55,8 @@ jobs:
       # 6 horas é o `timeout-minutes`, não esta poda.
       # `pnpm build` FICA: é o único passo que gera os dois bundles de verdade —
       # inclusive `backend/rotas.js`, o contrato "backend self-contained" — enquanto o
-      # `validar-frontend.sh` só constrói o bundle do frontend para /dev/null.
+      # `validar-frontend.sh` constrói só o bundle do frontend, num diretório
+      # temporário, para contar literais de cor nele e apagá-lo em seguida.
       - name: Build
         run: pnpm build
       - name: Validar frontend

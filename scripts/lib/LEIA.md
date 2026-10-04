@@ -11,6 +11,7 @@ Cada um exporta funções puras, sem efeito colateral, sem ler `process.argv` e 
 |---|---|---|
 | `fonte-ts.mjs` | `guard-tokens-css.mjs` · `guard-props-urbi.mjs` · `guard-box-model-urbi.mjs` | Onde termina um comentário, uma string, um template e um `${…}` — **nas três linguagens que vivem num `.ts` deste app** |
 | `sdk-auth.sh` | `validar-frontend.sh` | `urbi_pnpm_install` — roda o `pnpm install` com o `URBIVERSO_PACKAGES_TOKEN` do ambiente, para o `@urbiverso/sdk` (GitHub Packages privado) ser baixado |
+| `literais-cor.mjs` (+ `literais-cor.d.mts`) | `guard-literais-cor-bundle.mjs` · `testar-guard-literais-cor.sh` · `frontend/exportar-impressao.test.ts` | A conta de literais de cor da plataforma, copiada do auditor embutido no `urbi-empacotar` — a mesma que a instância mostra na tela de Upgrades. O `.d.mts` dá os tipos para o teste de frontend importar o mesmo contador |
 
 ✅ **`sdk-auth.sh` cumpre a regra inteira, e isso não foi de graça.** Ele exporta uma função só —
 `urbi_pnpm_install` —, que roda o `pnpm install` com o token do ambiente passado por `env`. Não

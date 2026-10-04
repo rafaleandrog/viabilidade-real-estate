@@ -4,6 +4,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-04 — PDFs nas cores do tema claro: zero literais de cor no bundle
+
+Pedido direto do autor, sem issue: a tela de Upgrades da instância avisava *"15 literais de cor
+fora de token no bundle — frontend/index.js"* a cada release. Os 15 eram todos do CSS e dos SVG dos
+dois documentos de impressão de `frontend/exportar.ts` (PDF da Proforma e PDF do Fluxo de Caixa),
+que o `CLAUDE.md` tratava como exceção permanente. O autor autorizou reverter a exceção.
+
+- **Como:** a janela de impressão recebe as regras `:root[data-theme="light"]` das folhas da página
+  (`cssTemaClaro`, síncrona, sem rede) e fixa `<html data-theme="light">`. O CSS de impressão passa
+  a usar só `var(--cor-*)`, com as bordas em `border: 1px solid` mais `border-color` à parte; os SVG
+  ganham classes (`pos`, `neg`, `eixo`, `rotulo`, `linha`, `payback`), com `fill`/`stroke:
+  currentColor` sobre o `color` da classe, no lugar de cor por atributo. O documento do fluxo foi extraído para `htmlFluxo`, puro, como já era `htmlProforma`;
+  `exportarPDF` e `exportarFluxoPDF` viraram invólucros que passam o tema da página.
+- **Sem a regra do tema** (folha de outra origem, seletor que mudou), o documento cai no texto preto
+  do navegador, com bordas e linhas visíveis, e o console avisa. Medido no Chromium: origem em
+  dark, cyberpunk e sem folha nenhuma.
+- **Rede:** `scripts/guard-literais-cor-bundle.mjs` faz a conta da plataforma sobre o bundle
+  buildado (etapa 7/8 do `validar-frontend.sh`), régua zero; o contador
+  (`scripts/lib/literais-cor.mjs`) é cópia do auditor do `urbi-empacotar`, com bateria própria.
+  Controle: com o `exportar.ts` da `main`, o guard acusa exatamente os 15 literais que a instância
+  listou.
+- **Fica para o autor:** publicar a release e conferir na Pinguim que a etapa "tokens de tema" do
+  upgrade saiu do aviso. O corpo de conhecimento das lentes (`.claude/revisao/aprendizados.md`,
+  `.claude/skills/revisar-pr-apps/SKILL.md`) ainda descreve a exceção antiga e é corrigido num PR
+  só de processo (regra R1).
+
+---
+
 ## 2026-10-04 — Identidade nova do módulo imobiliário e `shell_min` 0.56.23
 
 Pedido direto do autor, sem issue: o boot da instância (shell `0.56.24`) acusou a obsolescência
@@ -43,7 +71,8 @@ segue carregando até a remoção do compat, autorizada após 2026-11-08.
 Medido nesta sessão, com controle primeiro: o `urbi-empacotar` do SDK **93.0.0** publicado (o nível
 da instância), sobre uma cópia da árvore com o manifesto da `main`, reproduziu os dois avisos da
 instância — `identidade-imobiliario-antiga` e os 15 literais de cor. Sobre a branch, a obsolescência
-some e o pacote é gerado; os 15 literais de cor, que este PR não toca, continuam. O `urbi-empacotar`
+some e o pacote é gerado; os 15 literais de cor, que este PR não tocou, continuavam (zerados pelo PR
+seguinte, na seção acima). O `urbi-empacotar`
 do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitaria a chave antiga.
 `validar-frontend.sh` e `validar-backend.sh` verdes.
 
@@ -61,6 +90,9 @@ do SDK fixado empacota sem erro, mas a prova dele é fraca: ele também aceitari
 Recomendação, fora deste PR: subir o pin do `@urbiverso/sdk` (`57.0.0` → `93.0.0`), para o
 empacotador do CI auditar contra o catálogo de obsolescências atual — hoje é a instância que avisa
 primeiro.
+
+---
+
 ## 2026-10-03 — Aba Terrenos do Painel: só lotes do setor Urbitá
 
 Pedido direto do autor, sem issue: na aba **Terrenos** do Painel de estudos, lotes só aparecem se o
