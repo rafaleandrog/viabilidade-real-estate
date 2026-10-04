@@ -1090,15 +1090,22 @@ Git Bash — ver PROGRESSO).
 - Backend 100% self-contained (`backend/rotas.js`, sem `--packages=external`)
 - Sem `instanceof` cruzando shell↔app
 - Seed fora de migração; migração só transforma dados existentes
-- `shell_min = "0.53.20"` — subiu de `0.53.8` em 2026-09-04, porque os 7 parâmetros do manifesto
+- `shell_min = "0.56.23"` — subiu de `0.53.20` em 2026-10-04, porque a dependência do módulo
+  imobiliário passou a ser declarada pela identidade nova, `urbiverso/modulos-urbiverso::imobiliario`
+  (obsolescência `identidade-imobiliario-antiga`, que **gateia** a partir de 2026-10-09), e só o
+  catálogo do shell **0.56.23** conhece essa identidade: num shell anterior a app instalaria e não
+  carregaria (dependência não resolvida, app `!saudavel`). O piso é o `shell_min`, e não o
+  `sdk_min`, porque a troca é de valor no manifesto e não muda a superfície do SDK — o `sdk_min`
+  segue `87`, o que o bloco `dependencias` exige.
+  O degrau anterior (`0.53.8` → `0.53.20`, 2026-09-04) veio dos 7 parâmetros do manifesto, que
   migraram de `inicial` para `padrao` (obsolescência `parametro-inicial`, que **gateia** a partir
-  de 2026-09-06) e `padrao` só é reconhecido a partir de **0.53.20**; num shell anterior o
-  manifesto reprova com uma mensagem que nomeia o campo ANTIGO. **Não** subiu para `0.54.0`: o
-  caminho relativo de `api()` funciona em toda versão do resolver, então a app não passa a
-  **exigir** aquele shell — ela só parou de usar uma capacidade removida (`api-slug-manual`).
-  O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio do retorno declarativo de
-  migração (`remover_colunas`), cujo fluxo canônico substituto exige `dados.limparColuna`
-  (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
+  de 2026-09-06): `padrao` só é reconhecido a partir de **0.53.20**, e num shell anterior o
+  manifesto reprova com uma mensagem que nomeia o campo ANTIGO. Naquele degrau o piso **não**
+  subiu para `0.54.0`: o caminho relativo de `api()` funciona em toda versão do resolver, então a
+  app não passou a **exigir** aquele shell — ela só parou de usar uma capacidade removida
+  (`api-slug-manual`). O degrau de antes (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio do
+  retorno declarativo de migração (`remover_colunas`), cujo fluxo canônico substituto exige
+  `dados.limparColuna` (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
   **não** bumpa a `versao` — ela descreve o schema, e nada de schema mudou.
 
 - **Parâmetro do manifesto: `padrao`, e o default é VIVO.** A chave chama-se `padrao` (o nome

@@ -37,7 +37,7 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
 | **Nome da tag / release** | `viabilidade-a<x.y.z>_<sha8>` (ex.: `viabilidade-a0.1.0_c03c34e1`; o `-a` é o tipo app — a forma `-v` antiga está em obsolescência) — ver [Lançar uma release](#lançar-uma-release) |
 | **Web component** | `app-viabilidade` |
 | **Prefixo de rota** | shell prefixa tudo com `/api/viabilidade/` — **nunca** escreva o prefixo você mesmo |
-| **Versão do shell / SDK alvo** | `shell_min` = `0.53.20`; `sdk_min` = `87` (exigido pelo bloco `dependencias`); `@urbiverso/sdk` fixado = `57.0.0` (os dois não andam juntos desde 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
+| **Versão do shell / SDK alvo** | `shell_min` = `0.56.23`; `sdk_min` = `87` (exigido pelo bloco `dependencias`); `@urbiverso/sdk` fixado = `57.0.0` (os dois não andam juntos desde 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
 | **Escopo** | **Somente MVP.** Tudo marcado como "v2" na spec fica **de fora**. |
 
 ### Fontes de verdade que você DEVE ler (não invente contratos)
@@ -55,12 +55,16 @@ Se um contrato (comando, formato, assinatura de `req.*`, API do Núcleo) puder s
 1. **Backend 100% self-contained.** `backend/rotas.js` roda em produção sem `npm install`. Use o comando de build canônico (com `--minify` e o banner `createRequire`). Nada de `--packages=external` no backend.
 2. **Sem `instanceof` cruzando o limite shell↔app.** Faça matching por propriedade (`erro?.name === '...'` ou um `codigo` estável). Prefira `import type` quando só precisa da identidade de tipo.
 3. **Seed inicial fora de migração.** `schema.json` é o genesis da app — numa instalação virgem o schema nasce no estado final e as migrações sofrem baseline (registradas sem rodar). Dados semente devem ser idempotentes no boot ou declarativos. Migração é só para transformar dados de instâncias que já têm a app.
-4. **`shell_min` honesto.** `0.53.20`, formato `x.y.z` completo. Subiu de `0.53.8` para `0.53.20` em 2026-09-04: os 7 parâmetros do manifesto
-   migraram de `inicial` para `padrao`, e `padrao` só é reconhecido a partir de **0.53.20** —
-   num shell anterior o manifesto reprova nomeando o campo antigo. **Não** subiu para `0.54.0`:
-   o caminho relativo de `api()` sempre funcionou, então a app não passa a exigir aquele shell,
-   ela só parou de usar uma capacidade removida. Subir o piso **não** bumpa a `versao`.
-   O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio da migração `003`, que
+4. **`shell_min` honesto.** `0.56.23`, formato `x.y.z` completo. Subiu de `0.53.20` para `0.56.23` em 2026-10-04:
+   a dependência do módulo imobiliário passou a ser declarada pela identidade nova,
+   `urbiverso/modulos-urbiverso::imobiliario`, que só o catálogo do shell **0.56.23** conhece —
+   num shell anterior a app instalaria e não carregaria. Subir o piso **não** bumpa a `versao`.
+   O degrau anterior (`0.53.8` → `0.53.20`, 2026-09-04) veio dos 7 parâmetros do manifesto, que
+   migraram de `inicial` para `padrao`, e `padrao` só é reconhecido a partir de **0.53.20** — num
+   shell anterior o manifesto reprova nomeando o campo antigo. Naquele degrau o piso **não** subiu
+   para `0.54.0`: o caminho relativo de `api()` sempre funcionou, então a app não passou a exigir
+   aquele shell, ela só parou de usar uma capacidade removida.
+   O degrau de antes (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio da migração `003`, que
    trocou o retorno declarativo `remover_colunas` pelo fluxo canônico, que precisa de
    `dados.limparColuna` (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). "Honesto" é literal:
    o piso declara o menor shell em que a app **de fato** roda, e mentir para baixo faz a app passar

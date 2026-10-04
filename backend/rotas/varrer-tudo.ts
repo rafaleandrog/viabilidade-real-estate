@@ -3,7 +3,7 @@
 // ⚠️ POR QUE ISTO EXISTE EM VEZ DE `dados.varrerTudo`.
 //
 // A plataforma tem o verbo `varrerTudo` desde o shell 0.53.8, e o `shell_min`
-// deste app está em `0.53.20` — acima disso — então o RUNTIME o tem.
+// deste app está acima disso — então o RUNTIME o tem.
 //
 // ⚠️ **A PREMISSA ORIGINAL DESTE HELPER CAIU em 2026-09-04, e ele sobreviveu a
 // ela.** Este comentário dizia que o SDK publicado não declarava o método:
