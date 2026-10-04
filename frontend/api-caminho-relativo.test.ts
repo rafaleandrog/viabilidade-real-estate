@@ -39,8 +39,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const APP_ID = 'viabilidade';
+
+// O manifesto declara cada módulo pela IDENTIDADE dele (`{owner}/{repo}::{slug}`), e o slug
+// dessa chave é o que as funções do wrapper passam a `urbiVerso.modulo()`. Lido do arquivo,
+// e não repetido aqui como literal, para que a frase "que o manifesto não declara" das
+// asserções abaixo seja verdade medida.
+const MANIFESTO = JSON.parse(readFileSync(new URL('../manifesto.json', import.meta.url), 'utf8'));
+const SLUGS_DECLARADOS = Object.keys(MANIFESTO.dependencias ?? {}).map((chave) => chave.split('::')[1]);
 
 // Marca da recusa vinda do resolver simulado, para distingui-la de qualquer
 // outra exceção que uma função do wrapper possa lançar.
@@ -302,11 +310,24 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
     'as funções que leem o módulo imobiliário divergiram das que chamam urbiVerso.modulo()'
   );
   for (const { fn, slug, url } of chamadasModulo) {
-    assert.equal(slug, 'imobiliario', `${fn}() chamou o módulo "${slug}", que o manifesto não declara`);
+    assert.ok(SLUGS_DECLARADOS.includes(slug), `${fn}() chamou o módulo "${slug}", que o manifesto não declara`);
     const primeiro = comBarra(url.split(/[?#]/)[0]).split('/')[1] ?? '';
     assert.ok(
       ![APP_ID, 'modulos', 'nucleo', slug].includes(primeiro),
       `${fn}() passou "${url}" a modulo() — o caminho é relativo ao módulo`
     );
   }
+});
+
+// A identidade do módulo imobiliário mudou no shell 0.56.23, e a anterior
+// (`urbiverso/urbiverso::imobiliario`) entrou em obsolescência com gate na
+// instalação. O empacotador do SDK fixado não conhece essa obsolescência nem valida
+// o bloco `dependencias` — aceitaria a chave antiga —, então é este teste que fica
+// vermelho no CI se ela voltar.
+test('o manifesto declara o módulo imobiliário pela identidade atual', () => {
+  assert.deepEqual(
+    Object.keys(MANIFESTO.dependencias ?? {}),
+    ['urbiverso/modulos-urbiverso::imobiliario'],
+    'o bloco `dependencias` deve declarar só o imobiliário, pela identidade `urbiverso/modulos-urbiverso::imobiliario`'
+  );
 });

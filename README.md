@@ -58,7 +58,8 @@ Se um contrato (comando, formato, assinatura de `req.*`, API do Núcleo) puder s
 4. **`shell_min` honesto.** `0.56.23`, formato `x.y.z` completo. Subiu de `0.53.20` para `0.56.23` em 2026-10-04:
    a dependência do módulo imobiliário passou a ser declarada pela identidade nova,
    `urbiverso/modulos-urbiverso::imobiliario`, que só o catálogo do shell **0.56.23** conhece —
-   num shell anterior a app instalaria e não carregaria. Subir o piso **não** bumpa a `versao`.
+   num shell anterior a instalação seria recusada por dependência não resolvida, e o piso faz a
+   recusa nomear a causa verdadeira, a versão do shell. Subir o piso **não** bumpa a `versao`.
    O degrau anterior (`0.53.8` → `0.53.20`, 2026-09-04) veio dos 7 parâmetros do manifesto, que
    migraram de `inicial` para `padrao`, e `padrao` só é reconhecido a partir de **0.53.20** — num
    shell anterior o manifesto reprova nomeando o campo antigo. Naquele degrau o piso **não** subiu
