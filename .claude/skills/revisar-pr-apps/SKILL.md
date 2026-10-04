@@ -514,9 +514,11 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
 - **Precisão.** R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`. **Todo
   valor monetário resultado de fórmula tem 2 casas decimais.** Representações derivadas não
   monetárias (% e R$/m²) carregam precisão plena internamente e arredondam **só para exibir**.
-- **Tokens CSS do design system, nunca cor literal** — com **uma exceção real**: o CSS dos
-  documentos de impressão em `frontend/exportar.ts` roda em janela própria, onde `var(--cor-*)` não
-  resolve. Acusar isso é falso positivo.
+- **Tokens CSS do design system, nunca cor literal — sem exceção.** Inclui o CSS e os SVG dos
+  documentos de impressão em `frontend/exportar.ts`: a janela de impressão recebe o tema claro da
+  página (`cssTemaClaro`) e pinta só com `var(--cor-*)`. Literal solto em qualquer lugar do
+  frontend é achado; quem o barra é `guard-literais-cor-bundle.mjs`, sobre o bundle — o
+  `guard-tokens-css.mjs` confere os `var()`, não o literal solto.
 - **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.** Sem o
   primeiro, o default do GitHub é 6 horas e o job pendura em vez de ficar vermelho.
 - **O glob de teste precisa dos dois padrões** (`frontend/*.test.ts frontend/fixtures/*.test.ts`) —

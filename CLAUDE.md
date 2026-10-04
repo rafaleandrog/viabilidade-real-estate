@@ -850,9 +850,13 @@ plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** 
 > que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado — caiu em
 > 2026-09-03, quando a auth entrou em pé (§ Validação). Depois passou a dizer que a causa restante
 > era **a versão fixada**, e que subir o pin seria "o caminho para fechar a outra metade" — isso
-> caiu em 2026-09-04, quando o pin subiu para `57.0.0`. **Não há metade aberta nem causa
-> restante**: as duas lentes de contrato são executáveis. O que sobra é a disciplina de só publicar
-> `contratos=ok` quando as duas tiverem rodado de fato.
+> caiu em 2026-09-04, quando o pin subiu para `57.0.0`. As duas lentes de contrato são
+> executáveis, e o que sobra é a disciplina de só publicar `contratos=ok` quando as duas tiverem
+> rodado de fato. **Mas executável contra o SDK FIXADO, não contra o da instância**: o pin
+> (`57.0.0`) fica atrás do SDK que a instância roda, e o catálogo de obsolescências que a lente e o
+> `urbi-empacotar` leem é o do pin. Em 2026-10-04 a obsolescência `identidade-imobiliario-antiga`
+> (SDK 93) foi avisada primeiro pela instância, sem que lente nem empacotador a conhecessem. Pin
+> atrás da instância é ponto cego declarado, não "metade fechada".
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não

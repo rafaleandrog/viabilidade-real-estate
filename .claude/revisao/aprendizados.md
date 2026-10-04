@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v15-8c46447f -->
+<!-- corpus=v15-b8e58e74 -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -67,6 +67,12 @@ diff "parece" certo:
   autoridade é o bundle do SDK instalado (`node_modules/@urbiverso/sdk/dist/index.d.ts`), na versão
   que o `package.json` fixa — nunca o monorepo, nunca a memória.
 - **`var(--token)` que não existe.** O fallback vira cor literal disfarçada de token.
+- **Literal de cor solto, fora de `var()`** — `color: #abc`, `fill="#13a98d"`, `rgba(...)` —, em
+  qualquer arquivo do frontend, **inclusive o CSS de impressão de `frontend/exportar.ts`**. O
+  `guard-tokens-css.mjs` confere os `var()` (existência e falta de fallback) e não procura literal
+  solto; a instância conta esses literais no bundle a cada instalação e avisa na tela de Upgrades.
+  Quem barra aqui é `guard-literais-cor-bundle.mjs`, sobre o bundle. Os documentos de impressão
+  pintam com token e levam o tema claro da página (`cssTemaClaro`); literal ali é achado.
 - **Comentário `//` em `schema.json` ou `manifesto.json`.** JSON não tem comentário; o pacote é
   reprovado na instalação, antes de olhar qualquer tabela.
 - **Glob de teste que não alcança subdiretório.** `frontend/*.test.ts` sozinho não pega
@@ -145,9 +151,5 @@ de string não mede comportamento de comando.
 
 ## 11. O que NÃO é achado aqui
 
-- Cor literal no CSS de impressão/PDF de `frontend/exportar.ts`: roda em janela própria, onde
-  `var(--cor-*)` não resolve. É exceção declarada.
-- Aviso de "N literais de cor fora de token" do empacotador: a heurística conta o **fallback** de
-  `var(--token, #hex)`, que é o uso correto.
 - Estilo, preferência, nomenclatura, e qualquer código que o diff **não toca**.
 - O que já está em `retirados.md`. Leia-o antes de escrever o achado.
