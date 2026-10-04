@@ -961,8 +961,9 @@ bash scripts/validar-frontend.sh
 Ele roda os **guards estáticos** (aspas curvas em posição de atributo + **JSON estrito** em
 `schema.json`/`manifesto.json` + ciclos de FK), depois autentica o SDK
 (`scripts/lib/sdk-auth.sh`) e roda `pnpm install`, linka os pacotes e executa **typecheck do
-frontend + testes de frontend + build do bundle (esbuild) + os guards de UI e de endereços + o
-render em Chromium**. Verde = mudança de frontend validada.
+frontend + testes de frontend + build do bundle (esbuild) + os guards de UI e de endereços + a
+contagem de literais de cor no bundle buildado + o render em Chromium**. Verde = mudança de
+frontend validada.
 
 > Este parágrafo dizia "5 etapas" e "ignorando o 401 do SDK". Hoje são **8**, e o 401 não acontece
 > mais quando o token está no ambiente. O `|| true` do install **fica**: sem token o 401 volta, e o
@@ -1127,7 +1128,7 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-fluxo-custos.ts:770-772`); `frontend/exportar.ts:16` importa `fmtR$` em
   > vez de definir formatador próprio; a tabela de sensibilidade da proforma usa `fmtR$(v, false)`
   > (`frontend/tela-proforma.ts:503`, #492). A #449 unificou a célula do Fluxo de Caixa: `celula`
-  > (`frontend/fluxo-tabela.ts:40`) e `celulaFx` (`frontend/exportar.ts:229`, CSV/PDF) chamam a
+  > (`frontend/fluxo-tabela.ts:40`) e `celulaFx` (`frontend/exportar.ts:416`, CSV/PDF) chamam a
   > mesma função (`celula` de `frontend/viab-format.ts`) — 2 casas, limiar de célula vazia
   > `< R$ 0,005`, mesma representação de negativo — e `_fmtContabil`
   > (`frontend/tela-proforma.ts:358`) e `precoUnit`/`precoTotal`
@@ -1190,10 +1191,11 @@ Git Bash — ver PROGRESSO).
     do app. A janela de impressão é um documento à parte e não herda as variáveis do shell, então
     ela recebe as regras `:root[data-theme="light"]` das folhas da página (`cssTemaClaro`) e fixa
     `<html data-theme="light">`: o papel sai claro qualquer que seja o tema escolhido na tela, com
-    os valores que a instância dá aos tokens. Token só em `color`; borda, `fill` e `stroke` usam
-    `currentColor`, para que, se a regra do tema não for achada, o documento caia no texto preto
-    do navegador com bordas e linhas visíveis. Barras e linhas do SVG ganham cor por classe, nunca
-    por atributo.
+    os valores que a instância dá aos tokens. As bordas são escritas como `border: 1px solid` mais
+    um `border-color: var(--cor-*)` à parte, e o SVG pinta com `fill`/`stroke: currentColor` sobre
+    um `color: var(--cor-*)` por classe (nunca cor por atributo): se a regra do tema não for
+    achada, o token fica inválido, a borda cai na cor do texto e o documento sai no preto do
+    navegador, com bordas e linhas visíveis.
     > ⚠️ **Esta nota já mandou o contrário** — *"Exceção real… cor literal é a única opção. Não
     > 'corrija' isso"* — e sustentou 15 literais que a instância avisava na tela de Upgrades a cada
     > release. As duas premissas eram falsas: o tema pode ser levado à janela, e o tema claro já é a
@@ -1208,14 +1210,16 @@ Git Bash — ver PROGRESSO).
     hoje não há caso. A mesma conta roda na **instalação**, sobre o bundle do pacote, e aparece na
     tela de Upgrades da instância.
     **Defesa, em duas camadas:**
-    - `scripts/guard-tokens-css.mjs` reprova **qualquer** fallback em token `--cor-*` do espelho —
-      `#hex`, `rgba()`, `transparent`, cor nomeada ou outro `var()`; enumerar formas de literal não
-      converge. Hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém fallback. Ele lê o
-      **fonte**, e só dentro de `css`/`html`/`svg` do lit — template sem tag fica de fora.
-    - `scripts/guard-literais-cor-bundle.mjs` (etapa 7/8 do `validar-frontend.sh`) faz a conta da
-      plataforma **sobre o bundle buildado**, e a régua é **zero**, sem lista de exceção. O contador
-      é cópia do auditor embutido no `urbi-empacotar` (`scripts/lib/literais-cor.mjs`). É ele que
-      enxerga o template sem tag que o guard de fonte não lê.
+    - `scripts/guard-tokens-css.mjs` confere **todo** `var()` do fonte — em qualquer template ou
+      string, inclusive o CSS de impressão, que é template sem tag: o token tem de existir no
+      espelho e não pode ter fallback (`#hex`, `rgba()`, `transparent`, cor nomeada ou outro
+      `var()`; enumerar formas de literal não converge). Hook próprio (`--urbi-*`, `--x` declarado
+      pelo app) mantém fallback. O que ele **não** procura é literal de cor **solto**, fora de
+      `var()` — `color: #abc` passa nele, e foi assim que os 15 literais atravessaram.
+    - `scripts/guard-literais-cor-bundle.mjs` (etapa 7/8 do `validar-frontend.sh`) cobre exatamente
+      isso: faz a conta da plataforma **sobre o bundle buildado**, com régua **zero** e sem lista de
+      exceção. O contador é cópia do auditor embutido no `urbi-empacotar`
+      (`scripts/lib/literais-cor.mjs`).
     Se o aviso voltar, um dos dois falha antes do empacotador — não "explique" o número.
 - Só usar primitivos `urbi-*` disponíveis no `ui.md` do shell — e **só as props que eles declaram**:
   atributo inexistente num primitivo não dá erro, ele simplesmente **não faz nada** (falha

@@ -8,11 +8,12 @@
 // POR QUE EXISTE. A instância roda, na instalação de toda release, a auditoria
 // heurística de "cor fora de token" da plataforma sobre o `frontend/` do
 // pacote, e mostra o resultado como aviso na tela de Upgrades. Nada aqui
-// rodava essa conta: o `guard-tokens-css.mjs` lê o FONTE, só dentro de `css`
-// do lit, e não enxerga cor num template sem tag — foi assim que o CSS dos
-// documentos de impressão de `frontend/exportar.ts` manteve 15 literais que só
-// a instância contava. Este guard faz a mesma conta da plataforma
-// (`scripts/lib/literais-cor.mjs`), sobre o mesmo artefato: o bundle.
+// rodava essa conta: o `guard-tokens-css.mjs` confere os `var()` do fonte
+// (token existe, sem fallback), mas não procura literal de cor SOLTO — foi
+// assim que o CSS dos documentos de impressão de `frontend/exportar.ts`
+// manteve 15 literais que só a instância contava. Este guard faz a mesma conta
+// da plataforma (`scripts/lib/literais-cor.mjs`), sobre o mesmo artefato: o
+// bundle.
 //
 // A régua é ZERO, sem lista de exceção: o design system resolve toda cor de
 // tema por `var(--cor-*)`, inclusive nos documentos de impressão, que embutem

@@ -6,8 +6,9 @@
 // Origem: `scripts/lib/auditoria-tokens.js` da plataforma, embutido no bin do
 // `urbi-empacotar` (`node_modules/@urbiverso/sdk/dist/cli/empacotar.js`). É o
 // auditor que roda no empacotamento e de novo na instalação, e cujo resultado
-// aparece na tela de Upgrades como a etapa "tokens de tema". As três expressões
-// abaixo são as mesmas no SDK fixado (57.0.0) e no da instância (93.0.0).
+// aparece na tela de Upgrades como a etapa "tokens de tema". As expressões e a
+// lista de extensões abaixo são as mesmas no SDK fixado (57.0.0) e no da
+// instância (93.0.0).
 //
 // ⚠️ É CÓPIA. As regras de contagem (`RE_*`, a exclusão de dígitos puros curtos
 // e a remoção de comentário de bloco) precisam ficar idênticas às da

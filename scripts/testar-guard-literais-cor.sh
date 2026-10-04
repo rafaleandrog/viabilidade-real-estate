@@ -46,6 +46,15 @@ caso css             1 estilo.css 'a { color: #abc }'
 caso html            1 pagina.html '<p style="color:#abcdef">x</p>'
 caso subdiretorio    1 sub/dir/index.js 'x = "#abc"'
 caso comentario-linha 1 index.js '// #abcdef ainda conta: a plataforma só tira comentário de bloco'
+# Uma linha por alternativa da expressão de função e pela flag `i`: tirar
+# qualquer uma da cópia tem de deixar um caso vermelho.
+caso hsla            1 index.js 'x = "hsla(1,2%,3%,.5)"'
+caso oklab           1 index.js 'x = "oklab(0.5 0.1 0.1)"'
+caso lab             1 index.js 'x = "lab(50% 10 10)"'
+caso lch             1 index.js 'x = "lch(50% 10 10)"'
+caso color-fn        1 index.js 'x = "color(srgb 1 0 0)"'
+caso maiusculas      1 index.js 'x = "RGBA(0,0,0,1)"'
+caso extensao-maiuscula 1 INDEX.JS 'x = "#abcdef"'
 
 # ── não conta (sai 0) ───────────────────────────────────────────────────────
 caso limpo           0 index.js 'const s = `td { color: var(--cor-texto); border-bottom: 1px solid; }`;'
@@ -58,8 +67,9 @@ caso hash-longo      0 index.js 'x = "#0123456789abcdef"'
 # ficou FORA da varredura. Depois, com um .js limpo ao lado, têm de sair 0.
 caso extensao-fora   2 index.js.map '{"x":"#abcdef"}'
 caso node-modules    2 node_modules/lib/index.js 'x = "#abcdef"'
+caso dotdir          2 .oculto/index.js 'x = "#abcdef"'
 
-for nome in extensao-fora node-modules; do
+for nome in extensao-fora node-modules dotdir; do
   printf 'x = 1' > "$TMPRAIZ/$nome/index.js"
   node "$GUARD" "$TMPRAIZ/$nome" >/dev/null 2>&1
   saiu=$?

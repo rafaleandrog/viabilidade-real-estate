@@ -13,9 +13,9 @@ que o `CLAUDE.md` tratava como exceção permanente. O autor autorizou reverter 
 
 - **Como:** a janela de impressão recebe as regras `:root[data-theme="light"]` das folhas da página
   (`cssTemaClaro`, síncrona, sem rede) e fixa `<html data-theme="light">`. O CSS de impressão passa
-  a usar só `var(--cor-*)`: token só em `color`, e `currentColor` para borda, `fill` e `stroke`; os
-  SVG ganham classes (`pos`, `neg`, `eixo`, `rotulo`, `linha`, `payback`) no lugar de cor por
-  atributo. O documento do fluxo foi extraído para `htmlFluxo`, puro, como já era `htmlProforma`;
+  a usar só `var(--cor-*)`, com as bordas em `border: 1px solid` mais `border-color` à parte; os SVG
+  ganham classes (`pos`, `neg`, `eixo`, `rotulo`, `linha`, `payback`), com `fill`/`stroke:
+  currentColor` sobre o `color` da classe, no lugar de cor por atributo. O documento do fluxo foi extraído para `htmlFluxo`, puro, como já era `htmlProforma`;
   `exportarPDF` e `exportarFluxoPDF` viraram invólucros que passam o tema da página.
 - **Sem a regra do tema** (folha de outra origem, seletor que mudou), o documento cai no texto preto
   do navegador, com bordas e linhas visíveis, e o console avisa. Medido no Chromium: origem em

@@ -257,7 +257,11 @@ export interface DocumentoComFolhas {
   readonly adoptedStyleSheets?: ArrayLike<{ readonly cssRules: ArrayLike<RegraCssLida> }>;
 }
 
-/** O seletor do tema claro, contrato do design system (`ui.md` § Temas do SDK). */
+/**
+ * O seletor do tema claro, como o `ui.md` do SDK descreve os temas (§ Temas: cada um vive em
+ * `:root[data-theme="X"]` no `tokens.css`). É convenção documentada, não API de cópia: nenhum doc
+ * garante que a folha fica legível em `document.styleSheets`, e por isso a ausência degrada.
+ */
 const SELETOR_TEMA_CLARO = ':root[data-theme="light"]';
 
 function ehRegraTemaClaro(seletor: string): boolean {
@@ -776,7 +780,7 @@ export function htmlFluxo(
     td.v { font-variant-numeric: tabular-nums; }
     svg .pos { color: var(--cor-sucesso); fill: currentColor; }
     svg .neg { color: var(--cor-erro); fill: currentColor; }
-    svg .eixo { color: var(--cor-borda-forte); stroke: currentColor; }
+    svg .eixo { color: var(--cor-texto-fraco); stroke: currentColor; }
     svg .rotulo { color: var(--cor-texto-sec); fill: currentColor; }
     svg .linha { color: var(--cor-texto-forte); stroke: currentColor; fill: none; }
     svg line.payback { color: var(--cor-sucesso); stroke: currentColor; }
@@ -791,7 +795,7 @@ export function htmlFluxo(
   </body></html>`;
 }
 
-/** PDF do fluxo: abre `htmlFluxo` numa janela e imprime. Os parâmetros são os de `htmlFluxo`. */
+/** PDF do fluxo: abre `htmlFluxo` numa janela e imprime. Os parâmetros são os de `htmlFluxo`, menos o `temaCss`, que vem de `cssTemaClaro(document)`. */
 export function exportarFluxoPDF(
   estudo: any,
   c: FluxoCalc,

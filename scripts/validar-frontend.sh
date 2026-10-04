@@ -305,10 +305,11 @@ tst=$?
 
 # O bundle vai para um diretório temporário, e não para `/dev/null`, porque o
 # guard abaixo lê o ARTEFATO: a instância conta literais de cor no bundle do
-# pacote, a cada instalação, e avisa na tela de Upgrades. Contar no fonte não
-# serve — o `guard-tokens-css.mjs` não enxerga template sem tag, e foi por aí
-# que os documentos de impressão guardaram 15 literais que só a instância via.
-bundle_dir="$(mktemp -d)"
+# pacote, a cada instalação, e avisa na tela de Upgrades. O `guard-tokens-css.mjs`
+# confere os `var()`, mas não procura literal de cor solto, e foi por aí que os
+# documentos de impressão guardaram 15 literais que só a instância via.
+bundle_dir="$(mktemp -d)" && [ -n "$bundle_dir" ] || { echo "  mktemp FALHOU"; exit 1; }
+trap 'rm -rf "$bundle_dir"' EXIT
 "$esbuild_bin" frontend/index.ts --bundle --external:@urbiverso/ui \
   --format=esm --outfile="$bundle_dir/index.js" --target=es2022 --minify --tsconfig=tsconfig.json
 bd=$?

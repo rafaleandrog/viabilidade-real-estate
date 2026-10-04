@@ -3277,7 +3277,7 @@ primeira edição. A #260 migra todos os demais consumidores para o resolver can
 documento, contra o contrato **C7** do Anexo A.
 
 **Essa armadilha fechou com a #449** (2026-08-24): `fluxo-tabela.ts:40` e a exportação
-(`exportar.ts:412`, `celulaFx`) chamam a MESMA `celula` de `viab-format.ts`; a coluna R$ da Proforma
+(`exportar.ts:416`, `celulaFx`) chamam a MESMA `celula` de `viab-format.ts`; a coluna R$ da Proforma
 (`celulaProforma`, `exportar.ts:76` — a tela a reexporta; e `celulaProformaM2`,
 `tela-proforma.ts:52` — ambas extraídas de método privado pela #567) e `tela-fluxo-receitas.ts:451-452`
 (`precoUnit`/`precoTotal`) passaram a compartilhar formatador com a tela. A mesma célula sai
