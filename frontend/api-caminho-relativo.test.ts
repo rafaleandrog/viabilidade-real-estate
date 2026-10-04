@@ -77,6 +77,7 @@ const SEM_CHAMADA_API: Record<string, string> = {
   listarGlebasNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
   listarLotesNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
   listarParcelamentosNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
+  listarSetoresHabitacionaisNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
   buscarImovelNucleo: 'urbiVerso.modulo() — o shell monta /api/<app>/modulos/<slug> sem o resolver',
   uploadDocumentoApelo: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
   uploadDocumentoEmpreendimento: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
@@ -101,7 +102,7 @@ const ARG_ATIVO = {
 // Quantas funções o wrapper exporta. Trava a porta que a lista de exceção
 // deixaria aberta: função nova que nasça com o slug entra no laço abaixo em
 // vez de passar despercebida.
-const FUNCOES_EXPORTADAS = 79;
+const FUNCOES_EXPORTADAS = 80;
 
 type Registro = { fn: string; url: string };
 
@@ -306,7 +307,7 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   // modulos/…` e um 404. O único módulo declarado no manifesto é o imobiliário.
   assert.deepEqual(
     [...new Set(chamadasModulo.map((c) => c.fn))].sort(),
-    ['buscarImovelNucleo', 'listarGlebasNucleo', 'listarLotesNucleo', 'listarParcelamentosNucleo'],
+    ['buscarImovelNucleo', 'listarGlebasNucleo', 'listarLotesNucleo', 'listarParcelamentosNucleo', 'listarSetoresHabitacionaisNucleo'],
     'as funções que leem o módulo imobiliário divergiram das que chamam urbiVerso.modulo()'
   );
   for (const { fn, slug, url } of chamadasModulo) {
