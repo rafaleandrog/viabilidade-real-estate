@@ -7,6 +7,6 @@ export const caso = {
   nome: 'painel-terrenos-setor-sem-permissao',
   exigir: [{ seletor: 'urbi-hospedeiro[slot="terrenos"]', minimo: 1 }],
   aceitaNaoReproduzido: [...aceitaNaoReproduzidoBase, 'urbi-banner.variante'],
-  montar: montarCaso(true),
+  montar: montarCaso('sem-permissao'),
   medir: medirCaso,
 };

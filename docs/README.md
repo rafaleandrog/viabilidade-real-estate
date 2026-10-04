@@ -99,8 +99,9 @@ tem exportação própria. Ver [Exportação](exportacao).
 
 ## Para administradores
 
-Antes do primeiro estudo: conceda ao app a leitura de **imóveis**, **parcelamentos** e **setores habitacionais** do Núcleo em
-*Admin → Apps → viabilidade → Núcleo* (sem isso, só o terreno manual funciona); crie os
+Antes do primeiro estudo: conceda ao app a leitura de **imóveis** e **parcelamentos** do Núcleo em
+*Admin → Apps → viabilidade → Núcleo* (sem isso, só o terreno manual funciona) e, para os lotes
+aparecerem na aba **Terrenos** do Painel, a de **setores habitacionais**; crie os
 **benchmarks** de cada tipo de empreendimento; revise os **parâmetros** do app (alíquotas e
 percentuais padrão, prazo de arquivamento, limite da coleta de mercado) em *Admin → Apps →
 viabilidade*; e, se for usar a análise de mercado, cadastre as **regiões monitoradas**

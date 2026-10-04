@@ -8,7 +8,7 @@ import { naoDeclaradas, declaracoesOciosas, motivoParaPular, relato } from './ap
 
 const pular = await motivoParaPular();
 
-type Extra = { linhas: string[]; aviso: string };
+type Extra = { linhas: string[]; aviso: string; carregada: boolean };
 
 async function rodar(caso: string) {
   const a = await verificarRender({ caso, larguras: [1280] });
@@ -28,6 +28,7 @@ test('Terrenos: lote só do setor Urbitá, gleba qualquer uma', { skip: pular ??
     `só o lote do parcelamento do setor Urbitá e as duas glebas podiam aparecer. Linhas: ${JSON.stringify(extra.linhas)}` + relato(a),
   );
   assert.equal(extra.aviso, '', 'com o setor resolvido não há banner de lotes ocultos' + relato(a));
+  assert.equal(extra.carregada, true, 'carga completa marca a aba como carregada' + relato(a));
 });
 
 test('Terrenos: sem permissão em setores habitacionais, esconde TODOS os lotes e avisa (fail-closed)', { skip: pular ?? false }, async () => {
@@ -36,5 +37,16 @@ test('Terrenos: sem permissão em setores habitacionais, esconde TODOS os lotes 
     [...extra.linhas].sort(), ['GLEBA-A', 'GLEBA-B'],
     `sem identificar o setor nenhum lote pode aparecer; as glebas seguem. Linhas: ${JSON.stringify(extra.linhas)}` + relato(a),
   );
-  assert.match(extra.aviso, /Lotes ocultos/, 'o motivo tem que aparecer na tela' + relato(a));
+  assert.match(extra.aviso, /Lotes ocultos.*setores habitacionais/, 'o motivo tem que aparecer na tela' + relato(a));
+  assert.equal(
+    extra.carregada, false,
+    'falha de leitura não pode marcar a aba como carregada — senão conceder a permissão só vale recarregando o app' + relato(a),
+  );
+});
+
+test('Terrenos: setor Urbitá inexistente esconde os lotes, avisa e fica carregado', { skip: pular ?? false }, async () => {
+  const { extra, a } = await rodar('painel-terrenos-setor-inexistente');
+  assert.deepEqual([...extra.linhas].sort(), ['GLEBA-A', 'GLEBA-B'], `lotes ocultos, glebas seguem. Linhas: ${JSON.stringify(extra.linhas)}` + relato(a));
+  assert.match(extra.aviso, /não foi encontrado/, 'o aviso diz que o setor não foi encontrado' + relato(a));
+  assert.equal(extra.carregada, true, 'resposta (setor ausente) não é falha: não repete a varredura a cada visita' + relato(a));
 });

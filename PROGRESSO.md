@@ -15,11 +15,14 @@ parcelamento deles pertence ao setor Urbitá; glebas, qualquer uma.
   `listarSetoresHabitacionaisNucleo`. O setor é o que tiver "urbita" no `slug` ou no `nome`
   (sem acento nem caixa). Lógica pura em `frontend/terrenos-setor.ts`, ligada em
   `_carregarTerrenos` de `frontend/tela-dashboard.ts`.
-- **Fail-closed:** setor não encontrado, flag sem permissão ou erro de rede → nenhum lote aparece e
-  um banner diz o motivo (as glebas continuam). O filtro de regularização do seletor de lote
+- **Fail-closed:** setor não encontrado, ou leitura de setores/parcelamentos sem permissão ou com erro
+  → nenhum lote aparece e um banner diz o motivo (as glebas continuam). Falha de leitura não marca a
+  aba como carregada, então conceder a permissão vale na próxima visita; falha na paginação das
+  próprias glebas/lotes continua derrubando a aba inteira ("Núcleo indisponível"). O filtro de regularização do seletor de lote
   desliga quando falha; aqui desligar mostraria justamente o que a regra esconde.
 - **Paginação:** a aba trazia só a 1ª página (100) de glebas e lotes; como o corte é no cliente,
-  passou a paginar em 200 até acabar.
+  passou a paginar em 200 até acabar — guiada por `paginas` quando a resposta traz, e por "página
+  incompleta" só como reserva, para um teto de servidor menor que 200 não truncar a lista.
 - **Fica para o autor:** conceder a leitura de **setores habitacionais** em Admin → Apps →
   viabilidade → Núcleo (a aba esconde os lotes até lá). O **seletor de lote da Incorporação não foi
   alterado** e segue a regra da #746 (exclui lotes de parcelamento com setor habitacional) — oposta

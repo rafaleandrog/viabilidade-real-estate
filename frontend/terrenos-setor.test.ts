@@ -61,3 +61,28 @@ test('coletarPaginas acumula até a página vir incompleta ou acabar `paginas`',
   // Resposta sem `dados` não quebra.
   assert.deepEqual(await coletarPaginas(async () => ({}), 2), []);
 });
+
+test('coletarPaginas: `paginas` manda — página curta por teto de servidor menor NÃO encerra a coleta', async () => {
+  const pedidas: number[] = [];
+  // Servidor clampeia em 2 por página (o pedido foi 200): 3 páginas, a última com 1 item.
+  const r = await coletarPaginas(async (p) => {
+    pedidas.push(p);
+    return { dados: p < 3 ? [{ id: p * 10 }, { id: p * 10 + 1 }] : [{ id: 99 }], paginas: 3 };
+  }, 200);
+  assert.deepEqual(pedidas, [1, 2, 3]);
+  assert.equal(r.length, 5);
+});
+
+test('coletarPaginas: sem `paginas`, página incompleta encerra; cheia continua; vazia sempre encerra', async () => {
+  const a: number[] = [];
+  await coletarPaginas(async (p) => { a.push(p); return { dados: p === 1 ? [{ id: 1 }, { id: 2 }] : [{ id: 3 }] }; }, 2);
+  assert.deepEqual(a, [1, 2], 'cheia (2) continua; incompleta (1) encerra');
+
+  const b: number[] = [];
+  await coletarPaginas(async (p) => { b.push(p); return { dados: p < 3 ? [{ id: p }, { id: p + 10 }] : [] }; }, 2);
+  assert.deepEqual(b, [1, 2, 3], 'página vazia encerra mesmo sem `paginas`');
+
+  const c: number[] = [];
+  await coletarPaginas(async (p) => { c.push(p); return { dados: [], paginas: 9 }; }, 2);
+  assert.deepEqual(c, [1], 'vazia encerra mesmo quando `paginas` promete mais');
+});
