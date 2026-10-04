@@ -374,7 +374,8 @@ despachar:
 > pin do SDK for uma versão sem `docs/`"* e listava verbos do SDK e obsolescências como
 > descobertos. Com o pin `57.0.0` as duas lentes rodam, e a única pergunta que continua sendo do
 > autor é a aderência de `shell_min` ao que a instância de fato roda — essa nenhum bundle
-> responde.
+> responde. O outro ponto cego é o do catálogo: as lentes leem o SDK **fixado**, e obsolescência
+> mais nova que o pin só aparece na instância (ver § Superfície de leitura, item 1).
 >
 > **`contratos=ok` só quando a lente de doc de fato rodar.** Publicá-lo porque "o SDK está no disco"
 > é afirmação plausível e falsa — a classe que o `CLAUDE.md` registra como armadilha 11.
@@ -524,7 +525,9 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
   janela recebe o tema claro da página (`cssTemaClaro`) e pinta só com `var(--cor-*)`. Literal solto
   em código que **chega ao bundle** é achado; quem o barra é `guard-literais-cor-bundle.mjs`, sobre o
   bundle — o `guard-tokens-css.mjs` confere os `var()`, não o literal solto. Arquivo de teste não
-  chega ao bundle e pode citar cor de propósito: não é achado.
+  chega ao bundle e pode citar cor de propósito: não é achado. Fallback em token de tema `--cor-*`
+  (`var(--cor-texto, #fff)`) é achado; hook próprio (`--urbi-*`, `--x` declarado pelo app) mantém
+  fallback, e não é.
 - **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.** Sem o
   primeiro, o default do GitHub é 6 horas e o job pendura em vez de ficar vermelho.
 - **O glob de teste precisa dos dois padrões** (`frontend/*.test.ts frontend/fixtures/*.test.ts`) —
