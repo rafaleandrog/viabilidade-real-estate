@@ -144,7 +144,7 @@ percentual) — o quantificador é sobre **toda família com VGV**, inclusive a 
 sobre o total não é 5% sobre o VGV residencial — e, mesmo então, o relatório diz que a base no
 Avançado passa a ser a receita de caixa. E a linha em R$ tem um caso em que o motor a zera: ela é
 rateada por `distribuirProporcional` sobre a receita de vendas, e com receita vendável zero —
-catálogo vazio, ou todas as unidades reservadas em permuta física — a série sai zerada, enquanto
+catálogo vazio, preço zero, ou todas as unidades reservadas em permuta física — a série sai zerada, enquanto
 `calcularProforma` deduz a permuta fixa independentemente do VGV. A planejadora detecta receita
 vendável zero e, em vez de gravar uma linha que o motor zera, acusa no relatório a permuta
 financeira que o Avançado não consegue lançar. Quatro armadilhas que as versões anteriores desta regra tinham:
@@ -245,13 +245,16 @@ deixá-lo depois do commit reabriria o estado "estudo sem editor, inacessível" 
 compensa hoje. Consequência de desenho: os helpers que **escrevem** e que o executor reusa — `garantirMembro`,
 que recebe hoje `req` e escreve por `req.dados`, e o `criarLinhaCusto` que o PR 1 vai extrair de
 `POST /custos` — recebem o **handle de dados** (`HelperDados`, o mesmo tipo de `req.dados` e do `trx` em
-`dist/index.d.ts`), senão escrevem fora da transação sem erro de compilação. `lerCronograma` só lê
-`avancado_cronograma` (`listar`), que o upgrade não grava — os eventos vêm de `cronogramaPadrao()`
-—, então lê-lo antes do `trx` é inócuo; e as linhas de custo do upgrade ancoram por
+`dist/index.d.ts`), senão escrevem fora da transação sem erro de compilação. o cronograma do estudo
+novo não é lido de lugar nenhum: o estudo só existe dentro do `trx`, e `lerCronograma(req, estudo)`
+filtra por `estudo.id`; o executor monta os eventos pelo caminho puro que `lerCronograma` usa quando
+não há linhas — `cronogramaPadrao()` filtrado por `tem_pre_lancamento` e passado por
+`recalcularTravados` —, sem I/O; e as linhas de custo do upgrade ancoram por
 `cronograma_evento`, nunca por `fase_ancora_id`, então `ancorarLinhaCustoEmFase` (que lê
 `avancado_fases`) não é chamado — o grupo de receita que o upgrade grava **dentro** do `trx` não é
-âncora de custo nenhum. Quem resolve a âncora é o chamador: `criarLinhaCusto` recebe o cronograma
-já lido e aplica `ancorarLinhaCusto`, a função pura. O teste de fiação do § 5 exige a forma de chamada com o `trx`. O que
+âncora de custo nenhum. Quem resolve a âncora é o chamador: `criarLinhaCusto(dados, estudo, linha, cronograma)` recebe
+os eventos já montados e aplica `ancorarLinhaCusto`, a função pura; o ramo `fase_ancora_id` da rota
+(`ancorarLinhaCustoEmFase`) fica na rota, porque o upgrade não o usa. O teste de fiação do § 5 exige a forma de chamada com o `trx`. O que
 fica **fora**, depois do commit, é só o que não é tabela da app: `inscreverMembroEstudo` e
 `publicarEvento`, que usam `req.eventos` — o bundle não diz se o barramento aceita o `trx` (em
 migração ele registra que `eventos` *"escreve fora da transação"*; em runtime não diz nada), e é
@@ -270,7 +273,11 @@ do modo legado: o upgrade calcula o valor efetivo (canônico; na falta, o legado
 mantém a unidade original (`rs_m2_priv`, `pct_constr`) quando ela reconcilia ao centavo com a base
 convertida — senão a linha sai em R$ (`orcamento_valor_canonico`), com a divergência no relatório.
 É a mesma disciplina da permuta financeira (§ 3.5), e vale para toda linha cuja premissa tenha um
-canônico. Achado P1 do App do Codex na revisão deste documento.
+canônico — e também para toda linha em `rs_m2_priv` **sem** canônico (Decoração): a base do
+Avançado é `areaPrivativaTotalLinhas` sobre as áreas quantizadas a 2 casas (§ 3.2), que pode
+diferir da área privativa do Preliminar, e essa linha alimenta as bases de Gestão da obra
+(`pct_obra`) e Projetos (`pct_constr`). A regra é uma só: unidade original se o total reconciliar
+ao centavo com a base convertida, senão R$ com o custo efetivo do Preliminar. Achado P1 do App do Codex na revisão deste documento.
 
 ## 4. Mapeamento consolidado (corrige e completa a tabela da #833)
 
@@ -281,10 +288,10 @@ canônico. Achado P1 do App do Codex na revisão deste documento.
 | Produto (`tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade` pelo tipo **efetivo** (`tipoProdutoEfetivo`: tudo que não for exatamente `nao_residencial` é residencial): `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
 | Grupo de receita | `avancado_fases` tipo `receita`, nome por `proximoNumeroFase`, `absorcaoPadrao`, plano canônico via `planoDeNascimento` | 100% do catálogo alocado | § 3.4 |
 | Cronograma | nada a gravar | `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
-| `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | `rs_m2_terreno` só quando as duas bases coincidem; senão R$ | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); quando as duas regras dão áreas diferentes, a linha sai em R$ com o total efetivo do Preliminar (`custo_terreno_m2 × areaTerrenoDe`), e o relatório declara |
+| `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | `rs_m2_terreno` só quando as duas bases coincidem; senão R$ | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); quando as duas regras dão áreas diferentes, a linha sai em R$ com o total efetivo do Preliminar (`custoTerreno` de `calcularProforma`, que já é `custo_terreno_m2 × areaTerrenoDe` — `areaTerrenoDe` é privada; `Proforma.areaTerreno` é o campo público), e o relatório declara |
 | `custo_construcao_m2` / `construcao_valor_total` (`construcao_valor_canonico` com precedência) | `obra / Construção`, `rs_m2_priv` / `rs`, evento `obra` | unidade original se o valor efetivo reconciliar, senão R$ | § 3.2, § 3.12 |
 | `infra_*` (Loteamento; `infra_valor_canonico` com precedência) | `obra / Construção` | `valor_m2` → `rs_m2_priv` se reconciliar; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.8, § 3.12 |
-| `custo_decoracao_m2` | `obra / Decoração`, `rs_m2_priv` | direto | |
+| `custo_decoracao_m2` | `obra / Decoração`, `rs_m2_priv` | `rs_m2_priv` se o total reconciliar com a área quantizada, senão R$ | § 3.12: sem canônico, mas a base muda com a quantização, e ela alimenta `pct_obra` e `pct_constr` |
 | `taxa_gestao_pct` | `obra / Gestão da obra`, `pct_obra` | manter % | § 3.6 |
 | `contingencias_pct` (se `considerar_contingencias`) | `obra / Contingência`, `pct_vgv` | decisão § 3.1 | |
 | `projetos_*` (`projetos_valor_canonico` com precedência) | `diretos / Projetos` | `pct_constr` se reconciliar; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.12 |
@@ -355,7 +362,7 @@ Estritamente serial onde há arquivo compartilhado; um assunto por PR (R3).
 
 | # | Issue | Escopo | Por que nesta posição |
 |---|---|---|---|
-| 1 | **#813 (a)** | semear as três linhas obrigatórias no servidor ao criar estudo Avançado, extraindo de `POST /custos` um `criarLinhaCusto(dados: HelperDados, estudo, linha)` reusável — recebe o handle de dados, não `req`, para caber no `trx` do PR 4 (§ 3.11) | é o helper que o upgrade precisa; sozinho, fecha um bug P3 que a #833 cita como restrição |
+| 1 | **#813 (a)** | semear as três linhas obrigatórias no servidor ao criar estudo Avançado, extraindo de `POST /custos` um `criarLinhaCusto(dados: HelperDados, estudo, linha, cronograma)` reusável — recebe o handle de dados e os eventos do cronograma, não `req`, para caber no `trx` do PR 4 (§ 3.11) | é o helper que o upgrade precisa; sozinho, fecha um bug P3 que a #833 cita como restrição |
 | 2 | **#832** | aposentar (a) ou condicionar (b) `CAMADAS_DIVERGEM_PERMUTA_FISICA`; e `validarCustosDuplicados` passa a chavear a permuta física por `permuta_tipologia_id` (§ 3.9) | independente do upgrade, mas o critério 6 da #833 depende dela; e sem ela todo estudo gerado com permuta física nasce com alerta falso |
 | 3 | **#834** | regime e alíquota fora do RET no Avançado | § 3.7: sem ela o upgrade de estudo fora do RET nasce sem imposto |
 | 4 | **#833, backend** | `planejarDerivacao` + executor + rota + testes puros e de fiação + docs | depende de 1 e 3; toca `backend/`, então `validar-backend.sh` |
@@ -366,8 +373,9 @@ desta leitura): (1) `% VGV` não aceito → R$ congelado [recomendo sim]; (2) pe
 § 3.9 [recomendo]; (3) gestão da obra → `pct_obra` [recomendo]; (4) base do `% VGV` para as linhas
 que o Avançado aceita em % → manter % e declarar, com `corretagem_sobre_permuta_fisica = false`
 [recomendo]; (5) área aberta → ratear e reescrever o critério 2 [recomendo]; (6) permuta financeira
-→ uma linha em R$ com a soma dos valores efetivos [recomendo]; `%` só como opção sua, pelo predicado
-da § 3.5 e com a base de caixa declarada; (7) rastreabilidade → `notas`, sem coluna nova [recomendo]. E uma correção de premissa
+→ uma linha em R$ com a soma dos valores efetivos [recomendo], virando alerta quando não há receita
+vendável para rateá-la (§ 3.5); `%` só como opção sua, pelo predicado da § 3.5 e com a base de caixa
+declarada; (7) rastreabilidade → `notas`, sem coluna nova [recomendo]. E uma correção de premissa
 que não é decisão: o executor nasce em `req.dados.transaction()` (§ 3.11).
 
 ## 7. Riscos e o que não dá para medir daqui
@@ -389,3 +397,5 @@ que não é decisão: o executor nasce em `req.dados.transaction()` (§ 3.11).
   no Avançado; o relatório acusa, e o teste precisa do caso.
 - **Resíduo de quantização** das áreas a 2 casas (§ 3.2) entra no relatório do upgrade como
   diferença declarada, nunca como "igual".
+- **Permuta financeira sem receita vendável** (§ 3.5) não é lançada no Avançado; o relatório acusa,
+  e o teste precisa do caso.
