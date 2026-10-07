@@ -77,7 +77,9 @@ construção em `rs_m2_priv` (base `areaPrivativaTotalLinhas`, fechada + aberta)
 Preliminar, que multiplica `custo_construcao_m2` pela área privativa total (fechada + aberta).
 
 Não há mapeamento que preserve VGV **e** construção ao mesmo tempo. Recomendação: **ratear a aberta
-(proporcional à fechada, dentro da família) e reescrever o critério 2 fixando a base**: o que se
+(proporcional à fechada, dentro da família; família com área aberta e sem tipologia efetiva não
+recebe rateio — a planejadora acusa no relatório a área que o Avançado não representa, sem
+bloquear) e reescrever o critério 2 fixando a base**: o que se
 compara é o VGV **bruto** — Σ área × preço × unidades do catálogo do Preliminar (`porTipo.*.vgv`,
 antes de deduzir a permuta) contra Σ `vgvTipologia` do Avançado (`ctx.vgvTotal`, também bruto).
 Nessa base, "VGV igual quando não há área aberta; com área aberta, a diferença é Σ aberta × preço"
@@ -254,7 +256,9 @@ não há linhas — `cronogramaPadrao()` filtrado por `tem_pre_lancamento` e pas
 `avancado_fases`) não é chamado — o grupo de receita que o upgrade grava **dentro** do `trx` não é
 âncora de custo nenhum. Quem resolve a âncora é o chamador: `criarLinhaCusto(dados, estudo, linha, cronograma)` recebe
 os eventos já montados e aplica `ancorarLinhaCusto`, a função pura; o ramo `fase_ancora_id` da rota
-(`ancorarLinhaCustoEmFase`) fica na rota, porque o upgrade não o usa. O teste de fiação do § 5 exige a forma de chamada com o `trx`. O que
+(`ancorarLinhaCustoEmFase`) e o ramo de semeadura idempotente (`emSerie` + `semeaduraExistente`,
+PR 806) ficam na rota: o upgrade não ancora em fase e cria as três obrigatórias num estudo novo,
+sem linhas para deduplicar. O teste de fiação do § 5 exige a forma de chamada com o `trx`. O que
 fica **fora**, depois do commit, é só o que não é tabela da app: `inscreverMembroEstudo` e
 `publicarEvento`, que usam `req.eventos` — o bundle não diz se o barramento aceita o `trx` (em
 migração ele registra que `eventos` *"escreve fora da transação"*; em runtime não diz nada), e é
@@ -285,10 +289,10 @@ ao centavo com a base convertida, senão R$ com o custo efetivo do Preliminar. A
 |---|---|---|---|
 | Colunas de identidade, terreno, coeficientes, `notas`, `descricao`, `matricula`, `regiao_mercado_id`, `tem_pre_lancamento` | mesmas colunas | `montarCopiaEstudo` menos as 12 colunas de permuta física; `nivel_analise = 'avancado'`, `status = 'rascunho'` | as colunas de custo do Preliminar viajam juntas e ficam inertes — é o que o `duplicar` já faz, e é rastreabilidade de graça |
 | `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | mesmas tabelas | como o `duplicar`: `estudo_imoveis` no laço próprio que o precede, as outras três por `FILHAS_SIMPLES` | `preliminar_produtos` copiado **e** convertido: a cópia é a trilha do que gerou o catálogo; o Avançado não a lê (`produtosDoEstudo` devolve cru) |
-| Produto (`tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade` pelo tipo **efetivo** (`tipoProdutoEfetivo`: tudo que não for exatamente `nao_residencial` é residencial): `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
+| Produto (`nome`, `ordem`, `tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` (com `nome` e `ordem`) + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade` pelo tipo **efetivo** (`tipoProdutoEfetivo`: tudo que não for exatamente `nao_residencial` é residencial): `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
 | Grupo de receita | `avancado_fases` tipo `receita`, nome por `proximoNumeroFase`, `absorcaoPadrao`, plano canônico via `planoDeNascimento` | 100% do catálogo alocado | § 3.4 |
 | Cronograma | nada a gravar | `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
-| `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | `rs_m2_terreno` só quando as duas bases coincidem; senão R$ | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); quando as duas regras dão áreas diferentes, a linha sai em R$ com o total efetivo do Preliminar (`custoTerreno` de `calcularProforma`, que já é `custo_terreno_m2 × areaTerrenoDe` — `areaTerrenoDe` é privada; `Proforma.areaTerreno` é o campo público), e o relatório declara |
+| `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | `rs_m2_terreno` só quando as duas bases coincidem; senão R$ | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); quando as duas regras dão áreas diferentes, a linha sai em R$ com o total efetivo do Preliminar (`custoTerreno` de `calcularProforma` chamado **sem `sensibilidade`**, para o fator valer 1 — ele já aplica `considerar_custo_terreno` e `custo_terreno_m2 × areaTerrenoDe`; `areaTerrenoDe` é privada, `Proforma.areaTerreno` é o campo público), e o relatório declara |
 | `custo_construcao_m2` / `construcao_valor_total` (`construcao_valor_canonico` com precedência) | `obra / Construção`, `rs_m2_priv` / `rs`, evento `obra` | unidade original se o valor efetivo reconciliar, senão R$ | § 3.2, § 3.12 |
 | `infra_*` (Loteamento; `infra_valor_canonico` com precedência) | `obra / Construção` | `valor_m2` → `rs_m2_priv` se reconciliar; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.8, § 3.12 |
 | `custo_decoracao_m2` | `obra / Decoração`, `rs_m2_priv` | `rs_m2_priv` se o total reconciliar com a área quantizada, senão R$ | § 3.12: sem canônico, mas a base muda com a quantização, e ela alimenta `pct_obra` e `pct_constr` |
@@ -327,9 +331,10 @@ vai para `notas`.
    (`backend/rotas/varrer-tudo.ts`, que aceita o handle) e nunca com `listar` de página fixa — o
    `duplicar` lê `estudo_imoveis` com `por_pagina: 100` e as `FILHAS_SIMPLES` com 500, e trunca em
    silêncio acima disso (achado à parte para o autor); toda escrita dentro de um
-   **`req.dados.transaction()`** (§ 3.11): `garantirMembro` e `criarLinhaCusto` recebem o `trx`;
-   `coagirNumericosOuLancar`, `omitirValoresNulos` e `ancorarLinhaCusto` são puras, e
-   `lerCronograma` só lê, então nenhuma delas muda de assinatura. A planejadora pura arredonda as
+   **`req.dados.transaction()`** (§ 3.11): `garantirMembro(trx, …)` e
+   `criarLinhaCusto(trx, estudo, linha, cronograma)` recebem o `trx` como handle de dados;
+   `coagirNumericosOuLancar`, `omitirValoresNulos` e `ancorarLinhaCusto` são puras e não mudam; o
+   executor **não** chama `lerCronograma` — monta os eventos pelo caminho puro da § 3.11. A planejadora pura arredonda as
    áreas das tipologias a 2 casas antes de devolvê-las — a regra é a de `moeda()` em `proforma.ts`
    e do `round2` privado de `fluxo-caixa-motor.ts` (`Math.round(v × 100) ÷ 100`); o PR 4 exporta
    um dos dois em vez de escrever um terceiro —, porque é ela, e não o INSERT, que
