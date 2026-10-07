@@ -53,8 +53,10 @@ Duas saídas, e são decisão do autor (é a mesma classe da decisão 1 da #833)
 - **(b) congelar em R$** (`orcamento_valor_canonico`) — o número é preservado, a premissa vira
   valor absoluto.
 
-Para a **Corretagem** há um terceiro caminho, e ele é o único sem perda: `corretagem_sobre_permuta_fisica = false`
-(#473) faz o motor usar `vgvVendidoVendavelMensal`, a mesma base líquida do Preliminar. **O upgrade
+Para a **Corretagem** há um terceiro caminho, o mais próximo da base do Preliminar:
+`corretagem_sobre_permuta_fisica = false` (#473) faz o motor usar `vgvVendidoVendavelMensal`, o VGV
+líquido de permuta física — a mesma grandeza que o Preliminar usa, embora o valor não feche em
+fórmula com permuta física (§ 3.2: unidades inteiras valoradas com fechada e aberta). **O upgrade
 deve gravar `false`** nessa coluna — o default do schema é `true`, que reproduz a base bruta.
 
 ### 3.2 Área aberta na Incorporação: ratear nas tipologias quebra o critério 2 da issue
@@ -77,8 +79,13 @@ Não há mapeamento que preserve VGV **e** construção ao mesmo tempo. Recomend
 (proporcional à fechada, dentro da família) e reescrever o critério 2 fixando a base**: o que se
 compara é o VGV **bruto** — Σ área × preço × unidades do catálogo do Preliminar (`porTipo.*.vgv`,
 antes de deduzir a permuta) contra Σ `vgvTipologia` do Avançado (`ctx.vgvTotal`, também bruto).
-Nessa base, "VGV igual quando não há área aberta; com área aberta, a diferença é exatamente
-Σ aberta × preço" vale **com ou sem permuta física**, porque nenhum dos dois lados a deduz. A
+Nessa base, "VGV igual quando não há área aberta; com área aberta, a diferença é Σ aberta × preço"
+vale **com ou sem permuta física**, porque nenhum dos dois lados a deduz — e a expectativa sai dos
+valores **quantizados** que serão persistidos, não da fórmula: `area_privativa_m2` e
+`area_privativa_aberta_m2` têm escala 2 no `schema.json`, enquanto a área derivada de `pct_alv`
+(4 casas) ÷ unidades não é arredondada, então mesmo sem área aberta o VGV bruto pode divergir em até
+0,005 m² × unidades × preço por tipologia. O teste compara Σ (área gravada × unidades × preço) e o
+relatório declara o resíduo de quantização. A
 permuta física tem conferência própria, separada: unidades reservadas × área unitária contra a área
 canônica do Preliminar, com o resíduo do § 3.9 declarado no relatório. O que **não** fecha em fórmula
 é o VGV vendável: o Preliminar deduz a área da família valorada pelo preço médio da base fechada, e
@@ -115,25 +122,32 @@ No Preliminar a permuta financeira é por família e por modo: `permuta_financei
 escolhe entre `pct_vgv` (sobre o VGV residencial) e `valor_fixo` (R$), e a família NR tem o par
 próprio; o valor efetivo é o canônico (`permuta_financeira_*_valor_canonico`), com o legado como
 fallback — é o que `calcularProforma` lê. No Avançado é uma linha `terreno / Preço / Permuta
-financeira` em `pct_vgv` sobre o VGV **total**, ou em R$. Duas linhas com a mesma subcategoria
+financeira`, em R$ ou em `pct_vgv` — e o `%` do Avançado **não incide sobre o VGV**:
+`permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts`) aplica a taxa à **receita de
+caixa** do plano de pagamento, com juros de tabela e, conforme os dois flags da linha, menos imposto
+e corretagem. Duas linhas com a mesma subcategoria
 acionam `validarCustosDuplicados` (`fluxo-invariantes.ts`) na Reconciliação.
 
 A regra, então, parte do **valor efetivo de cada família**, calculado exatamente como
 `calcularProforma` o calcula (canônico; na falta dele, o legado pelo modo — `valor_fixo` vale mesmo
-sem VGV da família, porque `canonico()` não olha o VGV). A linha sai em `pct_vgv` **só quando toda
-família com valor efetivo maior que zero está em `pct_vgv`, à mesma taxa, tem VGV, e o canônico —
-quando gravado — bate ao centavo com taxa × VGV da família** (o canônico tem precedência
-incondicional em `calcularProforma`, mesmo no modo percentual, e pode estar velho em relação ao
-catálogo; um canônico que não reconcilia é R$); em qualquer outro caso — qualquer `valor_fixo` ou canônico não nulo, taxas diferentes,
-uma taxa zero com a outra não, família em `pct_vgv` sem VGV — a linha sai em R$ com a **soma dos
-valores efetivos**. E mesmo no caso em `%` o número muda quando há permuta física: o `%` do
-Preliminar incide sobre o VGV **líquido** da família, o `pct_vgv` do Avançado sobre o bruto total
-(§ 3.1) — declarado no relatório. Três armadilhas que as versões anteriores desta regra tinham:
+sem VGV da família, porque `canonico()` não olha o VGV), e **a linha sai em R$ com a soma dos
+valores efetivos** (`orcamento_valor_canonico`). É a regra, não a exceção, porque o `%` do Avançado
+é outra grandeza: incide sobre a receita de caixa, que o estudo gerado ainda não tem (juros e plano
+ficam por preencher), então uma linha em `%` mudaria de valor a cada passo que o usuário completasse —
+e nem sem permuta física ela reproduziria o Preliminar, cujo `%` incide sobre o VGV líquido da
+família. Manter `%` fica como **opção declarada do autor**, só quando toda família com VGV está em
+`pct_vgv` à mesma taxa, sem `valor_fixo` com valor e com canônico que reconcilie ao centavo com
+taxa × VGV (o canônico tem precedência incondicional em `calcularProforma`, mesmo no modo
+percentual) — o quantificador é sobre **toda família com VGV**, inclusive a de taxa zero, porque 5%
+sobre o total não é 5% sobre o VGV residencial — e, mesmo então, o relatório diz que a base no
+Avançado passa a ser a receita de caixa. Quatro armadilhas que as versões anteriores desta regra tinham:
 em `valor_fixo` o campo de percentual fica residual (zero nos dois lados, por exemplo) e "os
 percentuais coincidem" criaria uma linha em 0% descartando o valor real; X% sobre o VGV total não
 é X% sobre o VGV de uma família só, então "um é zero" nunca é caso de percentual; e "só uma
 família tem VGV" descartava o `valor_fixo` da família sem catálogo, que o Preliminar deduz
-(achados do App do Codex e da lente de delta na revisão deste documento).
+; e "`pct_vgv` sobre o bruto total" descrevia a base dos custos em `% VGV`, não a da permuta
+financeira, que é de caixa (achados do App do Codex e das lentes de delta na revisão deste
+documento).
 
 ### 3.6 Gestão da obra em `pct_obra` muda de base de verdade
 
@@ -182,8 +196,10 @@ acusa, como alerta, a permuta que o Avançado não consegue representar — nunc
 `permuta_quantidade = 0` em silêncio. E as **duas** linhas de uma Incorporação (R e NR) têm a mesma
 chave `terreno::Preço::Permuta física` em `validarCustosDuplicados` (`frontend/fluxo-invariantes.ts`),
 que acusaria `CATEGORIA_CUSTO_DUPLICADA` em todo estudo gerado com as duas famílias: a invariante
-passa a distinguir linhas de permuta física por `permuta_tipologia_id` — mudança pequena, no mesmo
-arquivo que a #832 toca, e por isso entra no PR 2 da fila (achado P2 do App do Codex na revisão
+passa a distinguir linhas de permuta física por `permuta_tipologia_id` — duas linhas para a **mesma**
+tipologia continuam acusadas, duas para tipologias diferentes deixam de ser (a reserva do motor já é
+por tipologia), e linha sem tipologia cai na chave antiga; mudança pequena, no mesmo arquivo que a
+#832 toca, e por isso entra no PR 2 da fila (achado P2 do App do Codex na revisão
 deste documento). "Maior quantidade" como critério
 único estava errado: o resíduo depende da área unitária, não da quantidade — 80 m² de permuta
 numa tipologia de 200 m² arredondam para zero unidades e perdem a permuta inteira, enquanto uma
@@ -215,16 +231,31 @@ estado parcial e um tombstone de soft-delete, e só existia porque a premissa er
 O que entra na transação é tudo o que escreve em tabela da app pelo helper de dados — inclusive
 `garantirMembro`, que grava `estudo_membros` por `req.dados.criar` (`backend/permissoes-estudo.ts`):
 deixá-lo depois do commit reabriria o estado "estudo sem editor, inacessível" que o `duplicar`
-compensa hoje. Consequência de desenho: os helpers que o executor reusa — `garantirMembro`,
-`lerCronograma`, `ancorarLinhaCustoEmFase` e o `criarLinhaCusto` proposto no PR 1 — recebem hoje
-`req` e escrevem por `req.dados`; eles passam a receber o **handle de dados** (`req.dados` ou o `trx`),
-senão escrevem fora da transação sem erro de compilação. O teste de fiação do § 5 exige isso. O que
+compensa hoje. Consequência de desenho: os helpers que **escrevem** e que o executor reusa — `garantirMembro`
+e o `criarLinhaCusto` proposto no PR 1 — recebem hoje `req` e escrevem por `req.dados`; eles passam a
+receber o **handle de dados** (`HelperDados`, o mesmo tipo de `req.dados` e do `trx` em
+`dist/index.d.ts`), senão escrevem fora da transação sem erro de compilação. `lerCronograma` e
+`ancorarLinhaCustoEmFase` só leem (`listar`/`buscar`) e o upgrade não grava cronograma nem fase,
+então ler fora do `trx` é inócuo. O teste de fiação do § 5 exige a forma de chamada com o `trx`. O que
 fica **fora**, depois do commit, é só o que não é tabela da app: `inscreverMembroEstudo` e
 `publicarEvento`, que usam `req.eventos` — o bundle não diz se o barramento aceita o `trx` (em
 migração ele registra que `eventos` *"escreve fora da transação"*; em runtime não diz nada), e é
 pergunta para o autor levar à plataforma. A premissa falsa nos dois comentários do repositório é
 achado à parte, fora deste estudo: o `duplicar` pode ser reescrito pelo mesmo caminho. Achados da
 lente de contratos e da lente de delta na revisão deste documento.
+
+### 3.12 O canônico dos custos tem precedência, e "direto" tem de passar por ele
+
+Infraestrutura, Construção e Projetos guardam um valor canônico em R$ (`infra_valor_canonico`,
+`construcao_valor_canonico`, `projetos_valor_canonico`), e `calcularProforma` o usa com precedência
+incondicional sobre o modo e o campo legados (`canonico(e.construcao_valor_canonico, construcaoLegada)`
+em `frontend/proforma.ts`, e o mesmo para os outros dois). O canônico é gravado quando o usuário
+edita o campo e pode estar velho em relação às áreas de hoje. Então a linha do Avançado **não** nasce
+do modo legado: o upgrade calcula o valor efetivo (canônico; na falta, o legado pelo modo), e só
+mantém a unidade original (`rs_m2_priv`, `pct_constr`) quando ela reconcilia ao centavo com a base
+convertida — senão a linha sai em R$ (`orcamento_valor_canonico`), com a divergência no relatório.
+É a mesma disciplina da permuta financeira (§ 3.5), e vale para toda linha cuja premissa tenha um
+canônico. Achado P1 do App do Codex na revisão deste documento.
 
 ## 4. Mapeamento consolidado (corrige e completa a tabela da #833)
 
@@ -236,16 +267,16 @@ lente de contratos e da lente de delta na revisão deste documento.
 | Grupo de receita | `avancado_fases` tipo `receita`, nome por `proximoNumeroFase`, `absorcaoPadrao`, plano canônico via `planoDeNascimento` | 100% do catálogo alocado | § 3.4 |
 | Cronograma | nada a gravar | `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
 | `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | direto, com ressalva | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); o relatório declara quando as duas regras dão áreas diferentes |
-| `custo_construcao_m2` / `construcao_valor_total` | `obra / Construção`, `rs_m2_priv` / `rs`, evento `obra` | direto | § 3.2 |
-| `infra_*` (Loteamento) | `obra / Construção` | `valor_m2` → `rs_m2_priv`; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.8 |
+| `custo_construcao_m2` / `construcao_valor_total` (`construcao_valor_canonico` com precedência) | `obra / Construção`, `rs_m2_priv` / `rs`, evento `obra` | unidade original se o valor efetivo reconciliar, senão R$ | § 3.2, § 3.12 |
+| `infra_*` (Loteamento; `infra_valor_canonico` com precedência) | `obra / Construção` | `valor_m2` → `rs_m2_priv` se reconciliar; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.8, § 3.12 |
 | `custo_decoracao_m2` | `obra / Decoração`, `rs_m2_priv` | direto | |
 | `taxa_gestao_pct` | `obra / Gestão da obra`, `pct_obra` | manter % | § 3.6 |
 | `contingencias_pct` (se `considerar_contingencias`) | `obra / Contingência`, `pct_vgv` | decisão § 3.1 | |
-| `projetos_*` | `diretos / Projetos` | `pct_constr` direto; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | |
+| `projetos_*` (`projetos_valor_canonico` com precedência) | `diretos / Projetos` | `pct_constr` se reconciliar; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.12 |
 | `incorporacao_registro_pct` | `terreno / Registro`, R$ congelado | só `rs`/`rs_m2_priv` | |
 | `manutencao_pct` | `diretos / Manutenção pós-obra`, `pct_vgv` | decisão § 3.1 | nasce ancorada em `pos_obra` |
 | `marketing_percentual` | `diretos / Marketing & Publicidade`, `pct_vgv` | decisão § 3.1 | |
-| `corretagem_percentual` | linha obrigatória `diretos / Corretagem de vendas`, `pct_vgv` + `corretagem_sobre_permuta_fisica = false` | direto | § 3.1 |
+| `corretagem_percentual` | linha obrigatória `diretos / Corretagem de vendas`, `pct_vgv` + `corretagem_sobre_permuta_fisica = false` | direto na premissa; o valor difere com permuta física | § 3.1, § 3.2 |
 | `stand_vendas_valor` (Loteamento) | `indireto / Stand de vendas`, `rs` | direto | |
 | `gestao_indiretos_pct` (se `considerar_gestao_indiretos`) | `indireto / Gestão`, `pct_vgv` | decisão § 3.1 | |
 | `sujeito_ret = true` | `considerar_ret = true`, `ret_pct = aliquota_ret_pct` da instância (`req.parametros.obter`) | direto | |
@@ -270,13 +301,16 @@ vai para `notas`.
    tipologias, grupo, alocacoes, custos, relatorio }`, sem I/O. É onde moram os testes de número
    (VGV, área, as três obrigatórias, nenhuma coluna de permuta, `corretagem_sobre_permuta_fisica`);
 2. **executor** que grava na ordem tipologias → grupo → alocações → custos (a permuta física
-   precisa dos ids das tipologias e das alocações), reusando `coagirNumericosOuLancar`,
+   precisa dos ids das tipologias e das alocações), lendo as filhas da origem com `varrerTudo`
+   (`backend/rotas/varrer-tudo.ts`, que aceita o handle) e nunca com `listar` de página fixa — o
+   `duplicar` lê `estudo_imoveis` com `por_pagina: 100` e as `FILHAS_SIMPLES` com 500, e trunca em
+   silêncio acima disso (achado à parte para o autor); reusando `coagirNumericosOuLancar`,
    `omitirValoresNulos`, `ancorarLinhaCusto` + `lerCronograma` (ancoragem das linhas, a mesma do
    `POST /custos`) e `garantirMembro`, todos recebendo o `trx` de um **`req.dados.transaction()`**
    (§ 3.11); só `inscreverMembroEstudo` e `publicarEvento` rodam depois do commit.
 
 **Fiação.** Teste que lê o fonte da rota e exige a forma de chamada (`planejarDerivacao(`,
-`corretagem_sobre_permuta_fisica`), no molde do PR 626 — apagar a chamada deixa os testes puros
+`corretagem_sobre_permuta_fisica`, `garantirMembro(trx`, `criarLinhaCusto(trx`), no molde do PR 626 — apagar a chamada deixa os testes puros
 verdes, e é a classe de defeito nº 1 do `CLAUDE.md`.
 
 **Tela.** Um botão no cabeçalho do estudo Preliminar (`frontend/tela-estudo.ts`, ao lado de
@@ -312,8 +346,8 @@ desta leitura): (1) `% VGV` não aceito → R$ congelado [recomendo sim]; (2) pe
 § 3.9 [recomendo]; (3) gestão da obra → `pct_obra` [recomendo]; (4) base do `% VGV` para as linhas
 que o Avançado aceita em % → manter % e declarar, com `corretagem_sobre_permuta_fisica = false`
 [recomendo]; (5) área aberta → ratear e reescrever o critério 2 [recomendo]; (6) permuta financeira
-→ `pct_vgv` só com as duas famílias em `pct_vgv` à mesma taxa, senão R$ canônico numa linha
-[recomendo]; (7) rastreabilidade → `notas`, sem coluna nova [recomendo]. E uma correção de premissa
+→ uma linha em R$ com a soma dos valores efetivos [recomendo]; `%` só como opção sua, pelo predicado
+da § 3.5 e com a base de caixa declarada; (7) rastreabilidade → `notas`, sem coluna nova [recomendo]. E uma correção de premissa
 que não é decisão: o executor nasce em `req.dados.transaction()` (§ 3.11).
 
 ## 7. Riscos e o que não dá para medir daqui
