@@ -35,7 +35,8 @@ fechar o desenho — o mapeamento tem lacunas que o código revela e que a issue
 ## 3. O que a #833 erra ou não cobre — achados desta leitura
 
 Cada item abaixo muda o número do estudo gerado, o desenho da rota ou uma premissa de que a issue
-parte. Estão em ordem de impacto.
+parte. As dez primeiras estão em ordem de impacto; as duas últimas (§ 3.11 e § 3.12) foram
+acrescentadas pela revisão deste documento e pesam tanto quanto as primeiras.
 
 ### 3.1 A base do "% do VGV" é diferente nos dois níveis
 
@@ -84,8 +85,9 @@ vale **com ou sem permuta física**, porque nenhum dos dois lados a deduz — e 
 valores **quantizados** que serão persistidos, não da fórmula: `area_privativa_m2` e
 `area_privativa_aberta_m2` têm escala 2 no `schema.json`, enquanto a área derivada de `pct_alv`
 (4 casas) ÷ unidades não é arredondada, então mesmo sem área aberta o VGV bruto pode divergir em até
-0,005 m² × unidades × preço por tipologia. O teste compara Σ (área gravada × unidades × preço) e o
-relatório declara o resíduo de quantização. A
+0,005 m² × unidades × preço por tipologia. Quem quantiza é a planejadora pura (`round2` nas áreas, § 5), não o INSERT — nenhum código da app
+arredonda antes de gravar, e deixar isso para o `NUMERIC` do Postgres tiraria do teste os valores que
+ele compara. O teste compara Σ (área quantizada × unidades × preço) e o relatório declara o resíduo. A
 permuta física tem conferência própria, separada: unidades reservadas × área unitária contra a área
 canônica do Preliminar, com o resíduo do § 3.9 declarado no relatório. O que **não** fecha em fórmula
 é o VGV vendável: o Preliminar deduz a área da família valorada pelo preço médio da base fechada, e
@@ -144,8 +146,8 @@ Avançado passa a ser a receita de caixa. Quatro armadilhas que as versões ante
 em `valor_fixo` o campo de percentual fica residual (zero nos dois lados, por exemplo) e "os
 percentuais coincidem" criaria uma linha em 0% descartando o valor real; X% sobre o VGV total não
 é X% sobre o VGV de uma família só, então "um é zero" nunca é caso de percentual; e "só uma
-família tem VGV" descartava o `valor_fixo` da família sem catálogo, que o Preliminar deduz
-; e "`pct_vgv` sobre o bruto total" descrevia a base dos custos em `% VGV`, não a da permuta
+família tem VGV" descartava o `valor_fixo` da família sem catálogo, que o Preliminar deduz;
+e "`pct_vgv` sobre o bruto total" descrevia a base dos custos em `% VGV`, não a da permuta
 financeira, que é de caixa (achados do App do Codex e das lentes de delta na revisão deste
 documento).
 
@@ -173,21 +175,25 @@ preencher — pior, porque é o caminho silencioso que a #834 descreve.
 - `avancado_tipologias.tipo_unidade` tem `padrao: 'apartamento'`; a tela de Tipologias do
   Loteamento esconde o seletor. O upgrade de Loteamento deve gravar **`lote`** (existe nas `opcoes`
   do schema, não na lista `TIPOS_UNIDADE_INC` da tela — e não precisa estar).
-- Infraestrutura em `valor_m2` (R$/m² da ALV) mapeia **direto** para `obra / Construção` em
-  `rs_m2_priv`: no Avançado `areaPrivativaTotalLinhas` do Loteamento é Σ área × unidades das
-  tipologias = ALV quando os produtos somam 100%. Só `pct_vgv` precisa congelar em R$ (decisão 1 da
-  #833). `valor_fixo` é `rs` direto.
+- Infraestrutura em `valor_m2` (R$/m² da ALV) mapeia para `obra / Construção` em `rs_m2_priv`
+  quando o valor efetivo reconcilia (§ 3.12): no Avançado `areaPrivativaTotalLinhas` do Loteamento
+  é Σ área × unidades das tipologias = ALV quando os produtos somam 100%. `valor_fixo` vai em `rs`
+  com o valor efetivo (canônico, se houver). Só `pct_vgv` precisa congelar em R$ (decisão 1 da
+  #833).
 - Estudo Preliminar de Loteamento não tem construção, decoração, gestão da obra nem registro
   (`lot ? 0 : …` em `calcularProforma`): essas linhas não são criadas, e a linha obrigatória
   **Construção** recebe a infraestrutura.
 
 ### 3.9 Permuta física m² → unidades: regra proposta
 
-Por família (R → tipologias cuja origem é produto `residencial`; NR → `nao_residencial`; no
-Loteamento tudo é residencial), a área canônica (`permuta_fisica_area_canonica`, ou o derivado
+Por família (R → tipologias cuja origem é produto de tipo efetivo `residencial`, NR →
+`nao_residencial`, sempre por `tipoProdutoEfetivo` — `tipo` nulo é residencial, como no
+`calcularProforma`; no Loteamento tudo é residencial), a área canônica (`permuta_fisica_area_canonica`, ou o derivado
 legado quando nula — a mesma leitura de `calcularProforma`) é convertida em unidades de **uma**
 tipologia da família: **elegível** é a tipologia da família com área unitária maior que zero e
-unidades alocadas maiores que zero; para cada uma, `unidades = round(A ÷ área unitária)`, limitado
+unidades alocadas maiores que zero; para cada uma, `unidades = round(A ÷ área unitária)` — com a área unitária **já quantizada** a 2 casas,
+a mesma que a planejadora grava em `area_privativa_m2` (§ 3.2), senão a área crua pode arredondar
+para zero onde a gravada arredonda para uma —, limitado
 às unidades alocadas (a regra do Avançado desde a #792: permutadas ⊆ alocadas), e o resíduo é
 `|A − unidades × área unitária|`; **vence a tipologia de menor resíduo** (empate: a de maior
 quantidade). O resíduo em m² vai para o relatório do upgrade. Se `unidades` der zero em toda
@@ -231,9 +237,9 @@ estado parcial e um tombstone de soft-delete, e só existia porque a premissa er
 O que entra na transação é tudo o que escreve em tabela da app pelo helper de dados — inclusive
 `garantirMembro`, que grava `estudo_membros` por `req.dados.criar` (`backend/permissoes-estudo.ts`):
 deixá-lo depois do commit reabriria o estado "estudo sem editor, inacessível" que o `duplicar`
-compensa hoje. Consequência de desenho: os helpers que **escrevem** e que o executor reusa — `garantirMembro`
-e o `criarLinhaCusto` proposto no PR 1 — recebem hoje `req` e escrevem por `req.dados`; eles passam a
-receber o **handle de dados** (`HelperDados`, o mesmo tipo de `req.dados` e do `trx` em
+compensa hoje. Consequência de desenho: os helpers que **escrevem** e que o executor reusa — `garantirMembro`,
+que recebe hoje `req` e escreve por `req.dados`, e o `criarLinhaCusto` que o PR 1 vai extrair de
+`POST /custos` — recebem o **handle de dados** (`HelperDados`, o mesmo tipo de `req.dados` e do `trx` em
 `dist/index.d.ts`), senão escrevem fora da transação sem erro de compilação. `lerCronograma` e
 `ancorarLinhaCustoEmFase` só leem (`listar`/`buscar`) e o upgrade não grava cronograma nem fase,
 então ler fora do `trx` é inócuo. O teste de fiação do § 5 exige a forma de chamada com o `trx`. O que
@@ -263,7 +269,7 @@ canônico. Achado P1 do App do Codex na revisão deste documento.
 |---|---|---|---|
 | Colunas de identidade, terreno, coeficientes, `notas`, `descricao`, `matricula`, `regiao_mercado_id`, `tem_pre_lancamento` | mesmas colunas | `montarCopiaEstudo` menos as 12 colunas de permuta física; `nivel_analise = 'avancado'`, `status = 'rascunho'` | as colunas de custo do Preliminar viajam juntas e ficam inertes — é o que o `duplicar` já faz, e é rastreabilidade de graça |
 | `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | mesmas tabelas | como o `duplicar`: `estudo_imoveis` no laço próprio que o precede, as outras três por `FILHAS_SIMPLES` | `preliminar_produtos` copiado **e** convertido: a cópia é a trilha do que gerou o catálogo; o Avançado não a lê (`produtosDoEstudo` devolve cru) |
-| Produto (`tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade`: `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
+| Produto (`tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade` pelo tipo **efetivo** (`tipoProdutoEfetivo`: `tipo` nulo é residencial): `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
 | Grupo de receita | `avancado_fases` tipo `receita`, nome por `proximoNumeroFase`, `absorcaoPadrao`, plano canônico via `planoDeNascimento` | 100% do catálogo alocado | § 3.4 |
 | Cronograma | nada a gravar | `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
 | `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | direto, com ressalva | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); o relatório declara quando as duas regras dão áreas diferentes |
@@ -304,10 +310,13 @@ vai para `notas`.
    precisa dos ids das tipologias e das alocações), lendo as filhas da origem com `varrerTudo`
    (`backend/rotas/varrer-tudo.ts`, que aceita o handle) e nunca com `listar` de página fixa — o
    `duplicar` lê `estudo_imoveis` com `por_pagina: 100` e as `FILHAS_SIMPLES` com 500, e trunca em
-   silêncio acima disso (achado à parte para o autor); reusando `coagirNumericosOuLancar`,
-   `omitirValoresNulos`, `ancorarLinhaCusto` + `lerCronograma` (ancoragem das linhas, a mesma do
-   `POST /custos`) e `garantirMembro`, todos recebendo o `trx` de um **`req.dados.transaction()`**
-   (§ 3.11); só `inscreverMembroEstudo` e `publicarEvento` rodam depois do commit.
+   silêncio acima disso (achado à parte para o autor); toda escrita dentro de um
+   **`req.dados.transaction()`** (§ 3.11): `garantirMembro` e `criarLinhaCusto` recebem o `trx`;
+   `coagirNumericosOuLancar`, `omitirValoresNulos` e `ancorarLinhaCusto` são puras, e
+   `lerCronograma` só lê, então nenhuma delas muda de assinatura. A planejadora pura arredonda as
+   áreas das tipologias a 2 casas (`round2`) antes de devolvê-las, porque é ela, e não o INSERT, que
+   fixa os valores que o teste do critério 2 compara (§ 3.2). Só `inscreverMembroEstudo` e
+   `publicarEvento` rodam depois do commit.
 
 **Fiação.** Teste que lê o fonte da rota e exige a forma de chamada (`planejarDerivacao(`,
 `corretagem_sobre_permuta_fisica`, `garantirMembro(trx`, `criarLinhaCusto(trx`), no molde do PR 626 — apagar a chamada deixa os testes puros
@@ -335,7 +344,7 @@ Estritamente serial onde há arquivo compartilhado; um assunto por PR (R3).
 
 | # | Issue | Escopo | Por que nesta posição |
 |---|---|---|---|
-| 1 | **#813 (a)** | semear as três linhas obrigatórias no servidor ao criar estudo Avançado, extraindo de `POST /custos` um `criarLinhaCusto(req, estudo, dados)` reusável | é o helper que o upgrade precisa; sozinho, fecha um bug P3 que a #833 cita como restrição |
+| 1 | **#813 (a)** | semear as três linhas obrigatórias no servidor ao criar estudo Avançado, extraindo de `POST /custos` um `criarLinhaCusto(dados: HelperDados, estudo, linha)` reusável — recebe o handle de dados, não `req`, para caber no `trx` do PR 4 (§ 3.11) | é o helper que o upgrade precisa; sozinho, fecha um bug P3 que a #833 cita como restrição |
 | 2 | **#832** | aposentar (a) ou condicionar (b) `CAMADAS_DIVERGEM_PERMUTA_FISICA`; e `validarCustosDuplicados` passa a chavear a permuta física por `permuta_tipologia_id` (§ 3.9) | independente do upgrade, mas o critério 6 da #833 depende dela; e sem ela todo estudo gerado com permuta física nasce com alerta falso |
 | 3 | **#834** | regime e alíquota fora do RET no Avançado | § 3.7: sem ela o upgrade de estudo fora do RET nasce sem imposto |
 | 4 | **#833, backend** | `planejarDerivacao` + executor + rota + testes puros e de fiação + docs | depende de 1 e 3; toca `backend/`, então `validar-backend.sh` |
