@@ -82,8 +82,9 @@ recebe rateio — a planejadora acusa no relatório a área que o Avançado não
 bloquear) e reescrever o critério 2 fixando a base**: o que se
 compara é o VGV **bruto** — Σ área × preço × unidades do catálogo do Preliminar (`porTipo.*.vgv`,
 antes de deduzir a permuta) contra Σ `vgvTipologia` do Avançado (`ctx.vgvTotal`, também bruto).
-Nessa base, "VGV igual quando não há área aberta; com área aberta, a diferença é Σ aberta × preço"
-vale **com ou sem permuta física**, porque nenhum dos dois lados a deduz — e a expectativa sai dos
+Nessa base, "VGV igual quando não há área aberta; com área aberta, a diferença é Σ aberta **rateada**
+× preço" (a aberta de família sem tipologia fica fora dos dois lados) vale **com ou sem permuta
+física**, porque nenhum dos dois lados a deduz — e a expectativa sai dos
 valores **quantizados** que serão persistidos, não da fórmula: `area_privativa_m2` e
 `area_privativa_aberta_m2` têm escala 2 no `schema.json`, enquanto a área derivada de `pct_alv`
 (4 casas) ÷ unidades não é arredondada, então mesmo sem área aberta o VGV bruto pode divergir em até
@@ -247,7 +248,7 @@ deixá-lo depois do commit reabriria o estado "estudo sem editor, inacessível" 
 compensa hoje. Consequência de desenho: os helpers que **escrevem** e que o executor reusa — `garantirMembro`,
 que recebe hoje `req` e escreve por `req.dados`, e o `criarLinhaCusto` que o PR 1 vai extrair de
 `POST /custos` — recebem o **handle de dados** (`HelperDados`, o mesmo tipo de `req.dados` e do `trx` em
-`dist/index.d.ts`), senão escrevem fora da transação sem erro de compilação. o cronograma do estudo
+`dist/index.d.ts`), senão escrevem fora da transação sem erro de compilação. O cronograma do estudo
 novo não é lido de lugar nenhum: o estudo só existe dentro do `trx`, e `lerCronograma(req, estudo)`
 filtra por `estudo.id`; o executor monta os eventos pelo caminho puro que `lerCronograma` usa quando
 não há linhas — `cronogramaPadrao()` filtrado por `tem_pre_lancamento` e passado por
@@ -291,7 +292,7 @@ ao centavo com a base convertida, senão R$ com o custo efetivo do Preliminar. A
 | `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | mesmas tabelas | como o `duplicar`: `estudo_imoveis` no laço próprio que o precede, as outras três por `FILHAS_SIMPLES` | `preliminar_produtos` copiado **e** convertido: a cópia é a trilha do que gerou o catálogo; o Avançado não a lê (`produtosDoEstudo` devolve cru) |
 | Produto (`nome`, `ordem`, `tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` (com `nome` e `ordem`) + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade` pelo tipo **efetivo** (`tipoProdutoEfetivo`: tudo que não for exatamente `nao_residencial` é residencial): `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
 | Grupo de receita | `avancado_fases` tipo `receita`, nome por `proximoNumeroFase`, `absorcaoPadrao`, plano canônico via `planoDeNascimento` | 100% do catálogo alocado | § 3.4 |
-| Cronograma | nada a gravar | `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
+| Cronograma | nada a gravar | o executor não lê cronograma (§ 3.11); depois do commit, `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
 | `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | `rs_m2_terreno` só quando as duas bases coincidem; senão R$ | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Diverge nos dois sentidos: origem Núcleo com manual residual, e origem manual com manual zero e núcleo maior que zero. As colunas viajam como estão (linha de cima); quando as duas regras dão áreas diferentes, a linha sai em R$ com o total efetivo do Preliminar (`custoTerreno` de `calcularProforma` chamado **sem `sensibilidade`**, para o fator valer 1 — ele já aplica `considerar_custo_terreno` e `custo_terreno_m2 × areaTerrenoDe`; `areaTerrenoDe` é privada, `Proforma.areaTerreno` é o campo público), e o relatório declara |
 | `custo_construcao_m2` / `construcao_valor_total` (`construcao_valor_canonico` com precedência) | `obra / Construção`, `rs_m2_priv` / `rs`, evento `obra` | unidade original se o valor efetivo reconciliar, senão R$ | § 3.2, § 3.12 |
 | `infra_*` (Loteamento; `infra_valor_canonico` com precedência) | `obra / Construção` | `valor_m2` → `rs_m2_priv` se reconciliar; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.8, § 3.12 |
@@ -370,14 +371,15 @@ Estritamente serial onde há arquivo compartilhado; um assunto por PR (R3).
 | 1 | **#813 (a)** | semear as três linhas obrigatórias no servidor ao criar estudo Avançado, extraindo de `POST /custos` um `criarLinhaCusto(dados: HelperDados, estudo, linha, cronograma)` reusável — recebe o handle de dados e os eventos do cronograma, não `req`, para caber no `trx` do PR 4 (§ 3.11) | é o helper que o upgrade precisa; sozinho, fecha um bug P3 que a #833 cita como restrição |
 | 2 | **#832** | aposentar (a) ou condicionar (b) `CAMADAS_DIVERGEM_PERMUTA_FISICA`; e `validarCustosDuplicados` passa a chavear a permuta física por `permuta_tipologia_id` (§ 3.9) | independente do upgrade, mas o critério 6 da #833 depende dela; e sem ela todo estudo gerado com permuta física nasce com alerta falso |
 | 3 | **#834** | regime e alíquota fora do RET no Avançado | § 3.7: sem ela o upgrade de estudo fora do RET nasce sem imposto |
-| 4 | **#833, backend** | `planejarDerivacao` + executor + rota + testes puros e de fiação + docs | depende de 1 e 3; toca `backend/`, então `validar-backend.sh` |
+| 4 | **#833, backend** | `planejarDerivacao` + executor + rota + testes puros e de fiação + docs; `garantirMembro` passa a receber o handle de dados (`HelperDados`) em vez de `req`, com os três chamadores de hoje (`POST /estudos`, `duplicar`, `membros-estudo.ts`) migrados no mesmo PR | depende de 1 e 3; toca `backend/`, então `validar-backend.sh` |
 | 5 | **#833, tela** | botão, modal, banner do relatório, caso de render | depende de 4; pode ser o mesmo PR se o autor preferir um só |
 
 Decisões que o autor precisa dar antes do PR 4, em comentário na #833 (as três dela mais quatro
 desta leitura): (1) `% VGV` não aceito → R$ congelado [recomendo sim]; (2) permuta física → regra da
 § 3.9 [recomendo]; (3) gestão da obra → `pct_obra` [recomendo]; (4) base do `% VGV` para as linhas
 que o Avançado aceita em % → manter % e declarar, com `corretagem_sobre_permuta_fisica = false`
-[recomendo]; (5) área aberta → ratear e reescrever o critério 2 [recomendo]; (6) permuta financeira
+[recomendo]; (5) área aberta → ratear por família e reescrever o critério 2 na base bruta, com a
+aberta de família sem tipologia acusada no relatório [recomendo]; (6) permuta financeira
 → uma linha em R$ com a soma dos valores efetivos [recomendo], virando alerta quando não há receita
 vendável para rateá-la (§ 3.5); `%` só como opção sua, pelo predicado da § 3.5 e com a base de caixa
 declarada; (7) rastreabilidade → `notas`, sem coluna nova [recomendo]. E uma correção de premissa
@@ -404,3 +406,5 @@ que não é decisão: o executor nasce em `req.dados.transaction()` (§ 3.11).
   diferença declarada, nunca como "igual".
 - **Permuta financeira sem receita vendável** (§ 3.5) não é lançada no Avançado; o relatório acusa,
   e o teste precisa do caso.
+- **Área aberta de família sem tipologia efetiva** (§ 3.2) não é rateada; o relatório acusa, e o
+  teste precisa do caso.
