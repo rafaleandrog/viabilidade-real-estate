@@ -15,7 +15,7 @@ Três decisões anteriores fecham as alternativas e deixam só uma em pé.
 |---|---|---|
 | **Promover no lugar** (trocar `nivel_analise` do mesmo estudo) | **Fechada.** `nivel_analise` é imutável por desenho: `422 NIVEL_IMUTAVEL` em `montarPatchEstudo` (`backend/rotas/estudos.ts`), com teste de regressão (PR 519, #486). A razão de fundo é que os dois níveis têm estruturas de dados diferentes (Premissas em colunas de `estudos` × catálogo/alocações/custos em tabelas filhas), e trocar o nível deixaria o mesmo registro com duas camadas descrevendo projetos diferentes — exatamente o incidente da #441 (Δ de R$ 17–23 MM entre abas do mesmo estudo). | #441, #486, PR 519 |
 | **Compartilhar premissas** (o Avançado deriva do Preliminar ao vivo, §4.3 de `referencia/padrao-incorporacao.md`) | **Fechada na prática.** A #88 removeu a aba Premissas do Avançado; a #441 decidiu "derivar, não persistir" e a #832 mostra que a última invariante que ainda compara as duas camadas é um falso positivo garantido. O Avançado hoje não lê nenhum campo de premissa do Preliminar além de terreno, coeficientes e RET. | #88, #441 (comentário de 2026-08-24), #832 |
-| **Duplicar preservando o nível** (`POST /estudos/:id/duplicar`) | **Existe e é robusto**, mas copia o nível. É a infraestrutura certa para reaproveitar: `montarCopiaEstudo`, `FILHAS_SIMPLES`, `montarCopiasFilhas`, compensação por remoção quando uma filha falha, coerção numérica na fronteira (PRs 626, 714; #609, #634). | #609, #634, #714 |
+| **Duplicar preservando o nível** (`POST /estudos/:id/duplicar`) | **Existe e é robusto**, mas copia o nível. É a infraestrutura certa para reaproveitar: `montarCopiaEstudo`, `FILHAS_SIMPLES`, `montarCopiasFilhas`, coerção numérica na fronteira (PRs 626, 714; #609, #634) — menos a compensação por remoção, que parte de uma premissa falsa (§ 3.11). | #609, #634, #714 |
 | **Gerar um Avançado NOVO, pré-preenchido** | **É a #833**, aberta hoje pelo autor com mapeamento campo a campo levantado na Pinguim (estudos 19–22). | #833 |
 
 Conclusão: **o botão que gera uma cópia Avançada pré-preenchida é a única alternativa coerente com
@@ -28,7 +28,8 @@ fechar o desenho — o mapeamento tem lacunas que o código revela e que a issue
 - Não copiar as 12 colunas `permuta_fisica_*` / `permuta_fisica_nr_*`. Coerente com a Decisão 1 da
   #441 e necessário para não disparar `CAMADAS_DIVERGEM_PERMUTA_FISICA` (#832).
 - Criar as três linhas obrigatórias no próprio upgrade (#813).
-- Sem transação: compensar removendo o estudo novo, como o `duplicar`.
+- Falha no meio não deixa estudo pela metade. A issue herda do `duplicar` a forma "compensar
+  removendo o estudo novo", e essa forma parte de uma premissa falsa — ver § 3.11.
 - A tabela de unidades aceitas por categoria está certa: confere com `UNIDADES_CAT` em
   `frontend/tela-fluxo-custos.ts` (Construção só `rs`/`rs_m2_priv`; Registro só `rs`/`rs_m2_priv`;
   Projetos `rs`/`rs_m2_priv`/`pct_constr`; Gestão da obra `rs`/`pct_obra`; Corretagem só `pct_vgv`).
@@ -75,9 +76,14 @@ Preliminar, que multiplica `custo_construcao_m2` pela área privativa total (fec
 
 Não há mapeamento que preserve VGV **e** construção ao mesmo tempo. Recomendação: **ratear a aberta
 (proporcional à fechada, dentro da família) e reescrever o critério 2** — "VGV igual quando não há
-área aberta; com área aberta, a diferença é exatamente Σ aberta × preço e é declarada no relatório
-do upgrade" — porque esconder a área aberta para fazer um número bater seria inventar uma convenção
-que nenhum dos dois níveis tem. Decisão do autor.
+área aberta nem permuta física; com área aberta e sem permuta física, a diferença é exatamente
+Σ aberta × preço; com permuta física, a expectativa sai das reservas convertidas (unidades inteiras
+× preço unitário com fechada + aberta, § 3.9), e o resíduo é declarado no relatório do upgrade" —
+porque esconder a área aberta para fazer um número bater seria inventar uma convenção que nenhum
+dos dois níveis tem. A fórmula fechada só vale sem permuta: o Preliminar deduz a área da família
+valorada pelo preço médio da base fechada, e o Avançado retira um número inteiro de unidades
+valoradas com fechada **e** aberta (`vgvPermutaFisicaTipologia`), com o arredondamento do § 3.9
+por cima (achado P2 do App do Codex na revisão deste documento). Decisão do autor.
 
 ### 3.3 `estudo_documentos` não é copiado pelo `duplicar`
 
@@ -101,15 +107,23 @@ importa módulos do frontend — `fluxo-shared.js`, `fluxo-pagamento-contrato.js
 ou a issue declara o estado "não migrado" como esperado. A primeira é a certa: o estudo nasce no
 contrato vigente.
 
-### 3.5 Permuta financeira: R e NR com percentuais diferentes não cabem numa linha
+### 3.5 Permuta financeira: duas famílias, dois modos, uma linha no Avançado
 
-No Preliminar a permuta financeira é por tipo (`permuta_financeira_residencial_pct` sobre o VGV
-residencial, `_nao_residencial_pct` sobre o NR). No Avançado é uma linha `terreno / Preço /
-Permuta financeira` em `pct_vgv` sobre o VGV total. Quando os dois percentuais são iguais (ou um é
-zero), uma linha em `%` basta; quando diferem, ou se congela em R$ (soma dos dois canônicos) ou se
-criam duas linhas com a mesma subcategoria — o que `validarCustosDuplicados`
-(`fluxo-invariantes.ts`) acusa como alerta na Reconciliação. Recomendação: **uma linha; `pct_vgv`
-se os percentuais coincidem, R$ canônico se diferem**, declarado no relatório.
+No Preliminar a permuta financeira é por família e por modo: `permuta_financeira_residencial_modo`
+escolhe entre `pct_vgv` (sobre o VGV residencial) e `valor_fixo` (R$), e a família NR tem o par
+próprio; o valor efetivo é o canônico (`permuta_financeira_*_valor_canonico`), com o legado como
+fallback — é o que `calcularProforma` lê. No Avançado é uma linha `terreno / Preço / Permuta
+financeira` em `pct_vgv` sobre o VGV **total**, ou em R$. Duas linhas com a mesma subcategoria
+acionam `validarCustosDuplicados` (`fluxo-invariantes.ts`) na Reconciliação.
+
+A regra, então, olha o **modo**, não só o percentual: a linha sai em `pct_vgv` **só quando as duas
+famílias com VGV estão em `pct_vgv` com a mesma taxa** (ou só uma família tem VGV e ela está em
+`pct_vgv`); em qualquer outro caso — um dos lados em `valor_fixo`, taxas diferentes, ou uma taxa
+zero com a outra não — a linha sai em R$ com a **soma dos dois canônicos**. Duas armadilhas que a
+versão anterior desta regra tinha: em `valor_fixo` o campo de percentual fica residual (zero nos
+dois lados, por exemplo) e "os percentuais coincidem" criaria uma linha em 0% descartando o valor
+real; e X% sobre o VGV total não é X% sobre o VGV de uma família só, então "um é zero" nunca é caso
+de percentual. Achado P1 do App do Codex na revisão deste documento. Declarado no relatório.
 
 ### 3.6 Gestão da obra em `pct_obra` muda de base de verdade
 
@@ -147,12 +161,16 @@ preencher — pior, porque é o caminho silencioso que a #834 descreve.
 
 Por família (R → tipologias cuja origem é produto `residencial`; NR → `nao_residencial`; no
 Loteamento tudo é residencial), a área canônica (`permuta_fisica_area_canonica`, ou o derivado
-legado quando nula — a mesma leitura de `calcularProforma`) é dividida pela área média da
-tipologia **de maior quantidade** da família, arredondada **para o inteiro mais próximo**, com teto
-nas unidades alocadas (a regra do Avançado desde a #792: permutadas ⊆ alocadas). O resíduo em m²
-vai para o relatório do upgrade. Com mais de uma tipologia na família, a escolha é "maior
-quantidade" porque minimiza o resíduo relativo; alternativa (distribuir proporcionalmente) cria
-várias linhas de permuta e fragmenta. Decisão 2 da #833 — recomendo esta regra.
+legado quando nula — a mesma leitura de `calcularProforma`) é convertida em unidades de **uma**
+tipologia da família: para cada tipologia elegível, `unidades = round(A ÷ área unitária)`, limitado
+às unidades alocadas (a regra do Avançado desde a #792: permutadas ⊆ alocadas), e o resíduo é
+`|A − unidades × área unitária|`; **vence a tipologia de menor resíduo** (empate: a de maior
+quantidade). O resíduo em m² vai para o relatório do upgrade. "Maior quantidade" como critério
+único estava errado: o resíduo depende da área unitária, não da quantidade — 80 m² de permuta
+numa tipologia de 200 m² arredondam para zero unidades e perdem a permuta inteira, enquanto uma
+de 80 m² a representa exata (achado P2 do App do Codex na revisão deste documento). A alternativa
+de distribuir proporcionalmente cria várias linhas de permuta e fragmenta. Decisão 2 da #833 —
+recomendo esta regra.
 
 ### 3.10 Rastreabilidade sem coluna nova
 
@@ -162,16 +180,36 @@ recomendo registrar a origem e o relatório de conversões em texto — `notas` 
 cabeçalho datado — e deixar a coluna para uma issue própria se a necessidade aparecer. É a mesma
 economia que o `duplicar` faz.
 
+### 3.11 "Sem transação" é premissa falsa: o SDK fixado tem `req.dados.transaction()`
+
+A issue e o `duplicar` (`backend/rotas/estudos.ts`, *"Sem transação no req.dados"*) e o lote do
+cronograma (`backend/rotas/avancado.ts`, *"não há transação disponível aqui"*) partem da premissa de
+que não existe transação no helper de dados. O bundle do SDK **57.0.0**, o pin do `package.json`,
+diz o contrário em `docs/banco-de-dados.md`, § Transações: *"Para operações que precisam ser
+atômicas, use o método `transaction()` no `req.dados`"*, com *"`ROLLBACK` automático"* se qualquer
+operação falhar, o mesmo conjunto de métodos (`criar`, `atualizar`, `deletar`, `listar`, `buscar`)
+no helper `trx`, e a restrição *"Transações só operam dentro do schema da app"*. Estudo,
+tipologias, grupo, alocações e custos ficam todos no schema da app, então o upgrade **nasce em
+`transaction()`**, sem o `try/catch` compensatório: a compensação por remoção deixa janela de
+estado parcial e um tombstone de soft-delete, e só existia porque a premissa era falsa.
+
+O que fica **fora** da transação, depois do commit: `garantirMembro`, `inscreverMembroEstudo` e
+`publicarEvento`. O bundle não diz se esses helpers aceitam o `trx` (em migração ele registra que
+`eventos` *"escreve fora da transação"*; em runtime não diz nada), e é pergunta para o autor levar
+à plataforma. A premissa falsa nos dois comentários do repositório é achado à parte, fora deste
+estudo: o `duplicar` pode ser reescrito pelo mesmo caminho. Achado da lente de contratos na revisão
+deste documento.
+
 ## 4. Mapeamento consolidado (corrige e completa a tabela da #833)
 
 | Preliminar | Avançado | Regra | Nota |
 |---|---|---|---|
 | Colunas de identidade, terreno, coeficientes, `notas`, `descricao`, `matricula`, `regiao_mercado_id`, `tem_pre_lancamento` | mesmas colunas | `montarCopiaEstudo` menos as 12 colunas de permuta física; `nivel_analise = 'avancado'`, `status = 'rascunho'` | as colunas de custo do Preliminar viajam juntas e ficam inertes — é o que o `duplicar` já faz, e é rastreabilidade de graça |
-| `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | mesmas tabelas | como o `duplicar` (`FILHAS_SIMPLES`) | `preliminar_produtos` copiado **e** convertido: a cópia é a trilha do que gerou o catálogo; o Avançado não a lê (`produtosDoEstudo` devolve cru) |
+| `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | mesmas tabelas | como o `duplicar`: `estudo_imoveis` no laço próprio que o precede, as outras três por `FILHAS_SIMPLES` | `preliminar_produtos` copiado **e** convertido: a cópia é a trilha do que gerou o catálogo; o Avançado não a lê (`produtosDoEstudo` devolve cru) |
 | Produto (`tipo`, `pct_alv`, `unidades`, `preco_venda_m2`) | `avancado_tipologias` + uma alocação no grupo padrão | área fechada = base × pct ÷ unidades (`produtosComAreaDerivada`); `preco_m2` na tipologia e na alocação; `tipo_unidade`: `residencial` → `apartamento`, `nao_residencial` → `loja`, Loteamento → `lote` | § 3.2 para a aberta; só produtos que compõem catálogo (`produtoCompoeCatalogo`) |
 | Grupo de receita | `avancado_fases` tipo `receita`, nome por `proximoNumeroFase`, `absorcaoPadrao`, plano canônico via `planoDeNascimento` | 100% do catálogo alocado | § 3.4 |
 | Cronograma | nada a gravar | `lerCronograma` cai em `cronogramaPadrao()` | o usuário completa |
-| `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | direto | base: `terreno_manual_area` ou `area_terreno_nucleo` nos dois níveis |
+| `custo_terreno_m2` (se `considerar_custo_terreno`) | `terreno / Preço / Valor à vista`, `rs_m2_terreno` | direto, com ressalva | a base não segue a mesma regra: o Preliminar escolhe pela `origem_terreno` (`areaTerrenoDe`); o Avançado faz `terreno_manual_area || area_terreno_nucleo` sem olhar a origem. Origem Núcleo com manual residual muda o custo em `rs_m2_terreno`; o upgrade grava a área que o Preliminar usou ou o relatório declara a diferença |
 | `custo_construcao_m2` / `construcao_valor_total` | `obra / Construção`, `rs_m2_priv` / `rs`, evento `obra` | direto | § 3.2 |
 | `infra_*` (Loteamento) | `obra / Construção` | `valor_m2` → `rs_m2_priv`; `valor_fixo` → `rs`; `pct_vgv` → R$ congelado | § 3.8 |
 | `custo_decoracao_m2` | `obra / Decoração`, `rs_m2_priv` | direto | |
@@ -208,8 +246,8 @@ vai para `notas`.
 2. **executor** que grava na ordem tipologias → grupo → alocações → custos (a permuta física
    precisa dos ids das tipologias e das alocações), reusando `coagirNumericosOuLancar`,
    `omitirValoresNulos`, `ancorarLinhaCusto` + `lerCronograma` (ancoragem das linhas, a mesma do
-   `POST /custos`), `garantirMembro`, `inscreverMembroEstudo`, `publicarEvento`, dentro do
-   `try/catch` compensatório do `duplicar`.
+   `POST /custos`), tudo **dentro de um `req.dados.transaction()`** (§ 3.11); `garantirMembro`,
+   `inscreverMembroEstudo` e `publicarEvento` rodam depois do commit.
 
 **Fiação.** Teste que lê o fonte da rota e exige a forma de chamada (`planejarDerivacao(`,
 `corretagem_sobre_permuta_fisica`), no molde do PR 626 — apagar a chamada deixa os testes puros
@@ -248,8 +286,9 @@ desta leitura): (1) `% VGV` não aceito → R$ congelado [recomendo sim]; (2) pe
 § 3.9 [recomendo]; (3) gestão da obra → `pct_obra` [recomendo]; (4) base do `% VGV` para as linhas
 que o Avançado aceita em % → manter % e declarar, com `corretagem_sobre_permuta_fisica = false`
 [recomendo]; (5) área aberta → ratear e reescrever o critério 2 [recomendo]; (6) permuta financeira
-R ≠ NR → R$ canônico numa linha [recomendo]; (7) rastreabilidade → `notas`, sem coluna nova
-[recomendo].
+→ `pct_vgv` só com as duas famílias em `pct_vgv` à mesma taxa, senão R$ canônico numa linha
+[recomendo]; (7) rastreabilidade → `notas`, sem coluna nova [recomendo]. E uma correção de premissa
+que não é decisão: o executor nasce em `req.dados.transaction()` (§ 3.11).
 
 ## 7. Riscos e o que não dá para medir daqui
 
