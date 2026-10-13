@@ -43,8 +43,14 @@ for (const id of process.argv.slice(2).filter((a) => a !== '--forcar')) {
     process.exit(2);
   }
   const juros = Number(estudo.juros_tabela_aa_padrao) || 0;
-  const crono = lista((await api('GET', `/estudos/${id}/avancado/cronograma`)).js);
-  const fases = lista((await api('GET', `/estudos/${id}/avancado/fases`)).js).filter((f) => f.tipo === 'receita');
+  const rc = await api('GET', `/estudos/${id}/avancado/cronograma`);
+  const rf = await api('GET', `/estudos/${id}/avancado/fases`);
+  if (rc.status >= 400 || rf.status >= 400) {
+    console.error(`estudo ${id}: não consegui ler cronograma (${rc.status}) ou fases (${rf.status}); nada foi convertido`);
+    process.exit(1);
+  }
+  const crono = lista(rc.js);
+  const fases = lista(rf.js).filter((f) => f.tipo === 'receita');
   for (const f of fases) {
     const fp = f.fluxo_pagamento ?? {};
     const form = {

@@ -426,6 +426,8 @@ def _validar_avancado(m, erros, avisos):
         campo = 'valor_pct' if str(un).startswith('pct') else 'valor_rs'
         if c.get(campo) is None:
             E(f'Custo {n}: falta o valor ({campo}) para a unidade {un}')
+        elif c[campo] < 0:
+            E(f'Custo {n}: {campo} não pode ser negativo (veio {c[campo]})')
         cr0 = str(c.get('cronograma') or '')
         if cr0 and cr0 != 'customizado' and not cr0.startswith('fase:') and cr0 not in EVENTOS:
             E(f'Custo {n}: cronograma "{cr0}" inválido (use um evento, customizado ou fase: <nome>)')
@@ -642,10 +644,12 @@ def escrever_avancado(api, m, eid):
             d.update(curva_id=curvas[dist], distribuicao_modo='fixo')
         elif dist in ('unit_delivery', 'sales_revenue'):
             d['distribuicao_modo'] = dist
-        elif dist:
+        elif dist in ('Linear', 'fixo'):
             d['distribuicao_modo'] = 'fixo'
-            if dist != 'Linear' and api.executar:
-                api.log.append(('AVISO', f'distribuição "{dist}" não existe no catálogo de curvas; gravada como Linear', 'aviso', ''))
+        elif dist:
+            if api.executar:                  # curva que a instância não tem: nunca vira Linear em silêncio
+                raise EscritaFalhou(f'distribuição "{dist}" não existe no catálogo de curvas da instância')
+            d['distribuicao_modo'] = 'fixo'
         cr = c.get('cronograma')
         if cr and str(cr).startswith('fase:'):
             d['fase_ancora_id'] = fase_id.get(str(cr)[5:].strip())
