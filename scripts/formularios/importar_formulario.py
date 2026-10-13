@@ -950,14 +950,16 @@ def main(argv):
         print('ERRO: o POST /estudos falhou (o estudo pode não ter sido criado):', api.falhas())
         return 1
     (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
-    if executar and api.falhas() and not manter:
+    def desfazer(motivo):
         # a validação prévia não conhece toda regra da API; se uma escrita for recusada depois do estudo existir,
         # o estudo parcial é removido em vez de ficar como se estivesse certo
-        print('ERRO: a API recusou escritas — estudo parcial:', api.falhas())
+        print(f'ERRO: {motivo} — estudo parcial:', api.falhas())
         st, _ = api.chamar('DELETE', f'/estudos/{eid}')
         print(f'estudo {eid} removido (HTTP {st}); nada ficou gravado pela metade.' if st in (200, 204)
               else f'ATENÇÃO: não consegui remover o estudo {eid} (HTTP {st}); apague-o à mão.')
         return 1
+    if executar and api.falhas() and not manter:
+        return desfazer('a API recusou escritas')
     for mt, c, st, r_ in api.log:
         if st == 'aviso':
             print('  aviso :', c)
@@ -972,6 +974,8 @@ def main(argv):
         for ln in saida.splitlines():
             print('  ', ln)
         if rc != 0:
+            if not manter:
+                return desfazer('a conversão do pagamento para o formato canônico falhou')
             pendencias.append('a conversão do pagamento para o formato canônico falhou')
     div = reler(api, m, eid)
     falhas = api.falhas()                       # depois da releitura: GET com erro também conta

@@ -33,6 +33,7 @@ async function api(metodo: string, rota: string, corpo?: unknown): Promise<any> 
 const lista = (js: any): any[] => (Array.isArray(js) ? js : (js?.dados ?? []));
 
 const forcar = process.argv.includes('--forcar');
+let falhou = false;
 for (const id of process.argv.slice(2).filter((a) => a !== '--forcar')) {
   if (!/^\d+$/.test(id)) { console.error(`id inválido: ${JSON.stringify(id)} (só número)`); process.exit(2); }
   const estudo = (await api('GET', `/estudos/${id}`)).js;
@@ -61,5 +62,7 @@ for (const id of process.argv.slice(2).filter((a) => a !== '--forcar')) {
     });
     console.log(`estudo ${id} · fase "${f.nome}" · componentes=${salvo.componentes.length} · pos_obra=${derivado} · PATCH ${r.status}`
       + (r.status >= 400 ? ' ' + JSON.stringify(r.js).slice(0, 200) : ''));
+    if (r.status >= 400) falhou = true;
   }
 }
+if (falhou) process.exit(1);
