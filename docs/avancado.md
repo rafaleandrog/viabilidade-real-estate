@@ -211,8 +211,7 @@ qualquer outra combinação — inclusive a mesma categoria com subcategoria —
 O plano de pagamento de um grupo de receita (`fluxo_pagamento`) só gera juros de tabela, carteira de clientes e repasse
 quando está no formato canônico, a lista `componentes`. Por isso a API o normaliza na escrita: o grupo novo nasce com
 `componentes`, e um `PATCH …/fases/:fid` cujo `fluxo_pagamento` traga só `entrada` e `parcelas` é convertido para `componentes` com a
-taxa de tabela do estudo (`juros_tabela_aa_padrao`). Quando `componentes` já vem no corpo, é gravado como veio. Para criar um estudo
-inteiro a partir de uma planilha, veja `scripts/formularios/LEIA-ME.md` no repositório.
+taxa de tabela do estudo (`juros_tabela_aa_padrao`). Quando `componentes` já vem no corpo, é gravado como veio.
 
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.

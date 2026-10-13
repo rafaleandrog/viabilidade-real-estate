@@ -6,7 +6,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ## 2026-10-13 — Formulários v2: API canônica, importador que confere e chaves legíveis por máquina
 
-Pedido direto do autor, sem issue de fechamento: tornar os formulários simplificados confiáveis para qualquer pessoa ou IA criar um estudo
+Pedido direto do autor; fecha a #839: tornar os formulários simplificados confiáveis para qualquer pessoa ou IA criar um estudo
 completo. Três frentes, a partir do diagnóstico da nota `historico/diagnostico-formularios-qa-2026-10-13.md`.
 
 - **Backend (#839):** `POST /avancado/fases` (grupo de receita) e `PATCH …/fases/:fid` levam o `fluxo_pagamento` ao formato canônico

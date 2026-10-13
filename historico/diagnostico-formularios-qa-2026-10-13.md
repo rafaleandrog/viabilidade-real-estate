@@ -89,3 +89,11 @@ F9. **Preliminar → Avançado exige conversões** (achado 5c): o formulário do
 Quatro estudos em rascunho na Pinguim, ids 25 a 28, prefixo `qa-`, autor QA Principal. Não foram arquivados nem apagados: são os
 estudos pedidos. Nenhum token foi cunhado, nenhuma alçada concedida, nenhum usuário do pool ativado. Estado compartilhado
 alterado: nenhum além dos próprios estudos.
+
+## Atualização (mesmo dia, depois da v2 dos formulários)
+
+Resolvidos na v2 (PR 844): F1 (a API normaliza o pagamento para `componentes`; a chave descreve a conversão), F2 (chaves `lista[n].campo`), F3
+(a legenda declara a regra do percentual e o importador converte pelo formato da célula), F4 (lista de vocabulário na distribuição e
+mapeamento no importador), F5 (`ordem` enviada) e F6 (base financiável por nome de linha de custo). Continuam abertos: F9 (equivalente em
+R$ de todas as premissas em % do Avançado; só o alerta de unidade e o valor de 1% do VGV entraram) e os achados 2, 3, 4, 5 e 6 do app,
+que dependem das issues citadas acima.
