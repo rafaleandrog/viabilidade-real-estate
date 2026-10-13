@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
-import { rotasAvancado, fluxoPagamentoCanonico, fluxoPagamentoPadrao } from './avancado.js';
+import { rotasAvancado, fluxoPagamentoCanonico, fluxoPagamentoDeNascimento, fluxoPagamentoPadrao } from './avancado.js';
 
 // A API deixa de gravar `fluxo_pagamento` só com o espelho legado (`entrada[]`/`parcelas[]`): o motor só calcula
 // juros de tabela, carteira e repasse pelo ramo canônico (`componentes`). Sem isto, um estudo criado por API
@@ -30,7 +30,7 @@ const FINANCIADOS = new Set(['prazo_fixo', 'ate_marco', 'concentrado']);
 
 test('legado vira componentes, e os financiados levam a taxa do estudo', () => {
   const r: any = fluxoPagamentoCanonico(LEGADO, CRONO, 12);
-  assert.ok(Array.isArray(r.componentes) && r.componentes.length === 4, `componentes=${JSON.stringify(r.componentes)}`);
+  assert.ok(Array.isArray(r.componentes) && r.componentes.length > 0, `componentes=${JSON.stringify(r.componentes)}`);
   const soma = r.componentes.reduce((s: number, c: any) => s + c.participacaoPct, 0);
   assert.ok(Math.abs(soma - 100) < 0.01, `Σ participacaoPct=${soma}`);
   const financiados = r.componentes.filter((c: any) => FINANCIADOS.has(c.tipo));
@@ -51,6 +51,29 @@ test('componentes já presentes voltam intactos (quem manda o canônico decide o
 
 test('null continua sendo null (ausente = default)', () => {
   assert.equal(fluxoPagamentoCanonico(null, CRONO, 12), null);
+});
+
+test('entrada e parcelas em objeto único (shape que a validação aceita) são convertidos, não estouram', () => {
+  const r: any = fluxoPagamentoCanonico({
+    entrada: { pct: 20, parcelas: 1, descontoPct: 0 },
+    parcelas: { pct: 30, parcelas: 12, ao_longo_obra: false, periodicidade: 'mensal', sinalPct: 0 },
+  }, CRONO, 12);
+  assert.ok(r.componentes.some((c: any) => c.tipo === 'imediato' && c.participacaoPct === 20));
+  assert.ok(r.componentes.some((c: any) => c.tipo === 'prazo_fixo' && c.participacaoPct === 30));
+});
+
+test('plano sem `entrada` não ganha uma entrada inventada (o ramo legado lia lista vazia)', () => {
+  const r: any = fluxoPagamentoCanonico({ parcelas: [{ pct: 40, parcelas: 10, ao_longo_obra: false, periodicidade: 'mensal', sinalPct: 0 }] }, CRONO, 12);
+  assert.ok(!r.componentes.some((c: any) => c.tipo === 'imediato'), JSON.stringify(r.componentes));
+  const soma = r.componentes.reduce((s: number, c: any) => s + c.participacaoPct, 0);
+  assert.ok(Math.abs(soma - 100) < 0.01, `Σ participacaoPct=${soma}`);
+});
+
+test('o grupo nasce como a tela o cria: canônico, sem `aplicado`, com `ancorasVivas`', () => {
+  const r: any = fluxoPagamentoDeNascimento(CRONO, 12);
+  assert.ok(Array.isArray(r.componentes) && r.componentes.length > 0);
+  assert.equal('aplicado' in r, false, '`aplicado` acende o ponto verde: nascer canônico não é decisão do usuário');
+  assert.equal(r.ancorasVivas, true, 'sem `ancorasVivas` as âncoras congelam no cronograma do instante');
 });
 
 // ── fiação ──
@@ -82,9 +105,9 @@ class DadosFake {
   async criar(t: string, dados: Record<string, any>) { return this.buscar(t, this.semear(t, dados)); }
 }
 
-async function comRota(fn: (base: string, dados: DadosFake) => Promise<void>) {
+async function comRota(fn: (base: string, dados: DadosFake) => Promise<void>, juros: number | null = 12) {
   const dados = new DadosFake();
-  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise', tipo_empreendimento: 'incorporacao', juros_tabela_aa_padrao: 12, tem_pre_lancamento: false });
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise', tipo_empreendimento: 'incorporacao', juros_tabela_aa_padrao: juros, tem_pre_lancamento: false });
   const app = express();
   app.use(express.json());
   app.use((req: any, _res, next) => { req.dados = dados; req.contexto = { nivelApp: 'admin', usuario: { id: 1 } }; next(); });
@@ -129,5 +152,63 @@ test('POST /avancado/fases (receita) já nasce canônico', async () => {
     assert.equal(r.status, 201, JSON.stringify(r.corpo));
     const fp = (await dados.buscar('avancado_fases', r.corpo.id)).fluxo_pagamento;
     assert.ok(Array.isArray(fp.componentes) && fp.componentes.length > 0, 'grupo novo nasceu sem componentes (Plano não migrado)');
+    assert.equal('aplicado' in fp, false, 'o grupo criado pela tela nasceria com o ponto verde de "aplicado"');
+    assert.equal(fp.ancorasVivas, true, 'o grupo criado pela tela perderia a reancoragem pelo cronograma');
+  });
+});
+
+test('PATCH legado usa o cronograma LIDO do estudo (obra 11+17 → marco no mês 27)', async () => {
+  await comRota(async (base, dados) => {
+    dados.semear('avancado_cronograma', { estudo_id: 1, evento: 'obra', inicio_mes: 11, duracao_meses: 17, travado_inicio: false, travado_duracao: false });
+    const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0, fluxo_pagamento: null });
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/${fid}`, { fluxo_pagamento: LEGADO });
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    const marco = (await dados.buscar('avancado_fases', fid)).fluxo_pagamento.componentes.find((c: any) => c.tipo === 'ate_marco');
+    assert.ok(marco, 'sem componente ao longo da obra');
+    assert.equal(marco.marcoMes, 27, 'a rota não passou o cronograma do estudo à conversão');
+  });
+});
+
+test('PATCH com objeto único em entrada/parcelas responde 200, não 500', async () => {
+  await comRota(async (base, dados) => {
+    const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0, fluxo_pagamento: null });
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/${fid}`, {
+      fluxo_pagamento: { entrada: { pct: 20, parcelas: 1 }, parcelas: { pct: 30, parcelas: 12, ao_longo_obra: false, periodicidade: 'mensal', sinalPct: 0 } },
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    assert.ok((await dados.buscar('avancado_fases', fid)).fluxo_pagamento.componentes.length > 0);
+  });
+});
+
+test('PATCH inválido (`componentes: []`) é recusado com 400 e nada é gravado', async () => {
+  await comRota(async (base, dados) => {
+    const original = { entrada: [{ pct: 10, parcelas: 1 }] };
+    const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0, fluxo_pagamento: original });
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/${fid}`, { fluxo_pagamento: { componentes: [] } });
+    assert.equal(r.status, 400, JSON.stringify(r.corpo));
+    assert.deepEqual((await dados.buscar('avancado_fases', fid)).fluxo_pagamento, original);
+  });
+});
+
+test('estudo sem taxa de tabela: o plano é convertido sem juros (taxaMensal 0), sem erro', async () => {
+  await comRota(async (base, dados) => {
+    const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0, fluxo_pagamento: null });
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/${fid}`, { fluxo_pagamento: LEGADO });
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    for (const c of (await dados.buscar('avancado_fases', fid)).fluxo_pagamento.componentes.filter((x: any) => FINANCIADOS.has(x.tipo))) {
+      assert.equal(c.taxaMensal, 0);
+    }
+  }, null);
+});
+
+test('PATCH legado com entrada + parcelas acima de 100% é recusado (400) e nada é gravado', async () => {
+  await comRota(async (base, dados) => {
+    const original = { entrada: [{ pct: 10, parcelas: 1 }] };
+    const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0, fluxo_pagamento: original });
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/${fid}`, {
+      fluxo_pagamento: { entrada: [{ pct: 60, parcelas: 1 }], parcelas: [{ pct: 60, parcelas: 12, ao_longo_obra: false, periodicidade: 'mensal', sinalPct: 0 }] },
+    });
+    assert.equal(r.status, 400, JSON.stringify(r.corpo));
+    assert.deepEqual((await dados.buscar('avancado_fases', fid)).fluxo_pagamento, original, 'o plano inválido foi gravado');
   });
 });

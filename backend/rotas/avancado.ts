@@ -5,7 +5,8 @@ import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
 import { erroComponentePagamento } from '../../frontend/fluxo-pagamento-contrato.js';
-import { fluxoPagamentoParaSalvar } from '../../frontend/fluxo-pagamento-editor.js';
+import { fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
+import { normalizarLinhasPagamento } from '../../frontend/fluxo-caixa-motor.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -315,16 +316,19 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
 }
 
 /**
- * Leva o `fluxo_pagamento` ao contrato CANÔNICO (`componentes`) — o que a tela já faz ao "Aplicar".
+ * Leva o `fluxo_pagamento` escrito POR API ao contrato CANÔNICO (`componentes`) — o que a tela faz ao "Aplicar".
  *
  * Por que a API precisa disto: o motor só calcula juros de tabela, carteira de clientes e repasse pelo
  * ramo canônico. Um `fluxo_pagamento` só com `entrada[]`/`parcelas[]` passava na validação e era
- * calculado pelo ramo legado, SEM juros — medido num estudo da Pinguim: TIR 35,58% contra 48,78% com
- * os mesmos dados, e nenhum erro em lugar nenhum. A #657 consertou o caminho da tela; quem escreve
- * por API (QA, importação, agente) continuava caindo no ramo legado.
+ * calculado pelo ramo legado, SEM juros e sem nenhum erro. Quem escreve por API (QA, importação, agente)
+ * caía nesse ramo; a tela já não cai, porque o grupo nasce canônico.
  *
- * Com `componentes` já presente o plano volta INTACTO: quem manda o canônico decide o conteúdo, e
+ * Com `componentes` já presentes o plano volta INTACTO: quem manda o canônico decide o conteúdo, e
  * regravá-lo aqui apagaria o que o espelho legado não sabe representar (sinal, defasagem, taxa).
+ *
+ * `entrada` e `parcelas` podem vir como lista OU como objeto único (a validação aceita os dois, e o ramo
+ * legado do motor também): são normalizados pela MESMA função do motor, e a ausência vale lista vazia —
+ * exatamente o que o ramo legado lia —, nunca um placeholder, para a conversão não inventar uma entrada.
  * `jurosTabelaAa` é OBRIGATÓRIO de propósito: omiti-lo vira erro de compilação, não um estudo sem juros.
  */
 export function fluxoPagamentoCanonico(
@@ -337,13 +341,25 @@ export function fluxoPagamentoCanonico(
   const padrao = fluxoPagamentoPadrao();
   const form = {
     comissao: fp.comissao ?? padrao.comissao,
-    entrada: fp.entrada ?? padrao.entrada,
-    parcelas: fp.parcelas ?? padrao.parcelas,
+    entrada: normalizarLinhasPagamento(fp.entrada),
+    parcelas: normalizarLinhasPagamento(fp.parcelas),
     repasse: fp.repasse ?? padrao.repasse,
     componentes: null,
   };
-  const salvo: Record<string, any> = { ...fp, ...fluxoPagamentoParaSalvar(form as any, cronograma as any, jurosTabelaAa) };
-  return salvo;
+  return { ...fp, ...fluxoPagamentoParaSalvar(form as any, cronograma as any, jurosTabelaAa) };
+}
+
+/**
+ * O plano com que um grupo de receita NASCE: o MESMO que a tela cria (`planoDeNascimento`) — canônico, sem
+ * `aplicado` (ninguém configurou ainda) e com `ancorasVivas` (as âncoras de cronograma seguem o cronograma
+ * até o primeiro Aplicar). Nascer por aqui em vez de por `fluxoPagamentoCanonico` é o que mantém o ponto
+ * verde da tela e a reancoragem do cronograma funcionando para o grupo criado pela própria tela.
+ */
+export function fluxoPagamentoDeNascimento(
+  cronograma: { evento: string; inicio_mes: number; duracao_meses: number }[],
+  jurosTabelaAa: number,
+): Record<string, any> {
+  return planoDeNascimento(fluxoPagamentoPadrao(), cronograma as any, jurosTabelaAa);
 }
 
 // #585: `fluxoPagamentoComDefaultJuros` FOI REMOVIDA. Ela semeava
@@ -1155,8 +1171,8 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
       dados.absorcao = absorcaoPadrao(estudo.tem_pre_lancamento !== false);
       // #585: sem semear juros na linha — a taxa é do estudo e o motor a lê de
       // lá. Ver a nota em `fluxoPagamentoPadrao`.
-      dados.fluxo_pagamento = fluxoPagamentoCanonico(
-        fluxoPagamentoPadrao(), (await lerCronograma(req, estudo)).linhas, Number(estudo.juros_tabela_aa_padrao) || 0,
+      dados.fluxo_pagamento = fluxoPagamentoDeNascimento(
+        (await lerCronograma(req, estudo)).linhas, Number(estudo.juros_tabela_aa_padrao) || 0,
       );
     }
     const criada = await req.dados!.criar('avancado_fases', dados);
@@ -1188,9 +1204,14 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
     if (req.body.fluxo_pagamento !== undefined) {
       const invalido = validarFluxoPagamento(req.body.fluxo_pagamento);
       if (invalido) { erro(res, 400, 'FLUXO_PAGAMENTO_INVALIDO', invalido); return; }
-      dados.fluxo_pagamento = fluxoPagamentoCanonico(
+      const canonico = fluxoPagamentoCanonico(
         req.body.fluxo_pagamento, (await lerCronograma(req, estudo)).linhas, Number(estudo.juros_tabela_aa_padrao) || 0,
       );
+      // O plano CONVERTIDO passa pela mesma validação que o canônico enviado passaria: entrada + parcelas acima de 100%
+      // zeram o repasse e geram componentes que somam mais que 100 — o que a rota recusaria se viesse como `componentes`.
+      const invalidoConvertido = canonico !== req.body.fluxo_pagamento ? validarFluxoPagamento(canonico) : null;
+      if (invalidoConvertido) { erro(res, 400, 'FLUXO_PAGAMENTO_INVALIDO', invalidoConvertido); return; }
+      dados.fluxo_pagamento = canonico;
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     const atualizada = await req.dados!.atualizar('avancado_fases', fase.id, dados);
