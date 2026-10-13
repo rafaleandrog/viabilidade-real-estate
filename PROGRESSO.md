@@ -4,6 +4,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-13 — Dois projetos, quatro estudos na Pinguim e diagnóstico
+
+Pedido direto do autor, sem issue: simular um Loteamento e uma Incorporação, cada um nos dois níveis, preenchendo os formulários
+simplificados e criando os quatro estudos no app. Estudos **25** e **27** (Incorporação, Preliminar e Avançado) e **26** e **28**
+(Loteamento), na instância Pinguim, em rascunho, prefixo `qa-`. Arquivos preenchidos em `referencia/formularios/exemplos/`; ferramentas em
+`scripts/formularios/` (`exemplos_projetos.py`, `importar_formulario.py`, `aplicar-pagamento-canonico.ts`, `comparar-niveis.ts`).
+
+- **Conferido:** os Preliminares fecham com a planilha e com o motor ao centavo; custos de obra iguais nos dois níveis.
+- **Achado principal:** a API aceita o fluxo de pagamento legado e o motor calcula sem juros, carteira e repasse, em silêncio
+  (TIR 35,58% contra 48,78% no mesmo estudo). Diagnóstico completo, achados do app, dos formulários e aprendizados em
+  `historico/diagnostico-formularios-qa-2026-10-13.md`.
+- **Fica para o autor:** decidir as issues abertas a partir do diagnóstico e a próxima versão dos formulários (chaves técnicas).
+
+---
+
 ## 2026-10-13 — Quatro formulários simplificados de estudo (uma aba, quatro colunas)
 
 Pedido direto do autor, sem issue: os quatro formulários de QA (`formulario-{preliminar,avancado}-{incorporacao,loteamento}`),
