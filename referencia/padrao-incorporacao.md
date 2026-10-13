@@ -993,7 +993,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > (`frontend/fluxo-absorcao-editor.ts`) zera apenas o valor **do formulário**, ao abrir o modal — e
 > guarda o valor cru em `form.lido`, justamente para que esse zero conte como **edição** e não seja
 > engolido pelo no-op da #431. Salvar os parâmetros do Cronograma **não toca no JSON de absorção**
-> (`backend/rotas/avancado.ts:466-488`): o bloco `pre_lancamento` persistido continua lá, com o
+> (`backend/rotas/avancado.ts:499-521`): o bloco `pre_lancamento` persistido continua lá, com o
 > percentual antigo.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
@@ -1863,7 +1863,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:88`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:786`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:819`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
