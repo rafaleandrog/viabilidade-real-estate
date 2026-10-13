@@ -192,7 +192,7 @@ CAMPOS_SIM_NAO = frozenset((
 
 
 ESTUDO_TEXTO = frozenset(('nome', 'descricao', 'matricula', 'notas', 'nivel_analise', 'origem_terreno',
-                          'terreno_manual_nome', 'tipo_empreendimento', 'uf'))
+                          'terreno_manual_nome', 'tipo_empreendimento', 'uf', 'regiao_mercado_id'))
 ESTUDO_SIM_NAO = frozenset(('sujeito_ret', 'corretagem_sobre_permuta_fisica'))
 
 
