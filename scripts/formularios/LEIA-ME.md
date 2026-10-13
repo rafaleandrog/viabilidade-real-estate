@@ -9,7 +9,7 @@ vira um estudo da instância com **um comando**, e o resultado é conferido ante
 python3 -I scripts/formularios/importar_formulario.py <preenchido.xlsx> --nome-estudo "qa-..." --executar --relatorio saida.json
 ```
 
-Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (com `--executar`, precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
+Se a API recusar alguma escrita depois de o estudo existir, o importador **remove o estudo** que acabou de criar e sai com 1 (`--manter-em-falha` mantém o estudo para diagnóstico). Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (com `--executar`, precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
 impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os passos 3 e 5 usam o motor do app).
 
 ## O que ele faz, nesta ordem

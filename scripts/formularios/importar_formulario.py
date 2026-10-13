@@ -137,6 +137,8 @@ def montar(entradas):
             m.estudo[modo_col] = modo
             m.estudo[valor_col] = e.valor
             m.alternativas[modo_col].append(e.rotulo)
+        elif k in NAO_ENVIADAS:
+            m.nao_enviadas.append((e.rotulo, NAO_ENVIADAS[k]))
         elif re.fullmatch(r'estudos\.\w+', k):
             m.estudo[k.split('.', 1)[1]] = e.valor
         elif k.startswith('parametros.'):
@@ -183,6 +185,8 @@ def candidatas(linhas, cat, sub):
 
 # Fail-closed: todo campo que NÃO é texto nem Sim/Não é número. Enumerar os numéricos não converge — campo novo
 # ficaria sem checagem —; enumerar os não numéricos faz campo novo cair na checagem mais estrita.
+# cópia de EVENTOS_ANCORA em backend/rotas/funding.ts
+EVENTOS_ANCORA = ('planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado')
 CAMPOS_TEXTO = frozenset((
     'grupo', 'tipologia', 'nome', 'categoria', 'subcategoria', 'cronograma', 'distribuicao', 'unidade', 'linha',
     'aporte', 'modo_retorno', 'base_financiavel', 'tipo', 'tipo_unidade', 'residuo_sem_prazo', 'data_inicio_projeto'))
@@ -192,7 +196,7 @@ CAMPOS_SIM_NAO = frozenset((
 
 
 ESTUDO_TEXTO = frozenset(('nome', 'descricao', 'matricula', 'notas', 'nivel_analise', 'origem_terreno',
-                          'terreno_manual_nome', 'tipo_empreendimento', 'uf', 'regiao_mercado_id'))
+                          'terreno_manual_nome', 'tipo_empreendimento', 'uf'))
 ESTUDO_SIM_NAO = frozenset(('sujeito_ret', 'corretagem_sobre_permuta_fisica'))
 
 
@@ -355,6 +359,9 @@ def _validar_avancado(m, erros, avisos):
         if q.get('pct') in (None, 0):
             E(f'Condição {n}: falta o % do total')
         por_grupo[q['grupo']] += float(q.get('pct') or 0)
+        pa = q.get('parcelas')
+        if pa is not None and not (float(pa).is_integer() and pa >= 1):
+            E(f'Condição {n}: nº de parcelas deve ser um inteiro ≥ 1 (veio {pa})')
         if q.get('linha') == 'Parcelamento':
             parcelamentos[q['grupo']] += 1
             if not q.get('ao_longo_obra') and not q.get('parcelas'):
@@ -447,6 +454,8 @@ def _validar_avancado(m, erros, avisos):
             ap = str(o.get('aporte') or '')
             if ap.startswith('fase:') and ap[5:].strip() not in fases_nomes:
                 E(f'{d} {n}: fase "{ap[5:].strip()}" não existe nas fases customizadas')
+            elif ap and not ap.startswith('fase:') and ap not in EVENTOS_ANCORA:
+                E(f'{d} {n}: âncora "{ap}" inválida; use um de: {", ".join(EVENTOS_ANCORA)} ou fase:<nome>')
     for n, o in sorted(m['funding.divida'].items()):
         am, ca = o.get('amortizacao_meses'), o.get('carencia_meses')
         if am and ca is not None and am > 0 and ca >= am:
@@ -914,8 +923,9 @@ def main(argv):
     ap.add_argument('--nome-estudo', help='sobrescreve o nome do estudo')
     ap.add_argument('--executar', action='store_true', help='escreve na instância (sem isto só valida e mostra o plano)')
     ap.add_argument('--relatorio', help='grava o relatório em JSON')
+    ap.add_argument('--manter-em-falha', action='store_true', help='não remove o estudo quando a API recusa alguma escrita (diagnóstico)')
     a = ap.parse_args(argv[1:])
-    executar, rel, arquivo = a.executar, a.relatorio, a.formulario
+    executar, rel, arquivo, manter = a.executar, a.relatorio, a.formulario, a.manter_em_falha
     m = montar(ler(arquivo))
     if a.nome_estudo:
         m.estudo['nome'] = a.nome_estudo
@@ -940,6 +950,14 @@ def main(argv):
         print('ERRO: o POST /estudos falhou (o estudo pode não ter sido criado):', api.falhas())
         return 1
     (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
+    if executar and api.falhas() and not manter:
+        # a validação prévia não conhece toda regra da API; se uma escrita for recusada depois do estudo existir,
+        # o estudo parcial é removido em vez de ficar como se estivesse certo
+        print('ERRO: a API recusou escritas — estudo parcial:', api.falhas())
+        st, _ = api.chamar('DELETE', f'/estudos/{eid}')
+        print(f'estudo {eid} removido (HTTP {st}); nada ficou gravado pela metade.' if st in (200, 204)
+              else f'ATENÇÃO: não consegui remover o estudo {eid} (HTTP {st}); apague-o à mão.')
+        return 1
     for mt, c, st, r_ in api.log:
         if st == 'aviso':
             print('  aviso :', c)
