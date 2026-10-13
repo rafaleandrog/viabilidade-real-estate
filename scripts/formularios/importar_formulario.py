@@ -414,6 +414,10 @@ def _validar_avancado(m, erros, avisos):
             ap = str(o.get('aporte') or '')
             if ap.startswith('fase:') and ap[5:].strip() not in fases_nomes:
                 E(f'{d} {n}: fase "{ap[5:].strip()}" não existe nas fases customizadas')
+    for n, o in sorted(m['funding.divida'].items()):
+        am, ca = o.get('amortizacao_meses'), o.get('carencia_meses')
+        if am and ca is not None and am > 0 and ca >= am:
+            E(f'funding.divida {n}: carência ({ca}) deve ser menor que a amortização ({am}) — a API recusa')
     return erros, avisos
 
 

@@ -14,6 +14,7 @@
  */
 import { fluxoPagamentoParaSalvar } from '../../frontend/fluxo-pagamento-editor.js';
 import { pctPosChavesDerivado } from '../../frontend/fluxo-shared.js';
+import { normalizarLinhasPagamento } from '../../frontend/fluxo-caixa-motor.js';
 
 const BASE = (process.env.URBI_BASE || '').replace(/\/$/, '');
 const TOKEN = process.env.URBI_TOKEN || '';
@@ -47,7 +48,7 @@ for (const id of process.argv.slice(2).filter((a) => a !== '--forcar')) {
     const fp = f.fluxo_pagamento ?? {};
     const form = {
       comissao: fp.comissao ?? { ativo: true, tipo: 'embutida', pct: 6 },
-      entrada: fp.entrada ?? [], parcelas: fp.parcelas ?? [],
+      entrada: normalizarLinhasPagamento(fp.entrada), parcelas: normalizarLinhasPagamento(fp.parcelas),
       repasse: fp.repasse ?? { apos_entrega_meses: 1 }, componentes: fp.componentes ?? null,
     };
     const salvo: any = fluxoPagamentoParaSalvar(form as any, crono, juros);
