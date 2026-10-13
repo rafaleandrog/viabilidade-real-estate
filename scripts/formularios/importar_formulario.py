@@ -23,6 +23,7 @@ e `<lista>[n].<campo>` (`funding.divida[2].taxa_anual`). Chave sem tratamento va
 
 Requisitos: python3, openpyxl, e — para os passos 3 e 5 — node com as dependências do repositório (`pnpm install`).
 """
+import argparse
 import json
 import os
 import re
@@ -85,7 +86,10 @@ class Entrada:
 
 
 def ler(caminho):
-    ws = openpyxl.load_workbook(caminho)['Formulário']
+    wb = openpyxl.load_workbook(caminho)
+    if 'Formulário' not in wb.sheetnames:
+        raise SystemExit(f'{caminho}: não tem a aba "Formulário" (abas: {", ".join(wb.sheetnames)}). Use um dos modelos de referencia/formularios/.')
+    ws = wb['Formulário']
     entradas = []
     for row in ws.iter_rows(min_row=4):
         a, b, d = row[0], row[1], row[3]
@@ -155,6 +159,28 @@ def montar(entradas):
 
 
 # ═════════════════════════ validação (fail-closed) ═════════════════════════
+def rotulos_da_base(texto):
+    """'Preço / Valor à vista; Construção' -> [('Preço', 'Valor à vista'), ('Construção', None)]."""
+    saida = []
+    for parte in [x.strip() for x in str(texto or '').split(';') if x.strip()]:
+        cat, _, sub = parte.partition('/')
+        saida.append((cat.strip(), sub.strip() or None))
+    return saida
+
+
+def linhas_de_custo_planejadas(m):
+    """(categoria, subcategoria) de cada linha de custo que a planilha vai criar, na ordem das vagas."""
+    linhas = [(c.get('categoria'), c.get('subcategoria') or None) for _, c in ordenados(m['custos']) if c.get('categoria')]
+    linhas += [('Preço', 'Permuta física') for _, q in ordenados(m['permuta_fisica']) if q.get('unidades') is not None]
+    linhas += [('Preço', 'Permuta financeira') for _, q in ordenados(m['permuta_financeira']) if q.get('unidade') is not None]
+    return linhas
+
+
+def candidatas(linhas, cat, sub):
+    """Índices das linhas que o rótulo designa: com subcategoria, o par exato; sem ela, a categoria inteira."""
+    return [i for i, (c, sc) in enumerate(linhas) if c == cat and (sub is None or sc == sub)]
+
+
 def validar(m):
     erros, avisos = [], []
     E, A = erros.append, avisos.append
@@ -210,6 +236,24 @@ def _validar_avancado(m, erros, avisos):
     if not tem_pre and m.crono.get('pre_lancamento', {}).get('duracao_meses') is not None:
         A('duração do Pré-lançamento preenchida com "tem Pré-lançamento = Não": será ignorada')
 
+    def sem_nome(lista, rotulo, campo_nome='nome'):
+        """Item com dados mas sem nome seria descartado em silêncio: é erro de preenchimento."""
+        nomes = []
+        for n, v in sorted(m[lista].items()):
+            dados = [k for k, x in v.items() if k != campo_nome and x is not None]
+            if v.get(campo_nome) is None and dados:
+                E(f'{rotulo} {n}: tem dados ({", ".join(dados[:3])}…) mas o nome está em branco')
+            if v.get(campo_nome) is not None:
+                nomes.append(str(v[campo_nome]).strip())
+        repetidos = sorted({x for x in nomes if nomes.count(x) > 1})
+        if repetidos:
+            E(f'{rotulo}: nome repetido ({", ".join(repetidos)})')
+    sem_nome('tipologias', 'Lote' if lote else 'Tipologia')
+    sem_nome('grupos', 'Grupo de venda')
+    sem_nome('fases', 'Fase')
+    sem_nome('funding.divida', 'Dívida')
+    sem_nome('funding.equity', 'Equity')
+    sem_nome('cenarios', 'Cenário')
     tips = {t['nome']: t for t in m['tipologias'].values() if t.get('nome')}
     if not tips:
         E('nenhuma tipologia/lote informado')
@@ -227,6 +271,11 @@ def _validar_avancado(m, erros, avisos):
         soma = sum(float(g.get(c) or 0) for c in ('pre_lancamento_pct', 'lancamento_pct', 'obra_pct'))
         if soma > 100.01:
             E(f'Grupo "{g["nome"]}": absorção pré+lançamento+obra = {soma:.2f}% (> 100)')
+        janela = g.get('pos_chaves_meses')
+        if not (isinstance(janela, (int, float)) and float(janela).is_integer() and 1 <= janela <= 12):
+            E(f'Grupo "{g["nome"]}": janela pós-chaves deve ser um inteiro de 1 a 12 (veio {janela!r})')
+        if tem_pre and g.get('pre_lancamento_pct') is None:
+            A(f'Grupo "{g["nome"]}": há pré-lançamento e a absorção de pré está em branco (vale 0%)')
         if not tem_pre and g.get('pre_lancamento_pct'):
             E(f'Grupo "{g["nome"]}": absorção de pré-lançamento sem pré-lançamento')
     por_grupo = defaultdict(float)
@@ -271,6 +320,8 @@ def _validar_avancado(m, erros, avisos):
     for n, q in sorted(m['permuta_fisica'].items()):
         if q.get('tipologia') is None and q.get('unidades') is None:
             continue
+        if not q.get('unidades'):
+            E(f'Permuta física {n}: unidades deve ser > 0')
         if q.get('tipologia') not in tips:
             E(f'Permuta física {n}: "{q.get("tipologia")}" não existe')
         elif int(q.get('unidades') or 0) > alocado[q['tipologia']]:
@@ -295,6 +346,9 @@ def _validar_avancado(m, erros, avisos):
         campo = 'valor_pct' if str(un).startswith('pct') else 'valor_rs'
         if c.get(campo) is None:
             E(f'Custo {n}: falta o valor ({campo}) para a unidade {un}')
+        cr0 = str(c.get('cronograma') or '')
+        if cr0 and cr0 != 'customizado' and not cr0.startswith('fase:') and cr0 not in EVENTOS:
+            E(f'Custo {n}: cronograma "{cr0}" inválido (use um evento, customizado ou fase: <nome>)')
         if c.get('cronograma') == 'customizado' and (c.get('inicio_mes') is None or not c.get('duracao_meses')):
             E(f'Custo {n}: cronograma customizado exige início e duração')
     for o in obrig - vistas:
@@ -309,32 +363,59 @@ def _validar_avancado(m, erros, avisos):
         if un is None:
             continue
         campo = 'valor_pct' if un == 'pct_vgv' else 'valor_rs'
-        if q.get(campo) is None:
-            E(f'Permuta financeira {n}: falta o valor ({campo})')
+        if not q.get(campo):
+            E(f'Permuta financeira {n}: falta o valor ({campo}) ou ele é 0')
     # funding
+    linhas_custo = linhas_de_custo_planejadas(m)
+    for n, o in sorted(m['funding.financiamento_producao'].items()):
+        for cat, sub in rotulos_da_base(o.get('base_financiavel')):
+            achadas = candidatas(linhas_custo, cat, sub)
+            rot = f'{cat} / {sub}' if sub else cat
+            if len(achadas) == 0:
+                E(f'Base financiável: "{rot}" não casa com nenhuma linha de custo')
+            elif len(achadas) > 1:
+                E(f'Base financiável: "{rot}" é ambíguo ({len(achadas)} linhas); use "Categoria / Subcategoria" para escolher uma só')
+    fases_nomes = {f['nome'] for f in m['fases'].values() if f.get('nome')}
     for d in ('funding.divida', 'funding.equity'):
         for n, o in sorted(m[d].items()):
             if o.get('nome') and not o.get('valor'):
                 E(f'{d} {n}: falta o valor')
+            ap = str(o.get('aporte') or '')
+            if ap.startswith('fase:') and ap[5:].strip() not in fases_nomes:
+                E(f'{d} {n}: fase "{ap[5:].strip()}" não existe nas fases customizadas')
     return erros, avisos
 
 
 # ═════════════════════════ HTTP ═════════════════════════
+class _SemRedirect(urllib.request.HTTPRedirectHandler):
+    """O `Authorization` não pode seguir um redirect para outro host."""
+    def redirect_request(self, *a, **k):
+        return None
+
+
+def base_da_api():
+    url = os.environ['URBIVERSO_QA_URL'].rstrip('/')
+    if not url.startswith('https://'):
+        raise SystemExit('URBIVERSO_QA_URL deve começar com https:// (o token não vai em texto claro).')
+    return url
+
+
 class Api:
     def __init__(self, executar):
         self.executar = executar
         self.log = []
+        self.abridor = urllib.request.build_opener(_SemRedirect, urllib.request.HTTPSHandler(context=CTX))
 
     def chamar(self, metodo, caminho, corpo=None):
         if not self.executar:
             self.log.append((metodo, caminho, 'plano', ''))
             return 0, {'id': 0}
-        url = os.environ['URBIVERSO_QA_URL'].rstrip('/') + '/api/viabilidade' + caminho
+        url = base_da_api() + '/api/viabilidade' + caminho
         dados = json.dumps(corpo).encode() if corpo is not None else None
         req = urllib.request.Request(url, data=dados, method=metodo, headers={
             'Authorization': 'Bearer ' + os.environ['URBIVERSO_QA_TOKEN_PCPAL'], 'Content-Type': 'application/json'})
         try:
-            r = urllib.request.urlopen(req, context=CTX, timeout=60)
+            r = self.abridor.open(req, timeout=60)
             status, txt = r.status, r.read().decode()
         except urllib.error.HTTPError as ex:
             status, txt = ex.code, ex.read().decode()
@@ -342,7 +423,7 @@ class Api:
             js = json.loads(txt) if txt else {}
         except ValueError:
             js = {'_texto': txt[:300]}
-        self.log.append((metodo, caminho, status, json.dumps(js, ensure_ascii=False)[:240] if status >= 400 else ''))
+        self.log.append((metodo, caminho, status, re.sub(r'Bearer\s+\S+', 'Bearer ***', json.dumps(js, ensure_ascii=False))[:240] if status >= 400 else ''))
         return status, js
 
     def get(self, caminho):
@@ -450,7 +531,8 @@ def escrever_avancado(api, m, eid):
                    {'tipologia_id': tip_id.get(a.get('tipologia')), 'unidades': a.get('unidades', 0), 'preco_m2': a.get('preco_m2')})
 
     curvas = {c['nome']: c['id'] for c in api.lista('/avancado/curvas')} if api.executar else {}
-    custo_id = {}
+    custo_ids = []                      # id de cada linha de custo criada, na ordem de linhas_de_custo_planejadas
+    linhas_custo = linhas_de_custo_planejadas(m)
 
     def comum(c):
         d = {}
@@ -480,23 +562,24 @@ def escrever_avancado(api, m, eid):
         corpo = {'grupo': c['grupo'], 'categoria': c['categoria'], 'subcategoria': c.get('subcategoria'),
                  'orcamento_unidade': un, 'orcamento_valor': valor, 'ordem': n, **comum(c)}
         _, r = api.chamar('POST', f'{base}/custos', corpo)
-        custo_id[(c['categoria'], c.get('subcategoria'))] = r.get('id')
-        custo_id.setdefault((c['categoria'], None), r.get('id'))
+        custo_ids.append(r.get('id'))
     for n, q in ordenados(m['permuta_fisica']):
         if q.get('unidades') is None:
             continue
-        api.chamar('POST', f'{base}/custos', {'grupo': 'terreno', 'categoria': 'Preço', 'subcategoria': 'Permuta física',
+        _, r = api.chamar('POST', f'{base}/custos', {'grupo': 'terreno', 'categoria': 'Preço', 'subcategoria': 'Permuta física',
                    'permuta_tipologia_id': tip_id.get(q.get('tipologia')), 'permuta_quantidade': q['unidades'],
                    'distribuicao_modo': 'unit_delivery', 'ordem': 100 + n})
+        custo_ids.append(r.get('id'))
     for n, q in ordenados(m['permuta_financeira']):
         if q.get('unidade') is None:
             continue
         valor = q.get('valor_pct') if q['unidade'] == 'pct_vgv' else q.get('valor_rs')
-        api.chamar('POST', f'{base}/custos', {
+        _, r = api.chamar('POST', f'{base}/custos', {
             'grupo': 'terreno', 'categoria': 'Preço', 'subcategoria': 'Permuta financeira', 'orcamento_unidade': q['unidade'],
             'orcamento_valor': valor, 'distribuicao_modo': 'sales_revenue', 'ordem': 110 + n,
             'permuta_financeira_deduzir_imposto': bool(q.get('deduzir_imposto', False)),
             'permuta_financeira_deduzir_corretagem': bool(q.get('deduzir_corretagem', False))})
+        custo_ids.append(r.get('id'))
 
     def anc(o):
         a = o.get('aporte')
@@ -514,15 +597,13 @@ def escrever_avancado(api, m, eid):
         base_fin = o.get('base_financiavel')
         if base_fin:
             ids = []
-            for nome in [x.strip() for x in str(base_fin).split(';') if x.strip()]:
-                cat, _, sub = nome.partition('/')
-                alvo = custo_id.get((cat.strip(), sub.strip() or None)) or custo_id.get((cat.strip(), None))
-                if alvo is None:
-                    api.log.append(('AVISO', f'base financiável: "{nome}" não casa com nenhuma linha de custo', 'aviso', ''))
-                else:
-                    ids.append(alvo)
-            if ids:
-                d['custo_linha_ids'] = ids
+            for cat, sub in rotulos_da_base(base_fin):
+                achadas = candidatas(linhas_custo, cat, sub)
+                if len(achadas) == 1 and achadas[0] < len(custo_ids) and (custo_ids[achadas[0]] or not api.executar):
+                    ids.append(custo_ids[achadas[0]])
+                else:                          # a validação já barrou isto; chegar aqui é defeito, não silêncio
+                    raise SystemExit(f'base financiável "{cat}": não resolveu uma única linha de custo criada')
+            d['custo_linha_ids'] = ids
         api.chamar('POST', f'{base}/funding', d)
     for n, o in ordenados(m['funding.divida']):
         if not o.get('nome'):
@@ -550,9 +631,12 @@ def escrever_avancado(api, m, eid):
 
 
 def canonico(eid):
-    env = dict(os.environ, URBI_BASE=os.environ['URBIVERSO_QA_URL'], URBI_TOKEN=os.environ['URBIVERSO_QA_TOKEN_PCPAL'])
-    r = subprocess.run(['node', '--import', 'tsx/esm', 'scripts/formularios/aplicar-pagamento-canonico.ts', str(eid)],
-                       cwd=RAIZ, env=env, capture_output=True, text=True, timeout=180)
+    env = dict(os.environ, URBI_BASE=base_da_api(), URBI_TOKEN=os.environ['URBIVERSO_QA_TOKEN_PCPAL'])
+    try:
+        r = subprocess.run(['node', '--import', 'tsx/esm', 'scripts/formularios/aplicar-pagamento-canonico.ts', str(eid), '--forcar'],
+                           cwd=RAIZ, env=env, capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.TimeoutExpired) as ex:
+        return 127, f'não consegui rodar o node: {ex}'
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
@@ -574,8 +658,11 @@ def igual(enviado, gravado, tol=0.0051):
 
 
 def reler(api, m, eid):
+    """Compara o que foi gravado com o que a planilha pediu. Ausência de resposta é DIVERGÊNCIA, nunca silêncio."""
     div = []
     est = api.get(f'/estudos/{eid}')
+    if not est or 'id' not in est:
+        return [f'GET /estudos/{eid} não devolveu o estudo: nada foi conferido']
     enviados = {k: v for k, v in m.estudo.items() if k not in ('nivel_analise', 'tipo_empreendimento')}
     for col, v in enviados.items():
         if col not in est:
@@ -596,12 +683,19 @@ def reler(api, m, eid):
         return div
     par = api.get(f'/estudos/{eid}/avancado/parametros')
     for c, v in m.param.items():
-        if c in par and not igual(v, par[c]):
+        if c not in par:
+            div.append(f'parametros.{c}: a API não devolveu o campo (enviado {v!r})')
+        elif not igual(v, par[c]):
             div.append(f'parametros.{c}: enviado {v!r}, gravado {par[c]!r}')
     cr = {x['evento']: x for x in api.lista(f'/estudos/{eid}/avancado/cronograma')}
+    tem_pre = m.param.get('tem_pre_lancamento') is True
     for ev, campos in m.crono.items():
         for c, v in campos.items():
-            if v is not None and ev in cr and c in cr[ev] and not (c == 'inicio_mes' and cr[ev].get('travado_inicio')) and not igual(v, cr[ev][c]):
+            if v is None or (ev == 'pre_lancamento' and not tem_pre):
+                continue
+            if ev not in cr or c not in cr[ev]:
+                div.append(f'cronograma.{ev}.{c}: a API não devolveu o campo (enviado {v!r})')
+            elif not (c == 'inicio_mes' and cr[ev].get('travado_inicio')) and not igual(v, cr[ev][c]):
                 div.append(f'cronograma.{ev}.{c}: enviado {v!r}, gravado {cr[ev][c]!r}')
     tips = api.lista(f'/estudos/{eid}/avancado/tipologias')
     pedidas = [v for _, v in ordenados(m['tipologias']) if v.get('nome')]
@@ -621,24 +715,56 @@ def reler(api, m, eid):
     if len(receitas) != len(pedidos_g):
         div.append(f'grupos: pedidos {len(pedidos_g)}, gravados {len(receitas)}')
     for r in receitas:
+        nome = r.get('nome')
+        g = pedidos_g.get(nome)
+        if g is None:
+            div.append(f'grupo "{nome}" existe no estudo e a planilha não o pediu')
+            continue
         fp = r.get('fluxo_pagamento') or {}
         comp = fp.get('componentes')
         if not (isinstance(comp, list) and comp):
-            div.append(f'grupo "{r.get("nome")}": fluxo de pagamento SEM componentes (o motor calcula sem juros)')
-        elif abs(sum(float(c.get('participacaoPct') or 0) for c in comp) - 100) > 0.01:
-            div.append(f'grupo "{r.get("nome")}": Σ componentes ≠ 100')
-        pos = [b for b in (r.get('absorcao') or {}).get('blocos', []) if b.get('evento') == 'pos_obra']
-        g = pedidos_g.get(r.get('nome'))
-        if g and pos:
-            esperado = 100 - sum(float(g.get(c) or 0) for c in ('pre_lancamento_pct', 'lancamento_pct', 'obra_pct'))
-            if not igual(esperado, pos[0].get('pct'), tol=0.01):
-                div.append(f'grupo "{r.get("nome")}": pós-chaves gravado {pos[0].get("pct")!r}, derivado {esperado!r}')
-        if g and not igual(g.get('residuo_sem_prazo', 'imediato'), fp.get('residuoAteMarco', 'imediato')):
-            div.append(f'grupo "{r.get("nome")}": resíduo sem prazo enviado {g.get("residuo_sem_prazo")!r}, gravado {fp.get("residuoAteMarco")!r}')
-        alocado = sum(int(t.get('quantidade') or 0) for t in r.get('tipologias', []))
-        pedido = sum(int(a.get('unidades') or 0) for _, a in ordenados(m['alocacoes']) if a.get('grupo') == r.get('nome'))
-        if alocado != pedido:
-            div.append(f'grupo "{r.get("nome")}": unidades alocadas pedidas {pedido}, gravadas {alocado}')
+            div.append(f'grupo "{nome}": fluxo de pagamento SEM componentes (o motor calcula sem juros)')
+        else:
+            ent = [(float(q.get('pct') or 0), 0.0) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Entrada']
+            par_ = [(float(q.get('pct') or 0), float(q.get('sinal_pct') or 0)) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Parcelamento']
+            repasse = round(100 - sum(x[0] for x in ent + par_), 6)
+            esperado = sorted(round(x[0], 2) for x in ent + par_ + ([(repasse, 0.0)] if repasse > 0.005 else []))
+            gravado = sorted(round(float(c.get('participacaoPct') or 0), 2) for c in comp)
+            if esperado != gravado:
+                div.append(f'grupo "{nome}": participações do pagamento pedidas {esperado}, gravadas {gravado}')
+            sinal_esp = round(sum(a * b / 100 for a, b in par_), 4)
+            sinal_grv = round(sum(float(c.get('participacaoPct') or 0) * float(c.get('sinalPct') or 0) / 100 for c in comp), 4)
+            if abs(sinal_esp - sinal_grv) > 0.01:
+                div.append(f'grupo "{nome}": sinal ponderado pedido {sinal_esp}, gravado {sinal_grv}')
+        blocos = (r.get('absorcao') or {}).get('blocos', [])
+        pos = [b for b in blocos if b.get('evento') == 'pos_obra']
+        esperado_pos = 100 - sum(float(g.get(c) or 0) for c in ('pre_lancamento_pct', 'lancamento_pct', 'obra_pct'))
+        if not pos:
+            div.append(f'grupo "{nome}": sem bloco de pós-chaves na absorção')
+        elif not igual(esperado_pos, pos[0].get('pct'), tol=0.01):
+            div.append(f'grupo "{nome}": pós-chaves gravado {pos[0].get("pct")!r}, derivado {esperado_pos!r}')
+        for evento, campo in (('lancamento', 'lancamento_pct'), ('obra', 'obra_pct')):
+            b = next((x for x in blocos if x.get('evento') == evento), None)
+            if b is None or not igual(g.get(campo) or 0, b.get('pct'), tol=0.01):
+                div.append(f'grupo "{nome}": absorção {evento} pedida {g.get(campo)!r}, gravada {None if b is None else b.get("pct")!r}')
+        ab = r.get('absorcao') or {}
+        if not igual(g.get('pos_chaves_meses', 12), ab.get('pos_chaves_meses', 12)):
+            div.append(f'grupo "{nome}": janela pós-chaves pedida {g.get("pos_chaves_meses")!r}, gravada {ab.get("pos_chaves_meses")!r}')
+        if bool(g.get('correcao_estoque', False)) != bool(ab.get('correcao_estoque', False)):
+            div.append(f'grupo "{nome}": correção de estoque pedida {g.get("correcao_estoque")!r}, gravada {ab.get("correcao_estoque")!r}')
+        if not igual(g.get('residuo_sem_prazo', 'imediato'), fp.get('residuoAteMarco', 'imediato')):
+            div.append(f'grupo "{nome}": resíduo sem prazo pedido {g.get("residuo_sem_prazo")!r}, gravado {fp.get("residuoAteMarco")!r}')
+        gravado_aloc = defaultdict(int)
+        for t in r.get('tipologias', []):
+            gravado_aloc[t.get('nome') or t.get('tipologia_id')] += int(t.get('quantidade') or 0)
+        pedido_aloc = defaultdict(int)
+        for _, a in ordenados(m['alocacoes']):
+            if a.get('grupo') == nome:
+                pedido_aloc[a.get('tipologia')] += int(a.get('unidades') or 0)
+        if sum(gravado_aloc.values()) != sum(pedido_aloc.values()):
+            div.append(f'grupo "{nome}": unidades alocadas pedidas {sum(pedido_aloc.values())}, gravadas {sum(gravado_aloc.values())}')
+        elif all(isinstance(k, str) for k in gravado_aloc) and dict(gravado_aloc) != dict(pedido_aloc):
+            div.append(f'grupo "{nome}": alocação por tipologia pedida {dict(pedido_aloc)}, gravada {dict(gravado_aloc)}')
     custos = api.lista(f'/estudos/{eid}/avancado/custos')
     esperados = []
     for _, c in ordenados(m['custos']):
@@ -665,11 +791,20 @@ def reler(api, m, eid):
         else:
             restantes.remove(achou)
     ops = api.lista(f'/estudos/{eid}/avancado/funding')
-    pedidas = (len(ordenados(m['funding.financiamento_producao'])) + len(ordenados(m['funding.divida'])) + len(ordenados(m['funding.equity'])))
-    pedidas = sum(1 for lista in ('funding.financiamento_producao', 'funding.divida', 'funding.equity')
-                  for _, o in ordenados(m[lista]) if o.get('nome'))
-    if len(ops) != pedidas:
-        div.append(f'funding: pedidas {pedidas}, gravadas {len(ops)}')
+    pedidas_f = [(t, o) for t, lista in (('financiamento_producao', 'funding.financiamento_producao'), ('divida', 'funding.divida'), ('equity', 'funding.equity'))
+                 for _, o in ordenados(m[lista]) if o.get('nome')]
+    if len(ops) != len(pedidas_f):
+        div.append(f'funding: pedidas {len(pedidas_f)}, gravadas {len(ops)}')
+    for tipo, o in pedidas_f:
+        g = next((x for x in ops if x.get('tipo') == tipo and x.get('nome') == o['nome']), None)
+        if g is None:
+            div.append(f'funding {tipo} "{o["nome"]}" não foi gravado')
+        elif o.get('valor') is not None and not igual(o['valor'], g.get('valor')):
+            div.append(f'funding {tipo} "{o["nome"]}".valor: enviado {o["valor"]!r}, gravado {g.get("valor")!r}')
+        if tipo == 'financiamento_producao' and o.get('base_financiavel') and g is not None:
+            pedidos_ids = len(rotulos_da_base(o['base_financiavel']))
+            if len(g.get('custo_linha_ids') or []) != pedidos_ids:
+                div.append(f'financiamento à produção: base financiável pedida com {pedidos_ids} linha(s), gravada com {len(g.get("custo_linha_ids") or [])}')
     cen = api.lista(f'/estudos/{eid}/avancado/cenarios')
     ped = [c for _, c in ordenados(m['cenarios']) if c.get('nome')]
     if len(cen) != len(ped):
@@ -678,9 +813,12 @@ def reler(api, m, eid):
 
 
 def conferir(eid):
-    env = dict(os.environ, URBI_BASE=os.environ['URBIVERSO_QA_URL'], URBI_TOKEN=os.environ['URBIVERSO_QA_TOKEN_PCPAL'])
-    r = subprocess.run(['node', '--import', 'tsx/esm', 'scripts/conferir-estudo.ts', str(eid)], cwd=RAIZ, env=env,
-                       capture_output=True, text=True, timeout=300)
+    env = dict(os.environ, URBI_BASE=base_da_api(), URBI_TOKEN=os.environ['URBIVERSO_QA_TOKEN_PCPAL'])
+    try:
+        r = subprocess.run(['node', '--import', 'tsx/esm', 'scripts/conferir-estudo.ts', str(eid)], cwd=RAIZ, env=env,
+                           capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as ex:
+        return [], [f'não consegui rodar o motor do app: {ex}'], [], 127
     saida = r.stdout + r.stderr
     resumo, reais, conhecidos = [], [], []
     for ln in saida.splitlines():
@@ -696,20 +834,22 @@ def conferir(eid):
 
 # ═════════════════════════ main ═════════════════════════
 def main(argv):
-    args = [a for a in argv[1:]]
-    executar = '--executar' in args
-    nome = args[args.index('--nome-estudo') + 1] if '--nome-estudo' in args else None
-    rel = args[args.index('--relatorio') + 1] if '--relatorio' in args else None
-    arquivo = next(a for a in args if a.endswith('.xlsx'))
+    ap = argparse.ArgumentParser(description='Cria um estudo a partir de um formulário simplificado e confere o resultado.')
+    ap.add_argument('formulario', help='o .xlsx preenchido')
+    ap.add_argument('--nome-estudo', help='sobrescreve o nome do estudo')
+    ap.add_argument('--executar', action='store_true', help='escreve na instância (sem isto só valida e mostra o plano)')
+    ap.add_argument('--relatorio', help='grava o relatório em JSON')
+    a = ap.parse_args(argv[1:])
+    executar, rel, arquivo = a.executar, a.relatorio, a.formulario
     m = montar(ler(arquivo))
-    if nome:
-        m.estudo['nome'] = nome
+    if a.nome_estudo:
+        m.estudo['nome'] = a.nome_estudo
     erros, avisos = validar(m)
     relatorio = {'arquivo': arquivo, 'erros_de_preenchimento': erros, 'avisos': avisos,
                  'ignoradas': m.ignoradas, 'estudo_id': None}
     print(f'Formulário: {arquivo}')
-    for a in avisos:
-        print('  aviso :', a)
+    for av in avisos:
+        print('  aviso :', av)
     for rot, k in m.ignoradas:
         print(f'  ignorado (sem tratamento): "{rot}" [{k}]')
     for er in erros:
@@ -722,30 +862,32 @@ def main(argv):
     api = Api(executar)
     eid = criar_estudo(api, m)
     if eid is None:
-        print('ERRO: o POST /estudos falhou:', api.falhas())
+        print('ERRO: o POST /estudos falhou (o estudo pode não ter sido criado):', api.falhas())
         return 1
     (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
-    falhas = api.falhas()
-    for mt, c, s, r_ in api.log:
-        if s == 'aviso':
+    for mt, c, st, r_ in api.log:
+        if st == 'aviso':
             print('  aviso :', c)
-    print(f'\nestudo_id = {eid} · {len(api.log)} chamadas · {len(falhas)} falha(s) HTTP')
-    for mt, c, s, r_ in falhas:
-        print(f'  XX {mt} {c} {s} {r_}')
-    relatorio.update(estudo_id=eid, falhas_http=[list(f) for f in falhas])
+    print(f'\nestudo_id = {eid} · {len(api.log)} chamadas · {len(api.falhas())} falha(s) HTTP')
     if not executar:
         print('\n(plano — use --executar para escrever)')
         return 0
+    pendencias = []
     if m.estudo['nivel_analise'] == 'avancado':
         rc, saida = canonico(eid)
         print('\npagamento canônico:', 'ok' if rc == 0 else 'FALHOU')
         for ln in saida.splitlines():
             print('  ', ln)
+        if rc != 0:
+            pendencias.append('a conversão do pagamento para o formato canônico falhou')
     div = reler(api, m, eid)
-    print(f'\nreleitura: {len(div)} divergência(s)')
+    falhas = api.falhas()                       # depois da releitura: GET com erro também conta
+    print(f'\nreleitura: {len(div)} divergência(s) · {len(falhas)} falha(s) HTTP no total')
+    for mt, c, st, r_ in falhas:
+        print(f'  XX {mt} {c} {st} {r_}')
     for d in div:
         print('  DIVERGE:', d)
-    resumo, reais, conhecidos, _ = conferir(eid)
+    resumo, reais, conhecidos, rc_motor = conferir(eid)
     print('\nmotor do app:')
     for ln in resumo:
         print('  ', ln)
@@ -753,10 +895,17 @@ def main(argv):
         print('  conhecido:', x)
     for x in reais:
         print('  PROBLEMA :', x)
-    relatorio.update(divergencias=div, motor=resumo, problemas=reais, conhecidos=conhecidos)
+    if rc_motor != 0:
+        pendencias.append(f'o motor do app (conferir-estudo) saiu com código {rc_motor}')
+    if not resumo:
+        pendencias.append('o motor do app não devolveu nenhum número reconhecível: o estudo NÃO foi conferido')
+    for pd in pendencias:
+        print('  PENDÊNCIA:', pd)
+    relatorio.update(estudo_id=eid, falhas_http=[list(f) for f in falhas], divergencias=div, motor=resumo,
+                     problemas=reais, conhecidos=conhecidos, pendencias=pendencias)
     if rel:
         Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
-    ok = not falhas and not div and not reais
+    ok = not falhas and not div and not reais and not pendencias
     print('\nRESULTADO:', 'OK' if ok else 'COM PENDÊNCIAS')
     return 0 if ok else 2
 

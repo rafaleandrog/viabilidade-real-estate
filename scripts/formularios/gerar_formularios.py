@@ -60,7 +60,7 @@ class Form:
         self.subtitulo = subtitulo
         self.linhas = []          # dicts
         self.nomes = {}           # nome -> índice em self.linhas
-        self.exemplo = {}         # nome -> valor de exemplo (só para verificação)
+        self.exemplo = {}         # nome -> valor pré-preenchido (nos modelos em branco, só os padrões declarados em `ex=` de campos de escolha fixa)
         self.listas = {}          # nome da lista -> itens (vão para a coluna oculta F)
 
     # ── construtores de linha ──
@@ -308,7 +308,7 @@ def bloco_criacao(f, tipo, nivel, ex):
     f.campo('nome', 'Nome do estudo *', 'texto (até 200)', 'estudos.nome', F_TXT, maxlen=200, ex=ex.get('nome'))
     f.campo('tipo', 'Tipo de empreendimento', 'fixo deste formulário', 'estudos.tipo_empreendimento', F_TXT, fixo=tipo)
     f.campo('nivel', 'Nível de análise', 'fixo deste formulário', 'estudos.nivel_analise', F_TXT, fixo=nivel)
-    f.campo('origem', 'Origem do terreno *', 'lista: manual (inserir novo) | nucleo (buscar terreno)',
+    f.campo('origem', 'Origem do terreno *', 'lista: manual (inserir novo) | nucleo (buscar terreno — o importador só aceita manual)',
             'estudos.origem_terreno', F_TXT, lista=['manual', 'nucleo'], ex='manual')
     f.campo('uf', 'UF (recomendado)', 'texto, 2 letras', 'estudos.uf', F_TXT, maxlen=2, ex=ex.get('uf'))
     f.campo('notas', 'Notas', 'texto livre (só pela API)', 'estudos.notas', F_TXT, ex=ex.get('notas'))
@@ -723,7 +723,7 @@ CATEGORIAS_CUSTO = ['Preço', 'Registro', 'Outro', 'Construção', 'Outorga', 'D
                     'Stand de vendas', 'Juros de financiamento', 'Taxas bancárias', 'Estruturação de dívida',
                     'Investidores']
 CRONOGRAMA_CUSTO = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado']
-UNIDADES_CUSTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita', 'pct_obra', 'pct_recebido', 'pct_constr']
+UNIDADES_CUSTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_obra', 'pct_recebido', 'pct_constr']
 ROTULO_UNIDADE = (
     '=IF({u}="","escolha a Unidade acima",IF({u}="rs","R$ (valor cheio)",IF({u}="rs_m2_priv","R$/m² privativo (fechada+aberta)",'
     'IF({u}="rs_m2_terreno","R$/m² de terreno",IF(LEFT({u},3)="pct","— (use a linha de %)","unidade inválida")))))'
@@ -750,7 +750,7 @@ UNIDADES_POR_CATEGORIA = {
 }
 
 NOTA_CUSTOS = (
-    'Categorias e unidades aceitas (rs = R$ · rs_m2_priv = R$/m² privativo · rs_m2_terreno · pct_vgv · pct_receita · pct_obra · '
+    'Categorias e unidades aceitas (rs = R$ · rs_m2_priv = R$/m² privativo · rs_m2_terreno · pct_vgv · pct_obra · '
     'pct_recebido · pct_constr). TERRENO: Preço (rs, rs_m2_terreno; permuta financeira: rs, pct_vgv) · Registro (rs, rs_m2_priv) · Outro (rs, pct_vgv). '
     'OBRA: Construção, Decoração (rs, rs_m2_priv) · Outorga, Contingência, Outro (rs, pct_vgv) · Gestão da obra (rs, pct_obra). '
     'DIRETOS: Marketing & Publicidade, Manutenção pós-obra, Outro (rs, pct_vgv, pct_recebido) · Corretagem de vendas (pct_vgv) · '

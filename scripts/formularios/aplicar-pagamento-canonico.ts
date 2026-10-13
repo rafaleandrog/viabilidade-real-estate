@@ -3,7 +3,10 @@
  * (`componentes`), do mesmo jeito que o modal da tela faz ao "Aplicar" — via `fluxoPagamentoParaSalvar` —, e grava o
  * `pos_obra` da absorção já DERIVADO (100 − pré − lançamento − obra), que é o que a conferência espera.
  *
- *     URBI_BASE=… URBI_TOKEN=… node --import tsx/esm scripts/formularios/aplicar-pagamento-canonico.ts <id> [<id> …]
+ *     URBI_BASE=… URBI_TOKEN=… node --import tsx/esm scripts/formularios/aplicar-pagamento-canonico.ts <id> [<id> …] [--forcar]
+ *
+ * Só aceita id numérico e, sem `--forcar`, só estudo cujo nome comece com `qa-`: o script ESCREVE (PATCH) nas fases de
+ * receita do estudo, e com o token de QA qualquer id seria alvo. O importador passa `--forcar` porque acabou de criar o estudo.
  *
  * Existe porque o importador de formulários grava o shape legado (`entrada[]`/`parcelas[]`, as chaves do formulário),
  * e esse shape faz o motor calcular sem juros, sem carteira e sem repasse. Quando o formulário passar a descrever o
@@ -28,8 +31,15 @@ async function api(metodo: string, rota: string, corpo?: unknown): Promise<any> 
 }
 const lista = (js: any): any[] => (Array.isArray(js) ? js : (js?.dados ?? []));
 
-for (const id of process.argv.slice(2)) {
+const forcar = process.argv.includes('--forcar');
+for (const id of process.argv.slice(2).filter((a) => a !== '--forcar')) {
+  if (!/^\d+$/.test(id)) { console.error(`id inválido: ${JSON.stringify(id)} (só número)`); process.exit(2); }
   const estudo = (await api('GET', `/estudos/${id}`)).js;
+  if (!estudo?.id) { console.error(`estudo ${id}: não encontrado`); process.exit(2); }
+  if (!forcar && !String(estudo.nome ?? '').startsWith('qa-')) {
+    console.error(`estudo ${id} ("${estudo.nome}") não começa com "qa-": recusado (use --forcar se for de propósito)`);
+    process.exit(2);
+  }
   const juros = Number(estudo.juros_tabela_aa_padrao) || 0;
   const crono = lista((await api('GET', `/estudos/${id}/avancado/cronograma`)).js);
   const fases = lista((await api('GET', `/estudos/${id}/avancado/fases`)).js).filter((f) => f.tipo === 'receita');

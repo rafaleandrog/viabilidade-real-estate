@@ -9,21 +9,22 @@ vira um estudo da instância com **um comando**, e o resultado é conferido ante
 python3 -I scripts/formularios/importar_formulario.py <preenchido.xlsx> --nome-estudo "qa-..." --executar --relatorio saida.json
 ```
 
-Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
+Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
 impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os passos 3 e 5 usam o motor do app).
 
 ## O que ele faz, nesta ordem
 
-1. **Valida a planilha e para no primeiro problema, antes de escrever.** Barra: duas unidades preenchidas no mesmo campo; Σ % dos
+1. **Valida a planilha, lista todos os problemas de uma vez e para antes de escrever.** Barra: duas unidades preenchidas no mesmo campo; Σ % dos
    produtos ≠ 100; grupo ou tipologia que não existe; alocado acima do catálogo; Σ do pagamento acima de 100; categoria de custo com
-   unidade que a tela não aceita; custo obrigatório ausente; valor na linha errada.
+   unidade que a tela não aceita; custo obrigatório ausente; valor na linha errada; item com dados e sem nome (tipologia, grupo, fase, dívida, equity, cenário); nome repetido; janela pós-chaves fora de 1 a 12; permuta com valor zero.
 2. **Cria o estudo** pelas rotas do app, na ordem que o app exige (parâmetros antes do cronograma, tipologias antes das alocações…).
 3. **Leva o pagamento ao formato canônico** (`aplicar-pagamento-canonico.ts`). Em instância com a normalização na API é um passo sem efeito.
-4. **Relê** o que foi gravado e compara com a planilha (estudo, produtos, tipologias, grupos, custos, funding, cenários).
+4. **Relê** o que foi gravado e compara com a planilha (estudo, parâmetros, cronograma, produtos, tipologias, absorção e pagamento de cada grupo, alocações, custos, funding, cenários). Campo que a API não devolve conta como divergência, não como silêncio.
 5. **Roda o motor do repositório** (`conferir-estudo.ts`) e separa defeito do estudo de achado conhecido do app (cada um com o número da issue).
 
-Saída 0 = sem erro de preenchimento, sem divergência na releitura e sem problema novo no motor. Saída 1 = planilha com erro (nada foi
-escrito). Saída 2 = o estudo foi criado, mas há pendência a olhar.
+Saída 0 = sem erro de preenchimento, sem divergência na releitura, sem falha HTTP e sem problema novo no motor. Saída 1 = planilha com erro
+(nada foi escrito) ou falha ao criar o estudo (o `POST /estudos` não devolveu 201). Saída 2 = o estudo foi criado, mas há pendência a olhar:
+conversão do pagamento que falhou, divergência na releitura, o motor do app que não rodou ou saiu com erro, ou problema novo no motor.
 
 ## Regras de preenchimento que o importador assume
 
