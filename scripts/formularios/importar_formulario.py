@@ -181,10 +181,30 @@ def candidatas(linhas, cat, sub):
     return [i for i, (c, sc) in enumerate(linhas) if c == cat and (sub is None or sc == sub)]
 
 
+CAMPOS_NUMERICOS = ('pre_lancamento_pct', 'lancamento_pct', 'obra_pct', 'pos_chaves_meses', 'pct', 'sinal_pct', 'parcelas',
+                    'unidades', 'preco_m2', 'quantidade', 'pct_alv', 'preco_venda_m2', 'valor_pct', 'valor_rs')
+
+
 def validar(m):
     erros, avisos = [], []
     E, A = erros.append, avisos.append
     e = m.estudo
+    # tipo errado (texto onde se espera número) vira erro listado, não traceback; o valor é anulado para
+    # o resto da validação seguir e listar os demais problemas
+    for lista, itens in m.listas.items():
+        for n, v in itens.items():
+            for c in CAMPOS_NUMERICOS:
+                x = v.get(c)
+                if x is not None and (isinstance(x, bool) or not isinstance(x, (int, float))):
+                    E(f'{lista}[{n}].{c}: esperado número, veio "{x}"')
+                    v[c] = None
+    for c, x in list(m.param.items()):
+        if c in CAMPOS_NUMERICOS and x is not None and (isinstance(x, bool) or not isinstance(x, (int, float))):
+            E(f'parametros.{c}: esperado número, veio "{x}"')
+            m.param[c] = None
+    if m.param.get('tem_pre_lancamento') is not None and not isinstance(m.param['tem_pre_lancamento'], bool):
+        E(f'parametros.tem_pre_lancamento: esperado Sim ou Não, veio "{m.param["tem_pre_lancamento"]}"')
+        m.param['tem_pre_lancamento'] = None
     for obrig in ('nome', 'tipo_empreendimento', 'nivel_analise'):
         if not e.get(obrig):
             E(f'campo obrigatório ausente: {obrig}')
@@ -254,6 +274,17 @@ def _validar_avancado(m, erros, avisos):
     sem_nome('funding.divida', 'Dívida')
     sem_nome('funding.equity', 'Equity')
     sem_nome('cenarios', 'Cenário')
+    sem_nome('funding.financiamento_producao', 'Financiamento à produção')
+
+    def sem_chave(lista, rotulo, chaves):
+        """Linha com dados mas sem a chave que a identifica seria descartada em silêncio pelo escritor."""
+        for n, v in sorted(m[lista].items()):
+            dados = [k for k, x in v.items() if k not in chaves and x is not None]
+            if all(v.get(c) is None for c in chaves) and dados:
+                E(f'{rotulo} {n}: tem dados ({", ".join(dados[:3])}…) mas falta {" / ".join(chaves)}')
+    sem_chave('pagamento', 'Condição', ('grupo', 'linha'))
+    sem_chave('alocacoes', 'Alocação', ('grupo', 'tipologia'))
+    sem_chave('permuta_financeira', 'Permuta financeira', ('unidade',))
     tips = {t['nome']: t for t in m['tipologias'].values() if t.get('nome')}
     if not tips:
         E('nenhuma tipologia/lote informado')

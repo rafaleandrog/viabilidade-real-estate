@@ -9,7 +9,7 @@ vira um estudo da instância com **um comando**, e o resultado é conferido ante
 python3 -I scripts/formularios/importar_formulario.py <preenchido.xlsx> --nome-estudo "qa-..." --executar --relatorio saida.json
 ```
 
-Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
+Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (com `--executar`, precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
 impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os passos 3 e 5 usam o motor do app).
 
 ## O que ele faz, nesta ordem
@@ -23,8 +23,8 @@ impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os 
 5. **Roda o motor do repositório** (`conferir-estudo.ts`) e separa defeito do estudo de achado conhecido do app (cada um com o número da issue).
 
 Saída 0 = sem erro de preenchimento, sem divergência na releitura, sem falha HTTP e sem problema novo no motor. Saída 1 = planilha com erro
-(nada foi escrito) ou falha ao criar o estudo (o `POST /estudos` não devolveu 201). Saída 2 = o estudo foi criado, mas há pendência a olhar:
-conversão do pagamento que falhou, divergência na releitura, o motor do app que não rodou ou saiu com erro, ou problema novo no motor.
+(nada foi escrito) ou falha ao criar o estudo (o `POST /estudos` não devolveu 201), inclusive URL ou token ausentes ou fora do https com `--executar`. Saída 2 = o estudo foi criado, mas há pendência a olhar:
+falha HTTP em alguma chamada, conversão do pagamento que falhou, divergência na releitura, o motor do app que não rodou ou saiu com erro, ou problema novo no motor.
 
 ## Regras de preenchimento que o importador assume
 
