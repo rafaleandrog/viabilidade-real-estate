@@ -296,7 +296,7 @@ SN = ['Sim', 'Não']
 LEGENDA = (
     'Como preencher: só as células AMARELAS da coluna B. Cinza-claro com valor em negrito = fixo do tipo de estudo '
     '(não editar); cinza com itálico = calculado pelo Excel, só para conferir (não editar). * = obrigatório. '
-    'PERCENTUAL: digite como porcentagem (4% ou 4 numa célula já formatada em %; nunca 0,04 num campo sem formato). '
+    'PERCENTUAL: digite como porcentagem (4% ou 4 numa célula já formatada em %). O Excel guarda 0,04; a API do app espera pontos (4) e o importador converte pelo FORMATO da célula — por isso não troque o formato das células. '
     'Números sem separador de milhar e com ponto decimal quando digitados fora do Excel. '
     'CAMPO COM VÁRIAS UNIDADES: há uma linha por unidade — preencha UMA só e deixe as outras em branco; '
     'o Excel não converte uma na outra. Listas (produtos, custos…) têm vagas numeradas; vaga totalmente em branco = sem item.'
@@ -734,6 +734,21 @@ ROTULO_UNIDADE_PCT = (
     'IF({u}="pct_constr","% da construção (constr.+decor.+gestão da obra)",IF(LEFT({u},2)="rs","— (use a linha de R$)","unidade inválida"))))))'
 )
 
+# Unidades aceitas por (grupo, categoria) — cópia da tabela da tela de Custos; a tela é a autoridade.
+UNIDADES_POR_CATEGORIA = {
+    ('terreno', 'Preço'): ['rs', 'rs_m2_terreno'], ('terreno', 'Registro'): ['rs', 'rs_m2_priv'], ('terreno', 'Outro'): ['rs', 'pct_vgv'],
+    ('obra', 'Construção'): ['rs', 'rs_m2_priv'], ('obra', 'Outorga'): ['rs', 'pct_vgv'], ('obra', 'Decoração'): ['rs', 'rs_m2_priv'],
+    ('obra', 'Gestão da obra'): ['rs', 'pct_obra'], ('obra', 'Contingência'): ['rs', 'pct_vgv'], ('obra', 'Outro'): ['rs', 'pct_vgv'],
+    ('diretos', 'Marketing & Publicidade'): ['rs', 'pct_vgv', 'pct_recebido'], ('diretos', 'Corretagem de vendas'): ['pct_vgv'],
+    ('diretos', 'Projetos'): ['rs', 'rs_m2_priv', 'pct_constr'], ('diretos', 'Licenças e Aprovações'): ['rs', 'rs_m2_priv'],
+    ('diretos', 'Manutenção pós-obra'): ['rs', 'pct_vgv', 'pct_recebido'], ('diretos', 'Outro'): ['rs', 'pct_vgv', 'pct_recebido'],
+    ('indireto', 'Marketing global'): ['rs', 'pct_vgv', 'pct_recebido'], ('indireto', 'Stand de vendas'): ['rs', 'pct_vgv'],
+    ('indireto', 'Gestão'): ['rs', 'pct_vgv', 'pct_recebido'], ('indireto', 'Outro'): ['rs', 'pct_vgv', 'pct_recebido'],
+    ('financeiro', 'Juros de financiamento'): ['rs', 'pct_vgv'], ('financeiro', 'Taxas bancárias'): ['rs', 'pct_vgv'],
+    ('financeiro', 'Estruturação de dívida'): ['rs', 'pct_vgv'], ('financeiro', 'Investidores'): ['rs', 'pct_vgv'],
+    ('financeiro', 'Outro'): ['rs', 'pct_vgv'],
+}
+
 NOTA_CUSTOS = (
     'Categorias e unidades aceitas (rs = R$ · rs_m2_priv = R$/m² privativo · rs_m2_terreno · pct_vgv · pct_receita · pct_obra · '
     'pct_recebido · pct_constr). TERRENO: Preço (rs, rs_m2_terreno; permuta financeira: rs, pct_vgv) · Registro (rs, rs_m2_priv) · Outro (rs, pct_vgv). '
@@ -754,6 +769,7 @@ def avancado(tipo, ex):
     f = Form(f'Formulário de estudo — Avançado · {rotulo}', LEGENDA + ' Meses: 0 = mês da data de início do projeto.')
     f.listas['categorias'] = CATEGORIAS_CUSTO
     f.listas['cronograma'] = CRONOGRAMA_CUSTO
+    f.listas['distribuicao'] = ['Linear', 'Curva S', 'unit_delivery', 'sales_revenue']
     bloco_criacao(f, tipo, 'avancado', ex)
 
     # ── Empreendimento › Informações ──
@@ -813,11 +829,11 @@ def avancado(tipo, ex):
     f.secao('Fases customizadas do cronograma (opcional) — 5 vagas; servem de âncora para custos e funding')
     N_FASE = 5
     for i in range(1, N_FASE + 1):
-        f.campo(f'fase{i}_nome', f'Fase {i} — Nome', 'texto', f'avancado_fases[{i}].nome (tipo = cronograma)', F_TXT,
+        f.campo(f'fase{i}_nome', f'Fase {i} — Nome', 'texto', f'fases[{i}].nome', F_TXT,
                 ex=ex.get(f'fase{i}_nome'))
-        f.campo(f'fase{i}_ini', f'Fase {i} — Início', 'mês (inteiro ≥ 0)', f'avancado_fases[{i}].inicio_mes', F_INT,
+        f.campo(f'fase{i}_ini', f'Fase {i} — Início', 'mês (inteiro ≥ 0)', f'fases[{i}].inicio_mes', F_INT,
                 minimo=0, inteiro=True, ex=ex.get(f'fase{i}_ini'))
-        f.campo(f'fase{i}_dur', f'Fase {i} — Duração', 'meses (inteiro ≥ 1)', f'avancado_fases[{i}].duracao_meses',
+        f.campo(f'fase{i}_dur', f'Fase {i} — Duração', 'meses (inteiro ≥ 1)', f'fases[{i}].duracao_meses',
                 F_INT, minimo=1, inteiro=True, ex=ex.get(f'fase{i}_dur'))
 
     bloco_mercado(f, ex)
@@ -831,25 +847,25 @@ def avancado(tipo, ex):
     for i in range(1, N_TIP + 1):
         t = f'tip{i}'
         f.grupo(f'{nome_item} {i}')
-        f.campo(f'{t}_nome', f'{nome_item} {i} — Nome', 'texto (até 100)', f'avancado_tipologias[{i}].nome', F_TXT,
+        f.campo(f'{t}_nome', f'{nome_item} {i} — Nome', 'texto (até 100)', f'tipologias[{i}].nome', F_TXT,
                 maxlen=100, ex=ex.get(f'{t}_nome'))
         if not lot:
             f.campo(f'{t}_tipo', f'Tipologia {i} — Tipo', 'lista: apartamento | cobertura | loja | outro',
-                    f'avancado_tipologias[{i}].tipo_unidade', F_TXT, lista=['apartamento', 'cobertura', 'loja', 'outro'],
+                    f'tipologias[{i}].tipo_unidade', F_TXT, lista=['apartamento', 'cobertura', 'loja', 'outro'],
                     ex=ex.get(f'{t}_tipo'))
-        f.campo(f'{t}_priv', f'{nome_item} {i} — Área privativa (fechada)', 'm²', f'avancado_tipologias[{i}].area_privativa_m2',
+        f.campo(f'{t}_priv', f'{nome_item} {i} — Área privativa (fechada)', 'm²', f'tipologias[{i}].area_privativa_m2',
                 F_M2, minimo=0, ex=ex.get(f'{t}_priv'))
         f.campo(f'{t}_aberta', f'{nome_item} {i} — Área aberta', 'm² (entra no VGV)',
-                f'avancado_tipologias[{i}].area_privativa_aberta_m2', F_M2, minimo=0, ex=ex.get(f'{t}_aberta'))
+                f'tipologias[{i}].area_privativa_aberta_m2', F_M2, minimo=0, ex=ex.get(f'{t}_aberta'))
         if not lot:
-            f.campo(f'{t}_dorm', f'Tipologia {i} — Dormitórios', 'inteiro', f'avancado_tipologias[{i}].dormitorios', F_INT,
+            f.campo(f'{t}_dorm', f'Tipologia {i} — Dormitórios', 'inteiro', f'tipologias[{i}].dormitorios', F_INT,
                     minimo=0, inteiro=True, ex=ex.get(f'{t}_dorm'))
-            f.campo(f'{t}_vagas', f'Tipologia {i} — Vagas', 'inteiro', f'avancado_tipologias[{i}].vagas', F_INT,
+            f.campo(f'{t}_vagas', f'Tipologia {i} — Vagas', 'inteiro', f'tipologias[{i}].vagas', F_INT,
                     minimo=0, inteiro=True, ex=ex.get(f'{t}_vagas'))
-        f.campo(f'{t}_un', f'{nome_item} {i} — Unidades', 'unidades (inteiro > 0)', f'avancado_tipologias[{i}].quantidade',
+        f.campo(f'{t}_un', f'{nome_item} {i} — Unidades', 'unidades (inteiro > 0)', f'tipologias[{i}].quantidade',
                 F_INT, minimo=0, inteiro=True, ex=ex.get(f'{t}_un'))
         f.campo(f'{t}_preco', f'{nome_item} {i} — Preço/m² sugerido', 'R$/m² (preço padrão da alocação)',
-                f'avancado_tipologias[{i}].preco_m2', F_RS, minimo=0, ex=ex.get(f'{t}_preco'))
+                f'tipologias[{i}].preco_m2', F_RS, minimo=0, ex=ex.get(f'{t}_preco'))
 
     # ── Grupos de venda ──
     N_GRP = 5
@@ -859,20 +875,20 @@ def avancado(tipo, ex):
     for g in range(1, N_GRP + 1):
         k = f'gr{g}'
         f.grupo(f'Grupo de venda {g}')
-        f.campo(f'{k}_nome', f'Grupo {g} — Nome', 'texto', f'avancado_fases[{g}].nome (tipo = receita)', F_TXT,
+        f.campo(f'{k}_nome', f'Grupo {g} — Nome', 'texto', f'grupos[{g}].nome', F_TXT,
                 ex=ex.get(f'{k}_nome'))
         f.campo(f'{k}_pre', f'Grupo {g} — Absorção no Pré-lançamento (só com pré)', '% das unidades',
-                f'absorcao.blocos[pre_lancamento].pct', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_pre'))
-        f.campo(f'{k}_lanc', f'Grupo {g} — Absorção no Lançamento', '% das unidades', 'absorcao.blocos[lancamento].pct',
+                f'grupos[{g}].pre_lancamento_pct', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_pre'))
+        f.campo(f'{k}_lanc', f'Grupo {g} — Absorção no Lançamento', '% das unidades', f'grupos[{g}].lancamento_pct',
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_lanc'))
-        f.campo(f'{k}_obra', f'Grupo {g} — Absorção Durante a obra', '% das unidades', 'absorcao.blocos[obra].pct',
+        f.campo(f'{k}_obra', f'Grupo {g} — Absorção Durante a obra', '% das unidades', f'grupos[{g}].obra_pct',
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_obra'))
-        f.campo(f'{k}_janela', f'Grupo {g} — Janela pós-chaves', 'meses (1 a 12)', 'absorcao.pos_chaves_meses', F_INT,
+        f.campo(f'{k}_janela', f'Grupo {g} — Janela pós-chaves', 'meses (1 a 12)', f'grupos[{g}].pos_chaves_meses', F_INT,
                 minimo=1, maximo=12, inteiro=True, ex=ex.get(f'{k}_janela'))
-        f.campo(f'{k}_corr', f'Grupo {g} — Correção de estoque', 'Sim/Não', 'absorcao.correcao_estoque', F_TXT, lista=SN,
+        f.campo(f'{k}_corr', f'Grupo {g} — Correção de estoque', 'Sim/Não', f'grupos[{g}].correcao_estoque', F_TXT, lista=SN,
                 ex=ex.get(f'{k}_corr'))
         f.campo(f'{k}_resid', f'Grupo {g} — Resíduo sem prazo', 'lista: imediato | concentrado',
-                'fluxo_pagamento.residuoAteMarco', F_TXT, lista=['imediato', 'concentrado'], ex=ex.get(f'{k}_resid'))
+                f'grupos[{g}].residuo_sem_prazo', F_TXT, lista=['imediato', 'concentrado'], ex=ex.get(f'{k}_resid'))
 
     # ── Pagamento ──
     N_PAG = 10
@@ -881,19 +897,19 @@ def avancado(tipo, ex):
     for j in range(1, N_PAG + 1):
         k = f'pg{j}'
         f.grupo(f'Condição de pagamento {j}')
-        f.campo(f'{k}_grupo', f'Condição {j} — Grupo', 'nome do grupo (seção 6)', f'fluxo_pagamento[{j}].grupo', F_TXT,
+        f.campo(f'{k}_grupo', f'Condição {j} — Grupo', 'nome do grupo (seção 6)', f'pagamento[{j}].grupo', F_TXT,
                 ex=ex.get(f'{k}_grupo'))
-        f.campo(f'{k}_linha', f'Condição {j} — Linha', 'lista: Entrada | Parcelamento', f'entrada[i] / parcelas[i] #{j}', F_TXT,
+        f.campo(f'{k}_linha', f'Condição {j} — Linha', 'lista: Entrada | Parcelamento', f'pagamento[{j}].linha', F_TXT,
                 lista=['Entrada', 'Parcelamento'], ex=ex.get(f'{k}_linha'))
-        f.campo(f'{k}_pct', f'Condição {j} — % do total', '% do preço', f'pct #{j}', F_PCT, minimo=0, maximo=1,
+        f.campo(f'{k}_pct', f'Condição {j} — % do total', '% do preço', f'pagamento[{j}].pct', F_PCT, minimo=0, maximo=1,
                 ex=ex.get(f'{k}_pct'))
-        f.campo(f'{k}_parc', f'Condição {j} — Nº de parcelas', 'inteiro (vazio se ao longo da obra)', f'parcelas #{j}',
+        f.campo(f'{k}_parc', f'Condição {j} — Nº de parcelas', 'inteiro (vazio se ao longo da obra)', f'pagamento[{j}].parcelas',
                 F_INT, minimo=1, inteiro=True, ex=ex.get(f'{k}_parc'))
-        f.campo(f'{k}_desc', f'Condição {j} — Desconto (só Entrada)', '% sobre a entrada', f'entrada[i].descontoPct #{j}',
+        f.campo(f'{k}_desc', f'Condição {j} — Desconto (só Entrada)', '% sobre a entrada', f'pagamento[{j}].desconto_pct',
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_desc'))
-        f.campo(f'{k}_sinal', f'Condição {j} — Sinal (só Parcelamento)', '% do parcelamento', f'parcelas[i].sinalPct #{j}',
+        f.campo(f'{k}_sinal', f'Condição {j} — Sinal (só Parcelamento)', '% do parcelamento', f'pagamento[{j}].sinal_pct',
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_sinal'))
-        f.campo(f'{k}_obra', f'Condição {j} — Ao longo da obra (só Parcelamento)', 'Sim/Não', f'parcelas[i].ao_longo_obra #{j}',
+        f.campo(f'{k}_obra', f'Condição {j} — Ao longo da obra (só Parcelamento)', 'Sim/Não', f'pagamento[{j}].ao_longo_obra',
                 F_TXT, lista=SN, ex=ex.get(f'{k}_obra'))
 
     # ── Alocações ──
@@ -902,13 +918,13 @@ def avancado(tipo, ex):
     for j in range(1, N_AL + 1):
         k = f'al{j}'
         f.grupo(f'Alocação {j}')
-        f.campo(f'{k}_grupo', f'Alocação {j} — Grupo', 'nome do grupo (seção 6)', f'alocacao[{j}].fase_id', F_TXT,
+        f.campo(f'{k}_grupo', f'Alocação {j} — Grupo', 'nome do grupo (seção 6)', f'alocacoes[{j}].grupo', F_TXT,
                 ex=ex.get(f'{k}_grupo'))
         f.campo(f'{k}_tip', f'Alocação {j} — {nome_item}', f'nome do {"lote" if lot else "tipologia"} (seção 5)',
-                f'alocacao[{j}].tipologia_id', F_TXT, ex=ex.get(f'{k}_tip'))
-        f.campo(f'{k}_un', f'Alocação {j} — Unidades', 'unidades (inteiro)', f'alocacao[{j}].unidades', F_INT, minimo=0,
+                f'alocacoes[{j}].tipologia', F_TXT, ex=ex.get(f'{k}_tip'))
+        f.campo(f'{k}_un', f'Alocação {j} — Unidades', 'unidades (inteiro)', f'alocacoes[{j}].unidades', F_INT, minimo=0,
                 inteiro=True, ex=ex.get(f'{k}_un'))
-        f.campo(f'{k}_preco', f'Alocação {j} — Preço', 'R$/m² (sobre privativa + aberta)', f'alocacao[{j}].preco_m2', F_RS,
+        f.campo(f'{k}_preco', f'Alocação {j} — Preço', 'R$/m² (sobre privativa + aberta)', f'alocacoes[{j}].preco_m2', F_RS,
                 minimo=0, ex=ex.get(f'{k}_preco'))
 
     # ── Custos ──
@@ -925,130 +941,130 @@ def avancado(tipo, ex):
                                  3: ' — obrigatório: diretos / Corretagem de vendas (% VGV)'}.get(k_, ''))
         fx = fixos.get(k_)
         f.campo(f'{c}_grupo', f'Custo {k_} — Grupo', 'lista: terreno | obra | diretos | indireto | financeiro',
-                f'avancado_linhas_custo[{k_}].grupo', F_TXT,
+                f'custos[{k_}].grupo', F_TXT,
                 lista=['terreno', 'obra', 'diretos', 'indireto', 'financeiro'], fixo=fx[0] if fx else None,
                 ex=ex.get(f'{c}_grupo'))
-        f.campo(f'{c}_cat', f'Custo {k_} — Categoria', 'ver tabela acima', f'avancado_linhas_custo[{k_}].categoria', F_TXT,
+        f.campo(f'{c}_cat', f'Custo {k_} — Categoria', 'ver tabela acima', f'custos[{k_}].categoria', F_TXT,
                 lista_ref='categorias', aviso=True, fixo=fx[1] if fx else None, ex=ex.get(f'{c}_cat'))
         f.campo(f'{c}_sub', f'Custo {k_} — Subcategoria / descrição', 'Preço: Valor à vista | Parcelado; Outro: texto',
-                f'avancado_linhas_custo[{k_}].subcategoria', F_TXT, ex=ex.get(f'{c}_sub'))
+                f'custos[{k_}].subcategoria', F_TXT, ex=ex.get(f'{c}_sub'))
         f.campo(f'{c}_un', f'Custo {k_} — Unidade', 'lista: ' + ' | '.join(UNIDADES_CUSTO),
-                f'avancado_linhas_custo[{k_}].orcamento_unidade', F_TXT, lista=UNIDADES_CUSTO,
+                f'custos[{k_}].unidade', F_TXT, lista=UNIDADES_CUSTO,
                 fixo='pct_vgv' if k_ == 3 else None, ex=ex.get(f'{c}_un'))
         f.campo(f'{c}_val', f'Custo {k_} — Valor (R$ ou R$/m²)', ROTULO_UNIDADE.replace('{u}', '{' + f'{c}_un' + '}'),
-                f'avancado_linhas_custo[{k_}].orcamento_valor (se unidade = rs*)', F_RS, minimo=0, ex=ex.get(f'{c}_val'))
+                f'custos[{k_}].valor_rs', F_RS, minimo=0, ex=ex.get(f'{c}_val'))
         f.campo(f'{c}_pct', f'Custo {k_} — Valor (%)', ROTULO_UNIDADE_PCT.replace('{u}', '{' + f'{c}_un' + '}'),
-                f'avancado_linhas_custo[{k_}].orcamento_valor (se unidade = pct_*; em pontos)', F_PCT, minimo=0, maximo=10,
+                f'custos[{k_}].valor_pct', F_PCT, minimo=0, maximo=10,
                 ex=ex.get(f'{c}_pct'))
-        f.campo(f'{c}_dist', f'Custo {k_} — Distribuição', 'Linear | nome da curva (ex.: Curva S) | unit_delivery | sales_revenue',
-                f'avancado_linhas_custo[{k_}].curva_id / distribuicao_modo', F_TXT, ex=ex.get(f'{c}_dist'))
+        f.campo(f'{c}_dist', f'Custo {k_} — Distribuição', 'Linear | nome de uma curva do catálogo (ex.: Curva S) | unit_delivery | sales_revenue',
+                f'custos[{k_}].distribuicao', F_TXT, lista_ref='distribuicao', aviso=True, ex=ex.get(f'{c}_dist'))
         f.campo(f'{c}_cron', f'Custo {k_} — Cronograma', 'evento, customizado ou "fase: <nome>"',
-                f'avancado_linhas_custo[{k_}].cronograma_evento / fase_ancora_id', F_TXT, lista_ref='cronograma', aviso=True,
+                f'custos[{k_}].cronograma', F_TXT, lista_ref='cronograma', aviso=True,
                 ex=ex.get(f'{c}_cron'))
         f.campo(f'{c}_ini', f'Custo {k_} — Início (só customizado)', 'mês (inteiro ≥ 0)',
-                f'avancado_linhas_custo[{k_}].inicio_mes', F_INT, minimo=0, inteiro=True, ex=ex.get(f'{c}_ini'))
+                f'custos[{k_}].inicio_mes', F_INT, minimo=0, inteiro=True, ex=ex.get(f'{c}_ini'))
         f.campo(f'{c}_dur', f'Custo {k_} — Duração (só customizado)', 'meses (inteiro ≥ 1)',
-                f'avancado_linhas_custo[{k_}].duracao_meses', F_INT, minimo=1, inteiro=True, ex=ex.get(f'{c}_dur'))
+                f'custos[{k_}].duracao_meses', F_INT, minimo=1, inteiro=True, ex=ex.get(f'{c}_dur'))
 
     f.grupo('Permuta física do terreno (terreno / Preço / Permuta física) — até 2')
     for m in (1, 2):
         pf = f'pf{m}'
         f.campo(f'{pf}_tip', f'Permuta física {m} — {nome_item} entregue', 'nome do ' + ('lote' if lot else 'tipologia'),
-                f'avancado_linhas_custo[permuta_fisica#{m}].permuta_tipologia_id', F_TXT, ex=ex.get(f'{pf}_tip'))
+                f'permuta_fisica[{m}].tipologia', F_TXT, ex=ex.get(f'{pf}_tip'))
         f.campo(f'{pf}_un', f'Permuta física {m} — Unidades entregues', 'unidades (≤ alocado)',
-                f'avancado_linhas_custo[permuta_fisica#{m}].permuta_quantidade', F_INT, minimo=0, inteiro=True,
+                f'permuta_fisica[{m}].unidades', F_INT, minimo=0, inteiro=True,
                 ex=ex.get(f'{pf}_un'))
     f.grupo('Permuta financeira do terreno (terreno / Preço / Permuta financeira) — até 2')
     for m in (1, 2):
         pn = f'pn{m}'
         f.campo(f'{pn}_un', f'Permuta financeira {m} — Unidade', 'lista: rs | pct_vgv',
-                f'avancado_linhas_custo[permuta_financeira#{m}].orcamento_unidade', F_TXT, lista=['rs', 'pct_vgv'],
+                f'permuta_financeira[{m}].unidade', F_TXT, lista=['rs', 'pct_vgv'],
                 ex=ex.get(f'{pn}_un'))
         f.campo(f'{pn}_val', f'Permuta financeira {m} — Valor em R$', 'R$ (valor cheio; se unidade = rs)',
-                f'avancado_linhas_custo[permuta_financeira#{m}].orcamento_valor', F_RS, minimo=0, ex=ex.get(f'{pn}_val'))
+                f'permuta_financeira[{m}].valor_rs', F_RS, minimo=0, ex=ex.get(f'{pn}_val'))
         f.campo(f'{pn}_pct', f'Permuta financeira {m} — Valor em % do VGV', '% do VGV (se unidade = pct_vgv)',
-                f'avancado_linhas_custo[permuta_financeira#{m}].orcamento_valor', F_PCT, minimo=0, maximo=1,
+                f'permuta_financeira[{m}].valor_pct', F_PCT, minimo=0, maximo=1,
                 ex=ex.get(f'{pn}_pct'))
         f.campo(f'{pn}_imp', f'Permuta financeira {m} — Deduzir impostos', 'Sim/Não',
-                f'avancado_linhas_custo[permuta_financeira#{m}].permuta_financeira_deduzir_imposto', F_TXT, lista=SN,
+                f'permuta_financeira[{m}].deduzir_imposto', F_TXT, lista=SN,
                 ex=ex.get(f'{pn}_imp'))
         f.campo(f'{pn}_cor', f'Permuta financeira {m} — Deduzir corretagem', 'Sim/Não',
-                f'avancado_linhas_custo[permuta_financeira#{m}].permuta_financeira_deduzir_corretagem', F_TXT, lista=SN,
+                f'permuta_financeira[{m}].deduzir_corretagem', F_TXT, lista=SN,
                 ex=ex.get(f'{pn}_cor'))
 
     # ── Funding ──
     f.secao('10 · Funding (operações) — 1 financiamento à produção + 3 dívidas + 3 equities; deixe em branco o que não existir')
     f.grupo('Financiamento à produção (no máximo um por estudo)')
-    f.campo('fp_nome', 'Financiamento à produção — Nome', 'texto', 'funding[financiamento_producao].nome', F_TXT,
+    f.campo('fp_nome', 'Financiamento à produção — Nome', 'texto', 'funding.financiamento_producao.nome', F_TXT,
             ex=ex.get('fp_nome'))
-    f.campo('fp_ativo', 'Financiamento à produção — Ativo', 'Sim/Não', 'funding[financiamento_producao].ativo', F_TXT,
+    f.campo('fp_ativo', 'Financiamento à produção — Ativo', 'Sim/Não', 'funding.financiamento_producao.ativo', F_TXT,
             lista=SN, ex=ex.get('fp_ativo'))
-    f.campo('fp_valor', 'Financiamento à produção — Teto', 'R$ (0 = sem teto)', 'funding[financiamento_producao].valor',
+    f.campo('fp_valor', 'Financiamento à produção — Teto', 'R$ (0 = sem teto)', 'funding.financiamento_producao.valor',
             F_RS, minimo=0, ex=ex.get('fp_valor'))
-    f.campo('fp_taxa', 'Financiamento à produção — Taxa', '% a.a.', 'funding[financiamento_producao].taxa_anual', F_PCT,
+    f.campo('fp_taxa', 'Financiamento à produção — Taxa', '% a.a.', 'funding.financiamento_producao.taxa_anual', F_PCT,
             minimo=0, maximo=1, ex=ex.get('fp_taxa'))
     f.campo('fp_exp', 'Financiamento à produção — Exposição mínima', '% (do custo)',
-            'funding[financiamento_producao].exposicao_minima', F_PCT, minimo=0, maximo=1, ex=ex.get('fp_exp'))
+            'funding.financiamento_producao.exposicao_minima', F_PCT, minimo=0, maximo=1, ex=ex.get('fp_exp'))
     f.campo('fp_fin', 'Financiamento à produção — % do custo financiado', '%',
-            'funding[financiamento_producao].percentual_financiavel', F_PCT, minimo=0, maximo=1, ex=ex.get('fp_fin'))
+            'funding.financiamento_producao.percentual_financiavel', F_PCT, minimo=0, maximo=1, ex=ex.get('fp_fin'))
     f.campo('fp_caixa', 'Financiamento à produção — Caixa amortiza antes das chaves', 'Sim/Não',
-            'funding[financiamento_producao].amortizar_com_caixa_disponivel', F_TXT, lista=SN, ex=ex.get('fp_caixa'))
-    f.campo('fp_base', 'Financiamento à produção — Base financiável', 'linhas de custo (texto); vazio = padrão',
-            'funding[financiamento_producao].custo_linha_ids', F_TXT, ex=ex.get('fp_base'))
+            'funding.financiamento_producao.amortizar_com_caixa_disponivel', F_TXT, lista=SN, ex=ex.get('fp_caixa'))
+    f.campo('fp_base', 'Financiamento à produção — Base financiável', 'linhas de custo separadas por ";" — Categoria ou Categoria / Subcategoria; vazio = padrão',
+            'funding.financiamento_producao.base_financiavel', F_TXT, ex=ex.get('fp_base'))
     for d in (1, 2, 3):
         k = f'dv{d}'
         f.grupo(f'Dívida {d}')
-        f.campo(f'{k}_nome', f'Dívida {d} — Nome', 'texto', f'funding[divida#{d}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
-        f.campo(f'{k}_valor', f'Dívida {d} — Valor', 'R$ (valor cheio)', f'funding[divida#{d}].valor', F_RS, minimo=0,
+        f.campo(f'{k}_nome', f'Dívida {d} — Nome', 'texto', f'funding.divida[{d}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
+        f.campo(f'{k}_valor', f'Dívida {d} — Valor', 'R$ (valor cheio)', f'funding.divida[{d}].valor', F_RS, minimo=0,
                 ex=ex.get(f'{k}_valor'))
         f.campo(f'{k}_aporte', f'Dívida {d} — Mês do aporte', 'evento, fase ("fase: <nome>") ou customizado',
-                f'funding[divida#{d}].cronograma_evento / fase_ancora_id', F_TXT, lista_ref='cronograma', aviso=True,
+                f'funding.divida[{d}].aporte', F_TXT, lista_ref='cronograma', aviso=True,
                 ex=ex.get(f'{k}_aporte'))
-        f.campo(f'{k}_mes', f'Dívida {d} — Mês (só customizado)', 'mês (inteiro ≥ 0)', f'funding[divida#{d}].inicio_mes',
+        f.campo(f'{k}_mes', f'Dívida {d} — Mês (só customizado)', 'mês (inteiro ≥ 0)', f'funding.divida[{d}].mes',
                 F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_mes'))
-        f.campo(f'{k}_dist', f'Dívida {d} — Distribuir aporte', 'Sim/Não', f'funding[divida#{d}].distribuir_aporte',
+        f.campo(f'{k}_dist', f'Dívida {d} — Distribuir aporte', 'Sim/Não', f'funding.divida[{d}].distribuir_aporte',
                 F_TXT, lista=SN, ex=ex.get(f'{k}_dist'))
-        f.campo(f'{k}_aporte_m', f'Dívida {d} — Aporte em', 'meses (≥ 1)', f'funding[divida#{d}].aporte_meses', F_INT,
+        f.campo(f'{k}_aporte_m', f'Dívida {d} — Aporte em', 'meses (≥ 1)', f'funding.divida[{d}].aporte_meses', F_INT,
                 minimo=1, inteiro=True, ex=ex.get(f'{k}_aporte_m'))
-        f.campo(f'{k}_taxa', f'Dívida {d} — Taxa', '% a.a.', f'funding[divida#{d}].taxa_anual', F_PCT, minimo=0,
+        f.campo(f'{k}_taxa', f'Dívida {d} — Taxa', '% a.a.', f'funding.divida[{d}].taxa_anual', F_PCT, minimo=0,
                 maximo=1, ex=ex.get(f'{k}_taxa'))
-        f.campo(f'{k}_amort', f'Dívida {d} — Amortização', 'meses', f'funding[divida#{d}].periodo_amortizacao_meses',
+        f.campo(f'{k}_amort', f'Dívida {d} — Amortização', 'meses', f'funding.divida[{d}].amortizacao_meses',
                 F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_amort'))
         f.campo(f'{k}_carencia', f'Dívida {d} — Carência', 'meses (< amortização)',
-                f'funding[divida#{d}].periodo_carencia_meses', F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_carencia'))
-        f.campo(f'{k}_estr', f'Dívida {d} — Estruturação', '% do valor', f'funding[divida#{d}].taxa_estruturacao_pct',
+                f'funding.divida[{d}].carencia_meses', F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_carencia'))
+        f.campo(f'{k}_estr', f'Dívida {d} — Estruturação', '% do valor', f'funding.divida[{d}].estruturacao_pct',
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_estr'))
-        f.campo(f'{k}_adm', f'Dívida {d} — Administração', 'R$/mês', f'funding[divida#{d}].taxa_administracao_mensal',
+        f.campo(f'{k}_adm', f'Dívida {d} — Administração', 'R$/mês', f'funding.divida[{d}].administracao_mensal',
                 F_RS, minimo=0, ex=ex.get(f'{k}_adm'))
-        f.campo(f'{k}_outros', f'Dívida {d} — Outros encargos', 'R$ (iniciais)', f'funding[divida#{d}].outros_encargos_iniciais',
+        f.campo(f'{k}_outros', f'Dívida {d} — Outros encargos', 'R$ (iniciais)', f'funding.divida[{d}].outros_encargos',
                 F_RS, minimo=0, ex=ex.get(f'{k}_outros'))
     for q in (1, 2, 3):
         k = f'eq{q}'
         f.grupo(f'Equity {q}')
-        f.campo(f'{k}_nome', f'Equity {q} — Nome', 'texto', f'funding[equity#{q}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
-        f.campo(f'{k}_valor', f'Equity {q} — Valor', 'R$ (valor cheio)', f'funding[equity#{q}].valor', F_RS, minimo=0,
+        f.campo(f'{k}_nome', f'Equity {q} — Nome', 'texto', f'funding.equity[{q}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
+        f.campo(f'{k}_valor', f'Equity {q} — Valor', 'R$ (valor cheio)', f'funding.equity[{q}].valor', F_RS, minimo=0,
                 ex=ex.get(f'{k}_valor'))
         f.campo(f'{k}_aporte', f'Equity {q} — Mês do aporte', 'evento, fase ("fase: <nome>") ou customizado',
-                f'funding[equity#{q}].cronograma_evento / fase_ancora_id', F_TXT, lista_ref='cronograma', aviso=True,
+                f'funding.equity[{q}].aporte', F_TXT, lista_ref='cronograma', aviso=True,
                 ex=ex.get(f'{k}_aporte'))
-        f.campo(f'{k}_mes', f'Equity {q} — Mês (só customizado)', 'mês (inteiro ≥ 0)', f'funding[equity#{q}].inicio_mes',
+        f.campo(f'{k}_mes', f'Equity {q} — Mês (só customizado)', 'mês (inteiro ≥ 0)', f'funding.equity[{q}].mes',
                 F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_mes'))
         f.campo(f'{k}_modo', f'Equity {q} — Modo de retorno', 'lista: permuta_financeira | resultado_final',
-                f'funding[equity#{q}].modo_retorno', F_TXT, lista=['permuta_financeira', 'resultado_final'],
+                f'funding.equity[{q}].modo_retorno', F_TXT, lista=['permuta_financeira', 'resultado_final'],
                 ex=ex.get(f'{k}_modo'))
         f.campo(f'{k}_pct', f'Equity {q} — % de retorno', '% (do resultado final ou da receita líquida)',
-                f'funding[equity#{q}].pct_retorno', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_pct'))
+                f'funding.equity[{q}].pct_retorno', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_pct'))
 
     # ── Cenários ──
     N_CEN = 5
     f.secao(f'11 · Cenários (variação sobre o estudo real) — {N_CEN} vagas')
     for c_ in range(1, N_CEN + 1):
         k = f'ce{c_}'
-        f.campo(f'{k}_nome', f'Cenário {c_} — Nome', 'texto', f'avancado_cenarios[{c_}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
+        f.campo(f'{k}_nome', f'Cenário {c_} — Nome', 'texto', f'cenarios[{c_}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
         f.campo(f'{k}_preco', f'Cenário {c_} — Preço de venda', 'variação % (pode ser negativa)',
-                f'avancado_cenarios[{c_}].preco_venda_pct', F_PCT, minimo=-1, maximo=10, ex=ex.get(f'{k}_preco'))
+                f'cenarios[{c_}].preco_venda_pct', F_PCT, minimo=-1, maximo=10, ex=ex.get(f'{k}_preco'))
         f.campo(f'{k}_obra', f'Cenário {c_} — Custo de obra', 'variação % (pode ser negativa)',
-                f'avancado_cenarios[{c_}].custo_obra_pct', F_PCT, minimo=-1, maximo=10, ex=ex.get(f'{k}_obra'))
+                f'cenarios[{c_}].custo_obra_pct', F_PCT, minimo=-1, maximo=10, ex=ex.get(f'{k}_obra'))
 
     # ════════ referência calculada ════════
     f.secao('REFERÊNCIA CALCULADA — não preencher (conferência do que foi preenchido)', calc=True)
@@ -1131,6 +1147,20 @@ def avancado(tipo, ex):
                f'IF({r(c+"_un")}="","",IF({r(c+"_un")}="rs",N({r(c+"_val")}),IF({r(c+"_un")}="rs_m2_priv",N({r(c+"_val")})*{r("k_area_aloc")},'
                f'IF({r(c+"_un")}="rs_m2_terreno",N({r(c+"_val")})*N({r("terreno_area")}),IF({r(c+"_un")}="pct_vgv",N({r(c+"_pct")})*{r("k_vgv")},'
                f'"depende do fluxo (app)")))))', F_RS)
+    # conferência por vaga: categoria × unidade (tabela da tela de Custos), uma só linha de valor, valor na linha certa
+    for k_ in range(1, N_CU + 1):
+        c = f'cu{k_}'
+        g_, ct, un, vr, vp = (r(c + x) for x in ('_grupo', '_cat', '_un', '_val', '_pct'))
+        combos = ','.join(
+            f'AND({g_}="{grp}",{ct}="{cat}",OR(' + ','.join(f'{un}="{u}"' for u in unidades) + '))'
+            for (grp, cat), unidades in UNIDADES_POR_CATEGORIA.items())
+        f.calc(f'{c}_alerta', f'Custo {k_} — conferência', 'alerta',
+               f'IF(AND({g_}="",{ct}=""),"",IF(OR({g_}="",{ct}="",{un}=""),"⚠ falta grupo, categoria ou unidade",'
+               f'IF(NOT(OR({combos})),"⚠ unidade não aceita nesta categoria",'
+               f'IF(AND({vr}<>"",{vp}<>""),"⚠ preencha só uma linha de valor",'
+               f'IF(IF(LEFT({un},3)="pct",{vp}="",{vr}=""),"⚠ falta o valor na linha certa","OK")))))')
+    f.calc('k_1pct', 'Cada 1% do VGV de tabela equivale a (para converter Projetos, que não aceita % do VGV)', 'R$',
+           f'{r("k_vgv")}*0.01', F_RS)
     for grp in ('terreno', 'obra', 'diretos', 'indireto', 'financeiro'):
         f.calc(f'k_g_{grp}', f'Σ custos conversíveis — {grp}', 'R$',
                '+'.join(f'IF({r(f"cu{k_}_grupo")}="{grp}",N({r(f"cu{k_}_rs")}),0)' for k_ in range(1, N_CU + 1)), F_RS)
