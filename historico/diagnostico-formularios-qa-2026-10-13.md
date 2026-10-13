@@ -82,7 +82,7 @@ F9. **Preliminar → Avançado exige conversões** (achado 5c): o formulário do
   próprio `conferir-estudo` (#835, #827): conferir a conferência é parte do trabalho.
 - **Ler o contrato canônico no código antes de escrever o importador** teria poupado uma volta: a nota da #657 já dizia o que acontecia.
 - **Reaproveitar a função do app** (`fluxoPagamentoParaSalvar`) em vez de reescrever a conversão evita criar uma terceira cópia da regra.
-- O formulário simplificado **funciona como interface**: os campos que deram problema não são os de valor, e sim os de contrato (achados F1–F6), não os de valor.
+- O formulário simplificado **funciona como interface**: os campos que deram problema não são os de valor, e sim os de contrato (achados F1–F6).
 
 ## Resíduo
 
