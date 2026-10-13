@@ -191,6 +191,11 @@ CAMPOS_SIM_NAO = frozenset((
     'deduzir_corretagem', 'deduzir_imposto', 'considerar_ret', 'tem_pre_lancamento'))
 
 
+ESTUDO_TEXTO = frozenset(('nome', 'descricao', 'matricula', 'notas', 'nivel_analise', 'origem_terreno',
+                          'terreno_manual_nome', 'tipo_empreendimento', 'uf'))
+ESTUDO_SIM_NAO = frozenset(('sujeito_ret', 'corretagem_sobre_permuta_fisica'))
+
+
 def _nao_numero(x):
     return isinstance(x, bool) or not isinstance(x, (int, float)) or x != x or x in (float('inf'), float('-inf'))
 
@@ -208,6 +213,21 @@ def validar(m):
                 if c not in CAMPOS_TEXTO and c not in CAMPOS_SIM_NAO and x is not None and _nao_numero(x):
                     E(f'{lista}[{n}].{c}: esperado número, veio "{x}"')
                     v[c] = None
+    for ev, d in m.crono.items():
+        for c, x in list(d.items()):
+            if x is not None and _nao_numero(x):
+                E(f'cronograma.{ev}.{c}: esperado número, veio "{x}"')
+                d[c] = None
+    for c, x in list(m.estudo.items()):
+        if c in ESTUDO_TEXTO or c.endswith('_modo') or x is None:
+            continue
+        if c in ESTUDO_SIM_NAO or c.startswith('considerar_'):
+            if not isinstance(x, bool):
+                E(f'estudo.{c}: esperado Sim ou Não, veio "{x}"')
+                m.estudo[c] = None
+        elif _nao_numero(x):
+            E(f'estudo.{c}: esperado número, veio "{x}"')
+            m.estudo[c] = None
     for c, x in list(m.param.items()):
         if c not in CAMPOS_TEXTO and c not in CAMPOS_SIM_NAO and x is not None and _nao_numero(x):
             E(f'parametros.{c}: esperado número, veio "{x}"')
@@ -431,6 +451,13 @@ def _validar_avancado(m, erros, avisos):
         am, ca = o.get('amortizacao_meses'), o.get('carencia_meses')
         if am and ca is not None and am > 0 and ca >= am:
             E(f'funding.divida {n}: carência ({ca}) deve ser menor que a amortização ({am}) — a API recusa')
+    por_modo = defaultdict(float)
+    for n, o in sorted(m['funding.equity'].items()):
+        if o.get('nome'):
+            por_modo[str(o.get('modo_retorno') or 'permuta_financeira')] += float(o.get('pct_retorno') or 0)
+    for modo, soma in por_modo.items():
+        if soma > 100.01:
+            E(f'funding.equity: Σ % de retorno em "{modo}" = {soma:.2f} (> 100) — a API recusa a operação que passar de 100')
     return erros, avisos
 
 
