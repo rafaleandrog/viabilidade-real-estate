@@ -36,28 +36,28 @@ catálogo e custos; acrescenta cronograma, grupos de venda, pagamento, alocaçõ
    mesmo dado, só trocando o shape: TIR 35,58% → 48,78%, VPL R$ 17,9 mi → R$ 29,8 mi, juros de clientes R$ 0 → R$ 19,0 mi,
    carteira máxima R$ 0 → R$ 81,4 mi. O frontend já corrigiu isto na tela (#657: o grupo nasce canônico); o backend continua
    semeando `fluxoPagamentoPadrao()` legado e aceitando legado no PATCH, e a única sinalização é a badge "Plano não migrado".
-   Quem cria por API (agente, QA, importação) obtém um estudo errado sem erro algum. → **issue nova**.
+   Quem cria por API (agente, QA, importação) obtém um estudo errado sem erro algum. → issue [#839](https://github.com/rafaleandrog/viabilidade-real-estate/issues/839).
 2. **O default de absorção grava `pos_obra: 0` e a conferência exige o derivado.** `absorcaoPadrao` grava 0 com o comentário
    "derivado = 100 − 30 − 40", e `conferir-estudo` acusa "pós-chaves GRAVADO vs DERIVADO" em todo grupo que nasce pela API.
-   Um dos dois está errado. → **issue nova**.
+   Um dos dois está errado. → issue [#840](https://github.com/rafaleandrog/viabilidade-real-estate/issues/840).
 3. **`CAMADAS_DIVERGEM_PERMUTA_FISICA` dispara nos dois Avançados** (alerta). Já registrado em **#832**; reproduzido aqui pela API
-   (260 m² e 30.000 m² no Catálogo × 0 nas Premissas). → comentário.
+   (260 m² e 30.000 m² no Catálogo × 0 nas Premissas). → comentário em #832.
 4. **`conferir-estudo` dá "FALHA VGV Σ tipologias/alocações" no Incorporação** (esperado R$ 126,9 mi, motor R$ 143,2 mi): a
-   conta do script ignora a área aberta, que o motor inclui por decisão. Já registrado em **#835**; Loteamento (área aberta 0) passa. → comentário.
+   conta do script ignora a área aberta, que o motor inclui por decisão. Já registrado em **#835**; Loteamento (área aberta 0) passa. → comentário em #835.
 5. **Preliminar e Avançado do mesmo projeto não são equivalentes linha a linha, e isso não está escrito em lugar nenhum.**
    Medido: (a) custos em % do VGV incidem sobre o VGV **líquido** de permuta física no Preliminar e sobre o VGV **total** no
    Avançado (marketing R$ 2,096 mi × R$ 2,149 mi); (b) a permuta física é valorada pelo **preço médio da categoria** no Preliminar
    e pelo preço da tipologia no Avançado (VGV Loteamento R$ 209,25 mi × R$ 210,0 mi); (c) **Projetos em % do VGV** só existe no
    Preliminar (o Avançado aceita rs, rs_m2_priv e pct_constr), então a conversão manual para R$ é obrigatória; (d) a corretagem
-   do Avançado depende de `corretagem_sobre_permuta_fisica`. Relaciona-se com **#833** (upgrade Preliminar → Avançado). → **issue nova** (decisão + guia).
+   do Avançado depende de `corretagem_sobre_permuta_fisica`. Relaciona-se com **#833** (upgrade Preliminar → Avançado). → issue [#841](https://github.com/rafaleandrog/viabilidade-real-estate/issues/841) (decisão + guia).
 6. **`pct_alv` tem 4 casas (`decimal(7,4)`)**, então frações como 864/10.400 não reproduzem a área exata (R$ 0,78 de VGV aqui). Pequeno, mas
-   é a única entrada do catálogo que não aceita o valor exato. → **issue nova**, P3.
-7. `RECEITA_BRUTA_NAO_CONSERVA` (Δ R$ 0,15, Loteamento, ramo legado, 1.000 lotes): já em **#824**; some com o pagamento canônico. → comentário.
+   é a única entrada do catálogo que não aceita o valor exato. → issue [#842](https://github.com/rafaleandrog/viabilidade-real-estate/issues/842), P3.
+7. `RECEITA_BRUTA_NAO_CONSERVA` (Δ R$ 0,15, Loteamento, ramo legado, 1.000 lotes): já em **#824**; some com o pagamento canônico. → comentário em #824.
 8. `CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING` nos dois Avançados: é o alerta D14, esperado — o funding dos exemplos foi montado sem checar caixa.
 
 Já conhecidos e confirmados, sem ação: `Σ legado entrada+parcelas` (#827) e linhas obrigatórias de custo ausentes em estudo criado por API (#813).
 
-### Dos formulários e do importador (insumo da próxima versão dos formulários)
+### Dos formulários e do importador (insumo da próxima versão dos formulários — issue [#843](https://github.com/rafaleandrog/viabilidade-real-estate/issues/843))
 
 F1. **A chave técnica do pagamento descreve o shape legado** (`entrada[i]`, `parcelas[i]`), que é o que causa o achado 1. A chave tem de
     descrever o contrato canônico (`componentes`: tipo, participacaoPct, sinalPct, prazoMeses, defasagemMeses) ou o importador tem de
