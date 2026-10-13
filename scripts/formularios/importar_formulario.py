@@ -181,8 +181,18 @@ def candidatas(linhas, cat, sub):
     return [i for i, (c, sc) in enumerate(linhas) if c == cat and (sub is None or sc == sub)]
 
 
-CAMPOS_NUMERICOS = ('pre_lancamento_pct', 'lancamento_pct', 'obra_pct', 'pos_chaves_meses', 'pct', 'sinal_pct', 'parcelas',
-                    'unidades', 'preco_m2', 'quantidade', 'pct_alv', 'preco_venda_m2', 'valor_pct', 'valor_rs')
+# Fail-closed: todo campo que NÃO é texto nem Sim/Não é número. Enumerar os numéricos não converge — campo novo
+# ficaria sem checagem —; enumerar os não numéricos faz campo novo cair na checagem mais estrita.
+CAMPOS_TEXTO = frozenset((
+    'grupo', 'tipologia', 'nome', 'categoria', 'subcategoria', 'cronograma', 'distribuicao', 'unidade', 'linha',
+    'aporte', 'modo_retorno', 'base_financiavel', 'tipo', 'tipo_unidade', 'residuo_sem_prazo', 'data_inicio_projeto'))
+CAMPOS_SIM_NAO = frozenset((
+    'correcao_estoque', 'distribuir_aporte', 'amortizar_com_caixa_disponivel', 'ativo', 'ao_longo_obra',
+    'deduzir_corretagem', 'deduzir_imposto', 'considerar_ret', 'tem_pre_lancamento'))
+
+
+def _nao_numero(x):
+    return isinstance(x, bool) or not isinstance(x, (int, float)) or x != x or x in (float('inf'), float('-inf'))
 
 
 def validar(m):
@@ -193,18 +203,21 @@ def validar(m):
     # o resto da validação seguir e listar os demais problemas
     for lista, itens in m.listas.items():
         for n, v in itens.items():
-            for c in CAMPOS_NUMERICOS:
-                x = v.get(c)
-                if x is not None and (isinstance(x, bool) or not isinstance(x, (int, float))):
+            for c in list(v):
+                x = v[c]
+                if c not in CAMPOS_TEXTO and c not in CAMPOS_SIM_NAO and x is not None and _nao_numero(x):
                     E(f'{lista}[{n}].{c}: esperado número, veio "{x}"')
                     v[c] = None
     for c, x in list(m.param.items()):
-        if c in CAMPOS_NUMERICOS and x is not None and (isinstance(x, bool) or not isinstance(x, (int, float))):
+        if c not in CAMPOS_TEXTO and c not in CAMPOS_SIM_NAO and x is not None and _nao_numero(x):
             E(f'parametros.{c}: esperado número, veio "{x}"')
             m.param[c] = None
-    if m.param.get('tem_pre_lancamento') is not None and not isinstance(m.param['tem_pre_lancamento'], bool):
-        E(f'parametros.tem_pre_lancamento: esperado Sim ou Não, veio "{m.param["tem_pre_lancamento"]}"')
-        m.param['tem_pre_lancamento'] = None
+    for itens in [{0: m.param}, *m.listas.values()]:
+        for n, v in itens.items():
+            for c in CAMPOS_SIM_NAO:
+                if v.get(c) is not None and not isinstance(v[c], bool):
+                    E(f'{c}: esperado Sim ou Não, veio "{v[c]}"')
+                    v[c] = None
     for obrig in ('nome', 'tipo_empreendimento', 'nivel_analise'):
         if not e.get(obrig):
             E(f'campo obrigatório ausente: {obrig}')
