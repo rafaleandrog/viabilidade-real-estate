@@ -5,6 +5,7 @@ import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
 import { erroComponentePagamento } from '../../frontend/fluxo-pagamento-contrato.js';
+import { fluxoPagamentoParaSalvar } from '../../frontend/fluxo-pagamento-editor.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -311,6 +312,38 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
     parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 }],
     repasse: { apos_entrega_meses: 1 }, // #345: repasse travado em 1 mês após a obra; pct derivado = 100 − 15 − 15 = 70
   };
+}
+
+/**
+ * Leva o `fluxo_pagamento` ao contrato CANÔNICO (`componentes`) — o que a tela já faz ao "Aplicar".
+ *
+ * Por que a API precisa disto: o motor só calcula juros de tabela, carteira de clientes e repasse pelo
+ * ramo canônico. Um `fluxo_pagamento` só com `entrada[]`/`parcelas[]` passava na validação e era
+ * calculado pelo ramo legado, SEM juros — medido num estudo da Pinguim: TIR 35,58% contra 48,78% com
+ * os mesmos dados, e nenhum erro em lugar nenhum. A #657 consertou o caminho da tela; quem escreve
+ * por API (QA, importação, agente) continuava caindo no ramo legado.
+ *
+ * Com `componentes` já presente o plano volta INTACTO: quem manda o canônico decide o conteúdo, e
+ * regravá-lo aqui apagaria o que o espelho legado não sabe representar (sinal, defasagem, taxa).
+ * `jurosTabelaAa` é OBRIGATÓRIO de propósito: omiti-lo vira erro de compilação, não um estudo sem juros.
+ */
+export function fluxoPagamentoCanonico(
+  fp: Record<string, any> | null | undefined,
+  cronograma: { evento: string; inicio_mes: number; duracao_meses: number }[],
+  jurosTabelaAa: number,
+): Record<string, any> | null {
+  if (fp === null || fp === undefined) return null;
+  if (Array.isArray(fp.componentes) && fp.componentes.length > 0) return fp;
+  const padrao = fluxoPagamentoPadrao();
+  const form = {
+    comissao: fp.comissao ?? padrao.comissao,
+    entrada: fp.entrada ?? padrao.entrada,
+    parcelas: fp.parcelas ?? padrao.parcelas,
+    repasse: fp.repasse ?? padrao.repasse,
+    componentes: null,
+  };
+  const salvo: Record<string, any> = { ...fp, ...fluxoPagamentoParaSalvar(form as any, cronograma as any, jurosTabelaAa) };
+  return salvo;
 }
 
 // #585: `fluxoPagamentoComDefaultJuros` FOI REMOVIDA. Ela semeava
@@ -1122,7 +1155,9 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
       dados.absorcao = absorcaoPadrao(estudo.tem_pre_lancamento !== false);
       // #585: sem semear juros na linha — a taxa é do estudo e o motor a lê de
       // lá. Ver a nota em `fluxoPagamentoPadrao`.
-      dados.fluxo_pagamento = fluxoPagamentoPadrao();
+      dados.fluxo_pagamento = fluxoPagamentoCanonico(
+        fluxoPagamentoPadrao(), (await lerCronograma(req, estudo)).linhas, Number(estudo.juros_tabela_aa_padrao) || 0,
+      );
     }
     const criada = await req.dados!.criar('avancado_fases', dados);
     res.status(201).json({ ...criada, alocacoes: [] });
@@ -1153,7 +1188,9 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
     if (req.body.fluxo_pagamento !== undefined) {
       const invalido = validarFluxoPagamento(req.body.fluxo_pagamento);
       if (invalido) { erro(res, 400, 'FLUXO_PAGAMENTO_INVALIDO', invalido); return; }
-      dados.fluxo_pagamento = req.body.fluxo_pagamento;
+      dados.fluxo_pagamento = fluxoPagamentoCanonico(
+        req.body.fluxo_pagamento, (await lerCronograma(req, estudo)).linhas, Number(estudo.juros_tabela_aa_padrao) || 0,
+      );
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     const atualizada = await req.dados!.atualizar('avancado_fases', fase.id, dados);
