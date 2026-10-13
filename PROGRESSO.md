@@ -4,6 +4,25 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-13 — Formulários v2: API canônica, importador que confere e chaves legíveis por máquina
+
+Pedido direto do autor, sem issue de fechamento: tornar os formulários simplificados confiáveis para qualquer pessoa ou IA criar um estudo
+completo. Três frentes, a partir do diagnóstico da nota `historico/diagnostico-formularios-qa-2026-10-13.md`.
+
+- **Backend (#839):** `POST /avancado/fases` (grupo de receita) e `PATCH …/fases/:fid` levam o `fluxo_pagamento` ao formato canônico
+  (`componentes`) com a taxa de tabela do estudo; com `componentes` presentes, gravam como vieram. Teste em Express real com o grupo criado e
+  o PATCH legado, e a mutação (apagar a chamada nas duas rotas) deixa 2 testes vermelhos.
+- **Formulários:** chaves técnicas no formato `lista[n].campo`; vocabulário de distribuição de custo com lista; legenda explica a regra do
+  percentual; conferência por vaga de custo (categoria × unidade, uma só linha de valor, valor na linha certa); base financiável por nome de linha.
+- **Importador** (`scripts/formularios/importar_formulario.py`): valida antes de escrever, cria, normaliza o pagamento, relê, e roda o motor do
+  repositório. Lê só a planilha (chave, rótulo e formato da célula). Testado com os 4 formulários (relê 0 divergência; resultado idêntico
+  aos estudos 25–28) e com 9 erros plantados, todos barrados sem escrever nada. Detalhes em `scripts/formularios/LEIA-ME.md`.
+- **Fica para o autor:** a integração na skill de QA é mudança de processo (`.claude/`) e, pela regra R1, vai em PR próprio; o texto do
+  roteiro está em `scripts/formularios/LEIA-ME.md`. Fora do alcance do importador, e avisado como tal: região de mercado, apelo comercial,
+  imagem e vínculo com o Núcleo.
+
+---
+
 ## 2026-10-13 — Dois projetos, quatro estudos na Pinguim e diagnóstico
 
 Pedido direto do autor, sem issue: simular um Loteamento e uma Incorporação, cada um nos dois níveis, preenchendo os formulários
