@@ -17,8 +17,8 @@ Regras de projeto (decisões do pedido que originou este gerador):
     · Campo que o app aceita em várias unidades (R$/m², R$ total, % do VGV…) vira UMA LINHA
       POR UNIDADE, todas em branco e todas manuais. O Excel nunca calcula uma unidade a partir
       de outra dentro da zona de entrada; os equivalentes aparecem só na zona calculada.
-    · Percentual é percentual de verdade do Excel (4% = 0,04, formatado 0,00%). Digitar 4 em célula
-      já formatada como % vira 4%.
+    · Percentual é percentual de verdade do Excel (4% = 0,04, formatado 0,00%). Digite sempre com o
+      símbolo % (4%); o número solto fica ambíguo conforme o programa que abre a planilha.
     · Listas (produtos, tipologias, custos…) são achatadas em linhas numeradas "Item N — campo".
 """
 import re
@@ -296,7 +296,7 @@ SN = ['Sim', 'Não']
 LEGENDA = (
     'Como preencher: só as células AMARELAS da coluna B. Cinza-claro com valor em negrito = fixo do tipo de estudo '
     '(não editar); cinza com itálico = calculado pelo Excel, só para conferir (não editar). * = obrigatório. '
-    'PERCENTUAL: digite como porcentagem (4% ou 4 numa célula já formatada em %). O Excel guarda 0,04; a API do app espera pontos (4) e o importador converte pelo FORMATO da célula — por isso não troque o formato das células. '
+    'PERCENTUAL: digite com o símbolo % (4%), nunca só o número. O Excel guarda 0,04; a API do app espera pontos (4) e o importador converte pelo FORMATO da célula — por isso não troque o formato das células. '
     'Números sem separador de milhar e com ponto decimal quando digitados fora do Excel. '
     'CAMPO COM VÁRIAS UNIDADES: há uma linha por unidade — preencha UMA só e deixe as outras em branco; '
     'o Excel não converte uma na outra. Listas (produtos, custos…) têm vagas numeradas; vaga totalmente em branco = sem item.'

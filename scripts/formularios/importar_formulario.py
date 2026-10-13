@@ -308,6 +308,15 @@ def _validar_avancado(m, erros, avisos):
     sem_nome('tipologias', 'Lote' if lote else 'Tipologia')
     sem_nome('grupos', 'Grupo de venda')
     sem_nome('fases', 'Fase')
+
+    def inteiro(x, minimo):
+        return isinstance(x, (int, float)) and float(x).is_integer() and x >= minimo
+    for n, f in sorted(m['fases'].items()):
+        if f.get('nome'):
+            if f.get('inicio_mes') is not None and not inteiro(f['inicio_mes'], 0):
+                E(f'Fase {n}: início deve ser um inteiro ≥ 0 (veio {f["inicio_mes"]})')
+            if f.get('duracao_meses') is not None and not inteiro(f['duracao_meses'], 1):
+                E(f'Fase {n}: duração deve ser um inteiro ≥ 1 (veio {f["duracao_meses"]})')
     sem_nome('funding.divida', 'Dívida')
     sem_nome('funding.equity', 'Equity')
     sem_nome('cenarios', 'Cenário')
@@ -420,6 +429,10 @@ def _validar_avancado(m, erros, avisos):
         cr0 = str(c.get('cronograma') or '')
         if cr0 and cr0 != 'customizado' and not cr0.startswith('fase:') and cr0 not in EVENTOS:
             E(f'Custo {n}: cronograma "{cr0}" inválido (use um evento, customizado ou fase: <nome>)')
+        if c.get('inicio_mes') is not None and not inteiro(c['inicio_mes'], 0):
+            E(f'Custo {n}: início deve ser um inteiro ≥ 0 (veio {c["inicio_mes"]})')
+        if c.get('duracao_meses') is not None and not inteiro(c['duracao_meses'], 1):
+            E(f'Custo {n}: duração deve ser um inteiro ≥ 1 (veio {c["duracao_meses"]})')
         if c.get('cronograma') == 'customizado' and (c.get('inicio_mes') is None or not c.get('duracao_meses')):
             E(f'Custo {n}: cronograma customizado exige início e duração')
     for o in obrig - vistas:
@@ -468,6 +481,10 @@ def _validar_avancado(m, erros, avisos):
         if soma > 100.01:
             E(f'funding.equity: Σ % de retorno em "{modo}" = {soma:.2f} (> 100) — a API recusa a operação que passar de 100')
     return erros, avisos
+
+
+class EscritaFalhou(Exception):
+    """Defeito interno durante a escrita: vai para a mesma limpeza das falhas HTTP, nunca sai direto."""
 
 
 # ═════════════════════════ HTTP ═════════════════════════
@@ -686,7 +703,7 @@ def escrever_avancado(api, m, eid):
                 if len(achadas) == 1 and achadas[0] < len(custo_ids) and (custo_ids[achadas[0]] or not api.executar):
                     ids.append(custo_ids[achadas[0]])
                 else:                          # a validação já barrou isto; chegar aqui é defeito, não silêncio
-                    raise SystemExit(f'base financiável "{cat}": não resolveu uma única linha de custo criada')
+                    raise EscritaFalhou(f'base financiável "{cat}": não resolveu uma única linha de custo criada')
             d['custo_linha_ids'] = ids
         api.chamar('POST', f'{base}/funding', d)
     for n, o in ordenados(m['funding.divida']):
@@ -949,7 +966,6 @@ def main(argv):
     if eid is None:
         print('ERRO: o POST /estudos falhou (o estudo pode não ter sido criado):', api.falhas())
         return 1
-    (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
     def desfazer(motivo):
         # a validação prévia não conhece toda regra da API; se uma escrita for recusada depois do estudo existir,
         # o estudo parcial é removido em vez de ficar como se estivesse certo
@@ -958,6 +974,12 @@ def main(argv):
         print(f'estudo {eid} removido (HTTP {st}); nada ficou gravado pela metade.' if st in (200, 204)
               else f'ATENÇÃO: não consegui remover o estudo {eid} (HTTP {st}); apague-o à mão.')
         return 1
+    try:
+        (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
+    except EscritaFalhou as ex:
+        if executar and not manter:
+            return desfazer(str(ex))
+        raise SystemExit(str(ex))
     if executar and api.falhas() and not manter:
         return desfazer('a API recusou escritas')
     for mt, c, st, r_ in api.log:
