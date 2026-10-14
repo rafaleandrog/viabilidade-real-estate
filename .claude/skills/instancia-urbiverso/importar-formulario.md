@@ -32,8 +32,11 @@ registrar.
     python3 -I scripts/formularios/importar_formulario.py <arquivo> …
   ```
 
-  O importador só aceita URL `https://`, não segue redirect e redige o token da saída; ainda assim,
-  **não imprima o comando com o valor expandido** (§ 1). Rode-o **você mesmo, no orquestrador**, e não
+  Com `--executar` o importador só aceita URL `https://`, não segue redirect e redige o token do log
+  de falhas HTTP; a saída dos passos de pagamento e de conferência não passa por essa redação.
+  Mostre à pessoa o comando **sem** o prefixo das variáveis, só
+  `python3 -I scripts/formularios/importar_formulario.py <arquivo> …`, e **nunca imprima o valor
+  expandido** (§ 1). Rode-o **você mesmo, no orquestrador**, e não
   o delegue: a credencial não viaja no briefing de outro agente.
 - **O token precisa poder escrever no app.** Se o cabeçalho (§ 2.2) disse `somente_leitura: true`, ou
   a identidade não tem acesso de escrita ao `viabilidade`, diga isso e pare: não conceda alçada a si
@@ -42,8 +45,9 @@ registrar.
 ## Os passos, nesta ordem
 
 1. **Valide sem escrever.** O mesmo comando, sem `--executar`, lista **todos** os problemas de
-   preenchimento, os avisos e as chaves ignoradas, e mostra o plano. É leitura: não precisa de
-   autorização. **Erro de preenchimento: pare.** Devolva a lista à pessoa, com a chave técnica de cada
+   preenchimento, os avisos e as chaves ignoradas, e mostra o plano. Não toca a instância e não lê
+   URL nem token, então **não precisa de autorização nem de credencial**; só o `--relatorio` grava um
+   arquivo local, mesmo nesta fase. **Erro de preenchimento: pare.** Devolva a lista à pessoa, com a chave técnica de cada
    célula; corrigir a planilha é dela.
 2. **Peça a autorização, com a lista inteira (§ 4).** O nome do estudo vem do formulário: **nunca o
    invente**, e se faltar pergunte. Diga em uma frase, e então espere o sim:
@@ -63,14 +67,15 @@ registrar.
    | Saída | Significa | O que fazer |
    |---|---|---|
    | `0` | sem divergência, sem falha HTTP, sem problema novo no motor | relate o estudo e os números |
-   | `1` | erro de preenchimento, ou a API recusou uma escrita e o importador **removeu** o estudo parcial | relate o motivo; **nada ficou**, não procure o estudo |
+   | `1` | erro de preenchimento, ou a API recusou uma escrita | relate o motivo. Confirme na saída que o estudo foi **removido** (`estudo <id> removido`): se a saída diz `ATENÇÃO: não consegui remover o estudo`, ou o `POST` do estudo falhou sem confirmação, **o estudo pode ter ficado**, e o relatório entrega o id para a pessoa apagar |
    | `2` | o estudo existe, mas há pendência (releitura, pagamento, motor) | relate cada pendência; o estudo **ficou**, com o id |
 
-   `--manter-em-falha` mantém o estudo parcial para diagnóstico. Só use se a pessoa pedir, e então ele
-   entra no relatório com o id.
+   `--manter-em-falha` mantém o estudo parcial para diagnóstico: uma exceção de escrita sai com `1` e o
+   estudo fica; uma falha HTTP ou de pagamento segue e sai com `2`. Só use se a pessoa pedir, e então o
+   estudo entra no relatório com o id.
 5. **Separe defeito de achado conhecido.** A saída marca `conhecido:` quando o motor acusa algo já
    registrado em issue do repositório, com o número: isso vai como "conhecido (#N)", **não** como
-   achado novo. `PROBLEMA:` é o que merece investigação, e a investigação não é desta skill: diga o que
+   achado novo. `PROBLEMA :` (com espaço antes dos dois-pontos) é o que merece investigação, e a investigação não é desta skill: diga o que
    viu e **recomende** a issue, sem abri-la.
 
 ## O que entra no relatório (§ 7)
@@ -97,6 +102,6 @@ formulário. Não rode sem o sim.
 - **Não trate verde como prova de que o formulário descreve o projeto.** O importador prova que o
   estudo gravado bate com a planilha e que o motor o calcula; planilha errada para o projeto dá estudo
   errado com a mesma limpeza.
-- **Não afirme cobertura que não houve.** Cada caminho do formulário foi exercitado só nos dois
-  projetos de exemplo de `referencia/formularios/exemplos/`; formulário com campo fora deles pode
+- **Não afirme cobertura que não houve.** Cada caminho do formulário foi exercitado só nos projetos
+  de exemplo de `referencia/formularios/exemplos/`; formulário com campo fora deles pode
   achar um caso que o importador ainda não conhece. Quando acontecer, diga.
