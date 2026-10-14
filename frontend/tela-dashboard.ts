@@ -13,7 +13,7 @@ import {
 } from './estudo-status.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
-  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarComplementosTerreno, salvarComplementoTerreno,
+  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarLoteParametros, salvarLoteParametros, importarLoteParametros,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
 } from './viabilidade-api.js';
@@ -21,9 +21,10 @@ import {
   coletarPaginas, idsParcelamentosRegularizacao, loteForaDaRegularizacao,
 } from './terrenos-nucleo.js';
 import {
-  SITUACOES, COR_SITUACAO, rotuloDe, paraNumero, indexarComplementos,
-} from './terrenos-complemento.js';
-import './tela-terreno-complemento.js';
+  indexarParametros, statusVinculo, registrosOrfaos, ROTULO_STATUS, paraNumero, type LoteNucleo, type StatusVinculo,
+} from './lote-parametros.js';
+import './tela-lote-parametros.js';
+import './tela-lote-parametros-importar.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
 import './viabilidade-config-mercado.js';
@@ -197,15 +198,19 @@ export class ViabTelaDashboard extends LitElement {
   /** Vazio = regularização resolvida. Preenchido = lotes escondidos (fail-closed) e este é o motivo. */
   @state() private terrenosAvisoLotes = '';
   private terrenosCarregados = false;
-  /** Complemento de viabilidade por id do imóvel (tabela `terrenos_complemento`). */
-  @state() private complementos = new Map<number, any>();
-  /** Preenchido quando a leitura dos complementos falhou — a lista de terrenos segue valendo. */
-  @state() private complementosAviso = '';
-  /** Terreno cujo modal "Informações do terreno" está aberto. */
-  @state() private terrenoAberto: any = null;
-  /** O PUT do modal está em voo. Vive aqui, e não no modal, para sobreviver a ele sair da tela. */
-  @state() private complementoSalvando = false;
-  @state() private complementoErro = '';
+  /** Parâmetros urbanísticos por id do LOTE no módulo (tabela `lote_parametros`). */
+  @state() private parametros = new Map<number, any>();
+  /** Preenchido quando a leitura dos parâmetros falhou — a lista de terrenos segue valendo. */
+  @state() private parametrosAviso = '';
+  /** Lotes ATIVOS do módulo, sem o filtro de regularização: a importação casa contra todos. */
+  @state() private lotesTodos: LoteNucleo[] = [];
+  /** Lote cujo modal "Parâmetros do lote" está aberto. */
+  @state() private loteAberto: any = null;
+  /** Um PUT (ou a importação) está em voo. Vive aqui, e não no modal, para sobreviver a ele sair da tela. */
+  @state() private parametrosSalvando = false;
+  @state() private parametrosErro = '';
+  @state() private importarAberto = false;
+  @state() private importarResumo: { ok: number; falhas: string[] } | null = null;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
@@ -247,7 +252,7 @@ export class ViabTelaDashboard extends LitElement {
     if (changed.has('aba') && this.aba === 'estudos') this._carregar();
     // Não recarrega com o PUT do modal em voo: o recarregamento zeraria `terrenoAberto` e o cache sob ele.
     if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando
-      && !this.complementoSalvando) this._carregarTerrenos();
+      && !this.parametrosSalvando) this._carregarTerrenos();
   }
 
   // Glebas: todas. Lotes: todos que não são de regularização fundiária (`frontend/terrenos-nucleo.ts`).
@@ -257,21 +262,21 @@ export class ViabTelaDashboard extends LitElement {
     this.terrenosDisponivel = true;
     this.terrenosMotivo = '';
     this.terrenosAvisoLotes = '';
-    this.complementosAviso = '';
-    this.terrenoAberto = null;
-    this.complementoErro = '';
+    this.parametrosAviso = '';
+    this.loteAberto = null;
+    this.parametrosErro = '';
     try {
       const POR = 200;
-      // Não derruba a aba: sem o complemento a lista de terrenos continua valendo.
+      // Não derruba a aba: sem os parâmetros a lista de terrenos continua valendo.
       // `urbiVerso.api` RESOLVE a resposta de erro (`{ erro: true, mensagem }`) em vez de lançar: sem
       // este `throw` ela virava "lista vazia", e o modal abria em branco sobre um registro que existe.
-      const complementosP = listarComplementosTerreno()
+      const parametrosP = listarLoteParametros()
         .then((r: any) => {
           if (r?.erro || !Array.isArray(r?.dados)) throw new Error(r?.mensagem || 'resposta inesperada');
-          return indexarComplementos(r.dados);
+          return indexarParametros(r.dados);
         })
         .catch((e: any) => {
-          this.complementosAviso = `não foi possível carregar as informações de viabilidade dos terrenos (${e?.message || 'indisponível'}).`;
+          this.parametrosAviso = `não foi possível carregar os parâmetros dos lotes (${e?.message || 'indisponível'}).`;
           return new Map<number, any>();
         });
       const [glebas, lotes] = await Promise.all([
@@ -295,9 +300,10 @@ export class ViabTelaDashboard extends LitElement {
         .filter((o: any) => loteForaDaRegularizacao(o, idsRegularizacao))
         .map((o: any) => ({ ...o, _tipo: 'lote' }));
       this.terrenos = [...g, ...l];
-      this.complementos = await complementosP;
-      // Falha ao ler os complementos também deixa a aba "não carregada": voltar a ela tenta de novo.
-      this.terrenosCarregados = !falhaTransitoria && !this.complementosAviso;
+      this.lotesTodos = lotes.filter((o: any) => !o.removido_em) as LoteNucleo[];
+      this.parametros = await parametrosP;
+      // Falha ao ler os parâmetros também deixa a aba "não carregada": voltar a ela tenta de novo.
+      this.terrenosCarregados = !falhaTransitoria && !this.parametrosAviso;
     } catch (e: any) {
       this.terrenosDisponivel = false;
       this.terrenosMotivo = e?.message || 'Indisponível';
@@ -306,27 +312,47 @@ export class ViabTelaDashboard extends LitElement {
   }
 
   // O ciclo de salvamento do modal mora AQUI: se o modal sair da tela com o PUT em voo (troca de aba),
-  // o cache `complementos` ainda é atualizado e reabrir mostra o valor gravado. Fechar e erro só valem
-  // para o terreno que foi salvo: se o usuário já abriu OUTRO, o resultado não toca o modal dele.
-  private async _salvarComplemento(d: { tipo: 'gleba' | 'lote'; imovelId: number; corpo: Record<string, any> }) {
-    if (this.complementoSalvando) return;
-    const mesmoTerreno = () => this.terrenoAberto != null
-      && Number(this.terrenoAberto.id) === d.imovelId && this.terrenoAberto._tipo === d.tipo;
-    this.complementoSalvando = true;
-    this.complementoErro = '';
+  // o cache `parametros` ainda é atualizado e reabrir mostra o valor gravado. Fechar e erro só valem
+  // para o lote que foi salvo: se o usuário já abriu OUTRO, o resultado não toca o modal dele.
+  private async _salvarParametros(d: { imovelId: number; corpo: Record<string, any> }) {
+    if (this.parametrosSalvando) return;
+    const mesmoLote = () => this.loteAberto != null && Number(this.loteAberto.id) === d.imovelId;
+    this.parametrosSalvando = true;
+    this.parametrosErro = '';
     try {
-      const res = await salvarComplementoTerreno(d.tipo, d.imovelId, d.corpo);
+      const res = await salvarLoteParametros(d.imovelId, d.corpo);
       if (res?.erro || res?.imovel_nucleo_id == null) {
-        if (mesmoTerreno()) this.complementoErro = res?.mensagem || 'Erro ao salvar';
+        if (mesmoLote()) this.parametrosErro = res?.mensagem || 'Erro ao salvar';
         return;
       }
-      this.complementos = new Map(this.complementos).set(Number(res.imovel_nucleo_id), res);
-      urbiVerso.notificar('Informações do terreno salvas.', 'sucesso');
-      if (mesmoTerreno()) this.terrenoAberto = null;
+      this.parametros = new Map(this.parametros).set(Number(res.imovel_nucleo_id), res);
+      urbiVerso.notificar('Parâmetros do lote salvos.', 'sucesso');
+      if (mesmoLote()) this.loteAberto = null;
     } catch (e: any) {
-      if (mesmoTerreno()) this.complementoErro = e?.message || 'Erro ao salvar';
+      if (mesmoLote()) this.parametrosErro = e?.message || 'Erro ao salvar';
     } finally {
-      this.complementoSalvando = false;
+      this.parametrosSalvando = false;
+    }
+  }
+
+  // A importação segue a mesma regra: o Painel faz a requisição e relê os registros ao final, para o
+  // cache refletir exatamente o que ficou gravado (inclusive o que foi atualizado em vez de criado).
+  private async _importarParametros(d: { itens: Record<string, any>[]; origem: string }) {
+    if (this.parametrosSalvando) return;
+    this.parametrosSalvando = true;
+    this.parametrosErro = '';
+    try {
+      const res = await importarLoteParametros(d.itens);
+      if (res?.erro || !Array.isArray(res?.resultados)) { this.parametrosErro = res?.mensagem || 'Erro ao importar'; return; }
+      const falhas = (res.resultados as any[]).filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
+      this.importarResumo = { ok: res.resultados.length - falhas.length, falhas };
+      const atual = await listarLoteParametros();
+      if (!atual?.erro && Array.isArray(atual?.dados)) this.parametros = indexarParametros(atual.dados);
+      urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length ? 'alerta' : 'sucesso');
+    } catch (e: any) {
+      this.parametrosErro = e?.message || 'Erro ao importar';
+    } finally {
+      this.parametrosSalvando = false;
     }
   }
 
@@ -816,26 +842,33 @@ export class ViabTelaDashboard extends LitElement {
       { id: 'tipo', label: 'Tipo', valor: (l: any) => (l._tipo === 'gleba' ? 'Gleba' : 'Lote') },
       { id: 'nome', label: 'Imóvel', valor: (l: any) => l.id_legivel || `#${l.id}` },
       { id: 'area', label: 'Área', alinhamento: 'direita', valor: (l: any) => `${fmtNum(Number(l.area) || 0)} m²` },
-      {
-        id: 'situacao', label: 'Situação', alinhamento: 'centro',
-        render: (l: any) => {
-          const sit = this.complementos.get(Number(l.id))?.situacao_negociacao;
-          return sit
-            ? html`<urbi-badge cor=${COR_SITUACAO[sit] ?? 'padrao'}>${rotuloDe(SITUACOES, sit)}</urbi-badge>`
-            : html`<span>—</span>`;
-        },
-      },
-      {
-        id: 'preco_pedido', label: 'Preço pedido', alinhamento: 'direita',
+      ...[
+        { id: 'coef_minimo', label: 'Coef. mín.' },
+        { id: 'coef_maximo', label: 'Coef. máx.' },
+        { id: 'gabarito_maximo', label: 'Gabarito máx.' },
+      ].map((c) => ({
+        id: c.id, label: c.label, alinhamento: 'direita',
         valor: (l: any) => {
-          const v = paraNumero(this.complementos.get(Number(l.id))?.preco_pedido);
-          return v == null ? '—' : fmtR$(v, false);
+          if (l._tipo !== 'lote') return '—';
+          const v = paraNumero(this.parametros.get(Number(l.id))?.[c.id]);
+          return v == null ? '—' : fmtNum(v, 2);
+        },
+      })),
+      {
+        id: 'vinculo', label: 'Vínculo', alinhamento: 'centro',
+        render: (l: any) => {
+          if (l._tipo !== 'lote') return html`<span>—</span>`;
+          const st: StatusVinculo = statusVinculo(this.parametros.get(Number(l.id)), l);
+          const cor = st === 'ok' ? 'sucesso' : st === 'sem-dados' ? 'padrao' : st === 'area' ? 'info' : 'alerta';
+          return html`<urbi-badge cor=${cor}>${ROTULO_STATUS[st]}</urbi-badge>`;
         },
       },
     ];
     const linhas = this.filtroTerreno
       ? this.terrenos.filter((t) => t._tipo === this.filtroTerreno)
       : this.terrenos;
+    const podeEditar = ['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '');
+    const orfaos = registrosOrfaos([...this.parametros.values()], this.lotesTodos);
     return html`
       ${this.terrenosAvisoLotes ? html`
         <urbi-banner variante="alerta">
@@ -852,29 +885,46 @@ export class ViabTelaDashboard extends LitElement {
           ]}
           @urbi:select-change=${(e: CustomEvent) => { this.filtroTerreno = e.detail.valor; }}
         ></urbi-select>
+        ${podeEditar && !this.parametrosAviso ? html`
+          <urbi-botao variante="fantasma" @click=${() => { this.importarResumo = null; this.parametrosErro = ''; this.importarAberto = true; }}>
+            Importar coeficientes (CSV)
+          </urbi-botao>` : nothing}
       </div>
-      ${this.complementosAviso ? html`
-        <urbi-banner variante="alerta">Informações de viabilidade indisponíveis: ${this.complementosAviso}</urbi-banner>` : nothing}
+      ${this.parametrosAviso ? html`
+        <urbi-banner variante="alerta">Parâmetros dos lotes indisponíveis: ${this.parametrosAviso}</urbi-banner>` : nothing}
+      ${orfaos.length ? html`
+        <urbi-banner variante="alerta">${orfaos.length} registro(s) de parâmetros apontam para lote que não existe mais (ou foi
+          removido) no módulo. Os valores ficam guardados, mas não aparecem na tabela.</urbi-banner>` : nothing}
       <urbi-tabela
         expandir
         clicavel
         .colunas=${colunas}
         .linhas=${linhas}
-        @urbi:tabela-click=${(e: CustomEvent) => { if (e.detail?.linha?.id != null) this.terrenoAberto = e.detail.linha; }}
+        @urbi:tabela-click=${(e: CustomEvent) => { const l = e.detail?.linha; if (l?.id != null && l._tipo === 'lote') this.loteAberto = l; }}
         mensagem-vazio=${this.terrenosAvisoLotes
           ? 'Nenhuma gleba cadastrada no Núcleo (os lotes estão ocultos, veja o aviso acima).'
           : 'Nenhuma gleba ou lote (fora de regularização) cadastrado no Núcleo.'}
       ></urbi-tabela>
-      ${this.terrenoAberto ? html`
-        <viab-terreno-complemento
-          .terreno=${this.terrenoAberto}
-          .complemento=${this.complementos.get(Number(this.terrenoAberto.id)) ?? null}
-          .editavel=${!this.complementosAviso && ['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '')}
-          .salvando=${this.complementoSalvando}
-          .erro=${this.complementoErro}
-          @viab-complemento-fechar=${() => { if (!this.complementoSalvando) { this.terrenoAberto = null; this.complementoErro = ''; } }}
-          @viab-complemento-salvar=${(e: CustomEvent) => this._salvarComplemento(e.detail)}
-        ></viab-terreno-complemento>` : nothing}
+      ${this.loteAberto ? html`
+        <viab-lote-parametros
+          .lote=${this.loteAberto}
+          .registro=${this.parametros.get(Number(this.loteAberto.id)) ?? null}
+          .status=${statusVinculo(this.parametros.get(Number(this.loteAberto.id)), this.loteAberto)}
+          .editavel=${!this.parametrosAviso && podeEditar}
+          .salvando=${this.parametrosSalvando}
+          .erro=${this.parametrosErro}
+          @viab-parametros-fechar=${() => { if (!this.parametrosSalvando) { this.loteAberto = null; this.parametrosErro = ''; } }}
+          @viab-parametros-salvar=${(e: CustomEvent) => this._salvarParametros(e.detail)}
+        ></viab-lote-parametros>` : nothing}
+      ${this.importarAberto ? html`
+        <viab-lote-parametros-importar
+          .lotes=${this.lotesTodos}
+          .importando=${this.parametrosSalvando}
+          .erro=${this.parametrosErro}
+          .resumoFinal=${this.importarResumo}
+          @viab-parametros-fechar=${() => { if (!this.parametrosSalvando) { this.importarAberto = false; this.importarResumo = null; this.parametrosErro = ''; } }}
+          @viab-parametros-importar=${(e: CustomEvent) => this._importarParametros(e.detail)}
+        ></viab-lote-parametros-importar>` : nothing}
     `;
   }
 

@@ -25,6 +25,10 @@ export const caso = {
   // `aba === 'estudos'`), então os `urbi-botao.*` daquele slot não entram
   // aqui.
   aceitaNaoReproduzido: [
+    // A barra de filtros da aba Terrenos: o select de tipo e o botão de importar coeficientes.
+    'urbi-botao.variante',
+    'urbi-select.label',
+    'urbi-select.opcoes',
     'urbi-abas.abas',
     'urbi-abas.ativa',
     'urbi-abas.expandir',

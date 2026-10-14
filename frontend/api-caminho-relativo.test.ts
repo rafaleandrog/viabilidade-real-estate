@@ -101,7 +101,7 @@ const ARG_ATIVO = {
 // Quantas funções o wrapper exporta. Trava a porta que a lista de exceção
 // deixaria aberta: função nova que nasça com o slug entra no laço abaixo em
 // vez de passar despercebida.
-const FUNCOES_EXPORTADAS = 81;
+const FUNCOES_EXPORTADAS = 82;
 
 type Registro = { fn: string; url: string };
 

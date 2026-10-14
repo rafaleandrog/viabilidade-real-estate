@@ -36,6 +36,27 @@ estudo avisa e só o terreno manual fica disponível. A de parcelamentos tem doi
 O seletor de lotes da Incorporação é mais restrito que a aba Terrenos: além da regularização, exclui
 lotes de parcelamento vinculado a setor habitacional.
 
+### Parâmetros urbanísticos dos lotes
+
+Na aba **Terrenos** do Painel, cada lote tem **coeficiente de aproveitamento mínimo e máximo** e **gabarito máximo**,
+guardados no próprio app e ligados ao lote do módulo imobiliário pelo id dele, sem escrever nada no módulo. O id é
+único: um lote não pode ter dois registros. Quem tem nível de escrita edita um lote clicando na linha, ou importa vários
+de uma vez em **Importar coeficientes (CSV)**.
+
+- **Planilha de importação.** CSV com `;` ou `,`, com as colunas `logradouro` (ou `rua`) e `numero`, e ao menos uma de
+  `cmax`, `cmin` e `gabarito`; opcionais `area_m2`, `uos` e `uso`. O lote do módulo é achado pela rua e pelo número
+  (sem distinguir acento ou caixa), e a área da planilha, quando vem, é conferida contra a do módulo (tolerância de
+  0,01 m²). A tela mostra o que vai entrar antes de gravar, e **só as linhas que casam com exatamente um lote entram**:
+  as sem lote, com mais de um lote, repetidas na planilha ou com área diferente ficam de fora e são listadas. Importar
+  de novo atualiza os valores, sem duplicar.
+- **Status do vínculo.** Junto dos valores o app guarda um carimbo do lote (parcelamento, rua, número, quadra, conjunto
+  e área). A coluna **Vínculo** compara o carimbo com o lote de hoje: *Conferido*; *Área mudou* (alerta, os valores
+  seguem valendo, pode ser retificação); *Lote mudou* (parcelamento, rua, número, quadra ou conjunto diferentes: a edição
+  fica bloqueada até **Reconfirmar vínculo**). Registros cujo lote não existe mais ou foi removido ficam guardados e são
+  contados num aviso.
+- **Etapas sem lote.** Só lotes que já existem no módulo recebem parâmetros: as linhas de uma etapa ainda sem lote
+  cadastrado aparecem como "sem lote" e entram quando o lote for criado, importando de novo.
+
 ### Parâmetros
 
 Em *Admin → Apps → viabilidade*, os parâmetros do app. Cada um tem um valor padrão que vale
@@ -127,6 +148,7 @@ dispara a manutenção. Dentro de um estudo, o que vale é a função de membro 
 | Benchmarks | `GET /benchmarks?tipo_empreendimento=…` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` (idempotente) | leitura para todos; escrita e semear só `admin` |
 | Curvas | `GET /avancado/curvas` (cria a Curva S se faltar) · `POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` | escrita só `admin` |
 | Regiões | `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` | escrita só `admin` |
+| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` · `POST /lote-parametros/importar` (`{ itens }`, até 300, resultado por lote) | leitura: qualquer usuário do app; escrita: `escrita` ou `admin` (`403 SEM_PERMISSAO`) |
 | Manutenção | `POST /manutencao/arquivar-inativos` → `{ ok, arquivados, prazo_dias }` | só `admin` (`403 SEM_PERMISSAO`) |
 
 Eventos publicados no barramento da instância: `estudo_criado`, `estudo_status_alterado` e

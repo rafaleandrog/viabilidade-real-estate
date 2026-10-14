@@ -20,19 +20,25 @@ export const aceitaNaoReproduzidoBase = [
   'urbi-shell-page.titulo',
 ];
 
+// Com a barra de filtros na tela (aba carregada e sem falha nos parâmetros): o select de tipo de terreno
+// e o botão "Importar coeficientes (CSV)", que só aparece para quem edita e com os parâmetros lidos.
+export const aceitaNaoReproduzidoComFiltros = [
+  ...aceitaNaoReproduzidoBase, 'urbi-botao.variante', 'urbi-select.label', 'urbi-select.opcoes',
+];
+
 export type ModoParcelamentos = 'ok' | 'sem-permissao';
 
 // `urbiVerso.api` real RESOLVE `{ erro: true }` em não-2xx; `rejeita` cobre a falha de rede.
-function respostaComplementos(c: any[] | 'rejeita' | 'erro-payload'): any {
+function respostaParametros(c: any[] | 'rejeita' | 'erro-payload'): any {
   if (c === 'rejeita') throw new Error('rede caiu');
   if (c === 'erro-payload') return { erro: true, codigo: 'ERRO_INTERNO', mensagem: 'falhou' };
   return { dados: c, total: c.length };
 }
 
-export function montarCaso(modo: ModoParcelamentos, complementos: any[] | 'rejeita' | 'erro-payload' = []) {
+export function montarCaso(modo: ModoParcelamentos, parametros: any[] | 'rejeita' | 'erro-payload' = []) {
   return async function montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).urbiVerso.api = async (rota: string) => (
-      String(rota).startsWith('/terrenos-complemento') ? respostaComplementos(complementos) : { dados: [] }
+      String(rota).startsWith('/lote-parametros') ? respostaParametros(parametros) : { dados: [] }
     );
     (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
       if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
@@ -53,10 +59,10 @@ export function montarCaso(modo: ModoParcelamentos, complementos: any[] | 'rejei
       }
       if (rota.startsWith('/lotes')) {
         return emPaginas([
-          { id: 1, id_legivel: 'LOTE-REGULARIZACAO', parcelamento_id: 10, area: '300' },
-          { id: 2, id_legivel: 'LOTE-COM-SETOR', parcelamento_id: 20, area: '300' },
-          { id: 3, id_legivel: 'LOTE-NORMAL', parcelamento_id: 30, area: '300' },
-          { id: 4, id_legivel: 'LOTE-SEM-PARCELAMENTO', parcelamento_id: null, area: '300' },
+          { id: 1, id_legivel: 'LOTE-REGULARIZACAO', parcelamento_id: 10, area: '300', rua: 'Amsterdam', numero_lote: '1' },
+          { id: 2, id_legivel: 'LOTE-COM-SETOR', parcelamento_id: 20, area: '300', rua: 'Amsterdam', numero_lote: '2' },
+          { id: 3, id_legivel: 'LOTE-NORMAL', parcelamento_id: 30, area: '300', rua: 'Amsterdam', numero_lote: '4910' },
+          { id: 4, id_legivel: 'LOTE-SEM-PARCELAMENTO', parcelamento_id: null, area: '300', rua: 'Barcelona', numero_lote: '4915' },
         ]);
       }
       if (rota.startsWith('/glebas')) {
@@ -93,7 +99,7 @@ export async function medirCaso(raiz: HTMLElement): Promise<{ linhas: string[]; 
 export const caso = {
   nome: 'painel-terrenos-regularizacao',
   exigir: [{ seletor: 'urbi-hospedeiro[slot="terrenos"]', minimo: 1 }],
-  aceitaNaoReproduzido: aceitaNaoReproduzidoBase,
+  aceitaNaoReproduzido: aceitaNaoReproduzidoComFiltros,
   montar: montarCaso('ok'),
   medir: medirCaso,
 };

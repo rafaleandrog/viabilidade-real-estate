@@ -502,25 +502,24 @@
       "indices": [["regiao_id"], ["data_coleta"]]
     },
 
-    "terrenos_complemento": {
+    "lote_parametros": {
       "acesso_externo": "restrito",
       "colunas": {
-        "imovel_nucleo_id":           { "tipo": "inteiro", "obrigatorio": true },
-        "tipo_imovel":                { "tipo": "texto", "limite": 10, "opcoes": ["gleba", "lote"], "obrigatorio": true },
-        "situacao_negociacao":        { "tipo": "texto", "limite": 20, "opcoes": ["prospeccao", "em_negociacao", "opcao_compra", "adquirido", "descartado"] },
-        "preco_pedido":               { "tipo": "decimal", "precisao": 12, "escala": 2 },
-        "proprietario":               { "tipo": "texto", "limite": 150 },
-        "contato":                    { "tipo": "texto", "limite": 150 },
-        "zoneamento":                 { "tipo": "texto", "limite": 100 },
-        "coeficiente_aproveitamento": { "tipo": "decimal", "precisao": 5, "escala": 2 },
-        "taxa_ocupacao_pct":          { "tipo": "inteiro" },
-        "gabarito_pavimentos":        { "tipo": "inteiro" },
-        "topografia":                 { "tipo": "texto", "limite": 20, "opcoes": ["plana", "leve", "acentuada"] },
-        "infraestrutura":             { "tipo": "texto", "limite": 20, "opcoes": ["completa", "parcial", "inexistente"] },
-        "restricoes":                 { "tipo": "texto_longo" },
-        "observacoes":                { "tipo": "texto_longo" }
+        "imovel_nucleo_id":  { "tipo": "inteiro", "obrigatorio": true },
+        "parcelamento_id":   { "tipo": "inteiro" },
+        "rua":               { "tipo": "texto", "limite": 150 },
+        "numero_lote":       { "tipo": "texto", "limite": 30 },
+        "quadra":            { "tipo": "texto", "limite": 60 },
+        "conjunto":          { "tipo": "texto", "limite": 60 },
+        "area_m2":           { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "coef_minimo":       { "tipo": "decimal", "precisao": 6, "escala": 2 },
+        "coef_maximo":       { "tipo": "decimal", "precisao": 6, "escala": 2 },
+        "gabarito_maximo":   { "tipo": "decimal", "precisao": 8, "escala": 2 },
+        "uos":               { "tipo": "texto", "limite": 40 },
+        "uso":               { "tipo": "texto", "limite": 40 },
+        "origem":            { "tipo": "texto", "limite": 200 }
       },
-      "indices": [["tipo_imovel"]],
+      "indices": [["parcelamento_id"]],
       "unicos": [["imovel_nucleo_id"]]
     }
   }

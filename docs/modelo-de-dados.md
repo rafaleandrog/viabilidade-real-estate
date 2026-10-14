@@ -76,7 +76,7 @@ só unidades e preço.
 | `benchmarks` | Os valores de referência por tipo de empreendimento (`campo`, `valor`, `regra_comparacao`, `variacao_positiva_pct`, `variacao_negativa_pct`, `medidor_min`, `medidor_max`, `medidor_faixa1_ate`, `medidor_faixa2_ate`). Único por `[tipo_empreendimento, campo]`. Ver [Benchmarks](benchmarks). |
 | `avancado_curvas` | As curvas de distribuição, globais da instância (a Curva S padrão e as criadas pelo administrador). |
 | `mercado_regioes` | As regiões monitoradas (`nome`, `uf`, `palavras_chave`, `ativa`) e o estado da última coleta (`ultima_coleta_em`, `_status`, `_itens`, `_msg`). |
-| `terrenos_complemento` | As informações de viabilidade de uma gleba ou de um lote que o Núcleo não guarda, um registro por imóvel (`imovel_nucleo_id`, único; `tipo_imovel` `gleba`/`lote`). Campos: `situacao_negociacao` (`prospeccao`, `em_negociacao`, `opcao_compra`, `adquirido`, `descartado`), `preco_pedido`, `proprietario`, `contato`, `zoneamento`, `coeficiente_aproveitamento`, `taxa_ocupacao_pct`, `gabarito_pavimentos`, `topografia` (`plana`, `leve`, `acentuada`), `infraestrutura` (`completa`, `parcial`, `inexistente`), `restricoes`, `observacoes`. Registro geral da instância, não de um estudo; editável por quem tem nível de escrita no app, e a edição é feita na aba Terrenos do Painel. |
+| `lote_parametros` | Os parâmetros urbanísticos de um **lote** do módulo imobiliário, no schema do app, sem escrever nada no módulo. Um registro por lote, ligado pelo `imovel_nucleo_id` — o id do lote no módulo —, **único**. Valores: `coef_minimo`, `coef_maximo` (decimal 6,2), `gabarito_maximo` (decimal 8,2), `uos` e `uso` (texto, informativos) e `origem` (de onde veio o dado, por exemplo o nome do arquivo importado). **Carimbo** do lote no momento do cadastro: `parcelamento_id`, `rua`, `numero_lote`, `quadra`, `conjunto` e `area_m2`, tirados dos campos do lote — nunca do nome legível. A aba Terrenos compara o carimbo com o lote de hoje: parcelamento, rua, número, quadra ou conjunto diferentes marcam o vínculo como "Lote mudou" e bloqueiam a edição até reconfirmar; só a área diferente alerta (pode ser retificação) e o registro segue valendo. Registro geral da instância, não de um estudo; editável por quem tem nível de escrita no app. |
 | `mercado_coletas` | O que a rotina diária guardou por região (`tipo`, `titulo`, `resumo`, `url`, `fonte`, `publicado_em`, `relevancia`, `bruto`). |
 
 ## O que a duplicação de estudo copia
@@ -109,7 +109,7 @@ Quatro colunas guardam id de outra linha sem FK no banco, cada uma por um motivo
 | Coluna | Por quê |
 |---|---|
 | `estudo_imoveis.imovel_nucleo_id` | o alvo vive no Núcleo, fora do schema do app |
-| `terrenos_complemento.imovel_nucleo_id` | idem |
+| `lote_parametros.imovel_nucleo_id` | idem — e é o que garante que o dado de um lote não seja confundido com o de outro |
 | `estudos.permuta_fisica_produto_id` | quebra do ciclo com `preliminar_produtos` (abaixo) |
 | `estudos.permuta_fisica_nr_produto_id` | idem |
 

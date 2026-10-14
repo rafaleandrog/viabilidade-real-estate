@@ -369,14 +369,17 @@ export function buscarImovelNucleo(id: number): Promise<any> {
   return imobiliario(`/imoveis/${id}`);
 }
 
-// ── Complemento de terreno (aba Terrenos do Painel) ──
-// Dados de viabilidade de uma gleba/lote que o módulo imobiliário não guarda. Um registro
-// por imóvel, chaveado pelo `id` que a listagem do módulo devolve.
-export function listarComplementosTerreno(): Promise<any> {
-  return urbiVerso.api(`/terrenos-complemento`);
+// ── Parâmetros urbanísticos do lote (aba Terrenos do Painel) ──
+// Coeficiente mínimo e máximo e gabarito máximo, guardados no schema do app e ligados ao lote do módulo
+// imobiliário pelo id dele (único). Nada é escrito no módulo.
+export function listarLoteParametros(): Promise<any> {
+  return urbiVerso.api(`/lote-parametros`);
 }
-export function salvarComplementoTerreno(tipo: 'gleba' | 'lote', imovelId: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`/terrenos-complemento/${tipo}/${imovelId}`, { method: 'PUT', body: JSON.stringify(dados) });
+export function salvarLoteParametros(imovelId: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`/lote-parametros/${imovelId}`, { method: 'PUT', body: JSON.stringify(dados) });
+}
+export function importarLoteParametros(itens: Record<string, any>[]): Promise<any> {
+  return urbiVerso.api(`/lote-parametros/importar`, { method: 'POST', body: JSON.stringify({ itens }) });
 }
 
 // ── Apelo Comercial (IA) ──

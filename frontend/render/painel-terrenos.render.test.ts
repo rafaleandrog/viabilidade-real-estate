@@ -45,72 +45,86 @@ test('Terrenos: sem permissão em parcelamentos, esconde TODOS os lotes e avisa 
   );
 });
 
-test('Terrenos: o complemento aparece na linha do imóvel certo e o clique abre o modal dele', { skip: pular ?? false }, async () => {
-  const a = await verificarRender({ caso: 'painel-terrenos-complemento', larguras: [1280] });
+async function medida(caso: string) {
+  const a = await verificarRender({ caso, larguras: [1280] });
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
-  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
   assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   const m = a.extra?.['1280'] as any;
   assert.ok(m, 'o caso não devolveu a medida extra — medir() não rodou' + relato(a));
-  assert.equal(m.preco['LOTE-NORMAL'], '1.500.000,00', 'preço pedido do lote com complemento' + relato(a));
-  assert.equal(m.preco['LOTE-COM-SETOR'], '—', 'lote sem complemento não herda preço de outro' + relato(a));
-  assert.deepEqual(
-    m.temSituacao, { 'GLEBA-A': false, 'GLEBA-B': false, 'LOTE-COM-SETOR': false, 'LOTE-NORMAL': true, 'LOTE-SEM-PARCELAMENTO': false },
-    'só o LOTE-NORMAL tem situação gravada' + relato(a),
-  );
+  return { m, a };
+}
+
+test('Terrenos: os parâmetros aparecem na linha do lote certo; clicar no lote abre o modal, na gleba não', { skip: pular ?? false }, async () => {
+  const { m, a } = await medida('painel-terrenos-parametros');
+  assert.equal(m.coefMax['LOTE-NORMAL'], '3,5', 'coeficiente máximo do lote com registro' + relato(a));
+  assert.equal(m.coefMin['LOTE-NORMAL'], '1', 'coeficiente mínimo do lote com registro' + relato(a));
+  assert.equal(m.gabarito['LOTE-NORMAL'], '12', 'gabarito do lote com registro' + relato(a));
+  assert.equal(m.coefMax['LOTE-COM-SETOR'], '—', 'lote sem registro não herda valor de outro' + relato(a));
+  assert.equal(m.coefMax['GLEBA-A'], '—', 'gleba não tem parâmetro de lote' + relato(a));
+  assert.match(m.vinculo['LOTE-NORMAL'], /Conferido/, 'carimbo bate com o lote de hoje' + relato(a));
+  assert.match(m.vinculo['LOTE-COM-SETOR'], /Sem dados/, 'lote sem registro' + relato(a));
   assert.equal(m.modalAntes, false, 'o modal não abre sozinho' + relato(a));
-  assert.equal(m.modalTerreno, 'LOTE-NORMAL', 'o clique abre o modal do imóvel clicado' + relato(a));
-  assert.equal(m.modalProprietario, 'Fulano de Tal', 'o modal recebe o registro desse imóvel' + relato(a));
+  assert.equal(m.gleba, false, 'clicar numa gleba não abre o modal de parâmetros de lote' + relato(a));
+  assert.equal(m.modalLote, 'LOTE-NORMAL', 'o clique abre o modal do lote clicado' + relato(a));
+  assert.equal(m.modalCoefMax, '3.50', 'o modal recebe o registro desse lote' + relato(a));
+  assert.equal(m.modalStatus, 'ok', 'o modal recebe a conferência do vínculo' + relato(a));
   assert.equal(m.modalEditavel, true, 'nível admin edita' + relato(a));
 });
 
 for (const modo of ['rejeita', 'erro-payload']) {
-  test(`Terrenos: leitura dos complementos falha (${modo}) → avisa, não carrega a aba e o modal NÃO edita`, { skip: pular ?? false }, async () => {
-    const a = await verificarRender({ caso: `painel-terrenos-complemento-${modo}`, larguras: [1280] });
-    assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
-    assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
-    assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
-    const m = a.extra?.['1280'] as any;
-    assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
-    assert.match(m.aviso, /Informações de viabilidade indisponíveis/, 'o banner de falha tem que aparecer' + relato(a));
+  test(`Terrenos: leitura dos parâmetros falha (${modo}) → avisa, não carrega a aba e o modal NÃO edita`, { skip: pular ?? false }, async () => {
+    const { m, a } = await medida(`painel-terrenos-parametros-${modo}`);
+    assert.match(m.aviso, /Parâmetros dos lotes indisponíveis/, 'o banner de falha tem que aparecer' + relato(a));
     assert.equal(m.carregada, false, 'falha de leitura não marca a aba como carregada: voltar a ela tenta de novo' + relato(a));
-    assert.equal(m.modalTerreno, 'LOTE-NORMAL', 'a lista de terrenos segue valendo e o clique abre o modal' + relato(a));
+    assert.equal(m.modalLote, 'LOTE-NORMAL', 'a lista de terrenos segue valendo e o clique abre o modal' + relato(a));
     assert.equal(m.modalEditavel, false, 'sem ler o registro o modal não pode ser editável (o PUT total apagaria dados)' + relato(a));
   });
 }
 
-test('Modal do terreno: pede para salvar uma vez; com o Painel salvando ignora fechar e segundo Salvar', { skip: pular ?? false }, async () => {
-  const a = await verificarRender({ caso: 'terreno-complemento-salvando', larguras: [1280] });
-  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
-  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
-  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
-  const m = a.extra?.['1280'] as any;
-  assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+test('Modal do lote: um pedido por Salvar, com carimbo só no cadastro; salvando ou vínculo a conferir bloqueiam tudo', { skip: pular ?? false }, async () => {
+  const { m, a } = await medida('lote-parametros-salvando');
   assert.equal(m.salvarEmitidos, 1, 'Salvar livre emite exatamente um pedido' + relato(a));
-  assert.equal(m.camposDoCorpo, 12, 'o corpo leva TODOS os campos (limpar na tela limpa no banco)' + relato(a));
-  assert.equal(m.tipoEImovel, 'lote/3', 'o pedido identifica o terreno' + relato(a));
+  assert.equal(m.imovelId, 3, 'o pedido identifica o lote pelo id do módulo' + relato(a));
+  assert.deepEqual(
+    m.chavesDoCorpoNovo,
+    ['area_m2', 'coef_maximo', 'coef_minimo', 'conjunto', 'gabarito_maximo', 'numero_lote', 'parcelamento_id', 'quadra', 'rua', 'uos', 'uso'],
+    'o cadastro leva o carimbo do lote e todos os campos editáveis' + relato(a),
+  );
+  assert.equal(m.chavesDoCorpoExistente, 5, 'a atualização leva só os 5 campos editáveis, sem reescrever o carimbo' + relato(a));
   assert.equal(m.fecharComSalvando, 0, 'fechar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.salvarComSalvando, 0, 'segundo Salvar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.cancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
-  assert.equal(m.camposTotal, 12, 'o modal tem os 12 campos de edição' + relato(a));
+  assert.equal(m.camposTotal, 5, 'o modal tem os 5 campos de edição' + relato(a));
   assert.equal(m.camposDesabilitadosLivre, 0, 'livre e com permissão, nenhum campo desabilitado' + relato(a));
-  assert.equal(m.camposDesabilitadosSalvando, 12, 'com o PUT em voo TODOS os campos ficam desabilitados (edição depois de Salvar seria descartada)' + relato(a));
+  assert.equal(m.camposDesabilitadosSalvando, 5, 'com o PUT em voo TODOS os campos ficam desabilitados' + relato(a));
+  assert.equal(m.camposBloqueadosPorVinculo, 5, 'com o vínculo a conferir (lote mudou) nenhum campo edita' + relato(a));
   assert.equal(m.fecharDepois, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));
 });
 
 test('Painel: PUT em voo + troca de aba — o cache ainda recebe o registro gravado', { skip: pular ?? false }, async () => {
-  const a = await verificarRender({ caso: 'painel-terrenos-salvando-troca-aba', larguras: [1280] });
-  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
-  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
-  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
-  const m = a.extra?.['1280'] as any;
-  assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+  const { m, a } = await medida('painel-terrenos-salvando-troca-aba');
   assert.equal(m.modalAbriu, true, 'o clique abre o modal' + relato(a));
   assert.equal(m.putChamado, true, 'o Painel (e não o modal) chamou o PUT' + relato(a));
+  assert.equal(m.putUrl, '/lote-parametros/3', 'o PUT vai para o id do lote no módulo' + relato(a));
   assert.equal(m.salvandoDuranteVoo, true, 'o Painel marca o salvamento em voo' + relato(a));
   assert.equal(m.modalRecebeSalvando, true, 'o Painel liga `.salvando` no modal' + relato(a));
-  assert.equal(m.cacheDepois, 'novo', 'o resultado do PUT chegou ao cache mesmo com o modal fora da tela' + relato(a));
+  assert.equal(m.cacheDepois, '4.00', 'o resultado do PUT chegou ao cache mesmo com o modal fora da tela' + relato(a));
   assert.equal(m.salvandoDepois, false, 'o salvamento termina' + relato(a));
   assert.equal(m.modalAbertoDepois, false, 'o modal é fechado pelo Painel' + relato(a));
+});
+
+test('Painel: importar CSV casa por rua e número, confere a área, grava só o casado e relê o cache', { skip: pular ?? false }, async () => {
+  const { m, a } = await medida('painel-terrenos-importar');
+  assert.equal(m.botao, true, 'o botão de importar aparece para quem edita' + relato(a));
+  assert.equal(m.dialogoAbriu, true, 'o botão abre o diálogo' + relato(a));
+  assert.equal(m.linhasLidas, 3, 'as 3 linhas do CSV foram lidas' + relato(a));
+  assert.equal(m.importaveis, 1, 'só a linha que casa (rua, número e área) é importável' + relato(a));
+  assert.equal(m.postUrl, '/lote-parametros/importar', 'o Painel faz o POST de importação' + relato(a));
+  assert.deepEqual(m.postItens, [{ imovel_nucleo_id: 3, coef_maximo: 3.5, area_m2: 300, origem: 'quadro.csv' }], 'o item leva o id do lote, o valor, o carimbo e a origem' + relato(a));
+  assert.equal(m.cacheTamanho, 1, 'o cache foi relido depois da importação' + relato(a));
+  assert.equal(m.cacheCoefMax, '3.5', 'o cache reflete o que ficou gravado' + relato(a));
+  assert.equal(m.resumoOk, 1, 'o diálogo mostra o resultado da gravação' + relato(a));
+  assert.equal(m.resumoFalhas, 0, 'sem falhas' + relato(a));
+  assert.equal(m.importandoDepois, false, 'a importação termina' + relato(a));
 });
