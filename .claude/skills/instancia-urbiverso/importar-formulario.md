@@ -60,8 +60,10 @@ registrar.
      tentativa: se o `DELETE` também falhar, **um estudo parcial pode ficar**, e o importador avisa quando consegue (numa queda de rede ele pode nem chegar a avisar);
    - **como desfazer:** apagar o estudo pela tela do app; o estudo fica visível a quem tem acesso ao
      app enquanto existir.
-3. **Guarde a lista de estudos que já existem, e então escreva.** A lista é leitura (a rota é a que o
-   índice dos docs do app documenta, § 3): anote os ids. Sem ela você não tem como saber, depois,
+3. **Guarde a lista de estudos que já existem, e então escreva — a cada formulário.** A lista é leitura (a rota é a que o
+   índice dos docs do app documenta, § 3): anote os ids, e **refaça a lista imediatamente antes de cada execução do importador**, também quando
+   um sim só cobre vários formulários (senão o estudo de um formulário já concluído entra na diferença
+   do seguinte). Sem ela você não tem como saber, depois,
    qual estudo é o da rodada, porque o nome não é único. Com o sim, o mesmo comando com `--executar --relatorio <arquivo.json>`. Vários
    formulários na mesma pessoa e no mesmo pedido saem com **um sim só**, desde que a lista de
    formulários esteja escrita, item por item, antes.
@@ -70,7 +72,7 @@ registrar.
    | Saída | Significa | O que fazer |
    |---|---|---|
    | `0` | sem divergência, sem falha HTTP, sem problema novo no motor | relate o estudo e os números |
-   | `1`, ou **qualquer traceback ou erro de rede** (`URLError`, tempo esgotado) | erro de preenchimento, ou a API recusou uma escrita, ou a execução caiu no meio | relate o motivo. Só trate como limpo se a saída disser `estudo <id> removido`. Sem essa confirmação (`ATENÇÃO: não consegui remover o estudo`, queda de rede, `POST` sem resposta), **considere que um estudo parcial pode ter ficado**: o arquivo de `--relatorio` não é gravado nesse caminho, e o id às vezes nem chega ao terminal. Releia a lista de estudos e compare com a que você guardou no passo 3: o estudo novo é o que **não estava nela**. Entregue o id à pessoa para apagar |
+   | `1`, ou **qualquer traceback ou erro de rede** (`URLError`, tempo esgotado) | erro de preenchimento, ou a API recusou uma escrita, ou a execução caiu no meio | relate o motivo. Só trate como limpo se a saída disser `estudo <id> removido`. Sem essa confirmação (`ATENÇÃO: não consegui remover o estudo`, queda de rede, `POST` sem resposta), **considere que um estudo parcial pode ter ficado**: o arquivo de `--relatorio` não é gravado nesse caminho, e o id às vezes nem chega ao terminal. Releia a lista de estudos e compare com a que você guardou no passo 3: o estudo novo é o que **não estava nela**. Se a diferença não for **exatamente um** estudo, é ambíguo: não escolha um id, diga isso à pessoa e entregue a lista dos candidatos. Achado o único, entregue o id para ela apagar |
    | `2` | o estudo existe, mas há pendência (releitura, pagamento, motor) | relate cada pendência; o estudo **ficou**, com o id |
 
    `--manter-em-falha` mantém o estudo parcial para diagnóstico: uma exceção de escrita sai com `1` e o
@@ -103,7 +105,7 @@ formulário. Não rode sem o sim.
   `--forcar` ou em estudo que o pedido não criou: o importador já os chama no momento certo, no estudo
   certo.
 - **Não apague estudo por conta própria** além do que o importador remove sozinho: apagar é decisão da
-  pessoa, e o relatório entrega o id (da saída do terminal, quando o caminho foi o de saída `1`).
+  pessoa, e o relatório entrega o id (o do arquivo de `--relatorio` ou do terminal quando houver; no caminho de saída `1` sem id, o da diferença entre as listas, do passo 3).
 - **Não trate verde como prova de que o formulário descreve o projeto.** O importador prova que o
   estudo gravado bate com a planilha e que o motor o calcula; planilha errada para o projeto dá estudo
   errado com a mesma limpeza.
