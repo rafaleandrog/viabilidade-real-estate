@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  validarParametros, CAMPOS_EDITAVEIS, gravarParametros, listarTodosParametros, importarParametros,
+  validarParametros, CAMPOS_EDITAVEIS, gravarParametros, listarTodosParametros, importarParametros, chaveCarimbo,
   MAX_ITENS_IMPORTACAO, type DadosParametros,
 } from './lote-parametros.js';
 import esquema from '../../schema.json';
 import { readFileSync } from 'node:fs';
 
 test('CAMPOS_EDITAVEIS bate com as colunas do schema (menos o vínculo imovel_nucleo_id)', () => {
-  const colunas = Object.keys((esquema as any).tabelas.lote_parametros.colunas).filter((c) => c !== 'imovel_nucleo_id');
+  const colunas = Object.keys((esquema as any).tabelas.lote_parametros.colunas).filter((c) => c !== 'imovel_nucleo_id' && c !== 'carimbo_chave');
   assert.deepEqual([...CAMPOS_EDITAVEIS].sort(), colunas.sort());
 });
 
@@ -224,7 +224,7 @@ test('importação: registro que existe no SERVIDOR não tem o carimbo regravado
   // O PUT do modal (reconfirmar) continua podendo regravar o carimbo.
   const r = await gravarParametros(f.dados, 781, { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
   assert.equal(r.http, 200);
-  assert.deepEqual(gravados[1], { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
+  assert.deepEqual(gravados[1], { parcelamento_id: 99, numero_lote: '1', area_m2: 5, carimbo_chave: chaveCarimbo({ parcelamento_id: 99, numero_lote: '1', area_m2: 5 }) });
 });
 
 test('importação: carimbo esperado diferente do gravado recusa o item (vínculo reconfirmado por outra pessoa)', async () => {
@@ -259,9 +259,29 @@ test('gravarParametros: se outra pessoa muda a linha entre a leitura e a escrita
 test('importação: carimbo reconfirmado entre a leitura e a escrita recusa o item (precondição atômica)', async () => {
   const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_maximo: '3.00', ...CARIMBO }]);
   const original = f.dados.atualizarSe;
-  f.dados.atualizarSe = async (t, id, d, c) => { f.linhas[0].numero_lote = 'NOVO'; return original(t, id, d, c); };
+  f.dados.atualizarSe = async (t, id, d, c) => { f.linhas[0].numero_lote = 'NOVO'; f.linhas[0].carimbo_chave = 'outra'; return original(t, id, d, c); };
   const r = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 4, carimbo_esperado: { ...CARIMBO } }]);
   assert.equal(r.resultados[0].ok, false);
   assert.match(r.resultados[0].erro!, /vínculo do lote mudou/);
   assert.equal(f.linhas[0].coef_maximo, '3.00');
+});
+
+test('chaveCarimbo: sem vírgula, estável em número/texto, e muda quando qualquer campo do carimbo muda', () => {
+  const base = { parcelamento_id: 12, rua: 'Rua A, B', numero_lote: '4910', quadra: null, conjunto: null, area_m2: '1464.9' };
+  const k = chaveCarimbo(base);
+  assert.ok(!k.includes(','), 'o DSL do atualizarSe parte por vírgula');
+  assert.equal(chaveCarimbo({ ...base, area_m2: 1464.9, parcelamento_id: '12' }), k);
+  for (const mud of [{ rua: 'Rua A, C' }, { numero_lote: '4911' }, { quadra: 'Q1' }, { parcelamento_id: null }, { area_m2: 1464.91 }]) {
+    assert.notEqual(chaveCarimbo({ ...base, ...mud }), k, JSON.stringify(mud));
+  }
+});
+
+test('o carimbo com vírgula também trava a corrida: cadastro grava a chave e a reconfirmação a troca', async () => {
+  const f = falso([]);
+  await gravarParametros(f.dados, 5, { parcelamento_id: 1, rua: 'Rua A, B', numero_lote: '7', area_m2: 100, coef_maximo: 3 });
+  assert.equal(f.linhas[0].carimbo_chave, chaveCarimbo(f.linhas[0]));
+  const original = f.dados.atualizarSe;
+  f.dados.atualizarSe = async (t, id, d, c) => { f.linhas[0].rua = 'Rua A, C'; f.linhas[0].carimbo_chave = chaveCarimbo(f.linhas[0]); return original(t, id, d, c); };
+  const r = await importarParametros(f.dados, [{ imovel_nucleo_id: 5, coef_maximo: 4, carimbo_esperado: { parcelamento_id: 1, rua: 'Rua A, B', numero_lote: '7', area_m2: 100 } }]);
+  assert.equal(r.resultados[0].ok, false);
 });

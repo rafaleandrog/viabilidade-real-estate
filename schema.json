@@ -517,7 +517,8 @@
         "gabarito_maximo":   { "tipo": "decimal", "precisao": 8, "escala": 2 },
         "uos":               { "tipo": "texto", "limite": 40 },
         "uso":               { "tipo": "texto", "limite": 40 },
-        "origem":            { "tipo": "texto", "limite": 200 }
+        "origem":            { "tipo": "texto", "limite": 200 },
+        "carimbo_chave":     { "tipo": "texto", "limite": 400 }
       },
       "indices": [["parcelamento_id"]],
       "unicos": [["imovel_nucleo_id"]]

@@ -114,17 +114,30 @@ function carimboIgual(campo: string, a: any, b: any): boolean {
 }
 
 /**
+ * Identidade do lote numa string SEM vírgula, mantida pelo servidor a cada escrita do carimbo. É o que o lock
+ * otimista compara: o DSL de filtros do `atualizarSe` parte o valor por vírgula, então rua, quadra ou conjunto
+ * com vírgula não poderiam entrar na condição como colunas — e a chave as cobre todas de uma vez.
+ */
+export function chaveCarimbo(linha: any): string {
+  return CAMPOS_CARIMBO.map((c) => {
+    const v = linha?.[c];
+    if (v === null || v === undefined || v === '') return '';
+    if (c === 'area_m2') { const n = paraNumeroLinha(v); return n == null ? '' : n.toFixed(2); }
+    if (c === 'parcelamento_id') { const n = paraNumeroLinha(v); return n == null ? '' : String(n); }
+    return encodeURIComponent(String(v).trim());
+  }).join('|');
+}
+
+/**
  * Condições do lock otimista (`atualizarSe`): a linha só é gravada se ainda tiver os valores contra os quais a
- * validação rodou. Nulo vira `[nulo]` (o DSL trata `null` como "sem filtro" e lança). Texto com vírgula fica
- * de fora: o DSL parte o valor por vírgula e a condição deixaria de casar a própria linha — esses campos
- * continuam conferidos em memória, só perdem a guarda atômica.
+ * validação rodou. Nulo vira `[nulo]` (o DSL trata `null` como "sem filtro" e lança). Só entram colunas sem
+ * texto livre: coeficientes e `carimbo_chave`.
  */
 export function condicoesDaLinha(atual: any, colunas: readonly string[]): Record<string, any> {
   const cond: Record<string, any> = {};
   for (const c of colunas) {
     const v = atual[c];
     if (v === null || v === undefined || v === '') cond[`${c}[nulo]`] = 'true';
-    else if (typeof v === 'string' && v.includes(',')) continue;
     else cond[c] = String(v);
   }
   return cond;
@@ -180,8 +193,11 @@ export async function gravarParametros(
     }
     // Leitura, conferência e escrita são um comando só: se outra pessoa mexeu nos coeficientes (ou, na
     // importação, no carimbo) depois da leitura, a escrita não acontece e a linha é relida.
-    const cond = condicoesDaLinha(atual, opcoes.preservarCarimbo ? ['coef_minimo', 'coef_maximo', ...CAMPOS_CARIMBO] : ['coef_minimo', 'coef_maximo']);
-    const gravado = await dados.atualizarSe('lote_parametros', atual.id, campos, cond);
+    const cond = condicoesDaLinha(atual, ['coef_minimo', 'coef_maximo', 'carimbo_chave']);
+    // O carimbo que muda carrega a chave nova junto, para o próximo lock enxergar a troca de identidade.
+    const gravar = CAMPOS_CARIMBO.some((c) => c in campos)
+      ? { ...campos, carimbo_chave: chaveCarimbo({ ...atual, ...campos }) } : campos;
+    const gravado = await dados.atualizarSe('lote_parametros', atual.id, gravar, cond);
     return gravado ? { http: 200, registro: gravado } : PERDEU;
   };
   const comRelitura = async (primeiro: any, campos: Record<string, any>): Promise<ResultadoGravacao> => {
@@ -205,7 +221,7 @@ export async function gravarParametros(
     };
   }
   try {
-    return { http: 201, registro: await dados.criar('lote_parametros', { imovel_nucleo_id: imovelId, ...campos }) };
+    return { http: 201, registro: await dados.criar('lote_parametros', { imovel_nucleo_id: imovelId, ...campos, carimbo_chave: chaveCarimbo(campos) }) };
   } catch (e) {
     const vencedor = await buscar();
     if (!vencedor) throw e;
