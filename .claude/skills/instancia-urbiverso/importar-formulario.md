@@ -13,17 +13,23 @@ registrar.
 
 ## Antes de começar: o alvo e a ferramenta
 
-- **O app é o `viabilidade`, e ele tem de estar instalado.** Confira em `GET /api/shell/apps` e leia o
-  índice dos docs dele (`GET /api/shell/docs/apps/viabilidade`, § 3). Sem o app na instância, pare com
-  uma linha e diga isso: o importador conhece as rotas e o schema dele e de nenhum outro.
+- **O app é o `viabilidade`, e ele tem de estar instalado.** Procure-o na listagem de apps que o doc
+  da instância documenta e leia o índice dos docs dele (`GET /api/shell/docs/apps/viabilidade`,
+  § 3); não assuma a rota da listagem de memória. Sem o app na instância, pare com uma linha e diga
+  isso: o importador conhece as rotas e o schema dele e de nenhum outro.
 - **O app instalado tem de ser compatível com o importador.** O importador monta chamadas a
   `/api/viabilidade` com rotas e payloads fixos do repositório, e instâncias rodam versões diferentes
-  (§ 3). Antes de escrever, confira duas coisas: a versão do `viabilidade` que a instância informa
-  (`GET /api/shell/apps` ou o índice dos docs do app; se ela não informar versão, diga que não deu
-  para conferir) é a `versao` do `manifesto.json` deste checkout, e, quando a instância informar o
-  build, o mesmo build, e o índice dos docs do app lista as rotas de estudos, fases, cronograma, custos e funding
-  que o importador usa. Qualquer divergência: **pare**, diga qual e não escreva. App mais antigo ou
-  mais novo que o checkout é o caso em que um estudo parcial nasce de uma rota que não existe.
+  (§ 3). Antes de escrever, faça duas conferências:
+  1. **a versão:** a versão do `viabilidade` que a instância informa tem de ser a `versao` do
+     `manifesto.json` deste checkout (e o mesmo build, quando ela o informar);
+  2. **as rotas:** o índice dos docs do app tem de listar as rotas de estudos, fases, cronograma,
+     custos e funding que o importador usa.
+
+  **Divergência em qualquer uma: pare**, diga qual e não escreva. **Não conseguir conferir** (a
+  instância não informa a versão, ou o índice não traz as rotas) também **não é um sim**: diga o que
+  faltou e pergunte à pessoa se quer seguir assim; se quiser, a autorização do passo 2 ganha a frase
+  "compatibilidade não confirmada". App mais antigo ou mais novo que o checkout é o caso em que a
+  escrita é recusada no meio, e o importador então tenta apagar o estudo que acabou de criar.
 - **O formulário é um dos modelos de `referencia/formularios/`, preenchido.** Planilha sem a aba
   `Formulário` ou sem a coluna de chaves técnicas, o importador recusa: não a adapte por conta própria.
 - **A ferramenta é `scripts/formularios/importar_formulario.py`.** Uso, saídas e limites estão em
