@@ -353,8 +353,9 @@ export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Prom
   if (busca) qs.set('busca', busca);
   return imobiliario(`/lotes?${qs}`);
 }
-// Parcelamentos — usado só para descobrir quais parcelamentos ficam FORA do
-// seletor de lotes da Incorporação: os de regularização fundiária
+// Parcelamentos — usado para descobrir quais parcelamentos ficam FORA do
+// seletor de lotes da Incorporação e da aba Terrenos do Painel (esta só pelo
+// critério de regularização): os de regularização fundiária
 // (`regularizacao=true`) e os vinculados a setor habitacional
 // (`setor_habitacional_id` preenchido) — os dois critérios da #746. Não há
 // filtro server-side por essas colunas no Núcleo hoje (camposFiltro de `lotes`
@@ -364,15 +365,18 @@ export function listarParcelamentosNucleo(pagina = 1, porPagina = 200): Promise<
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   return imobiliario(`/parcelamentos?${qs}`);
 }
-// Setores habitacionais — a aba Terrenos do Painel só mostra lote do setor
-// Urbitá, e o nome do setor só existe nesta entidade (o parcelamento guarda só
-// o `setor_habitacional_id`). Exige a flag `setores_habitacionais: ["ler"]`.
-export function listarSetoresHabitacionaisNucleo(pagina = 1, porPagina = 200): Promise<any> {
-  const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
-  return imobiliario(`/setores-habitacionais?${qs}`);
-}
 export function buscarImovelNucleo(id: number): Promise<any> {
   return imobiliario(`/imoveis/${id}`);
+}
+
+// ── Complemento de terreno (aba Terrenos do Painel) ──
+// Dados de viabilidade de uma gleba/lote que o módulo imobiliário não guarda. Um registro
+// por imóvel, chaveado pelo `id` que a listagem do módulo devolve.
+export function listarComplementosTerreno(): Promise<any> {
+  return urbiVerso.api(`/terrenos-complemento`);
+}
+export function salvarComplementoTerreno(tipo: 'gleba' | 'lote', imovelId: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`/terrenos-complemento/${tipo}/${imovelId}`, { method: 'PUT', body: JSON.stringify(dados) });
 }
 
 // ── Apelo Comercial (IA) ──

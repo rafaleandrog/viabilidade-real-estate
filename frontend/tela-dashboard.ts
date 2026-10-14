@@ -13,13 +13,17 @@ import {
 } from './estudo-status.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
-  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarSetoresHabitacionaisNucleo,
+  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarComplementosTerreno,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
 } from './viabilidade-api.js';
 import {
-  coletarPaginas, idsSetoresUrbita, idsParcelamentosDosSetores, loteDoSetor,
-} from './terrenos-setor.js';
+  coletarPaginas, idsParcelamentosRegularizacao, loteForaDaRegularizacao,
+} from './terrenos-nucleo.js';
+import {
+  SITUACOES, COR_SITUACAO, rotuloDe, paraNumero, indexarComplementos,
+} from './terrenos-complemento.js';
+import './tela-terreno-complemento.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
 import './viabilidade-config-mercado.js';
@@ -190,9 +194,15 @@ export class ViabTelaDashboard extends LitElement {
   @state() private terrenosCarregando = false;
   @state() private terrenosDisponivel = true;
   @state() private terrenosMotivo = '';
-  /** Vazio = setor Urbitá resolvido. Preenchido = lotes escondidos (fail-closed) e este é o motivo. */
-  @state() private terrenosAvisoSetor = '';
+  /** Vazio = regularização resolvida. Preenchido = lotes escondidos (fail-closed) e este é o motivo. */
+  @state() private terrenosAvisoLotes = '';
   private terrenosCarregados = false;
+  /** Complemento de viabilidade por id do imóvel (tabela `terrenos_complemento`). */
+  @state() private complementos = new Map<number, any>();
+  /** Preenchido quando a leitura dos complementos falhou — a lista de terrenos segue valendo. */
+  @state() private complementosAviso = '';
+  /** Terreno cujo modal "Informações do terreno" está aberto. */
+  @state() private terrenoAberto: any = null;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
@@ -235,46 +245,45 @@ export class ViabTelaDashboard extends LitElement {
     if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando) this._carregarTerrenos();
   }
 
-  // Glebas: todas. Lotes: só os do setor Urbitá (`frontend/terrenos-setor.ts`).
-  // Pagina tudo em 200 (teto do Núcleo) porque o corte por setor é no cliente — com
-  // a página única de 100 de antes, os lotes do setor podiam ficar fora da lista.
+  // Glebas: todas. Lotes: todos que não são de regularização fundiária (`frontend/terrenos-nucleo.ts`).
+  // Pagina tudo em 200 (teto do Núcleo) porque o corte é no cliente.
   private async _carregarTerrenos() {
     this.terrenosCarregando = true;
     this.terrenosDisponivel = true;
     this.terrenosMotivo = '';
-    this.terrenosAvisoSetor = '';
+    this.terrenosAvisoLotes = '';
+    this.complementosAviso = '';
     try {
       const POR = 200;
+      // Não derruba a aba: sem o complemento a lista de terrenos continua valendo.
+      const complementosP = listarComplementosTerreno()
+        .then((r: any) => indexarComplementos(r?.dados ?? []))
+        .catch((e: any) => {
+          this.complementosAviso = `não foi possível carregar as informações de viabilidade dos terrenos (${e?.message || 'indisponível'}).`;
+          return new Map<number, any>();
+        });
       const [glebas, lotes] = await Promise.all([
         coletarPaginas((p) => listarGlebasNucleo('', p, POR), POR),
         coletarPaginas((p) => listarLotesNucleo('', p, POR), POR),
       ]);
-      let idsParcelamento: Set<number> | null = null;
-      // Falha de leitura (flag ainda não concedida, rede) deixa `terrenosCarregados` falso: voltar
-      // à aba tenta de novo, e conceder a permissão passa a valer sem recarregar o app. "Setor
-      // não encontrado" é resposta, não falha — fica carregado, para não repetir a varredura toda.
+      let idsRegularizacao: Set<number> | null = null;
+      // Falha de leitura (flag não concedida, rede) deixa `terrenosCarregados` falso: voltar à
+      // aba tenta de novo, e conceder a permissão passa a valer sem recarregar o app.
       let falhaTransitoria = false;
-      let etapa = 'os setores habitacionais';
       try {
-        const setores = await coletarPaginas((p) => listarSetoresHabitacionaisNucleo(p, POR), POR);
-        const idsSetor = idsSetoresUrbita(setores);
-        if (idsSetor.size === 0) {
-          this.terrenosAvisoSetor = 'o setor Urbitá não foi encontrado no Núcleo.';
-        } else {
-          etapa = 'os parcelamentos';
-          const parcelamentos = await coletarPaginas((p) => listarParcelamentosNucleo(p, POR), POR);
-          idsParcelamento = idsParcelamentosDosSetores(parcelamentos, idsSetor);
-        }
+        const parcelamentos = await coletarPaginas((p) => listarParcelamentosNucleo(p, POR), POR);
+        idsRegularizacao = idsParcelamentosRegularizacao(parcelamentos);
       } catch (e: any) {
         falhaTransitoria = true;
-        this.terrenosAvisoSetor = `não foi possível ler ${etapa} (${e?.message || 'indisponível'}). `
+        this.terrenosAvisoLotes = `não foi possível ler os parcelamentos (${e?.message || 'indisponível'}). `
           + 'Um administrador pode liberar a leitura em Admin → Apps → viabilidade → Núcleo.';
       }
       const g = glebas.map((o: any) => ({ ...o, _tipo: 'gleba' }));
       const l = lotes
-        .filter((o: any) => loteDoSetor(o, idsParcelamento))
+        .filter((o: any) => loteForaDaRegularizacao(o, idsRegularizacao))
         .map((o: any) => ({ ...o, _tipo: 'lote' }));
       this.terrenos = [...g, ...l];
+      this.complementos = await complementosP;
       this.terrenosCarregados = !falhaTransitoria;
     } catch (e: any) {
       this.terrenosDisponivel = false;
@@ -769,14 +778,30 @@ export class ViabTelaDashboard extends LitElement {
       { id: 'tipo', label: 'Tipo', valor: (l: any) => (l._tipo === 'gleba' ? 'Gleba' : 'Lote') },
       { id: 'nome', label: 'Imóvel', valor: (l: any) => l.id_legivel || `#${l.id}` },
       { id: 'area', label: 'Área', alinhamento: 'direita', valor: (l: any) => `${fmtNum(Number(l.area) || 0)} m²` },
+      {
+        id: 'situacao', label: 'Situação', alinhamento: 'centro',
+        render: (l: any) => {
+          const sit = this.complementos.get(Number(l.id))?.situacao_negociacao;
+          return sit
+            ? html`<urbi-badge cor=${COR_SITUACAO[sit] ?? 'padrao'}>${rotuloDe(SITUACOES, sit)}</urbi-badge>`
+            : html`<span>—</span>`;
+        },
+      },
+      {
+        id: 'preco_pedido', label: 'Preço pedido', alinhamento: 'direita',
+        valor: (l: any) => {
+          const v = paraNumero(this.complementos.get(Number(l.id))?.preco_pedido);
+          return v == null ? '—' : fmtR$(v, false);
+        },
+      },
     ];
     const linhas = this.filtroTerreno
       ? this.terrenos.filter((t) => t._tipo === this.filtroTerreno)
       : this.terrenos;
     return html`
-      ${this.terrenosAvisoSetor ? html`
+      ${this.terrenosAvisoLotes ? html`
         <urbi-banner variante="alerta">
-          Lotes ocultos: só os lotes do setor Urbitá são exibidos, e ${this.terrenosAvisoSetor}
+          Lotes ocultos: sem saber quais parcelamentos são de regularização fundiária, ${this.terrenosAvisoLotes}
         </urbi-banner>` : nothing}
       <div class="filtros-bar">
         <urbi-select
@@ -790,14 +815,32 @@ export class ViabTelaDashboard extends LitElement {
           @urbi:select-change=${(e: CustomEvent) => { this.filtroTerreno = e.detail.valor; }}
         ></urbi-select>
       </div>
+      ${this.complementosAviso ? html`
+        <urbi-banner variante="alerta">Informações de viabilidade indisponíveis: ${this.complementosAviso}</urbi-banner>` : nothing}
       <urbi-tabela
         expandir
+        clicavel
         .colunas=${colunas}
         .linhas=${linhas}
-        mensagem-vazio=${this.terrenosAvisoSetor
+        @urbi:tabela-click=${(e: CustomEvent) => { if (e.detail?.linha?.id != null) this.terrenoAberto = e.detail.linha; }}
+        mensagem-vazio=${this.terrenosAvisoLotes
           ? 'Nenhuma gleba cadastrada no Núcleo (os lotes estão ocultos, veja o aviso acima).'
-          : 'Nenhuma gleba ou lote do setor Urbitá cadastrado no Núcleo.'}
+          : 'Nenhuma gleba ou lote (fora de regularização) cadastrado no Núcleo.'}
       ></urbi-tabela>
+      ${this.terrenoAberto ? html`
+        <viab-terreno-complemento
+          .terreno=${this.terrenoAberto}
+          .complemento=${this.complementos.get(Number(this.terrenoAberto.id)) ?? null}
+          .editavel=${['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '')}
+          @viab-complemento-fechar=${() => { this.terrenoAberto = null; }}
+          @viab-complemento-salvo=${(e: CustomEvent) => {
+            const reg = e.detail;
+            if (reg?.imovel_nucleo_id != null) {
+              this.complementos = new Map(this.complementos).set(Number(reg.imovel_nucleo_id), reg);
+            }
+            this.terrenoAberto = null;
+          }}
+        ></viab-terreno-complemento>` : nothing}
     `;
   }
 

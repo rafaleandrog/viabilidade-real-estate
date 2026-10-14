@@ -36,7 +36,7 @@ monitoradas**. A aba **Estudos** lista os estudos aos quais você tem acesso, co
 status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV, Margem, ROI e
 Criador. Na linha de cada estudo ficam as ações que a sua função permite: os botões de transição
 de status, **Duplicar** e **Remover**; clicar na linha abre o estudo, e é no cabeçalho do estudo
-aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e só os lotes do setor Urbitá. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
+aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e os lotes que não são de regularização fundiária; clicar numa linha abre as **informações de viabilidade** daquele terreno (situação da negociação, preço pedido, parâmetros urbanísticos, restrições), que o app guarda por conta própria e o Núcleo não tem. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
 (curvas de distribuição de custos no tempo, usadas pelo estudo Avançado) e **Regiões monitoradas**
 ([Análise de Mercado](analise-mercado)).
 
@@ -100,8 +100,7 @@ tem exportação própria. Ver [Exportação](exportacao).
 ## Para administradores
 
 Antes do primeiro estudo: conceda ao app a leitura de **imóveis** (sem ela, só o terreno manual funciona), de
-**parcelamentos** (filtra o seletor de lotes) e de **setores habitacionais** (libera os lotes da aba
-**Terrenos** do Painel) do Núcleo em *Admin → Apps → viabilidade → Núcleo*; crie os
+**parcelamentos** (filtra o seletor de lotes e a aba **Terrenos** do Painel) do Núcleo em *Admin → Apps → viabilidade → Núcleo*; crie os
 **benchmarks** de cada tipo de empreendimento; revise os **parâmetros** do app (alíquotas e
 percentuais padrão, prazo de arquivamento, limite da coleta de mercado) em *Admin → Apps →
 viabilidade*; e, se for usar a análise de mercado, cadastre as **regiões monitoradas**

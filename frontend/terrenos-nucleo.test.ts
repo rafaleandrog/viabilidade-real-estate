@@ -1,46 +1,38 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  coletarPaginas, idsSetoresUrbita, idsParcelamentosDosSetores, loteDoSetor, normalizarTexto,
-} from './terrenos-setor.js';
+  coletarPaginas, idsParcelamentosRegularizacao, loteForaDaRegularizacao,
+} from './terrenos-nucleo.js';
 
-const SETORES = [
-  { id: 1, slug: 'sol-nascente', nome: 'Sol Nascente' },
-  { id: 2, slug: 'urbita', nome: null },
-  { id: 3, slug: 'sh-3', nome: 'Setor Habitacional Urbitá' },
-];
-
-test('normalizarTexto tira acento e caixa', () => {
-  assert.equal(normalizarTexto('  URBITÁ '), 'urbita');
-  assert.equal(normalizarTexto(null), '');
-});
-
-test('idsSetoresUrbita casa por slug OU nome, sem acento nem caixa', () => {
-  assert.deepEqual([...idsSetoresUrbita(SETORES)].sort(), [2, 3]);
-  assert.equal(idsSetoresUrbita([{ id: 9, slug: 'outro', nome: 'Outro' }]).size, 0);
-  assert.equal(idsSetoresUrbita([]).size, 0);
-});
-
-test('idsParcelamentosDosSetores: só parcelamento ligado ao setor; setor nulo fica fora', () => {
+test('idsParcelamentosRegularizacao: só regularizacao verdadeira; ausente/falsa fica fora', () => {
   const parc = [
-    { id: 10, setor_habitacional_id: 2 },
-    { id: 11, setor_habitacional_id: 1 },
-    { id: 12, setor_habitacional_id: null },
+    { id: 10, regularizacao: true },
+    { id: 11, regularizacao: false },
+    { id: 12, regularizacao: null },
     { id: 13 },
-    { id: 14, setor_habitacional_id: '3' },
+    { id: 14, regularizacao: 'true' },
+    { id: 15, regularizacao: 'false' },
+    { id: 16, regularizacao: 1, setor_habitacional_id: 3 },
+    { id: 17, regularizacao: false, setor_habitacional_id: 3 },
   ];
-  assert.deepEqual([...idsParcelamentosDosSetores(parc, new Set([2, 3]))].sort(), [10, 14]);
+  assert.deepEqual([...idsParcelamentosRegularizacao(parc)].sort(), [10, 14, 16]);
+  assert.equal(idsParcelamentosRegularizacao([]).size, 0);
 });
 
-test('loteDoSetor é fail-closed: sem conjunto resolvido nenhum lote passa', () => {
-  const ids = new Set([10]);
-  assert.equal(loteDoSetor({ parcelamento_id: 10 }, ids), true);
-  assert.equal(loteDoSetor({ parcelamento_id: '10' }, ids), true);
-  assert.equal(loteDoSetor({ parcelamento_id: 11 }, ids), false);
-  assert.equal(loteDoSetor({ parcelamento_id: null }, ids), false);
-  assert.equal(loteDoSetor({}, ids), false);
-  assert.equal(loteDoSetor({ parcelamento_id: 10 }, null), false);
-  assert.equal(loteDoSetor({ parcelamento_id: 10 }, new Set()), false);
+test('loteForaDaRegularizacao: entra o que não é regularização, inclusive sem parcelamento', () => {
+  const reg = new Set([10]);
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: 10 }, reg), false);
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: '10' }, reg), false);
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: 11 }, reg), true);
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: null }, reg), true);
+  assert.equal(loteForaDaRegularizacao({}, reg), true);
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: 10 }, new Set()), true, 'nenhum parcelamento de regularização');
+});
+
+test('loteForaDaRegularizacao é fail-closed: sem conjunto resolvido nenhum lote passa', () => {
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: 11 }, null), false);
+  assert.equal(loteForaDaRegularizacao({ parcelamento_id: null }, null), false);
+  assert.equal(loteForaDaRegularizacao({}, null), false);
 });
 
 test('coletarPaginas acumula até a página vir incompleta ou acabar `paginas`', async () => {

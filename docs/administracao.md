@@ -20,22 +20,21 @@ análise de mercado for usada, cadastrar as regiões monitoradas.
 
 ### Permissão do Núcleo
 
-Em *Admin → Apps → viabilidade → Núcleo*, conceda ao app a leitura de **imóveis**,
-**parcelamentos** e **setores habitacionais**. Enquanto a de **imóveis** não existir, a criação de
-estudo avisa e só o terreno manual fica disponível. As outras duas têm efeitos separados:
+Em *Admin → Apps → viabilidade → Núcleo*, conceda ao app a leitura de **imóveis** e de
+**parcelamentos**. Enquanto a de **imóveis** não existir, a criação de
+estudo avisa e só o terreno manual fica disponível. A de parcelamentos tem dois efeitos:
 
 - **Parcelamentos** sustenta o filtro do seletor de lotes da Incorporação: lotes de parcelamento em
   regularização fundiária ou vinculado a um setor habitacional ficam de fora. Sem ela, o seletor
   avisa que a lista não está filtrada e mostra todos os lotes.
-- **Setores habitacionais** (junto com parcelamentos) alimenta a aba **Terrenos** do Painel, que lista
-  as glebas de qualquer origem e só os lotes cujo parcelamento pertence ao setor Urbitá — o setor
-  habitacional cujo nome ou *slug* contém "urbita", sem distinção de acento nem de maiúsculas. Sem
-  uma das duas leituras, ou sem um setor assim cadastrado, a aba esconde todos os lotes e avisa o
-  motivo, em vez de listá-los sem filtro; as glebas continuam. Conceder a permissão depois vale na
-  próxima vez que se abre a aba, sem recarregar o app.
+- Na aba **Terrenos** do Painel, a mesma leitura separa o que é regularização fundiária: a aba lista as
+  glebas de qualquer origem e os lotes cujo parcelamento **não** está marcado como regularização
+  (lote sem parcelamento também aparece). Sem a leitura de parcelamentos a aba não sabe quais lotes
+  esconder, então oculta todos os lotes e avisa o motivo, em vez de listá-los sem filtro; as glebas
+  continuam. Conceder a permissão depois vale na próxima vez que se abre a aba, sem recarregar o app.
 
-Um lote do setor Urbitá aparece na aba Terrenos, mas fica de fora do seletor de lotes da Incorporação,
-que exclui lotes de parcelamento vinculado a setor habitacional.
+O seletor de lotes da Incorporação é mais restrito que a aba Terrenos: além da regularização, exclui
+lotes de parcelamento vinculado a setor habitacional.
 
 ### Parâmetros
 

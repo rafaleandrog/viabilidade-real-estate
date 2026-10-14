@@ -4,6 +4,53 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-14 — Aba Terrenos: lotes fora de regularização, e informações de viabilidade por terreno
+
+Pedido direto do autor, sem issue. Dois assuntos na mesma aba, entregues juntos por pedido: (1) a aba
+mostrava "Lotes ocultos" e (2) faltava lugar para registrar dados de lote/gleba que o Núcleo não tem.
+
+**1. Lotes ocultos.** A causa era a permissão, não bug de código: a aba exigia a leitura de
+`setores_habitacionais` (flag nova, desligada no upgrade; na tela de Núcleo da instalação a de
+`setores_habitacionais` aparece desligada) e, sem ela, o filtro do setor Urbitá é fail-closed e
+esconde todos os lotes. Por decisão do autor a regra passa a ser "tudo que **não** é regularização
+fundiária": lote entra se o parcelamento dele não tem `regularizacao` verdadeira (lote sem
+parcelamento também entra). Isso só precisa da leitura de `parcelamentos`, que já está ligada, então
+o aviso some **sem ação do admin**. `manifesto.json` deixou de pedir `setores_habitacionais`
+(sem bump de `versao`: não é schema); `listarSetoresHabitacionaisNucleo` e todo o corte por setor
+saíram. Lógica pura em `frontend/terrenos-nucleo.ts` (era `terrenos-setor.ts`), ligada em
+`_carregarTerrenos`. **Continua fail-closed**: sem ler parcelamentos nenhum lote aparece, com banner
+(as glebas seguem), porque sem saber o que é regularização mostrar tudo exibiria o que a regra
+esconde. O seletor de lote da Incorporação **não mudou** e segue excluindo também lotes de
+parcelamento com setor habitacional.
+
+**2. Informações de viabilidade por terreno.** Nova tabela `terrenos_complemento` (`schema.json`,
+fim do arquivo, para não deslocar endereços `arquivo:linha` já citados): um registro por imóvel,
+chaveado por `imovel_nucleo_id` (único; o `id` da listagem de glebas/lotes do módulo, o mesmo que
+`estudo_imoveis` guarda), com `tipo_imovel`, `situacao_negociacao`, `preco_pedido`, `proprietario`,
+`contato`, `zoneamento`, `coeficiente_aproveitamento`, `taxa_ocupacao_pct`, `gabarito_pavimentos`,
+`topografia`, `infraestrutura`, `restricoes` e `observacoes`. Tabela nova, sem migração e sem bump de
+`versao` (mesma regra de tabelas anteriores: o schema reconcilia na instalação). Backend em
+`backend/rotas/terrenos-complemento.ts`: `GET /terrenos-complemento` (qualquer usuário do app) e
+`PUT /terrenos-complemento/:tipo/:imovelId` (upsert; nível de app escrita ou admin), com o parser
+numérico único da app. Frontend: a tabela da aba ganha as colunas Situação e Preço pedido, e clicar
+na linha abre o modal `viab-terreno-complemento` (somente leitura para quem não edita). O PUT manda
+todos os campos: limpar na tela limpa no banco. Falha ao ler os complementos mostra banner e **não**
+derruba a lista de terrenos.
+
+**Escolhas minhas, a confirmar:** o conjunto de campos (propus os de um estudo de viabilidade de
+terreno — negociação, preço, urbanismo, restrições) e quem edita (escrita+, como os estudos). Mudar
+campo é editar `schema.json`, `terrenos-complemento.ts` (backend e frontend) e a tela.
+
+Verificado: `validar-frontend.sh` e `validar-backend.sh` verdes. Mutação de controle nos dois casos de
+render: tirar o filtro de regularização, e tirar o `@urbi:tabela-click`, reprovam o teste de render e
+deixam a suíte de função pura verde.
+
+**Fica para o autor:** publicar e instalar release com este manifesto (a `0.1.40` instalada ainda
+pede `setores_habitacionais`); conferir que a sincronização do `schema.json` cria
+`terrenos_complemento` na instância (a execução real do schema é do ambiente autenticado).
+
+---
+
 ## 2026-10-14 — Importador de formulários: o id do estudo sai assim que ele é criado
 
 Raiz dos achados de revisão do PR de processo da skill `instancia-urbiverso`: o importador só imprimia o id do estudo no fim, então

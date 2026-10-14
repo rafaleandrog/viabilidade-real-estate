@@ -1,13 +1,13 @@
-// Caso de render: aba Terrenos do Painel — só lotes do setor Urbitá; glebas, qualquer uma.
+// Caso de render: aba Terrenos do Painel — lote só se NÃO for de regularização fundiária; glebas, qualquer uma.
 //
-// Cenário do Núcleo: setores 1 (Sol Nascente) e 2 (Urbitá); parcelamentos 10 (setor 2),
-// 20 (setor 1) e 30 (sem setor); três lotes (um por parcelamento, o do Urbitá na 3ª página) e duas glebas. Só o lote do
-// parcelamento 10 pode aparecer. O teste existe porque a lógica pura (`terrenos-setor.ts`) estar
-// testada não prova que o Painel a chama: apagar a chamada em `_carregarTerrenos` deixa a suíte
-// de função pura inteira verde e a tela listando todos os lotes.
+// Cenário do Núcleo: parcelamentos 10 (regularizacao=true), 20 (false, com setor habitacional) e 30
+// (sem setor); lotes um por parcelamento (o de regularização na 1ª página, o sem parcelamento na 4ª)
+// e duas glebas. Só o lote do parcelamento 10 fica de fora. O teste existe porque a lógica pura
+// (`terrenos-nucleo.ts`) estar testada não prova que o Painel a chama: apagar a chamada em
+// `_carregarTerrenos` deixa a suíte de função pura inteira verde e a tela listando todos os lotes.
 //
-// `semPermissao: true` reproduz a flag `setores_habitacionais` ainda não concedida (403): o
-// Painel tem que esconder TODOS os lotes e avisar, não listar sem filtro.
+// `sem-permissao` reproduz a flag de `parcelamentos` não concedida (403): o Painel tem que esconder
+// TODOS os lotes e avisar, não listar sem filtro.
 
 import '../../tela-dashboard.js';
 import { forcarEstado } from './dados.js';
@@ -20,38 +20,36 @@ export const aceitaNaoReproduzidoBase = [
   'urbi-shell-page.titulo',
 ];
 
-export type ModoSetor = 'ok' | 'sem-permissao' | 'sem-setor';
+export type ModoParcelamentos = 'ok' | 'sem-permissao';
 
-export function montarCaso(modo: ModoSetor) {
+export function montarCaso(modo: ModoParcelamentos, complementos: any[] = []) {
   return async function montar(raiz: HTMLElement): Promise<void> {
-    (globalThis as any).urbiVerso.api = async () => ({ dados: [] });
+    (globalThis as any).urbiVerso.api = async (rota: string) => (
+      String(rota).startsWith('/terrenos-complemento') ? { dados: complementos, total: complementos.length } : { dados: [] }
+    );
     (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
       if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
       const pag = (dados: any[]) => ({ dados, total: dados.length, pagina: 1, por_pagina: 200, paginas: 1 });
-      // Servidor que clampeia a página em 1 item (o pedido é 200) — o lote do setor Urbitá fica na
-      // 3ª página. Só a paginação de verdade (`paginas` + `pagina`) enxerga os dois; trocar
-      // `coletarPaginas` por uma chamada única esconde o lote do Urbitá.
+      // Servidor que clampeia a página em 1 item (o pedido é 200). Só a paginação de verdade
+      // (`paginas` + `pagina`) enxerga todos; trocar `coletarPaginas` por uma chamada única esconde lotes.
       const emPaginas = (todos: any[]) => {
         const pagina = Number(new URLSearchParams(rota.split('?')[1] ?? '').get('pagina')) || 1;
         return { dados: todos.slice(pagina - 1, pagina), total: todos.length, pagina, por_pagina: 1, paginas: todos.length };
       };
-      if (rota.startsWith('/setores-habitacionais')) {
-        if (modo === 'sem-permissao') throw new Error('Sem permissão de leitura em setores_habitacionais');
-        if (modo === 'sem-setor') return pag([{ id: 1, slug: 'sol-nascente', nome: 'Sol Nascente' }]);
-        return pag([{ id: 1, slug: 'sol-nascente', nome: 'Sol Nascente' }, { id: 2, slug: 'urbita', nome: 'Urbitá' }]);
-      }
       if (rota.startsWith('/parcelamentos')) {
+        if (modo === 'sem-permissao') throw new Error('Sem permissão de leitura em parcelamentos');
         return pag([
-          { id: 10, setor_habitacional_id: 2 },
-          { id: 20, setor_habitacional_id: 1 },
-          { id: 30, setor_habitacional_id: null },
+          { id: 10, regularizacao: true, setor_habitacional_id: null },
+          { id: 20, regularizacao: false, setor_habitacional_id: 1 },
+          { id: 30, regularizacao: false, setor_habitacional_id: null },
         ]);
       }
       if (rota.startsWith('/lotes')) {
         return emPaginas([
-          { id: 2, id_legivel: 'LOTE-OUTRO-SETOR', parcelamento_id: 20, area: '300' },
-          { id: 3, id_legivel: 'LOTE-SEM-SETOR', parcelamento_id: 30, area: '300' },
-          { id: 1, id_legivel: 'LOTE-URBITA', parcelamento_id: 10, area: '300' },
+          { id: 1, id_legivel: 'LOTE-REGULARIZACAO', parcelamento_id: 10, area: '300' },
+          { id: 2, id_legivel: 'LOTE-COM-SETOR', parcelamento_id: 20, area: '300' },
+          { id: 3, id_legivel: 'LOTE-NORMAL', parcelamento_id: 30, area: '300' },
+          { id: 4, id_legivel: 'LOTE-SEM-PARCELAMENTO', parcelamento_id: null, area: '300' },
         ]);
       }
       if (rota.startsWith('/glebas')) {
@@ -86,7 +84,7 @@ export async function medirCaso(raiz: HTMLElement): Promise<{ linhas: string[]; 
 }
 
 export const caso = {
-  nome: 'painel-terrenos-setor-urbita',
+  nome: 'painel-terrenos-regularizacao',
   exigir: [{ seletor: 'urbi-hospedeiro[slot="terrenos"]', minimo: 1 }],
   aceitaNaoReproduzido: aceitaNaoReproduzidoBase,
   montar: montarCaso('ok'),

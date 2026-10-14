@@ -76,6 +76,7 @@ só unidades e preço.
 | `benchmarks` | Os valores de referência por tipo de empreendimento (`campo`, `valor`, `regra_comparacao`, `variacao_positiva_pct`, `variacao_negativa_pct`, `medidor_min`, `medidor_max`, `medidor_faixa1_ate`, `medidor_faixa2_ate`). Único por `[tipo_empreendimento, campo]`. Ver [Benchmarks](benchmarks). |
 | `avancado_curvas` | As curvas de distribuição, globais da instância (a Curva S padrão e as criadas pelo administrador). |
 | `mercado_regioes` | As regiões monitoradas (`nome`, `uf`, `palavras_chave`, `ativa`) e o estado da última coleta (`ultima_coleta_em`, `_status`, `_itens`, `_msg`). |
+| `terrenos_complemento` | As informações de viabilidade de uma gleba ou de um lote que o Núcleo não guarda, um registro por imóvel (`imovel_nucleo_id`, único; `tipo_imovel` `gleba`/`lote`). Campos: `situacao_negociacao` (`prospeccao`, `em_negociacao`, `opcao_compra`, `adquirido`, `descartado`), `preco_pedido`, `proprietario`, `contato`, `zoneamento`, `coeficiente_aproveitamento`, `taxa_ocupacao_pct`, `gabarito_pavimentos`, `topografia` (`plana`, `leve`, `acentuada`), `infraestrutura` (`completa`, `parcial`, `inexistente`), `restricoes`, `observacoes`. Registro geral da instância, não de um estudo; editável por quem tem nível de escrita no app, e a edição é feita na aba Terrenos do Painel. |
 | `mercado_coletas` | O que a rotina diária guardou por região (`tipo`, `titulo`, `resumo`, `url`, `fonte`, `publicado_em`, `relevancia`, `bruto`). |
 
 ## O que a duplicação de estudo copia
@@ -102,12 +103,13 @@ original não financia. `curva_id` copia direto, porque curvas são globais da i
 
 ## Referências lógicas — colunas de id sem chave estrangeira
 
-Três colunas guardam id de outra linha sem FK no banco, cada uma por um motivo, e nenhuma deve ser
+Quatro colunas guardam id de outra linha sem FK no banco, cada uma por um motivo, e nenhuma deve ser
 "corrigida" para `referencia`:
 
 | Coluna | Por quê |
 |---|---|
 | `estudo_imoveis.imovel_nucleo_id` | o alvo vive no Núcleo, fora do schema do app |
+| `terrenos_complemento.imovel_nucleo_id` | idem |
 | `estudos.permuta_fisica_produto_id` | quebra do ciclo com `preliminar_produtos` (abaixo) |
 | `estudos.permuta_fisica_nr_produto_id` | idem |
 
@@ -152,13 +154,12 @@ tipo de empreendimento e o identificador não muda quando o estudo é renomeado.
 ## Núcleo
 
 O app declara, no bloco `dependencias` do manifesto, uma dependência do módulo imobiliário da
-plataforma (`urbiverso/modulos-urbiverso::imobiliario`), com leitura de `imoveis`, `parcelamentos` e
-`setores_habitacionais`: glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de
-terreno da Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um
-setor habitacional; e, junto com `setores_habitacionais`, restringe a aba Terrenos do Painel aos
-lotes do setor Urbitá (o lote herda o setor pelo parcelamento). O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
+plataforma (`urbiverso/modulos-urbiverso::imobiliario`), com leitura de `imoveis` e `parcelamentos`:
+glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de terreno da Incorporação os
+lotes de parcelamento em regularização fundiária ou vinculado a um setor habitacional e tira da aba
+Terrenos do Painel os lotes de regularização (o lote herda isso pelo parcelamento). O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
 `modulos/imobiliario/*` do app e o frontend as chama pelo cliente de módulo, com os caminhos
-relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/setores-habitacionais`, `/imoveis/:id`). O app não consulta o
+relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não consulta o
 banco do módulo: guarda o id e o tipo do imóvel como referência lógica, sem FK, e a área somada no
 próprio estudo (abaixo). A permissão é ligada pelo
 administrador da instância, na aba Núcleo do app; sem ela os endpoints respondem 403 e

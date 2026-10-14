@@ -500,6 +500,28 @@
         "bruto":         { "tipo": "json" }
       },
       "indices": [["regiao_id"], ["data_coleta"]]
+    },
+
+    "terrenos_complemento": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "imovel_nucleo_id":           { "tipo": "inteiro", "obrigatorio": true },
+        "tipo_imovel":                { "tipo": "texto", "limite": 10, "opcoes": ["gleba", "lote"], "obrigatorio": true },
+        "situacao_negociacao":        { "tipo": "texto", "limite": 20, "opcoes": ["prospeccao", "em_negociacao", "opcao_compra", "adquirido", "descartado"] },
+        "preco_pedido":               { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "proprietario":               { "tipo": "texto", "limite": 150 },
+        "contato":                    { "tipo": "texto", "limite": 150 },
+        "zoneamento":                 { "tipo": "texto", "limite": 100 },
+        "coeficiente_aproveitamento": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "taxa_ocupacao_pct":          { "tipo": "inteiro" },
+        "gabarito_pavimentos":        { "tipo": "inteiro" },
+        "topografia":                 { "tipo": "texto", "limite": 20, "opcoes": ["plana", "leve", "acentuada"] },
+        "infraestrutura":             { "tipo": "texto", "limite": 20, "opcoes": ["completa", "parcial", "inexistente"] },
+        "restricoes":                 { "tipo": "texto_longo" },
+        "observacoes":                { "tipo": "texto_longo" }
+      },
+      "indices": [["tipo_imovel"]],
+      "unicos": [["imovel_nucleo_id"]]
     }
   }
 }
