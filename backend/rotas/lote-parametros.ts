@@ -114,11 +114,17 @@ export type ResultadoGravacao =
  */
 export async function gravarParametros(
   dados: DadosParametros, imovelId: number, campos: Record<string, any>,
+  opcoes: { preservarCarimbo?: boolean } = {},
 ): Promise<ResultadoGravacao> {
   const buscar = async () => (await dados.listar('lote_parametros', {
     filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
   })).dados[0];
-  const sobre = async (atual: any): Promise<ResultadoGravacao> => {
+  const sobre = async (atual: any, camposOriginais: Record<string, any>): Promise<ResultadoGravacao> => {
+    // Importação: o carimbo de um registro que JÁ existe não é regravado, e quem decide que ele existe é o
+    // servidor (o Painel pode ter carregado antes de outro editor criar ou reconfirmar o registro).
+    const campos = opcoes.preservarCarimbo
+      ? Object.fromEntries(Object.entries(camposOriginais).filter(([c]) => !(CAMPOS_CARIMBO as readonly string[]).includes(c)))
+      : camposOriginais;
     if (Object.keys(campos).length === 0) return { http: 200, registro: atual };
     // Os invariantes valem para a LINHA que fica gravada, não só para o corpo: um PUT com só um dos dois
     // coeficientes, ou que zera um campo do carimbo, passaria na validação do corpo e deixaria a linha inconsistente.
@@ -135,7 +141,7 @@ export async function gravarParametros(
   };
 
   const existente = await buscar();
-  if (existente) return sobre(existente);
+  if (existente) return sobre(existente, campos);
   const faltando = CARIMBO_OBRIGATORIO.filter((c) => campos[c] == null);
   if (faltando.length > 0) {
     return {
@@ -148,7 +154,7 @@ export async function gravarParametros(
   } catch (e) {
     const vencedor = await buscar();
     if (!vencedor) throw e;
-    return sobre(vencedor);
+    return sobre(vencedor, campos);
   }
 }
 
@@ -216,7 +222,7 @@ export async function importarParametros(
     const v = validarParametros(item);
     if ('falha' in v) { resultados.push({ imovel_nucleo_id: id, ok: false, erro: v.falha.mensagem }); continue; }
     try {
-      const r = await gravarParametros(dados, id, v.dados);
+      const r = await gravarParametros(dados, id, v.dados, { preservarCarimbo: true });
       if (r.http === 400) resultados.push({ imovel_nucleo_id: id, ok: false, erro: r.mensagem });
       else resultados.push({ imovel_nucleo_id: id, ok: true, criado: r.http === 201 });
     } catch (e: any) {

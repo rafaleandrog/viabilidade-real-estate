@@ -20,6 +20,14 @@ export function normalizarTexto(v: unknown): string {
   return String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Áreas diferem além da tolerância? Compara em CENTÉSIMOS inteiros: `100.01 - 100` dá 0.010000000000005116
+ * em ponto flutuante e estouraria o limite de 0,01 m² que a documentação promete.
+ */
+export function areaDiverge(a: number, b: number): boolean {
+  return Math.abs(Math.round(a * 100) - Math.round(b * 100)) > Math.round(TOLERANCIA_AREA * 100);
+}
+
 export function paraNumero(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = typeof v === 'number' ? v : Number(v);
@@ -66,7 +74,7 @@ export function statusVinculo(registro: any | null | undefined, lote: LoteNucleo
     if (!igual(registro[campo], c[campo])) return 'identificacao';
   }
   const a = paraNumero(registro.area_m2); const b = paraNumero(c.area_m2);
-  if (a != null && b != null && Math.abs(a - b) > TOLERANCIA_AREA) return 'area';
+  if (a != null && b != null && areaDiverge(a, b)) return 'area';
   return 'ok';
 }
 
@@ -201,7 +209,7 @@ export function casarPlanilha(
       return { linha, lote, status: 'sem-valor' };
     }
     const a = paraNumero(lote.area);
-    if (linha.area != null && a != null && Math.abs(linha.area - a) > TOLERANCIA_AREA) {
+    if (linha.area != null && a != null && areaDiverge(linha.area, a)) {
       return { linha, lote, status: 'area-diverge' };
     }
     if (statusVinculo(registros.get(Number(lote.id)), lote) === 'identificacao') {

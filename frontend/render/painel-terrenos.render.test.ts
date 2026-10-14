@@ -154,7 +154,7 @@ test('Painel: nível leitura vê os parâmetros, mas não importa nem edita', { 
 test('Painel: importação gravou mas a releitura falhou — aviso, edição bloqueada e aba recarrega na volta', { skip: pular ?? false }, async () => {
   const { m, a } = await medida('painel-terrenos-importar-releitura-falha');
   assert.equal(m.resumoOk, 1, 'o resumo continua dizendo que gravou' + relato(a));
-  assert.match(m.aviso, /gravada, mas a lista não pôde ser atualizada/, 'o aviso de lista velha aparece' + relato(a));
+  assert.match(m.aviso, /a importação pode ter gravado, mas a lista não pôde ser atualizada/, 'o aviso de lista velha aparece' + relato(a));
   assert.equal(m.editavelDepois, false, 'com o cache velho nada edita (um Salvar desfaria a importação)' + relato(a));
   assert.equal(m.terrenosCarregadosDepois, false, 'a aba volta a carregar quando o usuário retornar' + relato(a));
 });

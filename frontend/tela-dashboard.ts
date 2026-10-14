@@ -343,9 +343,11 @@ export class ViabTelaDashboard extends LitElement {
     if (this.parametrosSalvando) return;
     this.parametrosSalvando = true;
     this.parametrosErro = '';
+    let enviou = false;
     try {
       const resultados: any[] = [];
       for (let i = 0; i < d.itens.length; i += MAX_ITENS_IMPORTACAO) {
+        enviou = true;
         const res = await importarLoteParametros(d.itens.slice(i, i + MAX_ITENS_IMPORTACAO));
         if (res?.erro || !Array.isArray(res?.resultados)) {
           // Os blocos anteriores já foram gravados: o resumo diz quantos, e o erro explica o resto.
@@ -356,25 +358,25 @@ export class ViabTelaDashboard extends LitElement {
       }
       const falhas = resultados.filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
       if (resultados.length > 0) this.importarResumo = { ok: resultados.length - falhas.length, falhas };
-      // A releitura é parte do dever de manter o cache fiel ao banco, mas falhar nela NÃO desfaz a gravação:
-      // avisa em vez de contradizer o resumo.
-      try {
-        const atual = await listarLoteParametros();
-        if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
-        this.parametros = indexarParametros(atual.dados);
-      } catch (e: any) {
-        // Cache velho + modal editável = o próximo Salvar manda os valores antigos e desfaz a importação.
-        // Mesmo tratamento de uma falha de leitura: aviso, edição bloqueada e a aba recarrega na volta.
-        this.parametrosAviso = `a importação foi gravada, mas a lista não pôde ser atualizada (${e?.message || 'indisponível'}). Volte a esta aba para recarregar.`;
-        this.terrenosCarregados = false;
-        this.parametrosErro = '';
-      }
       if (this.importarResumo) {
-        urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosAviso ? 'alerta' : 'sucesso');
+        urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosErro ? 'alerta' : 'sucesso');
       }
     } catch (e: any) {
       this.parametrosErro = e?.message || 'Erro ao importar';
     } finally {
+      // Qualquer pedido enviado pode ter gravado (inclusive um que falhou na volta): o cache é relido SEMPRE,
+      // sucesso ou falha. Se a releitura falha, o cache é desconhecido e o modal NÃO pode editar sobre ele —
+      // o próximo Salvar mandaria os valores antigos e desfaria o que já foi gravado.
+      if (enviou) {
+        try {
+          const atual = await listarLoteParametros();
+          if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
+          this.parametros = indexarParametros(atual.dados);
+        } catch (e: any) {
+          this.parametrosAviso = `a importação pode ter gravado, mas a lista não pôde ser atualizada (${e?.message || 'indisponível'}). Volte a esta aba para recarregar.`;
+          this.terrenosCarregados = false;
+        }
+      }
       this.parametrosSalvando = false;
     }
   }

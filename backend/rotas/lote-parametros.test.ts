@@ -200,3 +200,17 @@ test('o limite de itens por importação é o MESMO no frontend (que parte a pla
   assert.ok(m, 'constante do frontend encontrada');
   assert.equal(Number(m![1]), MAX_ITENS_IMPORTACAO);
 });
+
+test('importação: registro que existe no SERVIDOR não tem o carimbo regravado, mesmo que o cliente o tenha mandado', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
+  const gravados: any[] = [];
+  const original = f.dados.atualizar;
+  f.dados.atualizar = async (t, id, d) => { gravados.push(d); return original(t, id, d); };
+  // O cliente achou que o registro não existia (cache velho) e mandou o carimbo.
+  await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5, parcelamento_id: 99, numero_lote: '1', area_m2: 5 }]);
+  assert.deepEqual(gravados, [{ coef_maximo: 3.5 }]);
+  // O PUT do modal (reconfirmar) continua podendo regravar o carimbo.
+  const r = await gravarParametros(f.dados, 781, { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
+  assert.equal(r.http, 200);
+  assert.deepEqual(gravados[1], { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
+});

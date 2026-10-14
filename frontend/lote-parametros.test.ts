@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizarTexto, chaveRuaNumero, carimboDoLote, statusVinculo, registrosOrfaos, numeroPlanilha, lerCsv,
+  areaDiverge, normalizarTexto, chaveRuaNumero, carimboDoLote, statusVinculo, registrosOrfaos, numeroPlanilha, lerCsv,
   casarPlanilha, itensDaImportacao, formDoRegistro, corpoDoForm, validarForm, indexarParametros,
   type LoteNucleo,
 } from './lote-parametros.js';
@@ -188,4 +188,16 @@ test('referencia/dados/urbita-etapa-1-coeficientes.csv: 63 lotes, chave única, 
   assert.ok(linhas.every((l) => l.rua === l.rua.trim()));
   // Os EPC (equipamento público) têm coeficiente 0 e continuam importáveis.
   assert.equal(linhas.filter((l) => l.coef_maximo === 0).length, 2);
+});
+
+test('areaDiverge: a tolerância de 0,01 m² vale em centésimos, sem erro de ponto flutuante', () => {
+  assert.equal(100.01 - 100 > 0.01, true, 'a conta crua estoura o limite — é o defeito que a função evita');
+  assert.equal(areaDiverge(100, 100.01), false);
+  assert.equal(areaDiverge(1464.91, 1464.9), false);
+  assert.equal(areaDiverge(100, 100.02), true);
+  assert.equal(statusVinculo({ ...carimboDoLote(LOTE), area_m2: 100 }, { ...LOTE, area: 100.01 }), 'ok');
+  assert.equal(statusVinculo({ ...carimboDoLote(LOTE), area_m2: 100 }, { ...LOTE, area: 100.02 }), 'area');
+  const r = casarPlanilha([{ linha: 2, rua: 'Amsterdam', numero: '4910', area: 100.01, coef_maximo: 3, coef_minimo: null, gabarito_maximo: null, uos: '', uso: '' }],
+    [{ ...LOTE, area: 100 }]);
+  assert.equal(r[0].status, 'casado');
 });
