@@ -24,6 +24,7 @@ e `<lista>[n].<campo>` (`funding.divida[2].taxa_anual`). Chave sem tratamento va
 Requisitos: python3, openpyxl, e — para os passos 3 e 5 — node com as dependências do repositório (`pnpm install`).
 """
 import argparse
+import http.client
 import json
 import os
 import re
@@ -545,18 +546,27 @@ def ordenados(d):
     return [(n, v) for n, v in sorted(d.items()) if any(x is not None for x in v.values())]
 
 
+# falha de transporte (conexão, tempo esgotado, resposta cortada): o pedido pode ter chegado ao servidor
+ERROS_REDE = (urllib.error.URLError, OSError, http.client.HTTPException)
+CAMPOS_CRIACAO = ('nome', 'tipo_empreendimento', 'nivel_analise', 'origem_terreno', 'uf',
+                  'terreno_manual_nome', 'terreno_manual_area', 'notas')
+
+
 def criar_estudo(api, m):
-    e = dict(m.estudo)
-    corpo = {k: e.pop(k) for k in ('nome', 'tipo_empreendimento', 'nivel_analise', 'origem_terreno', 'uf',
-                                   'terreno_manual_nome', 'terreno_manual_area', 'notas') if k in e}
+    """Só o POST: o id precisa existir (e ser impresso) antes de qualquer outra escrita."""
+    corpo = {k: m.estudo[k] for k in CAMPOS_CRIACAO if k in m.estudo}
     corpo.setdefault('origem_terreno', 'manual')
     st, r = api.chamar('POST', '/estudos', corpo)
     if st not in (0, 201):
         return None
-    eid = r['id']
-    if e:
-        api.chamar('PATCH', f'/estudos/{eid}', e)
-    return eid
+    return r.get('id') if isinstance(r, dict) else None
+
+
+def completar_estudo(api, m, eid):
+    """Os campos do estudo que não vão no POST; roda já com o estudo criado, dentro da limpeza."""
+    resto = {k: v for k, v in m.estudo.items() if k not in CAMPOS_CRIACAO}
+    if resto:
+        api.chamar('PATCH', f'/estudos/{eid}', resto)
 
 
 def escrever_preliminar(api, m, eid):
@@ -968,13 +978,14 @@ def main(argv):
     api = Api(executar)
     try:
         eid = criar_estudo(api, m)
-    except (urllib.error.URLError, OSError) as ex:
+    except ERROS_REDE as ex:
         # a resposta do POST pode ter se perdido com o estudo já criado: sem id, só dá para conferir pela lista
         print(f'ERRO: falha de rede ao criar o estudo ({type(ex).__name__}: {ex}). Se o pedido chegou ao servidor, '
               'um estudo pode ter sido criado sem id: compare a lista de estudos do app com a de antes de rodar.')
         return 1
-    if eid is None:
-        print('ERRO: o POST /estudos falhou (o estudo pode não ter sido criado):', api.falhas())
+    if not eid and eid != 0:
+        print('ERRO: o POST /estudos falhou ou voltou sem id (o estudo pode ter sido criado; confira a lista de '
+              'estudos do app contra a de antes de rodar):', api.falhas())
         return 1
     if executar:
         # o id sai AQUI, antes de qualquer outra escrita: se a execução cair depois, ele já está no terminal
@@ -990,22 +1001,23 @@ def main(argv):
         print(f'ERRO: {motivo} — estudo parcial:', api.falhas())
         try:
             st, _ = api.chamar('DELETE', f'/estudos/{eid}')
-        except (urllib.error.URLError, OSError) as ex:
+        except ERROS_REDE as ex:
             st = f'{type(ex).__name__}: {ex}'
         print(f'estudo {eid} removido (HTTP {st}); nada ficou gravado pela metade.' if st in (200, 204)
               else f'ATENÇÃO: não consegui remover o estudo {eid} ({st}); apague-o à mão.')
         return 1
     try:
+        completar_estudo(api, m, eid)
         (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
     except EscritaFalhou as ex:
         if executar and not manter:
             return desfazer(str(ex))
-        raise SystemExit(f'{ex} (estudo {eid} mantido)')
-    except (urllib.error.URLError, OSError) as ex:
+        raise SystemExit(f'{ex}' + (f' (estudo {eid} mantido)' if executar else ''))
+    except ERROS_REDE as ex:
         motivo = f'falha de rede durante a escrita ({type(ex).__name__}: {ex})'
         if executar and not manter:
             return desfazer(motivo)
-        raise SystemExit(f'{motivo} (estudo {eid} mantido)')
+        raise SystemExit(f'{motivo}' + (f' (estudo {eid} mantido)' if executar else ''))
     if executar and api.falhas() and not manter:
         return desfazer('a API recusou escritas')
     for mt, c, st, r_ in api.log:
