@@ -11,6 +11,7 @@ export interface MedidaTrocaAba {
   modalAbriu: boolean;
   putChamado: boolean;
   salvandoDuranteVoo: boolean;
+  modalRecebeSalvando: boolean;
   cacheDepois: string;
   salvandoDepois: boolean;
   modalAbertoDepois: boolean;
@@ -49,6 +50,8 @@ export const caso = {
     }));
     await el.updateComplete;
     const salvandoDuranteVoo = el.complementoSalvando === true;
+    // Fiação: o Painel liga `.salvando` no modal (sem isso o Cancelar não desabilita).
+    const modalRecebeSalvando = modal.salvando === true;
 
     el.aba = 'estudos';                              // troca de aba com o PUT pendente
     await el.updateComplete;
@@ -56,7 +59,7 @@ export const caso = {
     for (let i = 0; i < 4; i++) { await new Promise((r) => setTimeout(r, 0)); await el.updateComplete; }
 
     const medida = {
-      modalAbriu, putChamado, salvandoDuranteVoo,
+      modalAbriu, putChamado, salvandoDuranteVoo, modalRecebeSalvando,
       cacheDepois: el.complementos.get(3)?.contato ?? '',
       salvandoDepois: el.complementoSalvando === true,
       modalAbertoDepois: el.terrenoAberto != null,

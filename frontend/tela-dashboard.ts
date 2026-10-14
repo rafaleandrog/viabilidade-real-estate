@@ -245,7 +245,9 @@ export class ViabTelaDashboard extends LitElement {
 
   updated(changed: Map<string, unknown>) {
     if (changed.has('aba') && this.aba === 'estudos') this._carregar();
-    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando) this._carregarTerrenos();
+    // Não recarrega com o PUT do modal em voo: o recarregamento zeraria `terrenoAberto` e o cache sob ele.
+    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando
+      && !this.complementoSalvando) this._carregarTerrenos();
   }
 
   // Glebas: todas. Lotes: todos que não são de regularização fundiária (`frontend/terrenos-nucleo.ts`).
@@ -303,22 +305,26 @@ export class ViabTelaDashboard extends LitElement {
     this.terrenosCarregando = false;
   }
 
-  // O ciclo de salvamento do modal mora AQUI: se o modal sair da tela com o PUT em voo (cancelar, troca
-  // de aba), o cache `complementos` ainda é atualizado e reabrir mostra o valor gravado.
+  // O ciclo de salvamento do modal mora AQUI: se o modal sair da tela com o PUT em voo (troca de aba),
+  // o cache `complementos` ainda é atualizado e reabrir mostra o valor gravado. Fechar e erro só valem
+  // para o terreno que foi salvo: se o usuário já abriu OUTRO, o resultado não toca o modal dele.
   private async _salvarComplemento(d: { tipo: 'gleba' | 'lote'; imovelId: number; corpo: Record<string, any> }) {
     if (this.complementoSalvando) return;
+    const mesmoTerreno = () => this.terrenoAberto != null
+      && Number(this.terrenoAberto.id) === d.imovelId && this.terrenoAberto._tipo === d.tipo;
     this.complementoSalvando = true;
     this.complementoErro = '';
     try {
       const res = await salvarComplementoTerreno(d.tipo, d.imovelId, d.corpo);
-      if (res?.erro) { this.complementoErro = res.mensagem || 'Erro ao salvar'; return; }
-      if (res?.imovel_nucleo_id != null) {
-        this.complementos = new Map(this.complementos).set(Number(res.imovel_nucleo_id), res);
+      if (res?.erro || res?.imovel_nucleo_id == null) {
+        if (mesmoTerreno()) this.complementoErro = res?.mensagem || 'Erro ao salvar';
+        return;
       }
+      this.complementos = new Map(this.complementos).set(Number(res.imovel_nucleo_id), res);
       urbiVerso.notificar('Informações do terreno salvas.', 'sucesso');
-      this.terrenoAberto = null;
+      if (mesmoTerreno()) this.terrenoAberto = null;
     } catch (e: any) {
-      this.complementoErro = e?.message || 'Erro ao salvar';
+      if (mesmoTerreno()) this.complementoErro = e?.message || 'Erro ao salvar';
     } finally {
       this.complementoSalvando = false;
     }

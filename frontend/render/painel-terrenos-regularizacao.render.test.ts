@@ -106,6 +106,7 @@ test('Painel: PUT em voo + troca de aba — o cache ainda recebe o registro grav
   assert.equal(m.modalAbriu, true, 'o clique abre o modal' + relato(a));
   assert.equal(m.putChamado, true, 'o Painel (e não o modal) chamou o PUT' + relato(a));
   assert.equal(m.salvandoDuranteVoo, true, 'o Painel marca o salvamento em voo' + relato(a));
+  assert.equal(m.modalRecebeSalvando, true, 'o Painel liga `.salvando` no modal' + relato(a));
   assert.equal(m.cacheDepois, 'novo', 'o resultado do PUT chegou ao cache mesmo com o modal fora da tela' + relato(a));
   assert.equal(m.salvandoDepois, false, 'o salvamento termina' + relato(a));
   assert.equal(m.modalAbertoDepois, false, 'o modal é fechado pelo Painel' + relato(a));
