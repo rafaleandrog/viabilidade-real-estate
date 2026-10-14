@@ -13,3 +13,5 @@ frontend/index.js
 # arquivo e passar ao `preflight-pr.mjs` antes de abrir o PR. Depois de aberto, o
 # texto vive no GitHub — o arquivo e descartavel e NAO entra no repositorio.
 CORPO-PR.md
+
+__pycache__/

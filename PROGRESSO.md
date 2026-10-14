@@ -4,6 +4,66 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-13 — Formulários v2: API canônica, importador que confere e chaves legíveis por máquina
+
+Pedido direto do autor; fecha a #839: tornar os formulários simplificados confiáveis para qualquer pessoa ou IA criar um estudo
+completo. Três frentes, a partir do diagnóstico da nota `historico/diagnostico-formularios-qa-2026-10-13.md`.
+
+- **Backend (#839):** `POST /avancado/fases` (grupo de receita) e `PATCH …/fases/:fid` levam o `fluxo_pagamento` ao formato canônico
+  (`componentes`) com a taxa de tabela do estudo; com `componentes` presentes, gravam como vieram. Teste em Express real com o grupo criado e
+  o PATCH legado, e a mutação (apagar a chamada nas duas rotas) deixa 6 testes vermelhos.
+- **Formulários:** chaves técnicas no formato `lista[n].campo`; vocabulário de distribuição de custo com lista; legenda explica a regra do
+  percentual; conferência por vaga de custo (categoria × unidade, uma só linha de valor, valor na linha certa); base financiável por nome de linha.
+- **Importador** (`scripts/formularios/importar_formulario.py`): valida antes de escrever, cria, normaliza o pagamento, relê, e roda o motor do
+  repositório. Lê só a planilha (chave, rótulo e formato da célula). Testado com os 4 formulários (relê 0 divergência; resultado idêntico
+  aos estudos 25–28) e com erros plantados, todos barrados sem escrever nada. Detalhes em `scripts/formularios/LEIA-ME.md`.
+- **Fica para o autor:** a integração na skill de QA é mudança de processo (`.claude/`) e, pela regra R1, vai em PR próprio; o texto do
+  roteiro está em `scripts/formularios/LEIA-ME.md`. Fora do alcance do importador, e avisado como tal: região de mercado, apelo comercial,
+  imagem e vínculo com o Núcleo.
+
+---
+
+## 2026-10-13 — Dois projetos, quatro estudos na Pinguim e diagnóstico
+
+Pedido direto do autor, sem issue: simular um Loteamento e uma Incorporação, cada um nos dois níveis, preenchendo os formulários
+simplificados e criando os quatro estudos no app. Estudos **25** e **27** (Incorporação, Preliminar e Avançado) e **26** e **28**
+(Loteamento), na instância Pinguim, em rascunho, prefixo `qa-`. Arquivos preenchidos em `referencia/formularios/exemplos/`; ferramentas em
+`scripts/formularios/` (`exemplos_projetos.py`, `importar_formulario.py`, `aplicar-pagamento-canonico.ts`, `comparar-niveis.ts`).
+
+- **Conferido:** os Preliminares fecham com a planilha e com o motor ao centavo; custos de obra iguais nos dois níveis.
+- **Achado principal:** a API aceita o fluxo de pagamento legado e o motor calcula sem juros, carteira e repasse, em silêncio
+  (TIR 35,58% contra 48,78% no mesmo estudo). Diagnóstico completo, achados do app, dos formulários e aprendizados em
+  `historico/diagnostico-formularios-qa-2026-10-13.md`.
+- **Fica para o autor:** decidir as issues abertas a partir do diagnóstico e a próxima versão dos formulários (chaves técnicas).
+
+---
+
+## 2026-10-13 — Quatro formulários simplificados de estudo (uma aba, quatro colunas)
+
+Pedido direto do autor, sem issue: os quatro formulários de QA (`formulario-{preliminar,avancado}-{incorporacao,loteamento}`),
+que tinham de 4 a 12 abas, viram **um arquivo por tipo de estudo com uma única aba** — Campo · Valor · Unidade · Chave técnica —,
+para o preenchimento levar os dados a qualquer estudo. Saída em `referencia/formularios/`, gerada por
+`scripts/formularios/gerar_formularios.py` (openpyxl; é a fonte, os `.xlsx` são derivados).
+
+- **Zona de entrada (amarela):** todos os campos do estudo. Campo que o app aceita em várias unidades tem **uma linha por
+  unidade**, todas em branco e manuais (preencher uma só); o Excel nunca converte uma na outra ali. Listas viram vagas
+  numeradas ("Produto 3 — Preço"); Custos têm 28 vagas + 2 permutas físicas + 2 financeiras do terreno; Funding tem 1
+  financiamento à produção + 3 dívidas + 3 equities. Percentual é percentual do Excel (4% = 0,04), não "pontos".
+- **Zona de referência (cinza):** fórmulas do Excel. No Preliminar espelham `calcularProforma` inteira (cascata de áreas,
+  catálogo, permutas com cap, deduções, custos, resultado, KPIs, equivalências de unidade). No Avançado só o que se deduz das
+  entradas (inícios travados do cronograma, datas, VGV de tabela, repasse, pós-chaves, custos convertidos em R$); TIR, VPL,
+  Proforma e Fluxo de Caixa ficam com o motor mensal do app.
+- **Conferência feita:** as quatro planilhas foram preenchidas com os exemplos dos formulários originais, recalculadas no
+  LibreOffice e comparadas com o motor real (`calcularProforma`): VGV, receita líquida, custos direto e indireto, resultado,
+  margem, ROI e áreas fecham ao centavo nos dois Preliminares, também com as unidades alternativas (R$ total, % da obra,
+  permuta em m² e em valor, cascata em m², % da poligonal e % da parcelável). No Avançado Incorporação o VGV (R$ 134.284.000),
+  o repasse (60% e 50%) e o pós-chaves (20% e 50%) batem com os exemplos originais.
+- **Suposição declarada na planilha:** a alíquota RET da instância (4%) é premissa de referência, não campo do estudo.
+- **Fica para o autor:** conferir que o leitor aceita percentual como fração (0,04) onde os formulários antigos pediam pontos
+  (4), e o rótulo de distribuição de custo (`Linear`/`Curva S`/`unit_delivery`…), que a observação 1 dos originais já deixava em aberto.
+
+---
+
 ## 2026-10-04 — PDFs nas cores do tema claro: zero literais de cor no bundle
 
 Pedido direto do autor, sem issue: a tela de Upgrades da instância avisava *"15 literais de cor
