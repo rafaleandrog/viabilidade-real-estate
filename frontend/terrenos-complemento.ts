@@ -72,6 +72,8 @@ export function payloadDoForm(form: FormComplemento): Record<string, any> {
 export function validarForm(form: FormComplemento): string {
   const taxa = form.taxa_ocupacao_pct;
   if (typeof taxa === 'number' && (taxa < 0 || taxa > 100)) return 'A taxa de ocupação deve estar entre 0 e 100%.';
+  // Coluna inteira: o `viab-num` guarda `62,5` como 62.5 mesmo com 0 casas, e o backend recusaria.
+  if (typeof taxa === 'number' && !Number.isInteger(taxa)) return 'A taxa de ocupação deve ser um número inteiro (sem casas decimais).';
   for (const c of NUMERICOS) {
     const v = form[c];
     if (typeof v === 'number' && v < 0) return 'Os valores numéricos não podem ser negativos.';

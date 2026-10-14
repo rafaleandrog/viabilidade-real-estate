@@ -45,7 +45,11 @@ export class ViabTerrenoComplemento extends LitElement {
     this.form = { ...this.form, [campo]: valor };
   }
 
+  // Fechar com o PUT em voo tiraria o componente da tela antes de `viab-complemento-salvo`: o evento
+  // se perderia, o cache do Painel ficaria velho e reabrir mostraria o valor antigo (que um novo
+  // Salvar sobrescreveria). Enquanto salva, fechar é ignorado e os botões ficam desabilitados.
   private _fechar = () => {
+    if (this.salvando) return;
     this.dispatchEvent(new CustomEvent('viab-complemento-fechar', { bubbles: true, composed: true }));
   };
 
@@ -143,7 +147,7 @@ export class ViabTerrenoComplemento extends LitElement {
         </div>
         ${this.erro ? html`<urbi-banner variante="erro">${this.erro}</urbi-banner>` : nothing}
         <div class="acoes">
-          <urbi-botao variante="fantasma" @click=${this._fechar}>${this.editavel ? 'Cancelar' : 'Fechar'}</urbi-botao>
+          <urbi-botao variante="fantasma" ?desabilitado=${this.salvando} @click=${this._fechar}>${this.editavel ? 'Cancelar' : 'Fechar'}</urbi-botao>
           ${this.editavel
             ? html`<urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar</urbi-botao>`
             : nothing}

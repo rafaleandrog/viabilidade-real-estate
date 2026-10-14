@@ -78,3 +78,13 @@ test('coletarPaginas: sem `paginas`, página incompleta encerra; cheia continua;
   await coletarPaginas(async (p) => { c.push(p); return { dados: [], paginas: 9 }; }, 2);
   assert.deepEqual(c, [1], 'vazia encerra mesmo quando `paginas` promete mais');
 });
+
+test('coletarPaginas: bater o teto de páginas sem ver a última LANÇA — lista parcial nunca é devolvida', async () => {
+  let chamadas = 0;
+  // Servidor que ignora `pagina` e devolve sempre uma página cheia, sem `paginas`.
+  await assert.rejects(
+    coletarPaginas(async () => { chamadas++; return { dados: [{ id: 1 }, { id: 2 }] }; }, 2),
+    /incompleta/,
+  );
+  assert.equal(chamadas, 500);
+});

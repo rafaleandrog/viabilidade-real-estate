@@ -51,9 +51,11 @@ export async function coletarPaginas(
     const res = await buscar(pagina);
     const dados: any[] = res?.dados ?? [];
     todos.push(...dados);
-    if (dados.length === 0) break;
+    if (dados.length === 0) return todos;
     const totalPaginas = Number(res?.paginas);
-    if (totalPaginas > 0 ? pagina >= totalPaginas : dados.length < porPagina) break;
+    if (totalPaginas > 0 ? pagina >= totalPaginas : dados.length < porPagina) return todos;
   }
-  return todos;
+  // Chegou ao teto sem ver a última página: lista parcial NÃO é devolvida. Truncar a varredura de
+  // parcelamentos faria lotes de parcelamento de regularização (que ficou de fora) aparecerem.
+  throw new Error(`a listagem passou de ${TETO_PAGINAS} páginas e foi recusada por estar incompleta`);
 }

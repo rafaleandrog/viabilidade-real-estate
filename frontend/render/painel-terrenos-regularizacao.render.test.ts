@@ -79,3 +79,16 @@ for (const modo of ['rejeita', 'erro-payload']) {
     assert.equal(m.modalEditavel, false, 'sem ler o registro o modal não pode ser editável (o PUT total apagaria dados)' + relato(a));
   });
 }
+
+test('Modal do terreno: fechar com o PUT em voo é ignorado e o evento de salvo não se perde', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'terreno-complemento-salvando', larguras: [1280] });
+  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
+  const m = a.extra?.['1280'] as any;
+  assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+  assert.equal(m.fechouDuranteSalvamento, 0, 'fechar durante o salvamento tem que ser ignorado' + relato(a));
+  assert.equal(m.botaoCancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
+  assert.equal(m.salvouEventos, 1, 'o evento viab-complemento-salvo chega ao Painel' + relato(a));
+  assert.equal(m.fechouDepoisDeSalvar, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));
+});

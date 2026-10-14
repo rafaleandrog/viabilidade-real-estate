@@ -37,6 +37,7 @@ test('validarForm: faixa da taxa, negativo e pavimentos inteiros', () => {
   assert.match(validarForm({ ...base, taxa_ocupacao_pct: 101 }), /taxa de ocupação/);
   assert.match(validarForm({ ...base, preco_pedido: -5 }), /negativos/);
   assert.match(validarForm({ ...base, gabarito_pavimentos: 2.5 }), /inteiro/);
+  assert.match(validarForm({ ...base, taxa_ocupacao_pct: 62.5 }), /taxa de ocupação.*inteiro/);
   assert.equal(validarForm({ ...base, taxa_ocupacao_pct: 100, gabarito_pavimentos: 12 }), '');
 });
 
