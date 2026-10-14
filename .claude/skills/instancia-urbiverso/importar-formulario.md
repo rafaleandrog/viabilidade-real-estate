@@ -55,8 +55,9 @@ registrar.
      seus parâmetros, cronograma, produtos, custos, grupos de venda, pagamento e funding, na tela
      Estudos do app;
    - **o que o importador faz sozinho:** converte o pagamento para o formato canônico, relê o que
-     gravou e roda o motor; **se a API recusar alguma escrita depois de o estudo existir, ele apaga o
-     estudo que acabou de criar** (um `DELETE` do estudo dele e de mais nada);
+     gravou e roda o motor; **se a API recusar alguma escrita depois de o estudo existir, ele tenta
+     apagar o estudo que acabou de criar** (um `DELETE` do estudo dele e de mais nada). É uma
+     tentativa: se o `DELETE` também falhar, **um estudo parcial pode ficar**, e o importador avisa;
    - **como desfazer:** apagar o estudo pela tela do app; o estudo fica visível a quem tem acesso ao
      app enquanto existir.
 3. **Escreva.** Com o sim, o mesmo comando com `--executar --relatorio <arquivo.json>`. Vários
@@ -71,7 +72,8 @@ registrar.
    | `2` | o estudo existe, mas há pendência (releitura, pagamento, motor) | relate cada pendência; o estudo **ficou**, com o id |
 
    `--manter-em-falha` mantém o estudo parcial para diagnóstico: uma exceção de escrita sai com `1` e o
-   estudo fica, com o id só na saída do terminal; uma falha HTTP ou de pagamento segue e sai com `2`, e
+   estudo fica, **sem o id em lugar nenhum da saída** (ache-o pelo nome na lista de estudos do app,
+   com a rota que o índice dos docs do app documenta, § 3); uma falha HTTP ou de pagamento segue e sai com `2`, e
    aí o id também vai no arquivo de `--relatorio`. Só use se a pessoa pedir, e então o estudo entra no
    relatório de vocês com o id.
 5. **Separe defeito de achado conhecido.** A saída marca `conhecido:` quando o motor acusa algo já
