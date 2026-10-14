@@ -61,7 +61,7 @@ function falso(linhas: any[] = [], opcoes: { falhaCriar?: Error; criarInsere?: b
   const dados: DadosParametros = {
     async listar(_t, o) {
       chamadas.push('listar');
-      if (o.filtros) return { dados: linhas.filter((l) => l.imovel_nucleo_id === o.filtros!.imovel_nucleo_id).slice(0, 1) };
+      if (o.filtros) return { dados: linhas.filter((l) => l.imovel_nucleo_id === o.filtros!.imovel_nucleo_id).slice(0, 1).map((l) => ({ ...l })) }; // cópia, como o banco
       const i = (o.pagina - 1) * o.por_pagina;
       return { dados: linhas.slice(i, i + o.por_pagina), total: linhas.length };
     },
@@ -266,10 +266,12 @@ test('importação: carimbo reconfirmado entre a leitura e a escrita recusa o it
   assert.equal(f.linhas[0].coef_maximo, '3.00');
 });
 
-test('chaveCarimbo: sem vírgula, estável em número/texto, e muda quando qualquer campo do carimbo muda', () => {
+test('chaveCarimbo: tamanho fixo, estável em número/texto, e muda quando qualquer campo do carimbo muda', () => {
   const base = { parcelamento_id: 12, rua: 'Rua A, B', numero_lote: '4910', quadra: null, conjunto: null, area_m2: '1464.9' };
   const k = chaveCarimbo(base);
-  assert.ok(!k.includes(','), 'o DSL do atualizarSe parte por vírgula');
+  assert.match(k, /^[0-9a-f]{64}$/, 'tamanho fixo e sem vírgula: cabe na coluna e atravessa o DSL do atualizarSe');
+  const pior = chaveCarimbo({ ...base, rua: ',,,'.repeat(50), quadra: 'ç'.repeat(60), conjunto: '%'.repeat(60) });
+  assert.equal(pior.length, 64, 'o pior caso de expansão não passa de 64 caracteres');
   assert.equal(chaveCarimbo({ ...base, area_m2: 1464.9, parcelamento_id: '12' }), k);
   for (const mud of [{ rua: 'Rua A, C' }, { numero_lote: '4911' }, { quadra: 'Q1' }, { parcelamento_id: null }, { area_m2: 1464.91 }]) {
     assert.notEqual(chaveCarimbo({ ...base, ...mud }), k, JSON.stringify(mud));
@@ -284,4 +286,22 @@ test('o carimbo com vírgula também trava a corrida: cadastro grava a chave e a
   f.dados.atualizarSe = async (t, id, d, c) => { f.linhas[0].rua = 'Rua A, C'; f.linhas[0].carimbo_chave = chaveCarimbo(f.linhas[0]); return original(t, id, d, c); };
   const r = await importarParametros(f.dados, [{ imovel_nucleo_id: 5, coef_maximo: 4, carimbo_esperado: { parcelamento_id: 1, rua: 'Rua A, B', numero_lote: '7', area_m2: 100 } }]);
   assert.equal(r.resultados[0].ok, false);
+});
+
+test('salvar coeficientes: se o carimbo trocou durante a gravação, recusa em vez de reaplicar na identidade nova', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_maximo: '3.00', ...CARIMBO, carimbo_chave: chaveCarimbo(CARIMBO) }]);
+  const original = f.dados.atualizarSe;
+  let uma = false;
+  f.dados.atualizarSe = async (t, id, d, c) => {
+    if (!uma) { uma = true; f.linhas[0].numero_lote = 'NOVO'; f.linhas[0].carimbo_chave = chaveCarimbo(f.linhas[0]); }
+    return original(t, id, d, c);
+  };
+  const r = await gravarParametros(f.dados, 781, { coef_maximo: 4 });
+  assert.equal(r.http, 400);
+  assert.match((r as any).mensagem, /vínculo do lote mudou/);
+  assert.equal(f.linhas[0].coef_maximo, '3.00', 'o valor digitado para a identidade antiga não foi aplicado');
+  // Reconfirmar (o corpo traz o próprio carimbo) escolhe a identidade e segue depois da releitura.
+  uma = false;
+  const ok = await gravarParametros(f.dados, 781, { coef_maximo: 4, ...CARIMBO });
+  assert.equal(ok.http, 200);
 });

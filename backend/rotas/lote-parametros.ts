@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import { coagirNumericosDeclarados, numeroEstrito } from './coercao-numerica.js';
 
@@ -114,18 +115,21 @@ function carimboIgual(campo: string, a: any, b: any): boolean {
 }
 
 /**
- * Identidade do lote numa string SEM vírgula, mantida pelo servidor a cada escrita do carimbo. É o que o lock
- * otimista compara: o DSL de filtros do `atualizarSe` parte o valor por vírgula, então rua, quadra ou conjunto
- * com vírgula não poderiam entrar na condição como colunas — e a chave as cobre todas de uma vez.
+ * Identidade do lote num resumo de tamanho FIXO (SHA-256 em hexadecimal, 64 caracteres), mantido pelo servidor a
+ * cada escrita do carimbo. É o que o lock otimista compara: o DSL de filtros do `atualizarSe` parte o valor
+ * por vírgula, então rua, quadra ou conjunto com vírgula não poderiam entrar na condição como colunas, e um
+ * texto codificado estouraria o limite da coluna no pior caso. O resumo cobre todos os campos, qualquer que
+ * seja o conteúdo.
  */
 export function chaveCarimbo(linha: any): string {
-  return CAMPOS_CARIMBO.map((c) => {
+  const canonico = CAMPOS_CARIMBO.map((c) => {
     const v = linha?.[c];
     if (v === null || v === undefined || v === '') return '';
     if (c === 'area_m2') { const n = paraNumeroLinha(v); return n == null ? '' : n.toFixed(2); }
     if (c === 'parcelamento_id') { const n = paraNumeroLinha(v); return n == null ? '' : String(n); }
-    return encodeURIComponent(String(v).trim());
+    return JSON.stringify(String(v).trim());
   }).join('|');
+  return createHash('sha256').update(canonico).digest('hex');
 }
 
 /**
@@ -205,8 +209,16 @@ export async function gravarParametros(
     for (let tentativa = 0; tentativa < 3; tentativa++) {
       const r = await sobre(atual, campos);
       if (r !== PERDEU) return r;
+      const anterior = chaveCarimbo(atual);
       atual = await buscar();
       if (!atual) throw new Error('registro de lote_parametros sumiu durante a gravação');
+      // Os valores digitados valiam para a identidade que a pessoa viu. Se o carimbo trocou no intervalo
+      // (alguém reconfirmou o vínculo), reaplicá-los sobre a identidade nova pularia o bloqueio "Lote mudou";
+      // só uma escrita que traz o próprio carimbo (reconfirmar) escolhe a identidade e pode seguir.
+      const trouxeCarimbo = CAMPOS_CARIMBO.some((c) => c in campos);
+      if (!trouxeCarimbo && chaveCarimbo(atual) !== anterior) {
+        return { http: 400, codigo: 'INVARIANTE', mensagem: 'O vínculo do lote mudou enquanto você salvava: recarregue a aba e confira o lote antes de salvar de novo' };
+      }
     }
     return { http: 400, codigo: 'INVARIANTE', mensagem: 'O registro do lote foi alterado por outra pessoa durante a gravação: recarregue e tente de novo' };
   };
