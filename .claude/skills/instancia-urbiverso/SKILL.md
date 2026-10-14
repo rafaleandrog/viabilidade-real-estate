@@ -1,6 +1,6 @@
 ---
 name: instancia-urbiverso
-description: Age NA INSTÂNCIA urbiverso da organização, pela API dela — instalar e atualizar app, homologar release de app, criar pessoa e dar permissão a app, alçadas e tokens, contas, domínio de e-mail, marca, IA, e ler o estado do que está no ar. Também configura o próprio acesso quando ele ainda não existe ("configure o meu acesso à instância", "confira o meu acesso"). Toda escrita é autorizada na conversa, antes de acontecer. Chame quando o pedido for sobre a instância, o painel Admin dela ou uma tela de lá — "instale o app lá", "dá acesso para fulano", "o que tem instalado", "por que ele não consegue abrir o app", "cadastra o domínio de e-mail". NÃO chame para escrever, empacotar ou publicar código de app, que é trabalho neste repositório; para revisar um Pull Request use revisar-pr-apps; para exercitar uma mudança já instalada use qa.
+description: Age NA INSTÂNCIA urbiverso da organização, pela API dela — instalar e atualizar app, homologar release de app, criar estudo do app viabilidade a partir de formulário preenchido, criar pessoa e dar permissão a app, alçadas e tokens, contas, domínio de e-mail, marca, IA, e ler o estado do que está no ar. Também configura o próprio acesso quando ele ainda não existe ("configure o meu acesso à instância", "confira o meu acesso"). Toda escrita é autorizada na conversa, antes de acontecer. Chame quando o pedido for sobre a instância, o painel Admin dela ou uma tela de lá — "instale o app lá", "crie o estudo a partir desta planilha", "dá acesso para fulano", "o que tem instalado", "por que ele não consegue abrir o app", "cadastra o domínio de e-mail". NÃO chame para escrever, empacotar ou publicar código de app, que é trabalho neste repositório; para revisar um Pull Request use revisar-pr-apps; para exercitar uma mudança já instalada use qa.
 ---
 
 # Operar a instância urbiverso
@@ -21,9 +21,14 @@ A instância é a que as pessoas usam. Não há ambiente de ensaio atrás dela.
 
 **Esta skill não escreve código de app** e não toca em `apps/` deste repositório.
 
-Esta skill viaja com um segundo arquivo, **`preparar-ambiente.md`, na mesma pasta que este** —
-`${CLAUDE_SKILL_DIR}` quando a variável existe; senão, a pasta de onde este `SKILL.md` foi lido.
-Ele é o roteiro de preparação do acesso (§ 2.1), e você só o lê quando a § 2 mandar.
+Esta skill viaja com **dois arquivos na mesma pasta que este** — `${CLAUDE_SKILL_DIR}` quando a
+variável existe; senão, a pasta de onde este `SKILL.md` foi lido. Você lê cada um só quando o caso
+que o governa chegar:
+
+| Arquivo | Quando |
+|---|---|
+| `preparar-ambiente.md` | a § 2 mandar: o acesso ainda não existe (§ 2.1) |
+| `importar-formulario.md` | o pedido é criar um estudo do app `viabilidade` a partir de um formulário simplificado preenchido |
 
 ## 1. Contrato de ambiente
 
