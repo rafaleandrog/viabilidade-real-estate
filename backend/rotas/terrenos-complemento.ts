@@ -100,16 +100,71 @@ function podeEscrever(req: Request): boolean {
   return nivel === 'escrita' || nivel === 'admin';
 }
 
+/** Subconjunto de `req.dados` que estas rotas usam — permite exercitar a lógica sem servidor nem banco. */
+export interface DadosComplemento {
+  listar(tabela: string, opcoes: Record<string, any>): Promise<{ dados: any[]; total?: number }>;
+  criar(tabela: string, dados: Record<string, any>): Promise<any>;
+  atualizar(tabela: string, id: number, dados: Record<string, any>): Promise<any>;
+}
+
+const POR_PAGINA = 200;
+const TETO_PAGINAS = 500;
+
+/**
+ * Todos os registros. NUNCA devolve uma lista truncada: a tela trata a ausência de registro como
+ * "terreno sem informações" e um PUT total em cima de um registro que ficou de fora o zeraria.
+ * Pagina até a página vir incompleta ou até somar `total`; bateu o teto sem terminar, LANÇA.
+ */
+export async function listarTodosComplementos(dados: DadosComplemento): Promise<any[]> {
+  const todos: any[] = [];
+  for (let pagina = 1; pagina <= TETO_PAGINAS; pagina++) {
+    const r = await dados.listar('terrenos_complemento', { por_pagina: POR_PAGINA, pagina });
+    todos.push(...r.dados);
+    if (r.dados.length < POR_PAGINA) return todos;
+    if (typeof r.total === 'number' && todos.length >= r.total) return todos;
+  }
+  throw new Error(`terrenos_complemento passou de ${TETO_PAGINAS * POR_PAGINA} registros: lista incompleta recusada`);
+}
+
+export type ResultadoGravacao =
+  | { http: 200 | 201; registro: any }
+  | { http: 409; codigo: 'TIPO_IMOVEL_DIVERGENTE'; mensagem: string };
+
+/**
+ * Upsert por `imovel_nucleo_id`. Dois primeiros PUTs simultâneos do mesmo imóvel passam ambos pela
+ * busca vazia e o segundo `criar` bate no único do schema: em vez de 500, recarrega o registro que
+ * venceu e atualiza por cima dele. Se depois do erro o registro continua ausente, o erro era outro
+ * e é relançado.
+ */
+export async function gravarComplemento(
+  dados: DadosComplemento, tipo: string, imovelId: number, campos: Record<string, any>,
+): Promise<ResultadoGravacao> {
+  const buscar = async () => (await dados.listar('terrenos_complemento', {
+    filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
+  })).dados[0];
+  const sobre = async (atual: any): Promise<ResultadoGravacao> => {
+    if (atual.tipo_imovel !== tipo) {
+      return { http: 409, codigo: 'TIPO_IMOVEL_DIVERGENTE', mensagem: `O imóvel já está registrado como "${atual.tipo_imovel}"` };
+    }
+    if (Object.keys(campos).length === 0) return { http: 200, registro: atual };
+    return { http: 200, registro: await dados.atualizar('terrenos_complemento', atual.id, campos) };
+  };
+
+  const existente = await buscar();
+  if (existente) return sobre(existente);
+  try {
+    return { http: 201, registro: await dados.criar('terrenos_complemento', { imovel_nucleo_id: imovelId, tipo_imovel: tipo, ...campos }) };
+  } catch (e) {
+    const vencedor = await buscar();
+    if (!vencedor) throw e;
+    return sobre(vencedor);
+  }
+}
+
 // GET /terrenos-complemento — todos os registros (a aba Terrenos cruza com a lista do Núcleo).
 rotasTerrenosComplemento.get('/terrenos-complemento', async (req: Request, res: Response) => {
   try {
-    const POR = 200;
-    const dados: any[] = [];
-    for (let pagina = 1; pagina <= 500; pagina++) {
-      const r = await req.dados!.listar('terrenos_complemento', { por_pagina: POR, pagina });
-      dados.push(...r.dados);
-      if (r.dados.length < POR) break;
-    }
+    const dados = await listarTodosComplementos(req.dados! as unknown as DadosComplemento);
     res.json({ dados, total: dados.length });
   } catch (e: any) {
     console.error('Erro em GET /terrenos-complemento:', e);
@@ -132,23 +187,9 @@ rotasTerrenosComplemento.put('/terrenos-complemento/:tipo/:imovelId', async (req
     const v = validarComplemento(req.body);
     if ('falha' in v) { erro(res, v.falha.http, v.falha.codigo, v.falha.mensagem); return; }
 
-    const existente = await req.dados!.listar('terrenos_complemento', {
-      filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
-    });
-    if (existente.dados.length > 0) {
-      const atual = existente.dados[0];
-      if (atual.tipo_imovel !== tipo) {
-        erro(res, 409, 'TIPO_IMOVEL_DIVERGENTE', `O imóvel já está registrado como "${atual.tipo_imovel}"`); return;
-      }
-      if (Object.keys(v.dados).length === 0) { res.json(atual); return; }
-      const atualizado = await req.dados!.atualizar('terrenos_complemento', atual.id, v.dados);
-      res.json(atualizado);
-      return;
-    }
-    const criado = await req.dados!.criar('terrenos_complemento', {
-      imovel_nucleo_id: imovelId, tipo_imovel: tipo, ...v.dados,
-    });
-    res.status(201).json(criado);
+    const r = await gravarComplemento(req.dados! as unknown as DadosComplemento, tipo, imovelId, v.dados);
+    if (r.http === 409) { erro(res, 409, r.codigo, r.mensagem); return; }
+    res.status(r.http).json(r.registro);
   } catch (e: any) {
     console.error('Erro em PUT /terrenos-complemento/:tipo/:imovelId:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);

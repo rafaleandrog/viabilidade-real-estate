@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarComplemento, CAMPOS_EDITAVEIS } from './terrenos-complemento.js';
+import {
+  validarComplemento, CAMPOS_EDITAVEIS, gravarComplemento, listarTodosComplementos, type DadosComplemento,
+} from './terrenos-complemento.js';
 import esquema from '../../schema.json';
 
 test('CAMPOS_EDITAVEIS bate com as colunas do schema (menos as de identidade)', () => {
@@ -59,4 +61,72 @@ test('teto das colunas: acima do que o NUMERIC/int do schema comporta é 400, n�
   assert.ok('falha' in validarComplemento({ preco_pedido: 1e10 }));
   assert.ok('dados' in validarComplemento({ preco_pedido: 9999999999.99 }));
   assert.ok('falha' in validarComplemento({ gabarito_pavimentos: 3e9 }));
+});
+
+// ── Upsert e listagem, contra um `dados` falso ──────────────────────────────
+
+function falso(linhas: any[] = [], opcoes: { falhaCriar?: Error; criarInsere?: boolean } = {}) {
+  const chamadas: string[] = [];
+  const dados: DadosComplemento = {
+    async listar(_t, o) {
+      chamadas.push('listar');
+      if (o.filtros) return { dados: linhas.filter((l) => l.imovel_nucleo_id === o.filtros!.imovel_nucleo_id).slice(0, 1) };
+      const i = (o.pagina - 1) * o.por_pagina;
+      return { dados: linhas.slice(i, i + o.por_pagina), total: linhas.length };
+    },
+    async criar(_t, d) {
+      chamadas.push('criar');
+      if (opcoes.falhaCriar) {
+        if (opcoes.criarInsere) linhas.push({ id: 99, tipo_imovel: d.tipo_imovel, imovel_nucleo_id: d.imovel_nucleo_id });
+        throw opcoes.falhaCriar;
+      }
+      const l = { id: linhas.length + 1, ...d }; linhas.push(l); return l;
+    },
+    async atualizar(_t, id, d) { chamadas.push('atualizar'); return { id, ...d }; },
+  };
+  return { dados, chamadas, linhas };
+}
+
+test('gravarComplemento: sem registro cria (201); com registro atualiza (200)', async () => {
+  const f = falso();
+  const c = await gravarComplemento(f.dados, 'lote', 7, { contato: 'a' });
+  assert.equal(c.http, 201);
+  assert.deepEqual(f.chamadas, ['listar', 'criar']);
+  const u = await gravarComplemento(f.dados, 'lote', 7, { contato: 'b' });
+  assert.equal(u.http, 200);
+  assert.equal(f.chamadas.at(-1), 'atualizar');
+});
+
+test('gravarComplemento: tipo divergente é 409 e não escreve; corpo vazio devolve o registro sem escrever', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 7, tipo_imovel: 'gleba' }]);
+  const r = await gravarComplemento(f.dados, 'lote', 7, { contato: 'x' });
+  assert.equal(r.http, 409);
+  const v = await gravarComplemento(f.dados, 'gleba', 7, {});
+  assert.equal(v.http, 200);
+  assert.ok(!f.chamadas.includes('atualizar') && !f.chamadas.includes('criar'));
+});
+
+test('gravarComplemento: corrida — criar bate no único, recarrega o vencedor e atualiza (não é 500)', async () => {
+  const f = falso([], { falhaCriar: new Error('duplicate key'), criarInsere: true });
+  const r = await gravarComplemento(f.dados, 'lote', 7, { contato: 'x' });
+  assert.equal(r.http, 200);
+  assert.deepEqual(f.chamadas, ['listar', 'criar', 'listar', 'atualizar']);
+});
+
+test('gravarComplemento: criar falha por OUTRO motivo (registro continua ausente) — relança', async () => {
+  const f = falso([], { falhaCriar: new Error('conexão caiu') });
+  await assert.rejects(gravarComplemento(f.dados, 'lote', 7, { contato: 'x' }), /conexão caiu/);
+});
+
+test('listarTodosComplementos: junta as páginas e nunca devolve lista truncada', async () => {
+  const muitas = Array.from({ length: 450 }, (_, i) => ({ id: i + 1, imovel_nucleo_id: i + 1 }));
+  assert.equal((await listarTodosComplementos(falso(muitas).dados)).length, 450);
+  assert.equal((await listarTodosComplementos(falso([]).dados)).length, 0);
+  // Página cheia que nunca termina (servidor que ignora `pagina` e devolve sempre 200, sem `total`):
+  // bate o teto e LANÇA em vez de devolver 100 mil linhas como se fosse tudo.
+  const infinito: DadosComplemento = {
+    async listar() { return { dados: Array.from({ length: 200 }, (_, i) => ({ id: i })) }; },
+    async criar() { return {}; }, async atualizar() { return {}; },
+  };
+  await assert.rejects(listarTodosComplementos(infinito), /lista incompleta recusada/);
 });
