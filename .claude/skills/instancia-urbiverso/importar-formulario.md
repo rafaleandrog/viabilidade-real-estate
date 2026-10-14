@@ -67,12 +67,13 @@ registrar.
    | Saída | Significa | O que fazer |
    |---|---|---|
    | `0` | sem divergência, sem falha HTTP, sem problema novo no motor | relate o estudo e os números |
-   | `1` | erro de preenchimento, ou a API recusou uma escrita | relate o motivo. Confirme na saída que o estudo foi **removido** (`estudo <id> removido`): se a saída diz `ATENÇÃO: não consegui remover o estudo`, ou o `POST` do estudo falhou sem confirmação, **o estudo pode ter ficado**, e o relatório entrega o id para a pessoa apagar |
+   | `1` | erro de preenchimento, ou a API recusou uma escrita | relate o motivo. Confirme na saída que o estudo foi **removido** (`estudo <id> removido`): se a saída diz `ATENÇÃO: não consegui remover o estudo`, ou o `POST` do estudo falhou sem confirmação, **o estudo pode ter ficado**: o id está só na saída do terminal (o arquivo de `--relatorio` não é gravado nesse caminho), e você o entrega à pessoa para apagar |
    | `2` | o estudo existe, mas há pendência (releitura, pagamento, motor) | relate cada pendência; o estudo **ficou**, com o id |
 
    `--manter-em-falha` mantém o estudo parcial para diagnóstico: uma exceção de escrita sai com `1` e o
-   estudo fica; uma falha HTTP ou de pagamento segue e sai com `2`. Só use se a pessoa pedir, e então o
-   estudo entra no relatório com o id.
+   estudo fica, com o id só na saída do terminal; uma falha HTTP ou de pagamento segue e sai com `2`, e
+   aí o id também vai no arquivo de `--relatorio`. Só use se a pessoa pedir, e então o estudo entra no
+   relatório de vocês com o id.
 5. **Separe defeito de achado conhecido.** A saída marca `conhecido:` quando o motor acusa algo já
    registrado em issue do repositório, com o número: isso vai como "conhecido (#N)", **não** como
    achado novo. `PROBLEMA :` (com espaço antes dos dois-pontos) é o que merece investigação, e a investigação não é desta skill: diga o que
@@ -98,7 +99,7 @@ formulário. Não rode sem o sim.
   `--forcar` ou em estudo que o pedido não criou: o importador já os chama no momento certo, no estudo
   certo.
 - **Não apague estudo por conta própria** além do que o importador remove sozinho: apagar é decisão da
-  pessoa, e o relatório entrega o id.
+  pessoa, e o relatório entrega o id (da saída do terminal, quando o caminho foi o de saída `1`).
 - **Não trate verde como prova de que o formulário descreve o projeto.** O importador prova que o
   estudo gravado bate com a planilha e que o motor o calcula; planilha errada para o projeto dá estudo
   errado com a mesma limpeza.
