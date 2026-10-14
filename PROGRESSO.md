@@ -4,6 +4,18 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-14 — Conferência do importador com os 4 formulários na Pinguim
+
+Pedido direto do autor. Os 4 formulários de `referencia/formularios/exemplos/` foram importados na Pinguim com o importador já com o id
+impresso na criação (estudos 38 a 41, nome com ` (importador v3)`), todos com saída 0, releitura sem divergência e pagamento canônico
+convertido nos dois Avançados. O `conferir-estudo`, rodado de novo depois, repete os números dos estudos 27 e 28 da véspera (Aurora
+Avançado TIR 48,78% e VPL R$ 29,78 mi; Vale do Sol Avançado TIR 39,25%), e os achados do motor são todos já registrados em issue
+(#835, #827, #832, e o alerta D14 esperado). Os estudos 25 a 28 foram apagados, com autorização, depois de conferir o nome de cada id.
+Nota datada com a tabela e o resíduo: `historico/conferencia-importador-4-formularios-2026-10-14.md`. Só documentação; sem código,
+schema ou migração.
+
+---
+
 ## 2026-10-14 — Importador de formulários: o id do estudo sai assim que ele é criado
 
 Raiz dos achados de revisão do PR de processo da skill `instancia-urbiverso`: o importador só imprimia o id do estudo no fim, então
