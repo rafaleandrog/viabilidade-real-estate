@@ -344,8 +344,8 @@ export class ViabTelaDashboard extends LitElement {
     this.parametrosSalvando = true;
     this.parametrosErro = '';
     let enviou = false;
+    const resultados: any[] = [];
     try {
-      const resultados: any[] = [];
       for (let i = 0; i < d.itens.length; i += MAX_ITENS_IMPORTACAO) {
         enviou = true;
         const res = await importarLoteParametros(d.itens.slice(i, i + MAX_ITENS_IMPORTACAO));
@@ -362,7 +362,13 @@ export class ViabTelaDashboard extends LitElement {
         urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosErro ? 'alerta' : 'sucesso');
       }
     } catch (e: any) {
+      // Pedido rejeitado no meio: os blocos anteriores já foram gravados e o resumo precisa dizer quais.
       this.parametrosErro = e?.message || 'Erro ao importar';
+      if (resultados.length > 0) {
+        const falhas = resultados.filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
+        this.importarResumo = { ok: resultados.length - falhas.length, falhas };
+        this.parametrosErro += ` (${this.importarResumo.ok} lote(s) de blocos anteriores já foram gravados)`;
+      }
     } finally {
       // Qualquer pedido enviado pode ter gravado (inclusive um que falhou na volta): o cache é relido SEMPRE,
       // sucesso ou falha. Se a releitura falha, o cache é desconhecido e o modal NÃO pode editar sobre ele —

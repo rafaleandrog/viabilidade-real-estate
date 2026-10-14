@@ -141,8 +141,10 @@ test('importação: só vai o que a planilha traz; o carimbo só no cadastro; re
   ], lotes, registros);
   assert.deepEqual(r.map((x) => x.status), ['casado', 'vinculo-mudou', 'casado']);
   const [existente, novo] = itensDaImportacao(r, 'q.csv', registros);
-  assert.deepEqual(existente, { imovel_nucleo_id: 781, coef_maximo: 3.5, origem: 'q.csv' },
+  const { carimbo_esperado: esperado, ...semEsperado } = existente;
+  assert.deepEqual(semEsperado, { imovel_nucleo_id: 781, coef_maximo: 3.5, origem: 'q.csv' },
     'registro existente: sem carimbo, sem null — não apaga o coef_minimo editado à mão');
+  assert.deepEqual(esperado, carimboDoLote(LOTE), 'registro existente leva o carimbo que a tela viu, como precondição');
   assert.ok('parcelamento_id' in novo && novo.coef_minimo === 1.5 && novo.gabarito_maximo === 12, 'cadastro novo leva carimbo e os valores que vieram');
   assert.ok(!('uos' in existente) && !('coef_minimo' in existente));
 });

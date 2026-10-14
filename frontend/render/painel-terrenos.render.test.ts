@@ -139,8 +139,8 @@ test('Painel: importar CSV casa por rua e número, confere a área, grava só o 
 test('Painel: importar por cima de registro existente não regrava o carimbo nem apaga o que a planilha não traz', { skip: pular ?? false }, async () => {
   const { m, a } = await medida('painel-terrenos-importar-existente');
   assert.equal(m.importaveis, 1, 'a linha casa com o lote que já tem registro' + relato(a));
-  assert.deepEqual(m.chavesDoItem, ['coef_maximo', 'imovel_nucleo_id', 'origem'],
-    'o item leva só o id, o valor que a planilha trouxe e a origem — sem carimbo e sem null' + relato(a));
+  assert.deepEqual(m.chavesDoItem, ['carimbo_esperado', 'coef_maximo', 'imovel_nucleo_id', 'origem'],
+    'o item leva o id, o valor que a planilha trouxe, a origem e o carimbo visto como precondição — sem carimbo para gravar e sem null' + relato(a));
 });
 
 test('Painel: nível leitura vê os parâmetros, mas não importa nem edita', { skip: pular ?? false }, async () => {

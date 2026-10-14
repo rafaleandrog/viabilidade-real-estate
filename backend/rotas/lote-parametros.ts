@@ -103,6 +103,16 @@ export async function listarTodosParametros(dados: DadosParametros): Promise<any
   throw new Error(`lote_parametros passou de ${TETO_PAGINAS * POR_PAGINA} registros: lista incompleta recusada`);
 }
 
+/** Igualdade de um campo do carimbo: área e parcelamento em valor (o banco devolve decimal como texto), o resto em texto. */
+function carimboIgual(campo: string, a: any, b: any): boolean {
+  if (campo === 'area_m2' || campo === 'parcelamento_id') {
+    const x = paraNumeroLinha(a); const y = paraNumeroLinha(b);
+    if (x == null || y == null) return x === y;
+    return Math.round(x * 100) === Math.round(y * 100);
+  }
+  return String(a ?? '').trim() === String(b ?? '').trim();
+}
+
 export type ResultadoGravacao =
   | { http: 200 | 201; registro: any }
   | { http: 400; codigo: 'CARIMBO_OBRIGATORIO' | 'INVARIANTE'; mensagem: string };
@@ -114,7 +124,7 @@ export type ResultadoGravacao =
  */
 export async function gravarParametros(
   dados: DadosParametros, imovelId: number, campos: Record<string, any>,
-  opcoes: { preservarCarimbo?: boolean } = {},
+  opcoes: { preservarCarimbo?: boolean; carimboEsperado?: Record<string, any> } = {},
 ): Promise<ResultadoGravacao> {
   const buscar = async () => (await dados.listar('lote_parametros', {
     filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
@@ -122,6 +132,17 @@ export async function gravarParametros(
   const sobre = async (atual: any, camposOriginais: Record<string, any>): Promise<ResultadoGravacao> => {
     // Importação: o carimbo de um registro que JÁ existe não é regravado, e quem decide que ele existe é o
     // servidor (o Painel pode ter carregado antes de outro editor criar ou reconfirmar o registro).
+    if (opcoes.preservarCarimbo) {
+      // Precondição: o carimbo que o cliente VIU (o do registro em cache, ou o do lote para um cadastro novo)
+      // tem de ser o que está gravado. Se outra pessoa reconfirmou o vínculo no intervalo, os valores da
+      // planilha foram casados com a identidade antiga e não podem ser aplicados à nova.
+      const visto = opcoes.carimboEsperado
+        ?? Object.fromEntries(CAMPOS_CARIMBO.filter((c) => c in camposOriginais).map((c) => [c, camposOriginais[c]]));
+      const mudou = Object.keys(visto).filter((c) => !carimboIgual(c, visto[c], atual[c]));
+      if (mudou.length > 0) {
+        return { http: 400, codigo: 'INVARIANTE', mensagem: `O vínculo do lote mudou desde que a planilha foi conferida (${mudou.join(', ')}): recarregue a aba e reimporte` };
+      }
+    }
     const campos = opcoes.preservarCarimbo
       ? Object.fromEntries(Object.entries(camposOriginais).filter(([c]) => !(CAMPOS_CARIMBO as readonly string[]).includes(c)))
       : camposOriginais;
@@ -221,8 +242,15 @@ export async function importarParametros(
     vistos.add(id);
     const v = validarParametros(item);
     if ('falha' in v) { resultados.push({ imovel_nucleo_id: id, ok: false, erro: v.falha.mensagem }); continue; }
+    const esperado = item?.carimbo_esperado;
+    if (esperado !== undefined && (esperado === null || typeof esperado !== 'object' || Array.isArray(esperado))) {
+      resultados.push({ imovel_nucleo_id: id, ok: false, erro: 'carimbo_esperado deve ser um objeto' }); continue;
+    }
     try {
-      const r = await gravarParametros(dados, id, v.dados, { preservarCarimbo: true });
+      const r = await gravarParametros(dados, id, v.dados, {
+        preservarCarimbo: true,
+        carimboEsperado: esperado ? Object.fromEntries(CAMPOS_CARIMBO.filter((c) => c in esperado).map((c) => [c, esperado[c]])) : undefined,
+      });
       if (r.http === 400) resultados.push({ imovel_nucleo_id: id, ok: false, erro: r.mensagem });
       else resultados.push({ imovel_nucleo_id: id, ok: true, criado: r.http === 201 });
     } catch (e: any) {

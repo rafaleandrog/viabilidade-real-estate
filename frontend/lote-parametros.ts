@@ -242,7 +242,10 @@ export function itensDaImportacao(
   return resultado.filter((r) => r.status === 'casado' && r.lote).map((r) => {
     const id = Number(r.lote!.id);
     const item: Record<string, any> = { imovel_nucleo_id: id };
-    if (!registros.has(id)) Object.assign(item, carimboDoLote(r.lote!));
+    const registro = registros.get(id);
+    if (!registro) Object.assign(item, carimboDoLote(r.lote!));
+    // Registro existente: o servidor só aplica os valores se o carimbo gravado ainda for o que esta tela viu.
+    else item.carimbo_esperado = Object.fromEntries(Object.keys(carimboDoLote(r.lote!)).map((c) => [c, registro[c] ?? null]));
     if (r.linha.coef_maximo != null) item.coef_maximo = r.linha.coef_maximo;
     if (r.linha.coef_minimo != null) item.coef_minimo = r.linha.coef_minimo;
     if (r.linha.gabarito_maximo != null) item.gabarito_maximo = r.linha.gabarito_maximo;

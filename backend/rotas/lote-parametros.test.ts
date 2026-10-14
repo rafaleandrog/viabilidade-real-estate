@@ -207,10 +207,24 @@ test('importação: registro que existe no SERVIDOR não tem o carimbo regravado
   const original = f.dados.atualizar;
   f.dados.atualizar = async (t, id, d) => { gravados.push(d); return original(t, id, d); };
   // O cliente achou que o registro não existia (cache velho) e mandou o carimbo.
-  await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5, parcelamento_id: 99, numero_lote: '1', area_m2: 5 }]);
+  await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5, ...CARIMBO }]);
   assert.deepEqual(gravados, [{ coef_maximo: 3.5 }]);
   // O PUT do modal (reconfirmar) continua podendo regravar o carimbo.
   const r = await gravarParametros(f.dados, 781, { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
   assert.equal(r.http, 200);
   assert.deepEqual(gravados[1], { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
+});
+
+test('importação: carimbo esperado diferente do gravado recusa o item (vínculo reconfirmado por outra pessoa)', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_maximo: '3.00', ...CARIMBO }]);
+  const r1 = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 4, carimbo_esperado: { ...CARIMBO, numero_lote: 'OUTRO' } }]);
+  assert.equal(r1.resultados[0].ok, false);
+  assert.match(r1.resultados[0].erro!, /vínculo do lote mudou/);
+  const r2 = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 4, carimbo_esperado: { ...CARIMBO } }]);
+  assert.equal(r2.resultados[0].ok, true);
+  // Cadastro novo na visão do cliente, mas o servidor já tem o registro com OUTRA identidade: recusa.
+  const r3 = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 5, ...CARIMBO, area_m2: 999 }]);
+  assert.equal(r3.resultados[0].ok, false);
+  const r4 = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 5, carimbo_esperado: 'x' }]);
+  assert.equal(r4.resultados[0].ok, false);
 });
