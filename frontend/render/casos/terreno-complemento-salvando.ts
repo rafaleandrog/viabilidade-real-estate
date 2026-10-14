@@ -12,6 +12,9 @@ export interface MedidaSalvando {
   fecharComSalvando: number;
   salvarComSalvando: number;
   cancelarDesabilitado: boolean;
+  camposTotal: number;
+  camposDesabilitadosSalvando: number;
+  camposDesabilitadosLivre: number;
   fecharDepois: number;
 }
 
@@ -44,10 +47,14 @@ export const caso = {
     el._salvar();                                   // livre: pede para salvar
     const unico = eventos.salvar[0];
 
+    const campos = () => [...el.shadowRoot.querySelectorAll('urbi-input, urbi-select, urbi-textarea, viab-num')] as any[];
+    const desab = () => campos().filter((c) => c.hasAttribute('desabilitado')).length;
+    const livre = desab();
     el.salvando = true; await el.updateComplete;    // o Painel começou o PUT
     el._salvar(); el._fechar();                     // segundo Salvar e Cancelar/X com o PUT em voo
     const botoes = [...el.shadowRoot.querySelectorAll('urbi-botao')] as any[];
     const cancelar = botoes.find((b) => /Cancelar/.test(b.textContent));
+    const camposSalvando = desab();
     const durante = { fechar: eventos.fechar, salvar: eventos.salvar.length - 1, desab: cancelar?.hasAttribute('desabilitado') === true };
 
     el.salvando = false; await el.updateComplete;   // o PUT terminou
@@ -59,6 +66,9 @@ export const caso = {
       fecharComSalvando: durante.fechar,
       salvarComSalvando: durante.salvar,
       cancelarDesabilitado: durante.desab,
+      camposTotal: campos().length,
+      camposDesabilitadosSalvando: camposSalvando,
+      camposDesabilitadosLivre: livre,
       fecharDepois: eventos.fechar,
     };
   },

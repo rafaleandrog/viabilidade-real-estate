@@ -93,6 +93,9 @@ test('Modal do terreno: pede para salvar uma vez; com o Painel salvando ignora f
   assert.equal(m.fecharComSalvando, 0, 'fechar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.salvarComSalvando, 0, 'segundo Salvar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.cancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
+  assert.equal(m.camposTotal, 12, 'o modal tem os 12 campos de edição' + relato(a));
+  assert.equal(m.camposDesabilitadosLivre, 0, 'livre e com permissão, nenhum campo desabilitado' + relato(a));
+  assert.equal(m.camposDesabilitadosSalvando, 12, 'com o PUT em voo TODOS os campos ficam desabilitados (edição depois de Salvar seria descartada)' + relato(a));
   assert.equal(m.fecharDepois, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));
 });
 

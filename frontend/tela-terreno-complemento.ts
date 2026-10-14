@@ -45,6 +45,9 @@ export class ViabTerrenoComplemento extends LitElement {
     }
   }
 
+  /** Sem permissão de editar, ou com o PUT em voo: uma edição feita depois de Salvar seria descartada ao fechar. */
+  private get _bloqueado(): boolean { return !this.editavel || this.salvando; }
+
   private _set(campo: string, valor: string | number | null) {
     this.form = { ...this.form, [campo]: valor };
   }
@@ -72,7 +75,7 @@ export class ViabTerrenoComplemento extends LitElement {
       <urbi-input
         label=${rotulo}
         placeholder=${placeholder}
-        ?desabilitado=${!this.editavel}
+        ?desabilitado=${this._bloqueado}
         .valor=${String(this.form[campo] ?? '')}
         @urbi:input-change=${(e: CustomEvent) => this._set(campo, e.detail.valor)}
       ></urbi-input>`;
@@ -85,7 +88,7 @@ export class ViabTerrenoComplemento extends LitElement {
         sufixo=${opcoes.sufixo ?? ''}
         casas-decimais=${opcoes.casas ?? 2}
         casas-minimas=${opcoes.minimas ?? 0}
-        ?desabilitado=${!this.editavel}
+        ?desabilitado=${this._bloqueado}
         .valor=${this.form[campo] as number | null}
         @urbi:input-numero-change=${(e: CustomEvent) => this._set(campo, e.detail.valor)}
       ></viab-num>`;
@@ -95,7 +98,7 @@ export class ViabTerrenoComplemento extends LitElement {
     return html`
       <urbi-select
         label=${rotulo}
-        ?desabilitado=${!this.editavel}
+        ?desabilitado=${this._bloqueado}
         .valor=${String(this.form[campo] ?? '')}
         .opcoes=${[SEM_VALOR, ...opcoes]}
         @urbi:select-change=${(e: CustomEvent) => this._set(campo, e.detail.valor)}
@@ -127,7 +130,7 @@ export class ViabTerrenoComplemento extends LitElement {
             <urbi-textarea
               label="Restrições (ambientais, jurídicas, servidões)"
               rows="3"
-              ?desabilitado=${!this.editavel}
+              ?desabilitado=${this._bloqueado}
               .valor=${String(this.form.restricoes ?? '')}
               @urbi:input-change=${(e: CustomEvent) => this._set('restricoes', e.detail.valor)}
             ></urbi-textarea>
@@ -136,7 +139,7 @@ export class ViabTerrenoComplemento extends LitElement {
             <urbi-textarea
               label="Observações"
               rows="3"
-              ?desabilitado=${!this.editavel}
+              ?desabilitado=${this._bloqueado}
               .valor=${String(this.form.observacoes ?? '')}
               @urbi:input-change=${(e: CustomEvent) => this._set('observacoes', e.detail.valor)}
             ></urbi-textarea>
