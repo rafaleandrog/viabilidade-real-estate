@@ -966,24 +966,46 @@ def main(argv):
             Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
         return 1
     api = Api(executar)
-    eid = criar_estudo(api, m)
+    try:
+        eid = criar_estudo(api, m)
+    except (urllib.error.URLError, OSError) as ex:
+        # a resposta do POST pode ter se perdido com o estudo já criado: sem id, só dá para conferir pela lista
+        print(f'ERRO: falha de rede ao criar o estudo ({type(ex).__name__}: {ex}). Se o pedido chegou ao servidor, '
+              'um estudo pode ter sido criado sem id: compare a lista de estudos do app com a de antes de rodar.')
+        return 1
     if eid is None:
         print('ERRO: o POST /estudos falhou (o estudo pode não ter sido criado):', api.falhas())
         return 1
+    if executar:
+        # o id sai AQUI, antes de qualquer outra escrita: se a execução cair depois, ele já está no terminal
+        # e no arquivo de --relatorio, e dá para achar (e apagar) o estudo parcial
+        print(f'estudo criado: id {eid} (nome "{m.estudo.get("nome")}")', flush=True)
+        relatorio['estudo_id'] = eid
+        if rel:
+            Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
+
     def desfazer(motivo):
         # a validação prévia não conhece toda regra da API; se uma escrita for recusada depois do estudo existir,
         # o estudo parcial é removido em vez de ficar como se estivesse certo
         print(f'ERRO: {motivo} — estudo parcial:', api.falhas())
-        st, _ = api.chamar('DELETE', f'/estudos/{eid}')
+        try:
+            st, _ = api.chamar('DELETE', f'/estudos/{eid}')
+        except (urllib.error.URLError, OSError) as ex:
+            st = f'{type(ex).__name__}: {ex}'
         print(f'estudo {eid} removido (HTTP {st}); nada ficou gravado pela metade.' if st in (200, 204)
-              else f'ATENÇÃO: não consegui remover o estudo {eid} (HTTP {st}); apague-o à mão.')
+              else f'ATENÇÃO: não consegui remover o estudo {eid} ({st}); apague-o à mão.')
         return 1
     try:
         (escrever_preliminar if m.estudo['nivel_analise'] == 'preliminar' else escrever_avancado)(api, m, eid)
     except EscritaFalhou as ex:
         if executar and not manter:
             return desfazer(str(ex))
-        raise SystemExit(str(ex))
+        raise SystemExit(f'{ex} (estudo {eid} mantido)')
+    except (urllib.error.URLError, OSError) as ex:
+        motivo = f'falha de rede durante a escrita ({type(ex).__name__}: {ex})'
+        if executar and not manter:
+            return desfazer(motivo)
+        raise SystemExit(f'{motivo} (estudo {eid} mantido)')
     if executar and api.falhas() and not manter:
         return desfazer('a API recusou escritas')
     for mt, c, st, r_ in api.log:

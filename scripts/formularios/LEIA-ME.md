@@ -9,7 +9,7 @@ vira um estudo da instância com **um comando**, e o resultado é conferido ante
 python3 -I scripts/formularios/importar_formulario.py <preenchido.xlsx> --nome-estudo "qa-..." --executar --relatorio saida.json
 ```
 
-Se a API recusar alguma escrita depois de o estudo existir, o importador **remove o estudo** que acabou de criar e sai com 1 (`--manter-em-falha` mantém o estudo para diagnóstico). Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (com `--executar`, precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
+Com `--executar`, o id do estudo sai **assim que ele é criado** (`estudo criado: id <N>`), antes de qualquer outra escrita, e vai também para o arquivo de `--relatorio`; se a execução cair depois, o id já está lá. Se a API recusar alguma escrita, ou a rede cair, depois de o estudo existir, o importador **tenta remover o estudo** que acabou de criar e sai com 1 (`--manter-em-falha` mantém o estudo para diagnóstico, com o id na mensagem de saída). Se a própria remoção falhar, ele avisa com o id (`ATENÇÃO: não consegui remover o estudo <N>`). A única janela sem id é a rede cair **durante o `POST` que cria o estudo**: a resposta pode ter se perdido com o estudo criado, e o importador avisa para conferir a lista de estudos do app contra a de antes de rodar. Sem `--executar` só valida a planilha e mostra o plano. Ambiente: `URBIVERSO_QA_URL` (com `--executar`, precisa começar com `https://`; o importador não segue redirect) e `URBIVERSO_QA_TOKEN_PCPAL` (o token nunca é
 impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os passos 3 e 5 usam o motor do app).
 
 ## O que ele faz, nesta ordem

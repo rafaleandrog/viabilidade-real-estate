@@ -4,6 +4,17 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-14 — Importador de formulários: o id do estudo sai assim que ele é criado
+
+Raiz dos achados de revisão do PR de processo da skill `instancia-urbiverso`: o importador só imprimia o id do estudo no fim, então
+uma execução que caía no meio deixava um estudo parcial que ninguém sabia achar. Agora, com `--executar`, o id sai
+(`estudo criado: id <N>`) e vai ao arquivo de `--relatorio` antes de qualquer outra escrita; queda de rede durante a escrita passa pela
+mesma limpeza das falhas HTTP (tenta remover o estudo; `--manter-em-falha` mantém, com o id na mensagem); e se a própria remoção cair,
+o aviso traz o id. A única janela sem id é a rede cair durante o `POST` que cria o estudo, e o importador avisa para conferir a lista de
+estudos. Só `scripts/formularios/`; sem schema, sem migração, sem `versao`.
+
+---
+
 ## 2026-10-13 — Formulários v2: API canônica, importador que confere e chaves legíveis por máquina
 
 Pedido direto do autor; fecha a #839: tornar os formulários simplificados confiáveis para qualquer pessoa ou IA criar um estudo
