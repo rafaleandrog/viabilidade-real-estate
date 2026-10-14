@@ -28,6 +28,11 @@ const CAMPOS_NUMERICOS = [
   'preco_pedido', 'coeficiente_aproveitamento', 'taxa_ocupacao_pct', 'gabarito_pavimentos',
 ];
 
+// DECIMAL(12,2) → 9.999.999.999,99; DECIMAL(5,2) → 999,99; inteiro de 32 bits → 2.147.483.647.
+const TETOS_NUMERICOS: Record<string, number> = {
+  preco_pedido: 9999999999.99, coeficiente_aproveitamento: 999.99, gabarito_pavimentos: 2147483647,
+};
+
 /** Campos que o cliente pode gravar — o resto do corpo é ignorado. */
 export const CAMPOS_EDITAVEIS = [
   ...Object.keys(OPCOES_COMPLEMENTO), ...Object.keys(LIMITES_TEXTO), ...CAMPOS_TEXTO_LONGO, ...CAMPOS_NUMERICOS,
@@ -71,6 +76,13 @@ export function validarComplemento(corpo: any): { dados: Record<string, any> } |
     const n = coagido.dados[campo];
     if (typeof n === 'number' && n < 0) {
       return { falha: { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: `Campo "${campo}" não pode ser negativo` } };
+    }
+  }
+  // Teto de cada coluna `decimal`/`inteiro` do schema: passar dele estoura no banco e viraria 500.
+  for (const [campo, teto] of Object.entries(TETOS_NUMERICOS)) {
+    const n = coagido.dados[campo];
+    if (typeof n === 'number' && n > teto) {
+      return { falha: { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: `Campo "${campo}" não pode passar de ${teto}` } };
     }
   }
   if (typeof coagido.dados.taxa_ocupacao_pct === 'number' && coagido.dados.taxa_ocupacao_pct > 100) {

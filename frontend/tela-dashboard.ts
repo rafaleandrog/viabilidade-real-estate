@@ -253,11 +253,17 @@ export class ViabTelaDashboard extends LitElement {
     this.terrenosMotivo = '';
     this.terrenosAvisoLotes = '';
     this.complementosAviso = '';
+    this.terrenoAberto = null;
     try {
       const POR = 200;
       // Não derruba a aba: sem o complemento a lista de terrenos continua valendo.
+      // `urbiVerso.api` RESOLVE a resposta de erro (`{ erro: true, mensagem }`) em vez de lançar: sem
+      // este `throw` ela virava "lista vazia", e o modal abria em branco sobre um registro que existe.
       const complementosP = listarComplementosTerreno()
-        .then((r: any) => indexarComplementos(r?.dados ?? []))
+        .then((r: any) => {
+          if (r?.erro || !Array.isArray(r?.dados)) throw new Error(r?.mensagem || 'resposta inesperada');
+          return indexarComplementos(r.dados);
+        })
         .catch((e: any) => {
           this.complementosAviso = `não foi possível carregar as informações de viabilidade dos terrenos (${e?.message || 'indisponível'}).`;
           return new Map<number, any>();
@@ -284,7 +290,8 @@ export class ViabTelaDashboard extends LitElement {
         .map((o: any) => ({ ...o, _tipo: 'lote' }));
       this.terrenos = [...g, ...l];
       this.complementos = await complementosP;
-      this.terrenosCarregados = !falhaTransitoria;
+      // Falha ao ler os complementos também deixa a aba "não carregada": voltar a ela tenta de novo.
+      this.terrenosCarregados = !falhaTransitoria && !this.complementosAviso;
     } catch (e: any) {
       this.terrenosDisponivel = false;
       this.terrenosMotivo = e?.message || 'Indisponível';
@@ -831,7 +838,7 @@ export class ViabTelaDashboard extends LitElement {
         <viab-terreno-complemento
           .terreno=${this.terrenoAberto}
           .complemento=${this.complementos.get(Number(this.terrenoAberto.id)) ?? null}
-          .editavel=${['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '')}
+          .editavel=${!this.complementosAviso && ['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '')}
           @viab-complemento-fechar=${() => { this.terrenoAberto = null; }}
           @viab-complemento-salvo=${(e: CustomEvent) => {
             const reg = e.detail;

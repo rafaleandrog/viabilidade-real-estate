@@ -14,6 +14,8 @@ const COMPLEMENTO = {
 };
 
 export interface MedidaComplemento {
+  aviso: string;
+  carregada: boolean;
   preco: Record<string, string>;
   temSituacao: Record<string, boolean>;
   modalAntes: boolean;
@@ -41,7 +43,10 @@ export async function medirComplemento(raiz: HTMLElement): Promise<MedidaComplem
   tabela.dispatchEvent(new CustomEvent('urbi:tabela-click', { detail: { linha: alvo }, bubbles: true, composed: true }));
   for (let i = 0; i < 3; i++) { await el.updateComplete; await new Promise((r) => setTimeout(r, 0)); }
   const modal = el.shadowRoot!.querySelector('viab-terreno-complemento') as any;
+  const banners = [...el.shadowRoot!.querySelectorAll('urbi-banner')].map((b: any) => b.textContent?.replace(/\s+/g, ' ').trim());
   return {
+    aviso: banners.find((t: string) => /Informações de viabilidade indisponíveis/.test(t)) ?? '',
+    carregada: !!el.terrenosCarregados,
     preco, temSituacao, modalAntes,
     modalTerreno: modal?.terreno?.id_legivel ?? '',
     modalProprietario: modal?.complemento?.proprietario ?? '',

@@ -52,3 +52,11 @@ test('corpo que não é objeto é recusado; campos fora da lista são ignorados'
   const r = validarComplemento({ id: 9, imovel_nucleo_id: 3, tipo_imovel: 'lote', contato: 'a' });
   assert.deepEqual((r as any).dados, { contato: 'a' });
 });
+
+test('teto das colunas: acima do que o NUMERIC/int do schema comporta é 400, não 500 do banco', () => {
+  assert.ok('falha' in validarComplemento({ coeficiente_aproveitamento: 1000 }));
+  assert.ok('dados' in validarComplemento({ coeficiente_aproveitamento: 999.99 }));
+  assert.ok('falha' in validarComplemento({ preco_pedido: 1e10 }));
+  assert.ok('dados' in validarComplemento({ preco_pedido: 9999999999.99 }));
+  assert.ok('falha' in validarComplemento({ gabarito_pavimentos: 3e9 }));
+});

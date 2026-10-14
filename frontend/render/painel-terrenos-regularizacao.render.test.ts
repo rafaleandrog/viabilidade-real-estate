@@ -64,3 +64,18 @@ test('Terrenos: o complemento aparece na linha do imóvel certo e o clique abre 
   assert.equal(m.modalProprietario, 'Fulano de Tal', 'o modal recebe o registro desse imóvel' + relato(a));
   assert.equal(m.modalEditavel, true, 'nível admin edita' + relato(a));
 });
+
+for (const modo of ['rejeita', 'erro-payload']) {
+  test(`Terrenos: leitura dos complementos falha (${modo}) → avisa, não carrega a aba e o modal NÃO edita`, { skip: pular ?? false }, async () => {
+    const a = await verificarRender({ caso: `painel-terrenos-complemento-${modo}`, larguras: [1280] });
+    assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+    assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+    assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
+    const m = a.extra?.['1280'] as any;
+    assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+    assert.match(m.aviso, /Informações de viabilidade indisponíveis/, 'o banner de falha tem que aparecer' + relato(a));
+    assert.equal(m.carregada, false, 'falha de leitura não marca a aba como carregada: voltar a ela tenta de novo' + relato(a));
+    assert.equal(m.modalTerreno, 'LOTE-NORMAL', 'a lista de terrenos segue valendo e o clique abre o modal' + relato(a));
+    assert.equal(m.modalEditavel, false, 'sem ler o registro o modal não pode ser editável (o PUT total apagaria dados)' + relato(a));
+  });
+}

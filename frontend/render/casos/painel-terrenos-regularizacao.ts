@@ -22,10 +22,17 @@ export const aceitaNaoReproduzidoBase = [
 
 export type ModoParcelamentos = 'ok' | 'sem-permissao';
 
-export function montarCaso(modo: ModoParcelamentos, complementos: any[] = []) {
+// `urbiVerso.api` real RESOLVE `{ erro: true }` em não-2xx; `rejeita` cobre a falha de rede.
+function respostaComplementos(c: any[] | 'rejeita' | 'erro-payload'): any {
+  if (c === 'rejeita') throw new Error('rede caiu');
+  if (c === 'erro-payload') return { erro: true, codigo: 'ERRO_INTERNO', mensagem: 'falhou' };
+  return { dados: c, total: c.length };
+}
+
+export function montarCaso(modo: ModoParcelamentos, complementos: any[] | 'rejeita' | 'erro-payload' = []) {
   return async function montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).urbiVerso.api = async (rota: string) => (
-      String(rota).startsWith('/terrenos-complemento') ? { dados: complementos, total: complementos.length } : { dados: [] }
+      String(rota).startsWith('/terrenos-complemento') ? respostaComplementos(complementos) : { dados: [] }
     );
     (globalThis as any).urbiVerso.modulo = async (slug: string, rota: string) => {
       if (slug !== 'imobiliario') throw new Error(`módulo não declarado: ${slug}`);
