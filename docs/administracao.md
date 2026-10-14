@@ -49,14 +49,15 @@ de uma vez em **Importar coeficientes (CSV)**.
   da planilha, quando vem, é conferida contra a do módulo (tolerância de 0,01 m²). A tela mostra o que vai entrar
   antes de gravar, e **só as linhas que casam com exatamente um lote entram**. Ficam de fora, e a tela lista até as
   doze primeiras: linhas sem lote, com mais de um lote, **repetidas na planilha (nenhuma das ocorrências entra)**, com
-  área diferente, sem nenhum valor, ou de um lote que já tem registro e **mudou no módulo** (esse se resolve no modal do
+  área diferente, **célula numérica com texto que não é número**, sem nenhum valor, ou de um lote que já tem registro e **mudou no módulo** (esse se resolve no modal do
   lote, com *Reconfirmar vínculo*).
 - **Importar de novo não apaga nada.** Célula vazia ou coluna ausente significam "não mexer": o CSV da etapa 1 traz só
   o coeficiente máximo, e reimportá-lo não apaga o mínimo, o gabarito, a UOS ou o uso que alguém editou no modal. Só o
   modal limpa um valor. O carimbo do lote é gravado no **cadastro** do registro; importar por cima de um registro que
   já existe não o regrava. Planilhas com mais de 300 lotes são enviadas em blocos de 300.
 - **Status do vínculo.** Junto dos valores o app guarda um carimbo do lote (parcelamento, rua, número, quadra, conjunto
-  e área). A coluna **Vínculo** compara o carimbo com o lote de hoje: *Conferido*; *Área mudou* (alerta, os valores
+  e área; o parcelamento pode ser vazio, e lote que ganha ou perde parcelamento depois conta como lote que mudou). A
+  coluna **Vínculo** compara o carimbo com o lote de hoje: *Conferido*; *Área mudou* (alerta, os valores
   seguem valendo, pode ser retificação); *Lote mudou* (parcelamento, rua, número, quadra ou conjunto diferentes: a edição
   fica bloqueada até **Reconfirmar vínculo**). Registros cujo lote não existe mais ou foi removido ficam guardados e são
   contados num aviso.

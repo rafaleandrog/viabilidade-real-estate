@@ -60,8 +60,8 @@ export function statusVinculo(registro: any | null | undefined, lote: LoteNucleo
   if (!lote || lote.removido_em) return 'removido';
   const c = carimboDoLote(lote);
   const igual = (a: unknown, b: unknown) => normalizarTexto(a) === normalizarTexto(b);
-  if (registro.parcelamento_id != null && c.parcelamento_id != null
-    && Number(registro.parcelamento_id) !== Number(c.parcelamento_id)) return 'identificacao';
+  // `null` é um valor: lote que ganha ou perde o parcelamento mudou de identidade.
+  if ((paraNumero(registro.parcelamento_id) ?? null) !== (paraNumero(c.parcelamento_id) ?? null)) return 'identificacao';
   for (const campo of ['rua', 'numero_lote', 'quadra', 'conjunto'] as const) {
     if (!igual(registro[campo], c[campo])) return 'identificacao';
   }
@@ -89,6 +89,8 @@ export interface LinhaPlanilha {
   linha: number; rua: string; numero: string; area: number | null;
   coef_maximo: number | null; coef_minimo: number | null; gabarito_maximo: number | null;
   uos: string; uso: string;
+  /** Campos numéricos cuja célula tinha texto que não é número (ex.: "abc", "3x"): a linha não é importável. */
+  invalidos?: string[];
 }
 
 /** Número de planilha: "3.5", "3,5", "1.234,56" ou "1,234.56"; qualquer outra coisa é `null`. */
@@ -146,6 +148,9 @@ export function lerCsv(texto: string): { linhas: LinhaPlanilha[]; erros: string[
       const v = (cel[j] ?? '').trim();
       const numerico = ['area', 'coef_maximo', 'coef_minimo', 'gabarito_maximo'].includes(campo);
       const valor = numerico ? numeroPlanilha(v) : v;
+      // Texto que não é número NÃO pode virar "célula vazia": a área ignoraria a conferência e o coeficiente
+      // limparia o valor gravado. A linha é marcada e não entra.
+      if (numerico && v !== '' && valor === null) (r.invalidos ??= []).push(campo);
       // Dois cabeçalhos para o mesmo campo ("numero" e "lote"): a coluna vazia não apaga a preenchida.
       if (valor !== null && valor !== '') r[campo] = valor;
     });
@@ -155,7 +160,7 @@ export function lerCsv(texto: string): { linhas: LinhaPlanilha[]; erros: string[
   return { linhas, erros };
 }
 
-export type StatusLinha = 'casado' | 'area-diverge' | 'sem-lote' | 'ambiguo' | 'duplicada' | 'sem-valor' | 'vinculo-mudou';
+export type StatusLinha = 'casado' | 'celula-invalida' | 'area-diverge' | 'sem-lote' | 'ambiguo' | 'duplicada' | 'sem-valor' | 'vinculo-mudou';
 
 export interface ResultadoLinha { linha: LinhaPlanilha; lote?: LoteNucleo; status: StatusLinha; }
 
@@ -186,6 +191,7 @@ export function casarPlanilha(
   }
   return linhas.map((linha): ResultadoLinha => {
     const k = chaveRuaNumero(linha.rua, linha.numero);
+    if (linha.invalidos?.length) return { linha, status: 'celula-invalida' };
     if ((ocorrencias.get(k) ?? 0) > 1) return { linha, status: 'duplicada' };
     const cands = porChave.get(k) ?? [];
     if (cands.length === 0) return { linha, status: 'sem-lote' };
@@ -207,6 +213,7 @@ export function casarPlanilha(
 
 export const ROTULO_LINHA: Record<StatusLinha, string> = {
   casado: 'Casado com o lote do módulo',
+  'celula-invalida': 'Célula numérica com texto que não é número (área, cmax, cmin ou gabarito)',
   'area-diverge': 'Casou pela rua e número, mas a área difere do módulo',
   'sem-lote': 'Nenhum lote do módulo com essa rua e número',
   ambiguo: 'Mais de um lote do módulo com essa rua e número',

@@ -78,6 +78,7 @@ function falso(linhas: any[] = [], opcoes: { falhaCriar?: Error; criarInsere?: b
   return { dados, chamadas, linhas };
 }
 const CARIMBO = { parcelamento_id: 12, numero_lote: '4910', area_m2: 1464.91 };
+const CARIMBO_SEM_PARCELAMENTO = { parcelamento_id: null, numero_lote: '4910', area_m2: 1464.91 };
 
 test('gravarParametros: criar exige o carimbo mínimo; atualizar não', async () => {
   const f = falso();
@@ -89,6 +90,14 @@ test('gravarParametros: criar exige o carimbo mínimo; atualizar não', async ()
   const u = await gravarParametros(f.dados, 781, { coef_maximo: 3 });
   assert.equal(u.http, 200);
   assert.equal(f.chamadas.at(-1), 'atualizar');
+});
+
+test('gravarParametros: lote SEM parcelamento também pode ter registro (parcelamento_id null no carimbo)', async () => {
+  const f = falso();
+  const r = await gravarParametros(f.dados, 790, { coef_maximo: 3, ...CARIMBO_SEM_PARCELAMENTO });
+  assert.equal(r.http, 201);
+  const sem = await gravarParametros(falso().dados, 791, { coef_maximo: 3, parcelamento_id: 12 });
+  assert.equal(sem.http, 400, 'número e área do lote continuam obrigatórios');
 });
 
 test('gravarParametros: corpo vazio devolve o registro sem escrever', async () => {
@@ -146,7 +155,7 @@ test('gravarParametros: os invariantes valem contra a LINHA gravada, não só co
   assert.equal(mudaMax.http, 400, 'máximo 0,5 contra o mínimo 1 já gravado');
   const ok = await gravarParametros(f.dados, 781, { coef_minimo: 2 });
   assert.equal(ok.http, 200);
-  for (const campo of ['numero_lote', 'parcelamento_id', 'area_m2']) {
+  for (const campo of ['numero_lote', 'area_m2']) {
     const r = await gravarParametros(f.dados, 781, { [campo]: null });
     assert.equal(r.http, 400, `${campo} do carimbo não pode ser apagado`);
   }

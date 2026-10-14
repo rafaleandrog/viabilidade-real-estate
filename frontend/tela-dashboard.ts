@@ -363,10 +363,14 @@ export class ViabTelaDashboard extends LitElement {
         if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
         this.parametros = indexarParametros(atual.dados);
       } catch (e: any) {
-        this.parametrosErro = `Importação gravada, mas não foi possível atualizar a lista (${e?.message || 'indisponível'}). Recarregue o app para ver os valores.`;
+        // Cache velho + modal editável = o próximo Salvar manda os valores antigos e desfaz a importação.
+        // Mesmo tratamento de uma falha de leitura: aviso, edição bloqueada e a aba recarrega na volta.
+        this.parametrosAviso = `a importação foi gravada, mas a lista não pôde ser atualizada (${e?.message || 'indisponível'}). Volte a esta aba para recarregar.`;
+        this.terrenosCarregados = false;
+        this.parametrosErro = '';
       }
       if (this.importarResumo) {
-        urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosErro ? 'alerta' : 'sucesso');
+        urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosAviso ? 'alerta' : 'sucesso');
       }
     } catch (e: any) {
       this.parametrosErro = e?.message || 'Erro ao importar';

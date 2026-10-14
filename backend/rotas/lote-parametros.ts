@@ -24,8 +24,12 @@ const TETOS: Record<string, number> = {
 };
 /** Campos de CARIMBO: identificam o lote no módulo no momento do cadastro. */
 export const CAMPOS_CARIMBO = ['parcelamento_id', 'rua', 'numero_lote', 'quadra', 'conjunto', 'area_m2'] as const;
-/** Sem estes três o vínculo não pode ser conferido depois: são obrigatórios ao CRIAR o registro. */
-export const CARIMBO_OBRIGATORIO = ['parcelamento_id', 'numero_lote', 'area_m2'] as const;
+/**
+ * Sem estes dois o vínculo não pode ser conferido depois: são obrigatórios ao CRIAR o registro.
+ * `parcelamento_id` NÃO é: lote sem parcelamento existe (a aba Terrenos o lista) e seu carimbo grava
+ * `null`, que a conferência trata como um valor — lote que ganha ou perde parcelamento depois muda de identidade.
+ */
+export const CARIMBO_OBRIGATORIO = ['numero_lote', 'area_m2'] as const;
 /** Campos que o cliente pode gravar — o resto do corpo é ignorado. */
 export const CAMPOS_EDITAVEIS = [
   ...CAMPOS_CARIMBO, 'coef_minimo', 'coef_maximo', 'gabarito_maximo', 'uos', 'uso', 'origem',

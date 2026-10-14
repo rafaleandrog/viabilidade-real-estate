@@ -22,6 +22,9 @@ export interface MedidaImportar {
   resumoOk: number;
   resumoFalhas: number;
   importandoDepois: boolean;
+  aviso: string;
+  editavelDepois: boolean;
+  terrenosCarregadosDepois: boolean;
 }
 
 // LOTE-NORMAL (Amsterdam 4910, 300 m²) casa; LOTE-SEM-PARCELAMENTO (Barcelona 4915) tem área errada;
@@ -32,7 +35,7 @@ Barcelona ;4915;999;3.5;;CSIIR 2;Misto
 Nada;1;10;3;;X;Y
 `;
 
-export async function medirImportar(raiz: HTMLElement, csv: string): Promise<MedidaImportar> {
+export async function medirImportar(raiz: HTMLElement, csv: string, releituraFalha = false): Promise<MedidaImportar> {
   const el: any = raiz.querySelector('viab-tela-dashboard');
   const apiAnterior = (globalThis as any).urbiVerso.api;
   let postUrl = ''; let postItens: any[] = [];
@@ -42,6 +45,7 @@ export async function medirImportar(raiz: HTMLElement, csv: string): Promise<Med
       return { resultados: postItens.map((i: any) => ({ imovel_nucleo_id: i.imovel_nucleo_id, ok: true, criado: true })) };
     }
     if (rota.startsWith('/lote-parametros')) {
+      if (releituraFalha && postUrl) return { erro: true, mensagem: 'indisponível' };
       return { dados: postItens.map((i, k) => ({ id: k + 1, ...i, coef_maximo: String(i.coef_maximo) })), total: postItens.length };
     }
     return apiAnterior(rota, opts);
@@ -66,6 +70,9 @@ export async function medirImportar(raiz: HTMLElement, csv: string): Promise<Med
     resumoOk: el.importarResumo?.ok ?? -1,
     resumoFalhas: el.importarResumo?.falhas?.length ?? -1,
     importandoDepois: el.parametrosSalvando === true,
+    aviso: el.parametrosAviso ?? '',
+    editavelDepois: !el.parametrosAviso,
+    terrenosCarregadosDepois: !!el.terrenosCarregados,
   };
 }
 

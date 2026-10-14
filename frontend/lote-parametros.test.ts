@@ -34,11 +34,30 @@ test('statusVinculo: ok, área alerta, identificação/parcelamento invalida, re
   assert.equal(statusVinculo(reg, { ...LOTE, removido_em: '2026-10-01' }), 'removido');
 });
 
+test('statusVinculo: parcelamento null é um VALOR — ganhar ou perder parcelamento muda a identidade', () => {
+  const sem: LoteNucleo = { ...LOTE, parcelamento_id: null };
+  const regSem = { ...carimboDoLote(sem), imovel_nucleo_id: 781 };
+  assert.equal(statusVinculo(regSem, sem), 'ok', 'lote sem parcelamento tem registro conferido');
+  assert.equal(statusVinculo(regSem, LOTE), 'identificacao', 'ganhou parcelamento');
+  assert.equal(statusVinculo({ ...carimboDoLote(LOTE), imovel_nucleo_id: 781 }, sem), 'identificacao', 'perdeu o parcelamento');
+});
+
 test('registrosOrfaos: registro cujo lote saiu da lista completa (ou foi removido)', () => {
   const regs = [{ imovel_nucleo_id: 781 }, { imovel_nucleo_id: 999 }, { imovel_nucleo_id: 5 }];
   const lotes = [LOTE, { ...LOTE, id: 5, removido_em: '2026-01-01' }];
   assert.deepEqual(registrosOrfaos(regs, lotes).map((r) => r.imovel_nucleo_id), [999, 5]);
   assert.equal(indexarParametros(regs).size, 3);
+});
+
+test('lerCsv/casarPlanilha: texto que não é número NÃO vira célula vazia (a linha não entra)', () => {
+  const r = lerCsv('rua;numero;area_m2;cmax;cmin\nAmsterdam;4910;abc;3.5;\nBarcelona;4915;2397.61;3x;1\nGenebra;5180;3823.76;0;\n');
+  assert.deepEqual(r.linhas.map((l) => l.invalidos ?? []), [['area'], ['coef_maximo'], []]);
+  const res = casarPlanilha(r.linhas, [
+    { id: 1, rua: 'Amsterdam', numero_lote: '4910', area: 1464.91, parcelamento_id: 12 },
+    { id: 2, rua: 'Barcelona', numero_lote: '4915', area: 2397.61, parcelamento_id: 12 },
+    { id: 3, rua: 'Genebra', numero_lote: '5180', area: 3823.76, parcelamento_id: 12 },
+  ]);
+  assert.deepEqual(res.map((x) => x.status), ['celula-invalida', 'celula-invalida', 'casado']);
 });
 
 test('numeroPlanilha: ponto, vírgula, milhar; lixo é null', () => {
