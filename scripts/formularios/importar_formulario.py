@@ -975,6 +975,13 @@ def main(argv):
         if rel:
             Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
         return 1
+    if executar and rel:
+        # o destino do relatório é testado ANTES de criar o estudo: não adianta descobrir depois que não dá para gravar
+        try:
+            Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
+        except OSError as ex:
+            print(f'ERRO: não consigo gravar o relatório em "{rel}" ({ex}) — nada foi escrito na instância.')
+            return 1
     api = Api(executar)
     try:
         eid = criar_estudo(api, m)
@@ -993,7 +1000,10 @@ def main(argv):
         print(f'estudo criado: id {eid} (nome "{m.estudo.get("nome")}")', flush=True)
         relatorio['estudo_id'] = eid
         if rel:
-            Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
+            try:
+                Path(rel).write_text(json.dumps(relatorio, ensure_ascii=False, indent=2))
+            except OSError as ex:
+                print(f'aviso: não consegui gravar o id em "{rel}" ({ex}); o id está só neste terminal.')
 
     def desfazer(motivo):
         # a validação prévia não conhece toda regra da API; se uma escrita for recusada depois do estudo existir,
