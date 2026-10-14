@@ -13,7 +13,7 @@ import {
 } from './estudo-status.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
-  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarComplementosTerreno,
+  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarComplementosTerreno, salvarComplementoTerreno,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
 } from './viabilidade-api.js';
@@ -203,6 +203,9 @@ export class ViabTelaDashboard extends LitElement {
   @state() private complementosAviso = '';
   /** Terreno cujo modal "Informações do terreno" está aberto. */
   @state() private terrenoAberto: any = null;
+  /** O PUT do modal está em voo. Vive aqui, e não no modal, para sobreviver a ele sair da tela. */
+  @state() private complementoSalvando = false;
+  @state() private complementoErro = '';
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
@@ -254,6 +257,7 @@ export class ViabTelaDashboard extends LitElement {
     this.terrenosAvisoLotes = '';
     this.complementosAviso = '';
     this.terrenoAberto = null;
+    this.complementoErro = '';
     try {
       const POR = 200;
       // Não derruba a aba: sem o complemento a lista de terrenos continua valendo.
@@ -297,6 +301,27 @@ export class ViabTelaDashboard extends LitElement {
       this.terrenosMotivo = e?.message || 'Indisponível';
     }
     this.terrenosCarregando = false;
+  }
+
+  // O ciclo de salvamento do modal mora AQUI: se o modal sair da tela com o PUT em voo (cancelar, troca
+  // de aba), o cache `complementos` ainda é atualizado e reabrir mostra o valor gravado.
+  private async _salvarComplemento(d: { tipo: 'gleba' | 'lote'; imovelId: number; corpo: Record<string, any> }) {
+    if (this.complementoSalvando) return;
+    this.complementoSalvando = true;
+    this.complementoErro = '';
+    try {
+      const res = await salvarComplementoTerreno(d.tipo, d.imovelId, d.corpo);
+      if (res?.erro) { this.complementoErro = res.mensagem || 'Erro ao salvar'; return; }
+      if (res?.imovel_nucleo_id != null) {
+        this.complementos = new Map(this.complementos).set(Number(res.imovel_nucleo_id), res);
+      }
+      urbiVerso.notificar('Informações do terreno salvas.', 'sucesso');
+      this.terrenoAberto = null;
+    } catch (e: any) {
+      this.complementoErro = e?.message || 'Erro ao salvar';
+    } finally {
+      this.complementoSalvando = false;
+    }
   }
 
   private async _carregar() {
@@ -839,14 +864,10 @@ export class ViabTelaDashboard extends LitElement {
           .terreno=${this.terrenoAberto}
           .complemento=${this.complementos.get(Number(this.terrenoAberto.id)) ?? null}
           .editavel=${!this.complementosAviso && ['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '')}
-          @viab-complemento-fechar=${() => { this.terrenoAberto = null; }}
-          @viab-complemento-salvo=${(e: CustomEvent) => {
-            const reg = e.detail;
-            if (reg?.imovel_nucleo_id != null) {
-              this.complementos = new Map(this.complementos).set(Number(reg.imovel_nucleo_id), reg);
-            }
-            this.terrenoAberto = null;
-          }}
+          .salvando=${this.complementoSalvando}
+          .erro=${this.complementoErro}
+          @viab-complemento-fechar=${() => { if (!this.complementoSalvando) { this.terrenoAberto = null; this.complementoErro = ''; } }}
+          @viab-complemento-salvar=${(e: CustomEvent) => this._salvarComplemento(e.detail)}
         ></viab-terreno-complemento>` : nothing}
     `;
   }

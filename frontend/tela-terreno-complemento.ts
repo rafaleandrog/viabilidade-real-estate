@@ -1,6 +1,5 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { urbiVerso, salvarComplementoTerreno } from './viabilidade-api.js';
 import { fmtNum } from './viab-format.js';
 import './viab-num.js';
 import {
@@ -11,7 +10,9 @@ import {
 // Modal de "Informações do terreno" da aba Terrenos do Painel: dados de viabilidade de uma gleba
 // ou de um lote que o módulo imobiliário não guarda. Um registro por imóvel (tabela
 // `terrenos_complemento`). O Núcleo é só leitura aqui — nada disto volta para ele.
-// Emite `viab-complemento-salvo` (detail: o registro gravado) e `viab-complemento-fechar`.
+// O PUT NÃO mora aqui: o modal pode sair da tela (cancelar, troca de aba) com a requisição em voo, e o
+// resultado se perderia. Ele emite `viab-complemento-salvar` (detail: o corpo do PUT) e `viab-complemento-fechar`;
+// quem salva, atualiza o cache e fecha é o Painel, que continua vivo. `salvando` e `erro` vêm de lá.
 
 const SEM_VALOR = { valor: '', rotulo: 'Não informado' };
 
@@ -22,10 +23,13 @@ export class ViabTerrenoComplemento extends LitElement {
   /** Registro de `terrenos_complemento` desse imóvel, ou `null` se ainda não há. */
   @property({ attribute: false }) complemento: any = null;
   @property({ type: Boolean }) editavel = false;
+  /** O Painel está com o PUT em voo: fechar é ignorado e os botões ficam desabilitados. */
+  @property({ type: Boolean }) salvando = false;
+  /** Erro do último salvamento, devolvido pelo Painel. */
+  @property() erro = '';
 
   @state() private form: FormComplemento = {};
-  @state() private salvando = false;
-  @state() private erro = '';
+  @state() private erroLocal = '';
 
   static styles = css`
     .resumo { margin: 0 0 12px; color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.75rem); }
@@ -37,7 +41,7 @@ export class ViabTerrenoComplemento extends LitElement {
   willUpdate(changed: Map<string, unknown>) {
     if (changed.has('complemento') || changed.has('terreno')) {
       this.form = formDoComplemento(this.complemento);
-      this.erro = '';
+      this.erroLocal = '';
     }
   }
 
@@ -45,29 +49,22 @@ export class ViabTerrenoComplemento extends LitElement {
     this.form = { ...this.form, [campo]: valor };
   }
 
-  // Fechar com o PUT em voo tiraria o componente da tela antes de `viab-complemento-salvo`: o evento
-  // se perderia, o cache do Painel ficaria velho e reabrir mostraria o valor antigo (que um novo
-  // Salvar sobrescreveria). Enquanto salva, fechar é ignorado e os botões ficam desabilitados.
+  // Enquanto o Painel salva, fechar é ignorado e os botões ficam desabilitados: o resultado do PUT
+  // atualiza o cache e fecha o modal por conta do Painel.
   private _fechar = () => {
     if (this.salvando) return;
     this.dispatchEvent(new CustomEvent('viab-complemento-fechar', { bubbles: true, composed: true }));
   };
 
-  private _salvar = async () => {
+  private _salvar = () => {
+    if (this.salvando) return;
     const msg = validarForm(this.form);
-    if (msg) { this.erro = msg; return; }
-    this.salvando = true;
-    this.erro = '';
-    try {
-      const res = await salvarComplementoTerreno(this.terreno._tipo, Number(this.terreno.id), payloadDoForm(this.form));
-      if (res?.erro) { this.erro = res.mensagem || 'Erro ao salvar'; return; }
-      urbiVerso.notificar('Informações do terreno salvas.', 'sucesso');
-      this.dispatchEvent(new CustomEvent('viab-complemento-salvo', { detail: res, bubbles: true, composed: true }));
-    } catch (e: any) {
-      this.erro = e?.message || 'Erro ao salvar';
-    } finally {
-      this.salvando = false;
-    }
+    if (msg) { this.erroLocal = msg; return; }
+    this.erroLocal = '';
+    this.dispatchEvent(new CustomEvent('viab-complemento-salvar', {
+      detail: { tipo: this.terreno._tipo, imovelId: Number(this.terreno.id), corpo: payloadDoForm(this.form) },
+      bubbles: true, composed: true,
+    }));
   };
 
   private _texto(campo: string, rotulo: string, placeholder = ''): TemplateResult {
@@ -145,7 +142,7 @@ export class ViabTerrenoComplemento extends LitElement {
             ></urbi-textarea>
           </div>
         </div>
-        ${this.erro ? html`<urbi-banner variante="erro">${this.erro}</urbi-banner>` : nothing}
+        ${(this.erroLocal || this.erro) ? html`<urbi-banner variante="erro">${this.erroLocal || this.erro}</urbi-banner>` : nothing}
         <div class="acoes">
           <urbi-botao variante="fantasma" ?desabilitado=${this.salvando} @click=${this._fechar}>${this.editavel ? 'Cancelar' : 'Fechar'}</urbi-botao>
           ${this.editavel

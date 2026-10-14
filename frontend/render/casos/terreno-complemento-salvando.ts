@@ -1,17 +1,18 @@
-// Caso de render: modal "Informações do terreno" com o PUT em voo.
+// Caso de render: modal "Informações do terreno" — o contrato com o Painel durante o salvamento.
 //
-// Cancelar (ou o X do modal) durante o salvamento tiraria o componente da tela antes de
-// `viab-complemento-salvo`: o evento se perderia e o cache do Painel ficaria velho. O componente tem
-// que ignorar o fechar enquanto salva e desabilitar o botão Cancelar. O PUT aqui nunca resolve até a
-// medição pedir, para o estado "salvando" ser observável.
+// O PUT mora no Painel (ele sobrevive ao modal sair da tela). O modal só pede para salvar e, com o
+// Painel salvando (`salvando`), ignora fechar, ignora um segundo Salvar e desabilita o Cancelar.
 
 import '../../tela-terreno-complemento.js';
 
 export interface MedidaSalvando {
-  fechouDuranteSalvamento: number;
-  botaoCancelarDesabilitado: boolean;
-  fechouDepoisDeSalvar: number;
-  salvouEventos: number;
+  salvarEmitidos: number;
+  camposDoCorpo: number;
+  tipoEImovel: string;
+  fecharComSalvando: number;
+  salvarComSalvando: number;
+  cancelarDesabilitado: boolean;
+  fecharDepois: number;
 }
 
 export const caso = {
@@ -23,9 +24,6 @@ export const caso = {
     'urbi-select.label', 'urbi-select.opcoes', 'urbi-textarea.label', 'urbi-textarea.rows',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
-    let liberar: (v: any) => void = () => {};
-    (globalThis as any).urbiVerso.api = () => new Promise((r) => { liberar = r; });
-    (globalThis as any).__liberarPut = (v: any) => liberar(v);
     const el: any = document.createElement('viab-terreno-complemento');
     el.terreno = { id: 3, _tipo: 'lote', id_legivel: 'LOTE-NORMAL', area: '300' };
     el.complemento = { id: 55, imovel_nucleo_id: 3, tipo_imovel: 'lote', contato: 'antigo' };
@@ -39,23 +37,29 @@ export const caso = {
   },
   async medir(raiz: HTMLElement): Promise<MedidaSalvando> {
     const el: any = raiz.querySelector('viab-terreno-complemento');
-    let fechou = 0; let salvou = 0;
-    el.addEventListener('viab-complemento-fechar', () => { fechou++; });
-    el.addEventListener('viab-complemento-salvo', () => { salvou++; });
-    const salvando = el._salvar();            // o PUT fica pendente
-    await el.updateComplete;
-    el._fechar();                             // equivale a Cancelar / X com o PUT em voo
+    const eventos = { salvar: [] as any[], fechar: 0 };
+    el.addEventListener('viab-complemento-salvar', (e: CustomEvent) => { eventos.salvar.push(e.detail); });
+    el.addEventListener('viab-complemento-fechar', () => { eventos.fechar++; });
+
+    el._salvar();                                   // livre: pede para salvar
+    const unico = eventos.salvar[0];
+
+    el.salvando = true; await el.updateComplete;    // o Painel começou o PUT
+    el._salvar(); el._fechar();                     // segundo Salvar e Cancelar/X com o PUT em voo
     const botoes = [...el.shadowRoot.querySelectorAll('urbi-botao')] as any[];
     const cancelar = botoes.find((b) => /Cancelar/.test(b.textContent));
-    const durante = { fechou, desab: cancelar?.hasAttribute('desabilitado') === true };
-    (globalThis as any).__liberarPut({ id: 55, imovel_nucleo_id: 3, tipo_imovel: 'lote' });
-    await salvando; await el.updateComplete;
+    const durante = { fechar: eventos.fechar, salvar: eventos.salvar.length - 1, desab: cancelar?.hasAttribute('desabilitado') === true };
+
+    el.salvando = false; await el.updateComplete;   // o PUT terminou
     el._fechar();
     return {
-      fechouDuranteSalvamento: durante.fechou,
-      botaoCancelarDesabilitado: durante.desab,
-      fechouDepoisDeSalvar: fechou,
-      salvouEventos: salvou,
+      salvarEmitidos: eventos.salvar.length - durante.salvar,
+      camposDoCorpo: Object.keys(unico?.corpo ?? {}).length,
+      tipoEImovel: `${unico?.tipo}/${unico?.imovelId}`,
+      fecharComSalvando: durante.fechar,
+      salvarComSalvando: durante.salvar,
+      cancelarDesabilitado: durante.desab,
+      fecharDepois: eventos.fechar,
     };
   },
 };

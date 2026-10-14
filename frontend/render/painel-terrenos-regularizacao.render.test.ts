@@ -80,15 +80,33 @@ for (const modo of ['rejeita', 'erro-payload']) {
   });
 }
 
-test('Modal do terreno: fechar com o PUT em voo é ignorado e o evento de salvo não se perde', { skip: pular ?? false }, async () => {
+test('Modal do terreno: pede para salvar uma vez; com o Painel salvando ignora fechar e segundo Salvar', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'terreno-complemento-salvando', larguras: [1280] });
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
   assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   const m = a.extra?.['1280'] as any;
   assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
-  assert.equal(m.fechouDuranteSalvamento, 0, 'fechar durante o salvamento tem que ser ignorado' + relato(a));
-  assert.equal(m.botaoCancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
-  assert.equal(m.salvouEventos, 1, 'o evento viab-complemento-salvo chega ao Painel' + relato(a));
-  assert.equal(m.fechouDepoisDeSalvar, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));
+  assert.equal(m.salvarEmitidos, 1, 'Salvar livre emite exatamente um pedido' + relato(a));
+  assert.equal(m.camposDoCorpo, 12, 'o corpo leva TODOS os campos (limpar na tela limpa no banco)' + relato(a));
+  assert.equal(m.tipoEImovel, 'lote/3', 'o pedido identifica o terreno' + relato(a));
+  assert.equal(m.fecharComSalvando, 0, 'fechar com o Painel salvando é ignorado' + relato(a));
+  assert.equal(m.salvarComSalvando, 0, 'segundo Salvar com o Painel salvando é ignorado' + relato(a));
+  assert.equal(m.cancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
+  assert.equal(m.fecharDepois, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));
+});
+
+test('Painel: PUT em voo + troca de aba — o cache ainda recebe o registro gravado', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'painel-terrenos-salvando-troca-aba', larguras: [1280] });
+  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
+  const m = a.extra?.['1280'] as any;
+  assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+  assert.equal(m.modalAbriu, true, 'o clique abre o modal' + relato(a));
+  assert.equal(m.putChamado, true, 'o Painel (e não o modal) chamou o PUT' + relato(a));
+  assert.equal(m.salvandoDuranteVoo, true, 'o Painel marca o salvamento em voo' + relato(a));
+  assert.equal(m.cacheDepois, 'novo', 'o resultado do PUT chegou ao cache mesmo com o modal fora da tela' + relato(a));
+  assert.equal(m.salvandoDepois, false, 'o salvamento termina' + relato(a));
+  assert.equal(m.modalAbertoDepois, false, 'o modal é fechado pelo Painel' + relato(a));
 });
