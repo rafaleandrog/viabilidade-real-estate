@@ -84,7 +84,7 @@ function paraNumeroLinha(v: unknown): number | null {
 export interface DadosParametros {
   listar(tabela: string, opcoes: Record<string, any>): Promise<{ dados: any[]; total?: number }>;
   criar(tabela: string, dados: Record<string, any>): Promise<any>;
-  atualizar(tabela: string, id: number, dados: Record<string, any>): Promise<any>;
+  atualizarSe(tabela: string, id: number, dados: Record<string, any>, condicoes: Record<string, any>): Promise<Record<string, any> | null>;
 }
 
 const POR_PAGINA = 200;
@@ -113,9 +113,29 @@ function carimboIgual(campo: string, a: any, b: any): boolean {
   return String(a ?? '').trim() === String(b ?? '').trim();
 }
 
+/**
+ * Condições do lock otimista (`atualizarSe`): a linha só é gravada se ainda tiver os valores contra os quais a
+ * validação rodou. Nulo vira `[nulo]` (o DSL trata `null` como "sem filtro" e lança). Texto com vírgula fica
+ * de fora: o DSL parte o valor por vírgula e a condição deixaria de casar a própria linha — esses campos
+ * continuam conferidos em memória, só perdem a guarda atômica.
+ */
+export function condicoesDaLinha(atual: any, colunas: readonly string[]): Record<string, any> {
+  const cond: Record<string, any> = {};
+  for (const c of colunas) {
+    const v = atual[c];
+    if (v === null || v === undefined || v === '') cond[`${c}[nulo]`] = 'true';
+    else if (typeof v === 'string' && v.includes(',')) continue;
+    else cond[c] = String(v);
+  }
+  return cond;
+}
+
 export type ResultadoGravacao =
   | { http: 200 | 201; registro: any }
   | { http: 400; codigo: 'CARIMBO_OBRIGATORIO' | 'INVARIANTE'; mensagem: string };
+
+/** A linha mudou entre a leitura e a escrita: o chamador relê e tenta de novo. */
+const PERDEU = Symbol('perdeu-a-corrida');
 
 /**
  * Upsert por `imovel_nucleo_id` (único no schema). Ao CRIAR exige o carimbo mínimo; ao atualizar, o
@@ -129,7 +149,7 @@ export async function gravarParametros(
   const buscar = async () => (await dados.listar('lote_parametros', {
     filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
   })).dados[0];
-  const sobre = async (atual: any, camposOriginais: Record<string, any>): Promise<ResultadoGravacao> => {
+  const sobre = async (atual: any, camposOriginais: Record<string, any>): Promise<ResultadoGravacao | typeof PERDEU> => {
     // Importação: o carimbo de um registro que JÁ existe não é regravado, e quem decide que ele existe é o
     // servidor (o Painel pode ter carregado antes de outro editor criar ou reconfirmar o registro).
     if (opcoes.preservarCarimbo) {
@@ -158,11 +178,25 @@ export async function gravarParametros(
     if (zerados.length > 0) {
       return { http: 400, codigo: 'INVARIANTE', mensagem: `O carimbo do lote não pode ser apagado: ${zerados.join(', ')}` };
     }
-    return { http: 200, registro: await dados.atualizar('lote_parametros', atual.id, campos) };
+    // Leitura, conferência e escrita são um comando só: se outra pessoa mexeu nos coeficientes (ou, na
+    // importação, no carimbo) depois da leitura, a escrita não acontece e a linha é relida.
+    const cond = condicoesDaLinha(atual, opcoes.preservarCarimbo ? ['coef_minimo', 'coef_maximo', ...CAMPOS_CARIMBO] : ['coef_minimo', 'coef_maximo']);
+    const gravado = await dados.atualizarSe('lote_parametros', atual.id, campos, cond);
+    return gravado ? { http: 200, registro: gravado } : PERDEU;
+  };
+  const comRelitura = async (primeiro: any, campos: Record<string, any>): Promise<ResultadoGravacao> => {
+    let atual = primeiro;
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
+      const r = await sobre(atual, campos);
+      if (r !== PERDEU) return r;
+      atual = await buscar();
+      if (!atual) throw new Error('registro de lote_parametros sumiu durante a gravação');
+    }
+    return { http: 400, codigo: 'INVARIANTE', mensagem: 'O registro do lote foi alterado por outra pessoa durante a gravação: recarregue e tente de novo' };
   };
 
   const existente = await buscar();
-  if (existente) return sobre(existente, campos);
+  if (existente) return comRelitura(existente, campos);
   const faltando = CARIMBO_OBRIGATORIO.filter((c) => campos[c] == null);
   if (faltando.length > 0) {
     return {
@@ -175,7 +209,7 @@ export async function gravarParametros(
   } catch (e) {
     const vencedor = await buscar();
     if (!vencedor) throw e;
-    return sobre(vencedor, campos);
+    return comRelitura(vencedor, campos);
   }
 }
 

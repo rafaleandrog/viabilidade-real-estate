@@ -73,7 +73,19 @@ function falso(linhas: any[] = [], opcoes: { falhaCriar?: Error; criarInsere?: b
       }
       const l = { id: linhas.length + 1, ...d }; linhas.push(l); return l;
     },
-    async atualizar(_t, id, d) { chamadas.push('atualizar'); return { id, ...d }; },
+    async atualizarSe(_t, id, d, cond) {
+      chamadas.push('atualizar');
+      const linha = linhas.find((l) => l.id === id);
+      // Honra as condições como o banco: o valor gravado tem de casar (nulo via `[nulo]`).
+      for (const [k, v] of Object.entries(cond)) {
+        const col = k.replace('[nulo]', '');
+        const atual = linha?.[col];
+        const casa = k.endsWith('[nulo]') ? (atual == null) === (v === 'true') : String(atual) === String(v);
+        if (!casa) return null;
+      }
+      if (linha) Object.assign(linha, d);
+      return { id, ...d };
+    },
   };
   return { dados, chamadas, linhas };
 }
@@ -124,7 +136,7 @@ test('listarTodosParametros: junta as páginas e nunca devolve lista truncada', 
   assert.equal((await listarTodosParametros(falso(muitas).dados)).length, 450);
   const infinito: DadosParametros = {
     async listar() { return { dados: Array.from({ length: 200 }, (_, i) => ({ id: i })) }; },
-    async criar() { return {}; }, async atualizar() { return {}; },
+    async criar() { return {}; }, async atualizarSe() { return {}; },
   };
   await assert.rejects(listarTodosParametros(infinito), /lista incompleta recusada/);
 });
@@ -178,8 +190,8 @@ test('importarParametros: id do lote passa pelo parser estrito ("0x10", "1e3" e 
 test('importarParametros: chave ausente não toca o valor já gravado (reimportar não apaga o mínimo editado à mão)', async () => {
   const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
   const gravados: any[] = [];
-  const original = f.dados.atualizar;
-  f.dados.atualizar = async (t, id, d) => { gravados.push(d); return original(t, id, d); };
+  const original = f.dados.atualizarSe;
+  f.dados.atualizarSe = async (t, id, d, c) => { gravados.push(d); return original(t, id, d, c); };
   await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5 }]);
   assert.deepEqual(gravados, [{ coef_maximo: 3.5 }], 'só o que veio é atualizado');
 });
@@ -188,7 +200,7 @@ test('listarTodosParametros pede ordem estável por id', async () => {
   const pedidos: any[] = [];
   await listarTodosParametros({
     async listar(_t, o) { pedidos.push(o); return { dados: [] }; },
-    async criar() { return {}; }, async atualizar() { return {}; },
+    async criar() { return {}; }, async atualizarSe() { return {}; },
   });
   assert.equal(pedidos[0].ordenar, 'id');
   assert.equal(pedidos[0].ordem, 'asc');
@@ -204,8 +216,8 @@ test('o limite de itens por importação é o MESMO no frontend (que parte a pla
 test('importação: registro que existe no SERVIDOR não tem o carimbo regravado, mesmo que o cliente o tenha mandado', async () => {
   const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
   const gravados: any[] = [];
-  const original = f.dados.atualizar;
-  f.dados.atualizar = async (t, id, d) => { gravados.push(d); return original(t, id, d); };
+  const original = f.dados.atualizarSe;
+  f.dados.atualizarSe = async (t, id, d, c) => { gravados.push(d); return original(t, id, d, c); };
   // O cliente achou que o registro não existia (cache velho) e mandou o carimbo.
   await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5, ...CARIMBO }]);
   assert.deepEqual(gravados, [{ coef_maximo: 3.5 }]);
@@ -227,4 +239,29 @@ test('importação: carimbo esperado diferente do gravado recusa o item (víncul
   assert.equal(r3.resultados[0].ok, false);
   const r4 = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 5, carimbo_esperado: 'x' }]);
   assert.equal(r4.resultados[0].ok, false);
+});
+
+test('gravarParametros: se outra pessoa muda a linha entre a leitura e a escrita, a escrita não acontece e a linha é relida', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
+  const original = f.dados.atualizarSe;
+  let intercalou = false;
+  f.dados.atualizarSe = async (t, id, d, c) => {
+    if (!intercalou) { intercalou = true; f.linhas[0].coef_maximo = '2.00'; } // outra pessoa grava depois da leitura
+    return original(t, id, d, c);
+  };
+  // min=2.5 passaria contra max=3.00 lido antes, mas a linha agora tem max=2.00: relê e recusa.
+  const r = await gravarParametros(f.dados, 781, { coef_minimo: 2.5 });
+  assert.equal(r.http, 400);
+  assert.equal((r as any).codigo, 'INVARIANTE');
+  assert.equal(f.linhas[0].coef_minimo, '1.00', 'a gravação sobre a leitura velha não aconteceu');
+});
+
+test('importação: carimbo reconfirmado entre a leitura e a escrita recusa o item (precondição atômica)', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_maximo: '3.00', ...CARIMBO }]);
+  const original = f.dados.atualizarSe;
+  f.dados.atualizarSe = async (t, id, d, c) => { f.linhas[0].numero_lote = 'NOVO'; return original(t, id, d, c); };
+  const r = await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 4, carimbo_esperado: { ...CARIMBO } }]);
+  assert.equal(r.resultados[0].ok, false);
+  assert.match(r.resultados[0].erro!, /vínculo do lote mudou/);
+  assert.equal(f.linhas[0].coef_maximo, '3.00');
 });
