@@ -319,10 +319,13 @@ export class ViabTelaDashboard extends LitElement {
     const mesmoLote = () => this.loteAberto != null && Number(this.loteAberto.id) === d.imovelId;
     this.parametrosSalvando = true;
     this.parametrosErro = '';
+    let ambiguo = false;
     try {
       const res = await salvarLoteParametros(d.imovelId, d.corpo);
       if (res?.erro || res?.imovel_nucleo_id == null) {
         if (mesmoLote()) this.parametrosErro = res?.mensagem || 'Erro ao salvar';
+        // Resposta de erro do servidor (400/403/…) não gravou nada; resposta sem corpo reconhecível pode ter.
+        ambiguo = !res?.erro;
         return;
       }
       this.parametros = new Map(this.parametros).set(Number(res.imovel_nucleo_id), res);
@@ -330,8 +333,24 @@ export class ViabTelaDashboard extends LitElement {
       if (mesmoLote()) this.loteAberto = null;
     } catch (e: any) {
       if (mesmoLote()) this.parametrosErro = e?.message || 'Erro ao salvar';
+      ambiguo = true; // a requisição pode ter gravado e a resposta se perdido
     } finally {
+      // Salvamento ambíguo: reabrir o modal mostraria o registro de antes e um novo Salvar desfaria o que
+      // ficou gravado. Relê o cache, e se não der, trata como importação: avisa e bloqueia a edição.
+      if (ambiguo) await this._reler('o salvamento');
       this.parametrosSalvando = false;
+    }
+  }
+
+  /** Relê os parâmetros; se falhar, o cache é desconhecido: aviso, edição bloqueada e aba recarrega ao voltar. */
+  private async _reler(oque: string) {
+    try {
+      const atual = await listarLoteParametros();
+      if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
+      this.parametros = indexarParametros(atual.dados);
+    } catch (e: any) {
+      this.parametrosAviso = `${oque} pode ter gravado, mas a lista não pôde ser atualizada (${e?.message || 'indisponível'}). Volte a esta aba para recarregar.`;
+      this.terrenosCarregados = false;
     }
   }
 
@@ -373,16 +392,7 @@ export class ViabTelaDashboard extends LitElement {
       // Qualquer pedido enviado pode ter gravado (inclusive um que falhou na volta): o cache é relido SEMPRE,
       // sucesso ou falha. Se a releitura falha, o cache é desconhecido e o modal NÃO pode editar sobre ele —
       // o próximo Salvar mandaria os valores antigos e desfaria o que já foi gravado.
-      if (enviou) {
-        try {
-          const atual = await listarLoteParametros();
-          if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
-          this.parametros = indexarParametros(atual.dados);
-        } catch (e: any) {
-          this.parametrosAviso = `a importação pode ter gravado, mas a lista não pôde ser atualizada (${e?.message || 'indisponível'}). Volte a esta aba para recarregar.`;
-          this.terrenosCarregados = false;
-        }
-      }
+      if (enviou) await this._reler('a importação');
       this.parametrosSalvando = false;
     }
   }

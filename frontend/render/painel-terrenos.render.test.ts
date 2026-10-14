@@ -92,7 +92,7 @@ test('Modal do lote: um pedido por Salvar, com carimbo só no cadastro; salvando
     ['area_m2', 'coef_maximo', 'coef_minimo', 'conjunto', 'gabarito_maximo', 'numero_lote', 'parcelamento_id', 'quadra', 'rua', 'uos', 'uso'],
     'o cadastro leva o carimbo do lote e todos os campos editáveis' + relato(a),
   );
-  assert.equal(m.chavesDoCorpoExistente, 5, 'a atualização leva só os 5 campos editáveis, sem reescrever o carimbo' + relato(a));
+  assert.equal(m.chavesDoCorpoExistente, 6, 'a atualização leva os 5 campos editáveis mais o registro visto (`base`), sem reescrever o carimbo' + relato(a));
   assert.equal(m.fecharComSalvando, 0, 'fechar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.salvarComSalvando, 0, 'segundo Salvar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.cancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
@@ -149,6 +149,15 @@ test('Painel: nível leitura vê os parâmetros, mas não importa nem edita', { 
   assert.equal(m.coefMax, '3,5', 'a leitura continua' + relato(a));
   assert.equal(m.modalLote, 'LOTE-NORMAL', 'o modal abre' + relato(a));
   assert.equal(m.modalEditavel, false, 'mas somente leitura' + relato(a));
+});
+
+test('Painel: salvamento ambíguo (PUT rejeitou) relê o cache e o corpo leva o registro que o modal viu', { skip: pular ?? false }, async () => {
+  const { m, a } = await medida('painel-terrenos-salvar-ambiguo');
+  assert.equal(m.modalAbriu, true, 'o modal do lote abriu' + relato(a));
+  assert.equal(m.corpoBase?.coef_maximo, '3.50', 'o PUT leva o valor que o modal viu (`base`)' + relato(a));
+  assert.equal(m.corpoBase?.parcelamento_id, 30, 'e o carimbo que o modal viu' + relato(a));
+  assert.equal(m.cacheDepois, '4.00', 'depois do PUT perdido o cache foi relido e mostra o que ficou gravado' + relato(a));
+  assert.equal(m.salvandoDepois, false, 'o ciclo de salvamento terminou' + relato(a));
 });
 
 test('Painel: importação gravou mas a releitura falhou — aviso, edição bloqueada e aba recarrega na volta', { skip: pular ?? false }, async () => {

@@ -155,7 +155,7 @@ dispara a manutenção. Dentro de um estudo, o que vale é a função de membro 
 | Benchmarks | `GET /benchmarks?tipo_empreendimento=…` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` (idempotente) | leitura para todos; escrita e semear só `admin` |
 | Curvas | `GET /avancado/curvas` (cria a Curva S se faltar) · `POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` | escrita só `admin` |
 | Regiões | `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` | escrita só `admin` |
-| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` · `POST /lote-parametros/importar` (`{ itens }`, até 300, resultado por lote) | leitura: qualquer usuário do app; escrita: `escrita` ou `admin` (`403 SEM_PERMISSAO`) |
+| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` (o corpo da atualização leva `base`, o registro visto; alterado por outra pessoa no intervalo, `400`) · `POST /lote-parametros/importar` (`{ itens }`, até 300, resultado por lote) | leitura: qualquer usuário do app; escrita: `escrita` ou `admin` (`403 SEM_PERMISSAO`) |
 | Manutenção | `POST /manutencao/arquivar-inativos` → `{ ok, arquivados, prazo_dias }` | só `admin` (`403 SEM_PERMISSAO`) |
 
 Eventos publicados no barramento da instância: `estudo_criado`, `estudo_status_alterado` e

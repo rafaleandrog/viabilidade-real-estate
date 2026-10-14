@@ -123,7 +123,7 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão do
 | Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `DELETE /estudos/:id/imoveis/:vinculoId` |
 | Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` |
 | Análise de mercado | `GET`/`POST /estudos/:id/analise-mercado` · `PATCH /estudos/:id/analise-mercado/regiao` · `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` |
-| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` (id do lote no módulo; cadastro exige parcelamento, número e área do lote; `403` sem nível de escrita) · `POST /lote-parametros/importar` (até 300 lotes, resultado por lote) |
+| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` (id do lote no módulo; cadastro exige número e área do lote; a atualização do modal leva `base`, o registro que a pessoa viu, e é recusada com `400` se outra pessoa o alterou antes; `403` sem nível de escrita) · `POST /lote-parametros/importar` (até 300 lotes, resultado por lote) |
 | Benchmarks | `GET /benchmarks` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` |
 | Configuração e manutenção | `GET /config` · `POST /manutencao/arquivar-inativos` |
 | Avançado — cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH`/`DELETE /estudos/:id/avancado/fases/:fid` · `POST /estudos/:id/avancado/fases/:fid/alocacoes` · `PATCH`/`DELETE …/alocacoes/:aid` |

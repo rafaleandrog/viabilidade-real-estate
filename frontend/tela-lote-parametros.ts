@@ -70,7 +70,7 @@ export class ViabLoteParametros extends LitElement {
     const msg = validarForm(this.form);
     if (msg) { this.erroLocal = msg; return; }
     this.erroLocal = '';
-    this._pedir(corpoDoForm(this.form, this.lote, this.registro != null));
+    this._pedir(corpoDoForm(this.form, this.lote, this.registro != null, this.registro));
   };
 
   /** Regrava o carimbo com o lote de hoje: o usuário confirma que é o mesmo lote (ex.: retificação de área). */

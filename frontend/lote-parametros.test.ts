@@ -162,9 +162,12 @@ test('formulário: ida e volta; cadastro leva o carimbo, atualização não; val
   assert.equal(novo.parcelamento_id, 12);
   assert.equal(novo.coef_minimo, 0, '0 não vira null');
   assert.equal(novo.uso, null);
-  const upd = corpoDoForm(f, LOTE, true);
+  const reg = { ...carimboDoLote(LOTE), coef_maximo: '3.50', uos: 'CSIIR 2' };
+  const upd = corpoDoForm(f, LOTE, true, reg);
   assert.ok(!('parcelamento_id' in upd), 'atualizar não reescreve o carimbo');
-  assert.equal(Object.keys(upd).length, 5);
+  assert.deepEqual(Object.keys(upd).sort(), ['base', 'coef_maximo', 'coef_minimo', 'gabarito_maximo', 'uos', 'uso']);
+  assert.equal(upd.base.parcelamento_id, 12, 'leva o carimbo que o modal viu como precondição');
+  assert.equal(upd.base.coef_maximo, '3.50', 'e o valor que o modal viu');
   assert.match(validarForm({ ...f, coef_minimo: 4, coef_maximo: 3 }), /mínimo/);
   assert.match(validarForm({ ...f, gabarito_maximo: -1 }), /negativos/);
   assert.equal(validarForm(f), '');

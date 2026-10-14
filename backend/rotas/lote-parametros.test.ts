@@ -305,3 +305,20 @@ test('salvar coeficientes: se o carimbo trocou durante a gravação, recusa em v
   const ok = await gravarParametros(f.dados, 781, { coef_maximo: 4, ...CARIMBO });
   assert.equal(ok.http, 200);
 });
+
+test('PUT do modal: `base` (o que o modal viu) diferente do gravado recusa, em vez de sobrescrever a edição alheia', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', uos: 'A', ...CARIMBO, carimbo_chave: chaveCarimbo(CARIMBO) }]);
+  const visto = { coef_minimo: '1.00', coef_maximo: '3.00', uos: 'A', ...CARIMBO };
+  // Outra pessoa trocou o máximo depois de o modal abrir.
+  f.linhas[0].coef_maximo = '2.50';
+  const r = await gravarParametros(f.dados, 781, { coef_minimo: 1.5 }, { base: visto });
+  assert.equal(r.http, 400);
+  assert.match((r as any).mensagem, /alterado por outra pessoa/);
+  assert.equal(f.linhas[0].coef_minimo, '1.00');
+  // Sem diferença (decimal como texto contra número), grava.
+  f.linhas[0].coef_maximo = '3.00';
+  assert.equal((await gravarParametros(f.dados, 781, { coef_minimo: 1.5 }, { base: { ...visto, coef_maximo: 3 } })).http, 200);
+  // Carimbo reconfirmado por outra pessoa depois do modal aberto: recusa.
+  f.linhas[0].numero_lote = '9999';
+  assert.equal((await gravarParametros(f.dados, 781, { coef_minimo: 1.6 }, { base: visto })).http, 400);
+});

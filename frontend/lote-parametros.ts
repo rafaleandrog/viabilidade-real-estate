@@ -270,11 +270,17 @@ export function formDoRegistro(r: any | null): FormParametros {
 }
 
 /** Formulário → corpo do PUT. Manda TODOS os campos editáveis: limpar na tela limpa no banco. O carimbo vai junto no cadastro. */
-export function corpoDoForm(form: FormParametros, lote: LoteNucleo, existente: boolean): Record<string, any> {
+export function corpoDoForm(form: FormParametros, lote: LoteNucleo, existente: boolean, registro: any | null = null): Record<string, any> {
   const p: Record<string, any> = {};
   for (const c of TEXTOS) p[c] = String(form[c] ?? '').trim() || null;
   for (const c of NUMERICOS) p[c] = form[c] ?? null;
-  return existente ? p : { ...carimboDoLote(lote), ...p };
+  if (!existente) return { ...carimboDoLote(lote), ...p };
+  // Atualização: leva também o registro que o modal VIU (`base`). O corpo manda o formulário inteiro, então
+  // sem isso um modal aberto antes de outra pessoa editar sobrescreveria a edição dela, ou aplicaria os
+  // valores a um vínculo reconfirmado; o servidor recusa se o gravado já não for o que foi visto.
+  const base: Record<string, any> = {};
+  for (const c of [...Object.keys(carimboDoLote(lote)), ...NUMERICOS, ...TEXTOS]) base[c] = registro?.[c] ?? null;
+  return { ...p, base };
 }
 
 export function validarForm(form: FormParametros): string {

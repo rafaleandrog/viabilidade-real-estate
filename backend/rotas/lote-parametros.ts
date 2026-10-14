@@ -104,9 +104,9 @@ export async function listarTodosParametros(dados: DadosParametros): Promise<any
   throw new Error(`lote_parametros passou de ${TETO_PAGINAS * POR_PAGINA} registros: lista incompleta recusada`);
 }
 
-/** Igualdade de um campo do carimbo: área e parcelamento em valor (o banco devolve decimal como texto), o resto em texto. */
-function carimboIgual(campo: string, a: any, b: any): boolean {
-  if (campo === 'area_m2' || campo === 'parcelamento_id') {
+/** Igualdade de um campo gravado: numéricos em valor (o banco devolve decimal como texto), o resto em texto. */
+function valorIgual(campo: string, a: any, b: any): boolean {
+  if (['area_m2', 'parcelamento_id', 'coef_minimo', 'coef_maximo', 'gabarito_maximo'].includes(campo)) {
     const x = paraNumeroLinha(a); const y = paraNumeroLinha(b);
     if (x == null || y == null) return x === y;
     return Math.round(x * 100) === Math.round(y * 100);
@@ -161,7 +161,7 @@ const PERDEU = Symbol('perdeu-a-corrida');
  */
 export async function gravarParametros(
   dados: DadosParametros, imovelId: number, campos: Record<string, any>,
-  opcoes: { preservarCarimbo?: boolean; carimboEsperado?: Record<string, any> } = {},
+  opcoes: { preservarCarimbo?: boolean; carimboEsperado?: Record<string, any>; base?: Record<string, any> } = {},
 ): Promise<ResultadoGravacao> {
   const buscar = async () => (await dados.listar('lote_parametros', {
     filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
@@ -169,13 +169,21 @@ export async function gravarParametros(
   const sobre = async (atual: any, camposOriginais: Record<string, any>): Promise<ResultadoGravacao | typeof PERDEU> => {
     // Importação: o carimbo de um registro que JÁ existe não é regravado, e quem decide que ele existe é o
     // servidor (o Painel pode ter carregado antes de outro editor criar ou reconfirmar o registro).
+    if (opcoes.base) {
+      // Precondição do modal: o registro que a pessoa VIU ao abrir. Se outra pessoa mexeu depois, o formulário
+      // inteiro (que é o que o PUT manda) sobrescreveria a edição dela ou valeria para outro vínculo.
+      const mudou = Object.keys(opcoes.base).filter((c) => !valorIgual(c, opcoes.base![c], atual[c]));
+      if (mudou.length > 0) {
+        return { http: 400, codigo: 'INVARIANTE', mensagem: `Este lote foi alterado por outra pessoa desde que você abriu a edição (${mudou.join(', ')}): recarregue a aba e confira antes de salvar` };
+      }
+    }
     if (opcoes.preservarCarimbo) {
       // Precondição: o carimbo que o cliente VIU (o do registro em cache, ou o do lote para um cadastro novo)
       // tem de ser o que está gravado. Se outra pessoa reconfirmou o vínculo no intervalo, os valores da
       // planilha foram casados com a identidade antiga e não podem ser aplicados à nova.
       const visto = opcoes.carimboEsperado
         ?? Object.fromEntries(CAMPOS_CARIMBO.filter((c) => c in camposOriginais).map((c) => [c, camposOriginais[c]]));
-      const mudou = Object.keys(visto).filter((c) => !carimboIgual(c, visto[c], atual[c]));
+      const mudou = Object.keys(visto).filter((c) => !valorIgual(c, visto[c], atual[c]));
       if (mudou.length > 0) {
         return { http: 400, codigo: 'INVARIANTE', mensagem: `O vínculo do lote mudou desde que a planilha foi conferida (${mudou.join(', ')}): recarregue a aba e reimporte` };
       }
@@ -197,7 +205,7 @@ export async function gravarParametros(
     }
     // Leitura, conferência e escrita são um comando só: se outra pessoa mexeu nos coeficientes (ou, na
     // importação, no carimbo) depois da leitura, a escrita não acontece e a linha é relida.
-    const cond = condicoesDaLinha(atual, ['coef_minimo', 'coef_maximo', 'carimbo_chave']);
+    const cond = condicoesDaLinha(atual, ['coef_minimo', 'coef_maximo', 'gabarito_maximo', 'carimbo_chave']);
     // O carimbo que muda carrega a chave nova junto, para o próximo lock enxergar a troca de identidade.
     const gravar = CAMPOS_CARIMBO.some((c) => c in campos)
       ? { ...campos, carimbo_chave: chaveCarimbo({ ...atual, ...campos }) } : campos;
@@ -276,7 +284,13 @@ rotasLoteParametros.put('/lote-parametros/:imovelId', async (req: Request, res: 
     if (imovelId === null) { erro(res, 400, 'ID_INVALIDO', 'imovelId deve ser um inteiro positivo'); return; }
     const v = validarParametros(req.body);
     if ('falha' in v) { erro(res, v.falha.http, v.falha.codigo, v.falha.mensagem); return; }
-    const r = await gravarParametros(req.dados! as unknown as DadosParametros, imovelId, v.dados);
+    const base = req.body?.base;
+    if (base !== undefined && (base === null || typeof base !== 'object' || Array.isArray(base))) {
+      erro(res, 400, 'CORPO_INVALIDO', 'base deve ser um objeto'); return;
+    }
+    const r = await gravarParametros(req.dados! as unknown as DadosParametros, imovelId, v.dados, {
+      base: base ? Object.fromEntries(CAMPOS_EDITAVEIS.filter((c) => c in base).map((c) => [c, base[c]])) : undefined,
+    });
     if (r.http === 400) { erro(res, 400, r.codigo, r.mensagem); return; }
     res.status(r.http).json(r.registro);
   } catch (e: any) {
