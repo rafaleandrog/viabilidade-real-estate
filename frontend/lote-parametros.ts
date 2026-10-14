@@ -9,6 +9,9 @@ export interface LoteNucleo {
   parcelamento_id?: number | null; removido_em?: string | null;
 }
 
+/** O backend aceita até este número de lotes por chamada de importação (`MAX_ITENS_IMPORTACAO`, lá). */
+export const MAX_ITENS_IMPORTACAO = 300;
+
 /** Tolerância de área entre o carimbo e o lote de hoje, e entre a planilha e o lote (m²). */
 export const TOLERANCIA_AREA = 0.01;
 
@@ -114,9 +117,12 @@ const ALIAS: Record<string, keyof LinhaPlanilha> = {
  * os erros de leitura (cabeçalho sem rua/número, linha curta). Aspas simples de CSV são tratadas.
  */
 export function lerCsv(texto: string): { linhas: LinhaPlanilha[]; erros: string[] } {
-  const bruto = texto.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim() !== '');
+  // Numera ANTES de descartar as linhas em branco: a mensagem de erro precisa apontar a linha do ARQUIVO.
+  const bruto = texto.replace(/^\uFEFF/, '').split(/\r?\n/)
+    .map((conteudo, i) => ({ conteudo, numero: i + 1 })).filter((l) => l.conteudo.trim() !== '');
   if (bruto.length < 2) return { linhas: [], erros: ['O arquivo precisa de um cabeçalho e ao menos uma linha.'] };
-  const sep = (bruto[0].match(/;/g)?.length ?? 0) >= (bruto[0].match(/,/g)?.length ?? 0) ? ';' : ',';
+  const cabecalho = bruto[0].conteudo;
+  const sep = (cabecalho.match(/;/g)?.length ?? 0) >= (cabecalho.match(/,/g)?.length ?? 0) ? ';' : ',';
   const partir = (l: string): string[] => {
     const out: string[] = []; let atual = ''; let aspas = false;
     for (const ch of l) {
@@ -126,39 +132,46 @@ export function lerCsv(texto: string): { linhas: LinhaPlanilha[]; erros: string[
     }
     out.push(atual); return out;
   };
-  const cab = partir(bruto[0]).map((c) => ALIAS[normalizarTexto(c).replace(/ /g, '_')] ?? null);
+  const cab = partir(cabecalho).map((c) => ALIAS[normalizarTexto(c).replace(/ /g, '_')] ?? null);
   const erros: string[] = [];
   if (!cab.includes('rua') || !cab.includes('numero')) {
     return { linhas: [], erros: ['O cabeçalho precisa ter "logradouro" (ou "rua") e "numero".'] };
   }
   const linhas: LinhaPlanilha[] = [];
-  bruto.slice(1).forEach((l, i) => {
-    const cel = partir(l);
-    const r: any = { linha: i + 2, rua: '', numero: '', area: null, coef_maximo: null, coef_minimo: null, gabarito_maximo: null, uos: '', uso: '' };
+  for (const { conteudo, numero } of bruto.slice(1)) {
+    const cel = partir(conteudo);
+    const r: any = { linha: numero, rua: '', numero: '', area: null, coef_maximo: null, coef_minimo: null, gabarito_maximo: null, uos: '', uso: '' };
     cab.forEach((campo, j) => {
       if (!campo) return;
       const v = (cel[j] ?? '').trim();
-      if (['area', 'coef_maximo', 'coef_minimo', 'gabarito_maximo'].includes(campo)) r[campo] = numeroPlanilha(v);
-      else r[campo] = v;
+      const numerico = ['area', 'coef_maximo', 'coef_minimo', 'gabarito_maximo'].includes(campo);
+      const valor = numerico ? numeroPlanilha(v) : v;
+      // Dois cabeçalhos para o mesmo campo ("numero" e "lote"): a coluna vazia não apaga a preenchida.
+      if (valor !== null && valor !== '') r[campo] = valor;
     });
-    if (!r.rua || !r.numero) { erros.push(`Linha ${r.linha}: sem rua ou sem número.`); return; }
+    if (!r.rua || !r.numero) { erros.push(`Linha ${r.linha}: sem rua ou sem número.`); continue; }
     linhas.push(r as LinhaPlanilha);
-  });
+  }
   return { linhas, erros };
 }
 
-export type StatusLinha = 'casado' | 'area-diverge' | 'sem-lote' | 'ambiguo' | 'duplicada' | 'sem-valor';
+export type StatusLinha = 'casado' | 'area-diverge' | 'sem-lote' | 'ambiguo' | 'duplicada' | 'sem-valor' | 'vinculo-mudou';
 
 export interface ResultadoLinha { linha: LinhaPlanilha; lote?: LoteNucleo; status: StatusLinha; }
 
 /**
  * Casa cada linha da planilha com UM lote do módulo pela chave rua + número (normalizadas) e confere
  * a área. Só `casado` é importável. `ambiguo` = a chave serve a mais de um lote do módulo;
- * `duplicada` = a chave se repete na planilha (a repetição não entra, para a última linha não vencer
- * a primeira em silêncio); `area-diverge` = casou pela chave, mas a área da planilha difere do lote;
- * `sem-valor` = nenhum coeficiente nem gabarito para registrar.
+ * `duplicada` = a chave se repete na planilha — TODAS as ocorrências ficam de fora, porque não há como
+ * saber qual valia; `area-diverge` = casou pela chave, mas a área da planilha difere do lote;
+ * `sem-valor` = nenhum coeficiente nem gabarito para registrar; `vinculo-mudou` = o lote já tem
+ * registro e o carimbo dele não bate mais com o lote de hoje (parcelamento, rua, número, quadra ou
+ * conjunto): importar por cima daria os valores de um lote a outro. Esse caso se resolve no modal,
+ * com "Reconfirmar vínculo".
  */
-export function casarPlanilha(linhas: LinhaPlanilha[], lotes: LoteNucleo[]): ResultadoLinha[] {
+export function casarPlanilha(
+  linhas: LinhaPlanilha[], lotes: LoteNucleo[], registros: Map<number, any> = new Map(),
+): ResultadoLinha[] {
   const porChave = new Map<string, LoteNucleo[]>();
   for (const l of lotes) {
     if (l.removido_em) continue;
@@ -166,11 +179,14 @@ export function casarPlanilha(linhas: LinhaPlanilha[], lotes: LoteNucleo[]): Res
     if (!k) continue;
     porChave.set(k, [...(porChave.get(k) ?? []), l]);
   }
-  const vistas = new Set<string>();
+  const ocorrencias = new Map<string, number>();
+  for (const linha of linhas) {
+    const k = chaveRuaNumero(linha.rua, linha.numero);
+    ocorrencias.set(k, (ocorrencias.get(k) ?? 0) + 1);
+  }
   return linhas.map((linha): ResultadoLinha => {
     const k = chaveRuaNumero(linha.rua, linha.numero);
-    if (vistas.has(k)) return { linha, status: 'duplicada' };
-    vistas.add(k);
+    if ((ocorrencias.get(k) ?? 0) > 1) return { linha, status: 'duplicada' };
     const cands = porChave.get(k) ?? [];
     if (cands.length === 0) return { linha, status: 'sem-lote' };
     if (cands.length > 1) return { linha, status: 'ambiguo' };
@@ -182,6 +198,9 @@ export function casarPlanilha(linhas: LinhaPlanilha[], lotes: LoteNucleo[]): Res
     if (linha.area != null && a != null && Math.abs(linha.area - a) > TOLERANCIA_AREA) {
       return { linha, lote, status: 'area-diverge' };
     }
+    if (statusVinculo(registros.get(Number(lote.id)), lote) === 'identificacao') {
+      return { linha, lote, status: 'vinculo-mudou' };
+    }
     return { linha, lote, status: 'casado' };
   });
 }
@@ -191,22 +210,32 @@ export const ROTULO_LINHA: Record<StatusLinha, string> = {
   'area-diverge': 'Casou pela rua e número, mas a área difere do módulo',
   'sem-lote': 'Nenhum lote do módulo com essa rua e número',
   ambiguo: 'Mais de um lote do módulo com essa rua e número',
-  duplicada: 'Rua e número repetidos na planilha',
+  duplicada: 'Rua e número repetidos na planilha (nenhuma das ocorrências entra)',
   'sem-valor': 'Sem coeficiente nem gabarito para registrar',
+  'vinculo-mudou': 'O lote já tem registro e mudou no módulo: reconfirme o vínculo no modal do lote antes de importar',
 };
 
-/** Itens prontos para `POST /lote-parametros/importar`: só as linhas `casado`. */
-export function itensDaImportacao(resultado: ResultadoLinha[], origem: string): Record<string, any>[] {
-  return resultado.filter((r) => r.status === 'casado' && r.lote).map((r) => ({
-    imovel_nucleo_id: Number(r.lote!.id),
-    ...carimboDoLote(r.lote!),
-    coef_maximo: r.linha.coef_maximo,
-    coef_minimo: r.linha.coef_minimo,
-    gabarito_maximo: r.linha.gabarito_maximo,
-    uos: r.linha.uos || null,
-    uso: r.linha.uso || null,
-    origem: origem || null,
-  }));
+/**
+ * Itens prontos para `POST /lote-parametros/importar`: só as linhas `casado`. Só vão os valores que a
+ * planilha TRAZ — célula vazia e coluna ausente significam "não mexer", nunca "limpar": reimportar o CSV
+ * da etapa 1 (só `cmax`) não pode apagar o mínimo ou o gabarito que alguém editou no modal. O carimbo do
+ * lote só vai no CADASTRO; num registro que já existe ele não é regravado (reconfirmar é ação do modal).
+ */
+export function itensDaImportacao(
+  resultado: ResultadoLinha[], origem: string, registros: Map<number, any> = new Map(),
+): Record<string, any>[] {
+  return resultado.filter((r) => r.status === 'casado' && r.lote).map((r) => {
+    const id = Number(r.lote!.id);
+    const item: Record<string, any> = { imovel_nucleo_id: id };
+    if (!registros.has(id)) Object.assign(item, carimboDoLote(r.lote!));
+    if (r.linha.coef_maximo != null) item.coef_maximo = r.linha.coef_maximo;
+    if (r.linha.coef_minimo != null) item.coef_minimo = r.linha.coef_minimo;
+    if (r.linha.gabarito_maximo != null) item.gabarito_maximo = r.linha.gabarito_maximo;
+    if (r.linha.uos) item.uos = r.linha.uos;
+    if (r.linha.uso) item.uso = r.linha.uso;
+    if (origem) item.origem = origem;
+    return item;
+  });
 }
 
 // ── Formulário do modal ─────────────────────────────────────────────────────

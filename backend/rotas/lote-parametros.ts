@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { coagirNumericosDeclarados } from './coercao-numerica.js';
+import { coagirNumericosDeclarados, numeroEstrito } from './coercao-numerica.js';
 
 export const rotasLoteParametros: ReturnType<typeof Router> = Router();
 
@@ -69,6 +69,13 @@ export function validarParametros(corpo: any): { dados: Record<string, any> } | 
   return { dados: coagido.dados };
 }
 
+/** `decimal` volta do banco como string (`"3.50"`). */
+function paraNumeroLinha(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Subconjunto de `req.dados` usado aqui — permite exercitar a lógica sem servidor nem banco. */
 export interface DadosParametros {
   listar(tabela: string, opcoes: Record<string, any>): Promise<{ dados: any[]; total?: number }>;
@@ -83,7 +90,8 @@ const TETO_PAGINAS = 500;
 export async function listarTodosParametros(dados: DadosParametros): Promise<any[]> {
   const todos: any[] = [];
   for (let pagina = 1; pagina <= TETO_PAGINAS; pagina++) {
-    const r = await dados.listar('lote_parametros', { por_pagina: POR_PAGINA, pagina });
+    // `ordenar: 'id'` torna a paginação por offset estável (o default do shell é `criado_em DESC`, que não é total).
+    const r = await dados.listar('lote_parametros', { por_pagina: POR_PAGINA, pagina, ordenar: 'id', ordem: 'asc' });
     todos.push(...r.dados);
     if (r.dados.length < POR_PAGINA) return todos;
     if (typeof r.total === 'number' && todos.length >= r.total) return todos;
@@ -93,7 +101,7 @@ export async function listarTodosParametros(dados: DadosParametros): Promise<any
 
 export type ResultadoGravacao =
   | { http: 200 | 201; registro: any }
-  | { http: 400; codigo: 'CARIMBO_OBRIGATORIO'; mensagem: string };
+  | { http: 400; codigo: 'CARIMBO_OBRIGATORIO' | 'INVARIANTE'; mensagem: string };
 
 /**
  * Upsert por `imovel_nucleo_id` (único no schema). Ao CRIAR exige o carimbo mínimo; ao atualizar, o
@@ -108,6 +116,17 @@ export async function gravarParametros(
   })).dados[0];
   const sobre = async (atual: any): Promise<ResultadoGravacao> => {
     if (Object.keys(campos).length === 0) return { http: 200, registro: atual };
+    // Os invariantes valem para a LINHA que fica gravada, não só para o corpo: um PUT com só um dos dois
+    // coeficientes, ou que zera um campo do carimbo, passaria na validação do corpo e deixaria a linha inconsistente.
+    const mesclada = { ...atual, ...campos };
+    const a = paraNumeroLinha(mesclada.coef_minimo); const b = paraNumeroLinha(mesclada.coef_maximo);
+    if (a != null && b != null && a > b) {
+      return { http: 400, codigo: 'INVARIANTE', mensagem: 'O coeficiente mínimo não pode ser maior que o máximo (conferido contra o valor já gravado)' };
+    }
+    const zerados = CARIMBO_OBRIGATORIO.filter((c) => c in campos && campos[c] == null);
+    if (zerados.length > 0) {
+      return { http: 400, codigo: 'INVARIANTE', mensagem: `O carimbo do lote não pode ser apagado: ${zerados.join(', ')}` };
+    }
     return { http: 200, registro: await dados.atualizar('lote_parametros', atual.id, campos) };
   };
 
@@ -138,9 +157,11 @@ function podeEscrever(req: Request): boolean {
   return nivel === 'escrita' || nivel === 'admin';
 }
 
+// A chave do vínculo passa pelo parser ÚNICO da app (`numeroEstrito`): `Number()` cru aceitaria "0x10"
+// (lote 16), "1e3" (lote 1000) e `true` (lote 1) como id.
 function idImovel(v: unknown): number | null {
-  const n = Number(v);
-  return Number.isInteger(n) && n > 0 && n <= 2147483647 ? n : null;
+  const n = numeroEstrito(v);
+  return n !== null && Number.isInteger(n) && n > 0 && n <= 2147483647 ? n : null;
 }
 
 // GET /lote-parametros — todos os registros (a aba Terrenos cruza com a lista de lotes do módulo).

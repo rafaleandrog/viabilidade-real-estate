@@ -15,6 +15,9 @@ import {
 export class ViabLoteParametrosImportar extends LitElement {
   /** Lotes ATIVOS do módulo (a lista completa, não só a filtrada da aba). */
   @property({ attribute: false }) lotes: LoteNucleo[] = [];
+  /** Registros já gravados, por id do lote: a importação não regrava o carimbo de um registro que existe
+   *  e não importa por cima de um vínculo que mudou. */
+  @property({ attribute: false }) registros: Map<number, any> = new Map();
   @property({ type: Boolean }) importando = false;
   @property() erro = '';
   /** Resultado da gravação feita pelo Painel: `{ ok, falhas: string[] }`. */
@@ -44,13 +47,13 @@ export class ViabLoteParametrosImportar extends LitElement {
     try {
       const { linhas, erros } = lerCsv(await f.text());
       this.errosLeitura = erros;
-      this.resultado = casarPlanilha(linhas, this.lotes);
+      this.resultado = casarPlanilha(linhas, this.lotes, this.registros);
     } catch (err: any) {
       this.errosLeitura = [err?.message || 'Não foi possível ler o arquivo.'];
     }
   };
 
-  private get _itens() { return itensDaImportacao(this.resultado, this.nomeArquivo); }
+  private get _itens() { return itensDaImportacao(this.resultado, this.nomeArquivo, this.registros); }
 
   private _importar = () => {
     if (this.importando || this._itens.length === 0) return;
@@ -75,7 +78,8 @@ export class ViabLoteParametrosImportar extends LitElement {
             CSV com as colunas <strong>logradouro</strong> (ou rua), <strong>numero</strong>, e ao menos uma de
             <strong>cmax</strong>, <strong>cmin</strong>, <strong>gabarito</strong>; opcionais <strong>area_m2</strong>
             (conferida contra o módulo), <strong>uos</strong> e <strong>uso</strong>. O lote é achado pela rua e pelo
-            número, sem distinguir acento ou caixa. Nada é escrito no módulo.
+            número, sem distinguir acento ou caixa. Célula vazia ou coluna ausente <strong>não apaga</strong> o valor já
+            gravado. Nada é escrito no módulo.
           </p>
           ${this.resumoFinal ? nothing : html`
             <urbi-seletor-arquivo

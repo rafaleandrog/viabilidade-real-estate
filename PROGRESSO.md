@@ -26,7 +26,7 @@ parcelamento com setor habitacional.
 **2. Parâmetros urbanísticos por lote (coeficientes e gabarito), no schema do app.** Pedido do autor
 depois de ver a planilha `Quadro de Áreas Urbitá Etapas 1 a 6 v05` (aba `DadosLotes`): registrar
 `coef_minimo`, `coef_maximo` e `gabarito_maximo` por **lote** sem levar a informação ao módulo
-imobiliário, com a garantia de que o dado é único e de que o lote do app é exatamente o do módulo.
+imobiliário, com o dado único por lote (o id do lote é único na tabela) e a conferência de que o lote do app continua sendo o do módulo (carimbo).
 (A primeira versão deste item, com campos de negociação que eu mesmo inventei, foi descartada antes de
 qualquer release: não era o que o autor pediu.)
 
@@ -50,6 +50,7 @@ qualquer release: não era o que o autor pediu.)
   linha pelo par rua + número (sem acento/caixa), confere a área e mostra o que entra ANTES de gravar —
   só linha que casa com exatamente um lote. Dados da etapa 1 prontos em
   `referencia/dados/urbita-etapa-1-coeficientes.csv` (63 lotes, `cmax`, `uos`, `uso`).
+- **Importação (regras que a revisão fixou).** Só vai o que a planilha traz (célula vazia ou coluna ausente = "não mexer", nunca "limpar"); o carimbo só no cadastro; linha de lote que já tem registro e mudou no módulo não entra; rua + número repetidos na planilha excluem todas as ocorrências; blocos de 300. O backend confere os invariantes (mínimo ≤ máximo, carimbo não apagável) contra a linha gravada e usa o parser estrito para o id do lote.
 - **Não feito, de propósito:** o coeficiente mínimo e o gabarito não existem na planilha (só `Cmax`) e
   ficam vazios e editáveis; **os parâmetros ainda não alimentam o estudo** (hoje o estudo guarda os
   coeficientes digitados em `estudos`); glebas não têm parâmetros.

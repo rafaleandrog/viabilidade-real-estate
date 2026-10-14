@@ -70,6 +70,7 @@ test('Terrenos: os parâmetros aparecem na linha do lote certo; clicar no lote a
   assert.equal(m.modalCoefMax, '3.50', 'o modal recebe o registro desse lote' + relato(a));
   assert.equal(m.modalStatus, 'ok', 'o modal recebe a conferência do vínculo' + relato(a));
   assert.equal(m.modalEditavel, true, 'nível admin edita' + relato(a));
+  assert.equal(m.orfaos, true, 'registro cujo lote não existe no módulo vira o aviso de órfãos' + relato(a));
 });
 
 for (const modo of ['rejeita', 'erro-payload']) {
@@ -100,6 +101,12 @@ test('Modal do lote: um pedido por Salvar, com carimbo só no cadastro; salvando
   assert.equal(m.camposDesabilitadosSalvando, 5, 'com o PUT em voo TODOS os campos ficam desabilitados' + relato(a));
   assert.equal(m.camposBloqueadosPorVinculo, 5, 'com o vínculo a conferir (lote mudou) nenhum campo edita' + relato(a));
   assert.equal(m.fecharDepois, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));
+  assert.deepEqual(m.botaoReconfirmar, { ok: false, area: true, identificacao: true, semPermissao: false },
+    'Reconfirmar vínculo só aparece com o vínculo a conferir e para quem edita' + relato(a));
+  assert.equal(m.reconfirmarEmitidos, 1, 'Reconfirmar emite um pedido' + relato(a));
+  assert.deepEqual(m.chavesReconfirmar, ['area_m2', 'conjunto', 'numero_lote', 'parcelamento_id', 'quadra', 'rua'],
+    'Reconfirmar regrava SÓ o carimbo, com o lote de hoje' + relato(a));
+  assert.equal(m.reconfirmarComSalvando, 0, 'Reconfirmar com o Painel salvando é ignorado' + relato(a));
 });
 
 test('Painel: PUT em voo + troca de aba — o cache ainda recebe o registro gravado', { skip: pular ?? false }, async () => {
@@ -127,4 +134,19 @@ test('Painel: importar CSV casa por rua e número, confere a área, grava só o 
   assert.equal(m.resumoOk, 1, 'o diálogo mostra o resultado da gravação' + relato(a));
   assert.equal(m.resumoFalhas, 0, 'sem falhas' + relato(a));
   assert.equal(m.importandoDepois, false, 'a importação termina' + relato(a));
+});
+
+test('Painel: importar por cima de registro existente não regrava o carimbo nem apaga o que a planilha não traz', { skip: pular ?? false }, async () => {
+  const { m, a } = await medida('painel-terrenos-importar-existente');
+  assert.equal(m.importaveis, 1, 'a linha casa com o lote que já tem registro' + relato(a));
+  assert.deepEqual(m.chavesDoItem, ['coef_maximo', 'imovel_nucleo_id', 'origem'],
+    'o item leva só o id, o valor que a planilha trouxe e a origem — sem carimbo e sem null' + relato(a));
+});
+
+test('Painel: nível leitura vê os parâmetros, mas não importa nem edita', { skip: pular ?? false }, async () => {
+  const { m, a } = await medida('painel-terrenos-leitor');
+  assert.equal(m.botaoImportar, false, 'sem botão de importar para quem não escreve' + relato(a));
+  assert.equal(m.coefMax, '3,5', 'a leitura continua' + relato(a));
+  assert.equal(m.modalLote, 'LOTE-NORMAL', 'o modal abre' + relato(a));
+  assert.equal(m.modalEditavel, false, 'mas somente leitura' + relato(a));
 });

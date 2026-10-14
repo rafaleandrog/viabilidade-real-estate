@@ -21,7 +21,7 @@ import {
   coletarPaginas, idsParcelamentosRegularizacao, loteForaDaRegularizacao,
 } from './terrenos-nucleo.js';
 import {
-  indexarParametros, statusVinculo, registrosOrfaos, ROTULO_STATUS, paraNumero, type LoteNucleo, type StatusVinculo,
+  indexarParametros, MAX_ITENS_IMPORTACAO, statusVinculo, registrosOrfaos, ROTULO_STATUS, paraNumero, type LoteNucleo, type StatusVinculo,
 } from './lote-parametros.js';
 import './tela-lote-parametros.js';
 import './tela-lote-parametros-importar.js';
@@ -337,18 +337,37 @@ export class ViabTelaDashboard extends LitElement {
 
   // A importação segue a mesma regra: o Painel faz a requisição e relê os registros ao final, para o
   // cache refletir exatamente o que ficou gravado (inclusive o que foi atualizado em vez de criado).
+  // O backend aceita até 300 lotes por chamada: uma planilha maior vai em blocos, e o resultado é o
+  // conjunto de todos.
   private async _importarParametros(d: { itens: Record<string, any>[]; origem: string }) {
     if (this.parametrosSalvando) return;
     this.parametrosSalvando = true;
     this.parametrosErro = '';
     try {
-      const res = await importarLoteParametros(d.itens);
-      if (res?.erro || !Array.isArray(res?.resultados)) { this.parametrosErro = res?.mensagem || 'Erro ao importar'; return; }
-      const falhas = (res.resultados as any[]).filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
-      this.importarResumo = { ok: res.resultados.length - falhas.length, falhas };
-      const atual = await listarLoteParametros();
-      if (!atual?.erro && Array.isArray(atual?.dados)) this.parametros = indexarParametros(atual.dados);
-      urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length ? 'alerta' : 'sucesso');
+      const resultados: any[] = [];
+      for (let i = 0; i < d.itens.length; i += MAX_ITENS_IMPORTACAO) {
+        const res = await importarLoteParametros(d.itens.slice(i, i + MAX_ITENS_IMPORTACAO));
+        if (res?.erro || !Array.isArray(res?.resultados)) {
+          // Os blocos anteriores já foram gravados: o resumo diz quantos, e o erro explica o resto.
+          this.parametrosErro = `${res?.mensagem || 'Erro ao importar'}${resultados.length ? ` (${resultados.filter((r) => r.ok).length} lote(s) de blocos anteriores já foram gravados)` : ''}`;
+          break;
+        }
+        resultados.push(...res.resultados);
+      }
+      const falhas = resultados.filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
+      if (resultados.length > 0) this.importarResumo = { ok: resultados.length - falhas.length, falhas };
+      // A releitura é parte do dever de manter o cache fiel ao banco, mas falhar nela NÃO desfaz a gravação:
+      // avisa em vez de contradizer o resumo.
+      try {
+        const atual = await listarLoteParametros();
+        if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
+        this.parametros = indexarParametros(atual.dados);
+      } catch (e: any) {
+        this.parametrosErro = `Importação gravada, mas não foi possível atualizar a lista (${e?.message || 'indisponível'}). Recarregue o app para ver os valores.`;
+      }
+      if (this.importarResumo) {
+        urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosErro ? 'alerta' : 'sucesso');
+      }
     } catch (e: any) {
       this.parametrosErro = e?.message || 'Erro ao importar';
     } finally {
@@ -919,6 +938,7 @@ export class ViabTelaDashboard extends LitElement {
       ${this.importarAberto ? html`
         <viab-lote-parametros-importar
           .lotes=${this.lotesTodos}
+          .registros=${this.parametros}
           .importando=${this.parametrosSalvando}
           .erro=${this.parametrosErro}
           .resumoFinal=${this.importarResumo}

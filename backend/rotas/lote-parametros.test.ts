@@ -5,6 +5,7 @@ import {
   MAX_ITENS_IMPORTACAO, type DadosParametros,
 } from './lote-parametros.js';
 import esquema from '../../schema.json';
+import { readFileSync } from 'node:fs';
 
 test('CAMPOS_EDITAVEIS bate com as colunas do schema (menos o vínculo imovel_nucleo_id)', () => {
   const colunas = Object.keys((esquema as any).tabelas.lote_parametros.colunas).filter((c) => c !== 'imovel_nucleo_id');
@@ -135,4 +136,58 @@ test('importarParametros: um resultado por lote; erro de um não derruba os outr
   assert.match(resultados[3].erro!, /repetido/);
   assert.equal(f.linhas.length, 1, 'só o primeiro lote válido foi gravado');
   assert.ok(MAX_ITENS_IMPORTACAO >= 63, 'a etapa 1 inteira cabe numa importação');
+});
+
+test('gravarParametros: os invariantes valem contra a LINHA gravada, não só contra o corpo', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
+  const mudaMin = await gravarParametros(f.dados, 781, { coef_minimo: 5 });
+  assert.equal(mudaMin.http, 400, 'mínimo 5 contra o máximo 3 já gravado');
+  const mudaMax = await gravarParametros(f.dados, 781, { coef_maximo: 0.5 });
+  assert.equal(mudaMax.http, 400, 'máximo 0,5 contra o mínimo 1 já gravado');
+  const ok = await gravarParametros(f.dados, 781, { coef_minimo: 2 });
+  assert.equal(ok.http, 200);
+  for (const campo of ['numero_lote', 'parcelamento_id', 'area_m2']) {
+    const r = await gravarParametros(f.dados, 781, { [campo]: null });
+    assert.equal(r.http, 400, `${campo} do carimbo não pode ser apagado`);
+  }
+  assert.ok(!f.chamadas.includes('criar'));
+  assert.equal(f.chamadas.filter((c) => c === 'atualizar').length, 1, 'só a atualização válida foi gravada');
+});
+
+test('importarParametros: id do lote passa pelo parser estrito ("0x10", "1e3" e true não viram id)', async () => {
+  const f = falso();
+  const { resultados } = await importarParametros(f.dados, [
+    { imovel_nucleo_id: '0x10', coef_maximo: 3, ...CARIMBO },
+    { imovel_nucleo_id: '1e3', coef_maximo: 3, ...CARIMBO },
+    { imovel_nucleo_id: true, coef_maximo: 3, ...CARIMBO },
+    { imovel_nucleo_id: '781', coef_maximo: 3, ...CARIMBO },
+  ]);
+  assert.deepEqual(resultados.map((r) => r.ok), [false, false, false, true]);
+  assert.equal(f.linhas.length, 1);
+});
+
+test('importarParametros: chave ausente não toca o valor já gravado (reimportar não apaga o mínimo editado à mão)', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
+  const gravados: any[] = [];
+  const original = f.dados.atualizar;
+  f.dados.atualizar = async (t, id, d) => { gravados.push(d); return original(t, id, d); };
+  await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5 }]);
+  assert.deepEqual(gravados, [{ coef_maximo: 3.5 }], 'só o que veio é atualizado');
+});
+
+test('listarTodosParametros pede ordem estável por id', async () => {
+  const pedidos: any[] = [];
+  await listarTodosParametros({
+    async listar(_t, o) { pedidos.push(o); return { dados: [] }; },
+    async criar() { return {}; }, async atualizar() { return {}; },
+  });
+  assert.equal(pedidos[0].ordenar, 'id');
+  assert.equal(pedidos[0].ordem, 'asc');
+});
+
+test('o limite de itens por importação é o MESMO no frontend (que parte a planilha em blocos)', () => {
+  const fonte = readFileSync(new URL('../../frontend/lote-parametros.ts', import.meta.url), 'utf8');
+  const m = fonte.match(/export const MAX_ITENS_IMPORTACAO = (\d+);/);
+  assert.ok(m, 'constante do frontend encontrada');
+  assert.equal(Number(m![1]), MAX_ITENS_IMPORTACAO);
 });

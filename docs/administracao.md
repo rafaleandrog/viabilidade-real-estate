@@ -44,11 +44,17 @@ guardados no próprio app e ligados ao lote do módulo imobiliário pelo id dele
 de uma vez em **Importar coeficientes (CSV)**.
 
 - **Planilha de importação.** CSV com `;` ou `,`, com as colunas `logradouro` (ou `rua`) e `numero`, e ao menos uma de
-  `cmax`, `cmin` e `gabarito`; opcionais `area_m2`, `uos` e `uso`. O lote do módulo é achado pela rua e pelo número
-  (sem distinguir acento ou caixa), e a área da planilha, quando vem, é conferida contra a do módulo (tolerância de
-  0,01 m²). A tela mostra o que vai entrar antes de gravar, e **só as linhas que casam com exatamente um lote entram**:
-  as sem lote, com mais de um lote, repetidas na planilha ou com área diferente ficam de fora e são listadas. Importar
-  de novo atualiza os valores, sem duplicar.
+  `cmax`, `cmin` e `gabarito`; opcionais `area_m2`, `uos` e `uso`. Números com ponto ou vírgula decimal e **sem
+  separador de milhar**. O lote do módulo é achado pela rua e pelo número (sem distinguir acento ou caixa), e a área
+  da planilha, quando vem, é conferida contra a do módulo (tolerância de 0,01 m²). A tela mostra o que vai entrar
+  antes de gravar, e **só as linhas que casam com exatamente um lote entram**. Ficam de fora, e a tela lista até as
+  doze primeiras: linhas sem lote, com mais de um lote, **repetidas na planilha (nenhuma das ocorrências entra)**, com
+  área diferente, sem nenhum valor, ou de um lote que já tem registro e **mudou no módulo** (esse se resolve no modal do
+  lote, com *Reconfirmar vínculo*).
+- **Importar de novo não apaga nada.** Célula vazia ou coluna ausente significam "não mexer": o CSV da etapa 1 traz só
+  o coeficiente máximo, e reimportá-lo não apaga o mínimo, o gabarito, a UOS ou o uso que alguém editou no modal. Só o
+  modal limpa um valor. O carimbo do lote é gravado no **cadastro** do registro; importar por cima de um registro que
+  já existe não o regrava. Planilhas com mais de 300 lotes são enviadas em blocos de 300.
 - **Status do vínculo.** Junto dos valores o app guarda um carimbo do lote (parcelamento, rua, número, quadra, conjunto
   e área). A coluna **Vínculo** compara o carimbo com o lote de hoje: *Conferido*; *Área mudou* (alerta, os valores
   seguem valendo, pode ser retificação); *Lote mudou* (parcelamento, rua, número, quadra ou conjunto diferentes: a edição

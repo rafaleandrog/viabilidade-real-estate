@@ -13,7 +13,11 @@ export const REGISTRO = {
   area_m2: '300.00', coef_minimo: '1.00', coef_maximo: '3.50', gabarito_maximo: '12.00', uos: 'CSIIR 2', uso: 'Misto',
 };
 
+// Registro cujo lote (id 999) não existe no módulo: tem que virar o aviso de órfãos, e só ele.
+export const REGISTRO_ORFAO = { ...REGISTRO, id: 56, imovel_nucleo_id: 999, numero_lote: '777' };
+
 export interface MedidaParametros {
+  orfaos: boolean;
   aviso: string;
   carregada: boolean;
   coefMax: Record<string, string>;
@@ -47,6 +51,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
   const banners = [...el.shadowRoot!.querySelectorAll('urbi-banner')].map((b: any) => b.textContent?.replace(/\s+/g, ' ').trim());
   const aviso = banners.find((t: string) => /Parâmetros dos lotes indisponíveis/.test(t)) ?? '';
   const carregada = !!el.terrenosCarregados;
+  const orfaos = banners.some((t: string) => /apontam para lote que não existe mais/.test(t));
 
   const modalAntes = !!el.shadowRoot!.querySelector('viab-lote-parametros');
   const click = (linha: any) => tabela.dispatchEvent(new CustomEvent('urbi:tabela-click', { detail: { linha }, bubbles: true, composed: true }));
@@ -57,7 +62,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
   for (let i = 0; i < 3; i++) { await el.updateComplete; await new Promise((r) => setTimeout(r, 0)); }
   const modal = el.shadowRoot!.querySelector('viab-lote-parametros') as any;
   return {
-    aviso, carregada, coefMax, coefMin, gabarito, vinculo, modalAntes, gleba,
+    orfaos, aviso, carregada, coefMax, coefMin, gabarito, vinculo, modalAntes, gleba,
     modalLote: modal?.lote?.id_legivel ?? '',
     modalCoefMax: String(modal?.registro?.coef_maximo ?? ''),
     modalStatus: modal?.status ?? '',
@@ -68,7 +73,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
 export const caso = {
   nome: 'painel-terrenos-parametros',
   exigir: [{ seletor: 'urbi-hospedeiro[slot="terrenos"]', minimo: 1 }],
-  aceitaNaoReproduzido: [...aceitaNaoReproduzidoComFiltros, 'urbi-modal.title'],
-  montar: montarCaso('ok', [REGISTRO]),
+  aceitaNaoReproduzido: [...aceitaNaoReproduzidoComFiltros, 'urbi-modal.title', 'urbi-banner.variante'],
+  montar: montarCaso('ok', [REGISTRO, REGISTRO_ORFAO]),
   medir: medirParametros,
 };

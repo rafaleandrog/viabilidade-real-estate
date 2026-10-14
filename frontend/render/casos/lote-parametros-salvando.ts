@@ -19,6 +19,10 @@ export interface MedidaSalvando {
   camposDesabilitadosSalvando: number;
   camposBloqueadosPorVinculo: number;
   fecharDepois: number;
+  botaoReconfirmar: Record<string, boolean>;
+  chavesReconfirmar: string[];
+  reconfirmarEmitidos: number;
+  reconfirmarComSalvando: number;
 }
 
 const LOTE = { id: 3, id_legivel: 'LOTE-NORMAL', area: '300', rua: 'Amsterdam', numero_lote: '4910', parcelamento_id: 30 };
@@ -28,7 +32,7 @@ export const caso = {
   // O host do modal não tem caixa própria (o `urbi-modal` é fixo), então a âncora visível é outra.
   exigir: [{ seletor: '#ancora-lote', minimo: 1 }],
   aceitaNaoReproduzido: [
-    'urbi-modal.title', 'urbi-botao.variante', 'urbi-botao.desabilitado', 'urbi-input.label', 'urbi-input.placeholder',
+    'urbi-modal.title', 'urbi-botao.variante', 'urbi-botao.desabilitado', 'urbi-botao.carregando', 'urbi-input.label', 'urbi-input.placeholder',
     'urbi-input.desabilitado', 'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
@@ -80,7 +84,23 @@ export const caso = {
     el.status = 'identificacao'; await el.updateComplete;
     const bloqueados = desab();
 
+    // Reconfirmar vínculo: aparece com o vínculo a conferir (e só para quem edita); regrava SÓ o carimbo.
+    const temBotao = () => [...el.shadowRoot.querySelectorAll('urbi-botao')].some((b: any) => /Reconfirmar/.test(b.textContent));
+    const botaoReconfirmar: Record<string, boolean> = {};
+    for (const st of ['ok', 'area', 'identificacao']) { el.status = st; await el.updateComplete; botaoReconfirmar[st] = temBotao(); }
+    el.editavel = false; await el.updateComplete; botaoReconfirmar.semPermissao = temBotao();
+    el.editavel = true; el.status = 'identificacao'; await el.updateComplete;
+    const antes = eventos.salvar.length;
+    el._reconfirmar();
+    const reconf = eventos.salvar[eventos.salvar.length - 1];
+    const emitiu = eventos.salvar.length - antes;
+    el.salvando = true; await el.updateComplete;
+    el._reconfirmar();
+    const comSalvando = eventos.salvar.length - antes - emitiu;
+
     return {
+      botaoReconfirmar, chavesReconfirmar: Object.keys(reconf?.corpo ?? {}).sort(),
+      reconfirmarEmitidos: emitiu, reconfirmarComSalvando: comSalvando,
       salvarEmitidos: aposPrimeiro,
       chavesDoCorpoNovo: Object.keys(novo?.corpo ?? {}).sort(),
       chavesDoCorpoExistente: Object.keys(existente?.corpo ?? {}).length,

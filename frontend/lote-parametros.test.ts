@@ -57,6 +57,13 @@ Genebra;5180;3823.76;0.0;Inst. EP;EPC;
 Sem Lote;1;10;3;X;Y;
 `;
 
+test('lerCsv: a linha do erro é a do ARQUIVO (linhas em branco contam) e coluna vazia não apaga a preenchida', () => {
+  const r = lerCsv('rua;numero;lote;cmax\nA;1;;3\n\n\nB;;;2\n');
+  assert.equal(r.linhas.length, 1);
+  assert.equal(r.linhas[0].numero, '1', 'duas colunas para o número: a vazia ("lote") não sobrescreve a preenchida');
+  assert.deepEqual(r.erros, ['Linha 5: sem rua ou sem número.']);
+});
+
 test('lerCsv: cabeçalho por apelido, separador detectado, BOM, vírgula decimal, erro de linha', () => {
   const r = lerCsv(CSV);
   assert.equal(r.linhas.length, 4);
@@ -75,24 +82,50 @@ const LOTES: LoteNucleo[] = [
   { id: 702, rua: 'dublin', numero_lote: '1', area: 10, parcelamento_id: 13 },
 ];
 
-test('casarPlanilha: casado, sem lote, área diverge, ambíguo, duplicada e sem valor; só casado importa', () => {
-  const l = (rua: string, numero: string, area: number | null, cmax: number | null) =>
-    ({ linha: 2, rua, numero, area, coef_maximo: cmax, coef_minimo: null, gabarito_maximo: null, uos: 'U', uso: 'M' });
+const L = (rua: string, numero: string, area: number | null, cmax: number | null, extra: Record<string, any> = {}) =>
+  ({ linha: 2, rua, numero, area, coef_maximo: cmax, coef_minimo: null, gabarito_maximo: null, uos: 'U', uso: 'M', ...extra });
+
+test('casarPlanilha: casado, sem lote, área diverge e ambíguo; só casado importa', () => {
   const r = casarPlanilha([
-    l('Amsterdam', '4910', 1464.91, 3.5),
-    l('Barcelona ', '4915', 2397.61, 3.5),
-    l('Genebra', '5180', 3000, 0),
-    l('Nada', '9', 5, 3),
-    l('Dublin', '1', 10, 3),
-    l('Amsterdam', '4910', 1464.91, 3),
-    l('Barcelona', '4915', 2397.61, null),
+    L('Amsterdam', '4910', 1464.91, 3.5),
+    L('Barcelona ', '4915', 2397.61, 3.5),
+    L('Genebra', '5180', 3000, 0),
+    L('Nada', '9', 5, 3),
+    L('Dublin', '1', 10, 3),
   ], LOTES);
-  assert.deepEqual(r.map((x) => x.status), ['casado', 'casado', 'area-diverge', 'sem-lote', 'ambiguo', 'duplicada', 'duplicada']);
+  assert.deepEqual(r.map((x) => x.status), ['casado', 'casado', 'area-diverge', 'sem-lote', 'ambiguo']);
   const itens = itensDaImportacao(r, 'Quadro de Áreas v05');
   assert.deepEqual(itens.map((i) => i.imovel_nucleo_id), [781, 772]);
-  assert.equal(itens[0].area_m2, 1464.91);
+  assert.equal(itens[0].area_m2, 1464.91, 'cadastro novo leva o carimbo');
   assert.equal(itens[0].origem, 'Quadro de Áreas v05');
   assert.equal(itens[0].coef_maximo, 3.5);
+});
+
+test('casarPlanilha: rua + número repetidos na planilha — NENHUMA das ocorrências entra', () => {
+  const r = casarPlanilha([
+    L('Amsterdam', '4910', 1464.91, 3.5), L('Barcelona', '4915', 2397.61, 3.5), L('amsterdam ', '4910', 1464.91, 3),
+  ], LOTES);
+  assert.deepEqual(r.map((x) => x.status), ['duplicada', 'casado', 'duplicada']);
+  assert.deepEqual(itensDaImportacao(r, '').map((i) => i.imovel_nucleo_id), [772]);
+});
+
+test('importação: só vai o que a planilha traz; o carimbo só no cadastro; registro com vínculo mudado não entra', () => {
+  const lotes: LoteNucleo[] = [LOTE, { ...LOTE, id: 780, numero_lote: '4915', area: 1271.72 }, { ...LOTE, id: 779, numero_lote: '4940', area: 800.69 }];
+  const registros = new Map<number, any>([
+    [781, { ...carimboDoLote(LOTE), imovel_nucleo_id: 781, coef_minimo: '1.00' }],            // existe e confere
+    [780, { ...carimboDoLote(LOTE), imovel_nucleo_id: 780, numero_lote: '9999' }],           // existe, mas o lote mudou
+  ]);
+  const r = casarPlanilha([
+    L('Amsterdam', '4910', 1464.91, 3.5, { uos: '', uso: '' }),
+    L('Amsterdam', '4915', 1271.72, 3.5),
+    L('Amsterdam', '4940', 800.69, 3.0, { coef_minimo: 1.5, gabarito_maximo: 12 }),
+  ], lotes, registros);
+  assert.deepEqual(r.map((x) => x.status), ['casado', 'vinculo-mudou', 'casado']);
+  const [existente, novo] = itensDaImportacao(r, 'q.csv', registros);
+  assert.deepEqual(existente, { imovel_nucleo_id: 781, coef_maximo: 3.5, origem: 'q.csv' },
+    'registro existente: sem carimbo, sem null — não apaga o coef_minimo editado à mão');
+  assert.ok('parcelamento_id' in novo && novo.coef_minimo === 1.5 && novo.gabarito_maximo === 12, 'cadastro novo leva carimbo e os valores que vieram');
+  assert.ok(!('uos' in existente) && !('coef_minimo' in existente));
 });
 
 test('casarPlanilha: coeficiente zero (EPC) é valor válido e importa; sem nenhum valor não', () => {
