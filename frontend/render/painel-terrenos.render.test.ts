@@ -89,8 +89,8 @@ test('Modal do lote: um pedido por Salvar, com carimbo só no cadastro; salvando
   assert.equal(m.imovelId, 3, 'o pedido identifica o lote pelo id do módulo' + relato(a));
   assert.deepEqual(
     m.chavesDoCorpoNovo,
-    ['area_m2', 'coef_maximo', 'coef_minimo', 'conjunto', 'gabarito_maximo', 'numero_lote', 'parcelamento_id', 'quadra', 'rua', 'uos', 'uso'],
-    'o cadastro leva o carimbo do lote e todos os campos editáveis' + relato(a),
+    ['area_m2', 'ausente', 'coef_maximo', 'coef_minimo', 'conjunto', 'gabarito_maximo', 'numero_lote', 'parcelamento_id', 'quadra', 'rua', 'uos', 'uso'],
+    'o cadastro leva o carimbo do lote, todos os campos editáveis e `ausente` (o modal abriu sem registro)' + relato(a),
   );
   assert.equal(m.chavesDoCorpoExistente, 6, 'a atualização leva os 5 campos editáveis mais o registro visto (`base`), sem reescrever o carimbo' + relato(a));
   assert.equal(m.fecharComSalvando, 0, 'fechar com o Painel salvando é ignorado' + relato(a));

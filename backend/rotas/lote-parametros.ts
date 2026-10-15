@@ -133,6 +133,20 @@ export function chaveCarimbo(linha: any): string {
 }
 
 /**
+ * Resumo do CONTEÚDO editável do registro (coeficientes, gabarito, UOS, uso e origem), de tamanho fixo. Os
+ * textos livres podem ter vírgula e não entram no DSL do `atualizarSe` como colunas; o resumo os cobre.
+ */
+export function chaveConteudo(linha: any): string {
+  const canonico = ['coef_minimo', 'coef_maximo', 'gabarito_maximo', 'uos', 'uso', 'origem'].map((c) => {
+    const v = linha?.[c];
+    if (v === null || v === undefined || v === '') return '';
+    if (c.startsWith('coef') || c === 'gabarito_maximo') { const n = paraNumeroLinha(v); return n == null ? '' : n.toFixed(2); }
+    return JSON.stringify(String(v).trim());
+  }).join('|');
+  return createHash('sha256').update(canonico).digest('hex');
+}
+
+/**
  * Condições do lock otimista (`atualizarSe`): a linha só é gravada se ainda tiver os valores contra os quais a
  * validação rodou. Nulo vira `[nulo]` (o DSL trata `null` como "sem filtro" e lança). Só entram colunas sem
  * texto livre: coeficientes e `carimbo_chave`.
@@ -161,7 +175,7 @@ const PERDEU = Symbol('perdeu-a-corrida');
  */
 export async function gravarParametros(
   dados: DadosParametros, imovelId: number, campos: Record<string, any>,
-  opcoes: { preservarCarimbo?: boolean; carimboEsperado?: Record<string, any>; base?: Record<string, any> } = {},
+  opcoes: { preservarCarimbo?: boolean; carimboEsperado?: Record<string, any>; base?: Record<string, any>; esperaAusente?: boolean } = {},
 ): Promise<ResultadoGravacao> {
   const buscar = async () => (await dados.listar('lote_parametros', {
     filtros: { imovel_nucleo_id: imovelId }, por_pagina: 1,
@@ -205,10 +219,10 @@ export async function gravarParametros(
     }
     // Leitura, conferência e escrita são um comando só: se outra pessoa mexeu nos coeficientes (ou, na
     // importação, no carimbo) depois da leitura, a escrita não acontece e a linha é relida.
-    const cond = condicoesDaLinha(atual, ['coef_minimo', 'coef_maximo', 'gabarito_maximo', 'carimbo_chave']);
-    // O carimbo que muda carrega a chave nova junto, para o próximo lock enxergar a troca de identidade.
-    const gravar = CAMPOS_CARIMBO.some((c) => c in campos)
-      ? { ...campos, carimbo_chave: chaveCarimbo({ ...atual, ...campos }) } : campos;
+    const cond = condicoesDaLinha(atual, ['coef_minimo', 'coef_maximo', 'gabarito_maximo', 'conteudo_chave', 'carimbo_chave']);
+    // As chaves novas vão junto da escrita, para o próximo lock enxergar a troca de identidade ou de conteúdo.
+    const mesclado = { ...atual, ...campos };
+    const gravar = { ...campos, carimbo_chave: chaveCarimbo(mesclado), conteudo_chave: chaveConteudo(mesclado) };
     const gravado = await dados.atualizarSe('lote_parametros', atual.id, gravar, cond);
     return gravado ? { http: 200, registro: gravado } : PERDEU;
   };
@@ -231,8 +245,10 @@ export async function gravarParametros(
     return { http: 400, codigo: 'INVARIANTE', mensagem: 'O registro do lote foi alterado por outra pessoa durante a gravação: recarregue e tente de novo' };
   };
 
+  // O modal abriu sem registro: se agora existe (outra pessoa cadastrou), o formulário inteiro o sobrescreveria.
+  const jaExiste: ResultadoGravacao = { http: 400, codigo: 'INVARIANTE', mensagem: 'Este lote já recebeu parâmetros de outra pessoa desde que você abriu a edição: recarregue a aba e confira antes de salvar' };
   const existente = await buscar();
-  if (existente) return comRelitura(existente, campos);
+  if (existente) return opcoes.esperaAusente ? jaExiste : comRelitura(existente, campos);
   const faltando = CARIMBO_OBRIGATORIO.filter((c) => campos[c] == null);
   if (faltando.length > 0) {
     return {
@@ -241,11 +257,11 @@ export async function gravarParametros(
     };
   }
   try {
-    return { http: 201, registro: await dados.criar('lote_parametros', { imovel_nucleo_id: imovelId, ...campos, carimbo_chave: chaveCarimbo(campos) }) };
+    return { http: 201, registro: await dados.criar('lote_parametros', { imovel_nucleo_id: imovelId, ...campos, carimbo_chave: chaveCarimbo(campos), conteudo_chave: chaveConteudo(campos) }) };
   } catch (e) {
     const vencedor = await buscar();
     if (!vencedor) throw e;
-    return comRelitura(vencedor, campos);
+    return opcoes.esperaAusente ? jaExiste : comRelitura(vencedor, campos);
   }
 }
 
@@ -289,6 +305,7 @@ rotasLoteParametros.put('/lote-parametros/:imovelId', async (req: Request, res: 
       erro(res, 400, 'CORPO_INVALIDO', 'base deve ser um objeto'); return;
     }
     const r = await gravarParametros(req.dados! as unknown as DadosParametros, imovelId, v.dados, {
+      esperaAusente: req.body?.ausente === true,
       base: base ? Object.fromEntries(CAMPOS_EDITAVEIS.filter((c) => c in base).map((c) => [c, base[c]])) : undefined,
     });
     if (r.http === 400) { erro(res, 400, r.codigo, r.mensagem); return; }

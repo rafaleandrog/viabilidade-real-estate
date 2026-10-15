@@ -162,6 +162,7 @@ test('formulário: ida e volta; cadastro leva o carimbo, atualização não; val
   assert.equal(novo.parcelamento_id, 12);
   assert.equal(novo.coef_minimo, 0, '0 não vira null');
   assert.equal(novo.uso, null);
+  assert.equal(novo.ausente, true, 'cadastro declara que o modal abriu sem registro');
   const reg = { ...carimboDoLote(LOTE), coef_maximo: '3.50', uos: 'CSIIR 2' };
   const upd = corpoDoForm(f, LOTE, true, reg);
   assert.ok(!('parcelamento_id' in upd), 'atualizar não reescreve o carimbo');

@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  validarParametros, CAMPOS_EDITAVEIS, gravarParametros, listarTodosParametros, importarParametros, chaveCarimbo,
+  validarParametros, CAMPOS_EDITAVEIS, gravarParametros, listarTodosParametros, importarParametros, chaveCarimbo, chaveConteudo,
   MAX_ITENS_IMPORTACAO, type DadosParametros,
 } from './lote-parametros.js';
 import esquema from '../../schema.json';
 import { readFileSync } from 'node:fs';
 
 test('CAMPOS_EDITAVEIS bate com as colunas do schema (menos o vínculo imovel_nucleo_id)', () => {
-  const colunas = Object.keys((esquema as any).tabelas.lote_parametros.colunas).filter((c) => c !== 'imovel_nucleo_id' && c !== 'carimbo_chave');
+  const colunas = Object.keys((esquema as any).tabelas.lote_parametros.colunas).filter((c) => c !== 'imovel_nucleo_id' && c !== 'carimbo_chave' && c !== 'conteudo_chave');
   assert.deepEqual([...CAMPOS_EDITAVEIS].sort(), colunas.sort());
 });
 
@@ -55,6 +55,12 @@ test('limite de texto do schema é respeitado; corpo inválido e campos extras',
 });
 
 // ── gravação e listagem contra um `dados` falso ─────────────────────────────
+
+/** Tira as chaves que o servidor acrescenta a toda escrita: o teste olha só o que o chamador pediu. */
+function semChaves(d: Record<string, any>) {
+  const { carimbo_chave: _a, conteudo_chave: _b, ...resto } = d;
+  return resto;
+}
 
 function falso(linhas: any[] = [], opcoes: { falhaCriar?: Error; criarInsere?: boolean } = {}) {
   const chamadas: string[] = [];
@@ -191,7 +197,7 @@ test('importarParametros: chave ausente não toca o valor já gravado (reimporta
   const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
   const gravados: any[] = [];
   const original = f.dados.atualizarSe;
-  f.dados.atualizarSe = async (t, id, d, c) => { gravados.push(d); return original(t, id, d, c); };
+  f.dados.atualizarSe = async (t, id, d, c) => { gravados.push(semChaves(d)); return original(t, id, d, c); };
   await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5 }]);
   assert.deepEqual(gravados, [{ coef_maximo: 3.5 }], 'só o que veio é atualizado');
 });
@@ -217,14 +223,14 @@ test('importação: registro que existe no SERVIDOR não tem o carimbo regravado
   const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_minimo: '1.00', coef_maximo: '3.00', ...CARIMBO }]);
   const gravados: any[] = [];
   const original = f.dados.atualizarSe;
-  f.dados.atualizarSe = async (t, id, d, c) => { gravados.push(d); return original(t, id, d, c); };
+  f.dados.atualizarSe = async (t, id, d, c) => { gravados.push(semChaves(d)); return original(t, id, d, c); };
   // O cliente achou que o registro não existia (cache velho) e mandou o carimbo.
   await importarParametros(f.dados, [{ imovel_nucleo_id: 781, coef_maximo: 3.5, ...CARIMBO }]);
   assert.deepEqual(gravados, [{ coef_maximo: 3.5 }]);
   // O PUT do modal (reconfirmar) continua podendo regravar o carimbo.
   const r = await gravarParametros(f.dados, 781, { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
   assert.equal(r.http, 200);
-  assert.deepEqual(gravados[1], { parcelamento_id: 99, numero_lote: '1', area_m2: 5, carimbo_chave: chaveCarimbo({ parcelamento_id: 99, numero_lote: '1', area_m2: 5 }) });
+  assert.deepEqual(gravados[1], { parcelamento_id: 99, numero_lote: '1', area_m2: 5 });
 });
 
 test('importação: carimbo esperado diferente do gravado recusa o item (vínculo reconfirmado por outra pessoa)', async () => {
@@ -321,4 +327,35 @@ test('PUT do modal: `base` (o que o modal viu) diferente do gravado recusa, em v
   // Carimbo reconfirmado por outra pessoa depois do modal aberto: recusa.
   f.linhas[0].numero_lote = '9999';
   assert.equal((await gravarParametros(f.dados, 781, { coef_minimo: 1.6 }, { base: visto })).http, 400);
+});
+
+test('cadastro com `ausente`: se o registro já existe (ou foi criado na corrida), recusa em vez de sobrescrever', async () => {
+  const f = falso([{ id: 1, imovel_nucleo_id: 781, coef_maximo: '3.00', ...CARIMBO }]);
+  const r = await gravarParametros(f.dados, 781, { ...CARIMBO, coef_maximo: 9 }, { esperaAusente: true });
+  assert.equal(r.http, 400);
+  assert.match((r as any).mensagem, /já recebeu parâmetros/);
+  assert.equal(f.linhas[0].coef_maximo, '3.00');
+  // Corrida: a busca não vê, o criar bate no único, o vencedor existe.
+  const g = falso([], { falhaCriar: new Error('único'), criarInsere: true });
+  assert.equal((await gravarParametros(g.dados, 5, { ...CARIMBO, coef_maximo: 9 }, { esperaAusente: true })).http, 400);
+  // Sem registro, `ausente` grava normalmente.
+  assert.equal((await gravarParametros(falso([]).dados, 5, { ...CARIMBO }, { esperaAusente: true })).http, 201);
+});
+
+test('UOS e uso entram no lock otimista pelo resumo do conteúdo', async () => {
+  const linha = { id: 1, imovel_nucleo_id: 781, uos: 'A', uso: 'X', ...CARIMBO, carimbo_chave: chaveCarimbo(CARIMBO) };
+  const f = falso([{ ...linha, conteudo_chave: chaveConteudo(linha) }]);
+  const original = f.dados.atualizarSe;
+  f.dados.atualizarSe = async (t, id, d, c) => {
+    // Outra pessoa troca só o texto depois da leitura, atualizando a chave como o servidor faria.
+    f.linhas[0].uos = 'OUTRO'; f.linhas[0].conteudo_chave = chaveConteudo(f.linhas[0]);
+    return original(t, id, d, c);
+  };
+  assert.equal(chaveConteudo({ uos: 'A', coef_maximo: 3 }), chaveConteudo({ uos: ' A ', coef_maximo: '3.00' }), 'estável em número/texto');
+  assert.notEqual(chaveConteudo({ uos: 'A' }), chaveConteudo({ uos: 'B' }));
+  // O modal viu uos='A' e manda o formulário com uos='B'; no meio, outra pessoa gravou 'OUTRO'. Sem o resumo
+  // do conteúdo na condição a escrita passaria e apagaria a edição dela; com ele, perde, relê e a base recusa.
+  const r = await gravarParametros(f.dados, 781, { uos: 'B', uso: 'X' }, { base: { uos: 'A', uso: 'X' } });
+  assert.equal(r.http, 400);
+  assert.equal(f.linhas[0].uos, 'OUTRO', 'a edição do outro não foi sobrescrita');
 });

@@ -274,7 +274,8 @@ export function corpoDoForm(form: FormParametros, lote: LoteNucleo, existente: b
   const p: Record<string, any> = {};
   for (const c of TEXTOS) p[c] = String(form[c] ?? '').trim() || null;
   for (const c of NUMERICOS) p[c] = form[c] ?? null;
-  if (!existente) return { ...carimboDoLote(lote), ...p };
+  // Cadastro: `ausente` diz que o modal abriu sem registro; se outra pessoa cadastrou antes, o servidor recusa.
+  if (!existente) return { ...carimboDoLote(lote), ...p, ausente: true };
   // Atualização: leva também o registro que o modal VIU (`base`). O corpo manda o formulário inteiro, então
   // sem isso um modal aberto antes de outra pessoa editar sobrescreveria a edição dela, ou aplicaria os
   // valores a um vínculo reconfirmado; o servidor recusa se o gravado já não for o que foi visto.
