@@ -76,8 +76,12 @@ export class ViabLoteParametros extends LitElement {
   /** Regrava o carimbo com o lote de hoje: o usuário confirma que é o mesmo lote (ex.: retificação de área). */
   private _reconfirmar = () => {
     if (this.salvando || !this.lote) return;
+    // Com o vínculo em "área mudou" o formulário continua editável: o que a pessoa já digitou vai junto
+    // (um pedido só com o carimbo fecharia o modal e descartaria as edições visíveis).
+    const msg = validarForm(this.form);
+    if (msg) { this.erroLocal = msg; return; }
     this.erroLocal = '';
-    this._pedir(carimboDoLote(this.lote));
+    this._pedir({ ...corpoDoForm(this.form, this.lote, true, this.registro), ...carimboDoLote(this.lote) });
   };
 
   private _texto(campo: string, rotulo: string, placeholder = ''): TemplateResult {

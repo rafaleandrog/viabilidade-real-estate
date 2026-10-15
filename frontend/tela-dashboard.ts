@@ -323,6 +323,14 @@ export class ViabTelaDashboard extends LitElement {
     try {
       const res = await salvarLoteParametros(d.imovelId, d.corpo);
       if (res?.erro || res?.imovel_nucleo_id == null) {
+        // INVARIANTE: o servidor viu o registro diferente do que o modal viu. O cache está velho: relê, fecha o
+        // modal (reabrir mostra o valor atual) e avisa, em vez de deixar a pessoa salvar contra a mesma base velha.
+        if (res?.codigo === 'INVARIANTE') {
+          urbiVerso.notificar(res?.mensagem || 'O lote foi alterado por outra pessoa.', 'alerta');
+          if (mesmoLote()) this.loteAberto = null;
+          ambiguo = true;
+          return;
+        }
         if (mesmoLote()) this.parametrosErro = res?.mensagem || 'Erro ao salvar';
         // Resposta de erro do servidor (400/403/…) não gravou nada; resposta sem corpo reconhecível pode ter.
         ambiguo = !res?.erro;

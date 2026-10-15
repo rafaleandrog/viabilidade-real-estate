@@ -104,8 +104,8 @@ test('Modal do lote: um pedido por Salvar, com carimbo só no cadastro; salvando
   assert.deepEqual(m.botaoReconfirmar, { ok: false, area: true, identificacao: true, semPermissao: false },
     'Reconfirmar vínculo só aparece com o vínculo a conferir e para quem edita' + relato(a));
   assert.equal(m.reconfirmarEmitidos, 1, 'Reconfirmar emite um pedido' + relato(a));
-  assert.deepEqual(m.chavesReconfirmar, ['area_m2', 'conjunto', 'numero_lote', 'parcelamento_id', 'quadra', 'rua'],
-    'Reconfirmar regrava SÓ o carimbo, com o lote de hoje' + relato(a));
+  assert.deepEqual(m.chavesReconfirmar, ['area_m2', 'base', 'coef_maximo', 'coef_minimo', 'conjunto', 'gabarito_maximo', 'numero_lote', 'parcelamento_id', 'quadra', 'rua', 'uos', 'uso'],
+    'Reconfirmar regrava o carimbo com o lote de hoje e leva junto o que já foi digitado (`base` protege contra edição alheia)' + relato(a));
   assert.equal(m.reconfirmarComSalvando, 0, 'Reconfirmar com o Painel salvando é ignorado' + relato(a));
 });
 
@@ -158,6 +158,8 @@ test('Painel: salvamento ambíguo (PUT rejeitou) relê o cache e o corpo leva o 
   assert.equal(m.corpoBase?.parcelamento_id, 30, 'e o carimbo que o modal viu' + relato(a));
   assert.equal(m.cacheDepois, '4.00', 'depois do PUT perdido o cache foi relido e mostra o que ficou gravado' + relato(a));
   assert.equal(m.salvandoDepois, false, 'o ciclo de salvamento terminou' + relato(a));
+  assert.equal(m.cacheDepoisConflito, '5.00', 'conflito INVARIANTE também relê o cache' + relato(a));
+  assert.equal(m.modalFechouNoConflito, true, 'e fecha o modal, para reabrir mostrar o valor atual' + relato(a));
 });
 
 test('Painel: importação gravou mas a releitura falhou — aviso, edição bloqueada e aba recarrega na volta', { skip: pular ?? false }, async () => {
