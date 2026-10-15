@@ -49,7 +49,13 @@ export async function coletarPaginas(
   const todos: any[] = [];
   for (let pagina = 1; pagina <= TETO_PAGINAS; pagina++) {
     const res = await buscar(pagina);
-    const dados: any[] = res?.dados ?? [];
+    // `urbiVerso.modulo` resolve a resposta de erro (`{ erro: true }`) em vez de lançar: tratá-la como página
+    // vazia encerraria a coleta "com sucesso". Numa varredura de parcelamentos isso viraria conjunto de
+    // regularização vazio e mostraria lotes que a regra fail-closed manda esconder.
+    if (res?.erro || !Array.isArray(res?.dados)) {
+      throw new Error(res?.mensagem || 'resposta inesperada do Núcleo');
+    }
+    const dados: any[] = res.dados;
     todos.push(...dados);
     if (dados.length === 0) return todos;
     const totalPaginas = Number(res?.paginas);

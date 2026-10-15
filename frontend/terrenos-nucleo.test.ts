@@ -50,8 +50,8 @@ test('coletarPaginas acumula até a página vir incompleta ou acabar `paginas`',
   await coletarPaginas(async (p) => { cortadas.push(p); return { dados: cheia(p), paginas: 1 }; }, 2);
   assert.deepEqual(cortadas, [1]);
 
-  // Resposta sem `dados` não quebra.
-  assert.deepEqual(await coletarPaginas(async () => ({}), 2), []);
+  // Página vazia legítima é `{ dados: [] }`; resposta sem `dados` não é página: ver o teste de erro abaixo.
+  assert.deepEqual(await coletarPaginas(async () => ({ dados: [] }), 2), []);
 });
 
 test('coletarPaginas: `paginas` manda — página curta por teto de servidor menor NÃO encerra a coleta', async () => {
@@ -87,4 +87,15 @@ test('coletarPaginas: bater o teto de páginas sem ver a última LANÇA — list
     /incompleta/,
   );
   assert.equal(chamadas, 500);
+});
+
+test('coletarPaginas: resposta de erro (resolvida, não lançada) ou sem `dados` LANÇA, na 1ª página e nas seguintes', async () => {
+  await assert.rejects(coletarPaginas(async () => ({ erro: true, mensagem: 'sem permissão' }), 2), /sem permissão/);
+  await assert.rejects(coletarPaginas(async () => ({}), 2), /inesperada/);
+  await assert.rejects(coletarPaginas(async () => ({ dados: 'x' }), 2), /inesperada/);
+  // Erro numa página tardia: o prefixo já coletado não é devolvido como se fosse tudo.
+  await assert.rejects(
+    coletarPaginas(async (p) => (p === 1 ? { dados: [{ id: 1 }, { id: 2 }], paginas: 3 } : { erro: true, mensagem: 'falhou' }), 2),
+    /falhou/,
+  );
 });
