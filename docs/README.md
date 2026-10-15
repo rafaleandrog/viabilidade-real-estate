@@ -36,7 +36,7 @@ monitoradas**. A aba **Estudos** lista os estudos aos quais você tem acesso, co
 status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV, Margem, ROI e
 Criador. Na linha de cada estudo ficam as ações que a sua função permite: os botões de transição
 de status, **Duplicar** e **Remover**; clicar na linha abre o estudo, e é no cabeçalho do estudo
-aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e só os lotes do setor Urbitá. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
+aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e os lotes que não são de regularização fundiária. Para cada lote ela mostra os **parâmetros urbanísticos** que o app guarda por conta própria — coeficiente de aproveitamento mínimo e máximo e gabarito máximo — e o status do vínculo com o lote do módulo; clicar num lote abre a edição, e quem tem nível de escrita também **importa os coeficientes de uma planilha CSV**. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
 (curvas de distribuição de custos no tempo, usadas pelo estudo Avançado) e **Regiões monitoradas**
 ([Análise de Mercado](analise-mercado)).
 
@@ -100,8 +100,7 @@ tem exportação própria. Ver [Exportação](exportacao).
 ## Para administradores
 
 Antes do primeiro estudo: conceda ao app a leitura de **imóveis** (sem ela, só o terreno manual funciona), de
-**parcelamentos** (filtra o seletor de lotes) e de **setores habitacionais** (libera os lotes da aba
-**Terrenos** do Painel) do Núcleo em *Admin → Apps → viabilidade → Núcleo*; crie os
+**parcelamentos** (filtra o seletor de lotes e a aba **Terrenos** do Painel) do Núcleo em *Admin → Apps → viabilidade → Núcleo*; crie os
 **benchmarks** de cada tipo de empreendimento; revise os **parâmetros** do app (alíquotas e
 percentuais padrão, prazo de arquivamento, limite da coleta de mercado) em *Admin → Apps →
 viabilidade*; e, se for usar a análise de mercado, cadastre as **regiões monitoradas**
@@ -113,8 +112,8 @@ ver também [Benchmarks](benchmarks) e [Análise de Mercado](analise-mercado).
 
 ## Instruções para não humanos
 
-Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é por estudo: quem não
-é membro (nem `admin` do app) recebe `403`, e um `leitor` não vê estudos em Rascunho ou Arquivado.
+Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão dos estudos é por estudo: quem não
+é membro (nem `admin` do app) recebe `403`, e um `leitor` não vê estudos em Rascunho ou Arquivado. Os parâmetros dos lotes não são de um estudo: qualquer usuário do app lê, e só o nível de escrita ou admin grava.
 
 | Recurso | Rotas |
 |---|---|
@@ -124,6 +123,7 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é
 | Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `DELETE /estudos/:id/imoveis/:vinculoId` |
 | Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` |
 | Análise de mercado | `GET`/`POST /estudos/:id/analise-mercado` · `PATCH /estudos/:id/analise-mercado/regiao` · `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` |
+| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` (id do lote no módulo; cadastro exige número e área do lote; a atualização do modal leva `base`, o registro que a pessoa viu, e é recusada com `400` se outra pessoa o alterou antes (o cadastro, se alguém já cadastrou o lote); `403` sem nível de escrita) · `POST /lote-parametros/importar` (até 300 lotes, resultado por lote) |
 | Benchmarks | `GET /benchmarks` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` |
 | Configuração e manutenção | `GET /config` · `POST /manutencao/arquivar-inativos` |
 | Avançado — cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH`/`DELETE /estudos/:id/avancado/fases/:fid` · `POST /estudos/:id/avancado/fases/:fid/alocacoes` · `PATCH`/`DELETE …/alocacoes/:aid` |

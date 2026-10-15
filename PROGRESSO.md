@@ -4,6 +4,74 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-14 — Aba Terrenos: lotes fora de regularização, e parâmetros urbanísticos por lote
+
+Pedido direto do autor, sem issue. Dois assuntos na mesma aba, entregues juntos por pedido: (1) a aba
+mostrava "Lotes ocultos" e (2) faltava lugar para registrar dados de lote/gleba que o Núcleo não tem.
+
+**1. Lotes ocultos.** A causa era a permissão, não bug de código: a aba exigia a leitura de
+`setores_habitacionais` (flag nova, desligada no upgrade; na tela de Núcleo da instalação a de
+`setores_habitacionais` aparece desligada) e, sem ela, o filtro do setor Urbitá é fail-closed e
+esconde todos os lotes. Por decisão do autor a regra passa a ser "tudo que **não** é regularização
+fundiária": lote entra se o parcelamento dele não tem `regularizacao` verdadeira (lote sem
+parcelamento também entra). Isso só precisa da leitura de `parcelamentos`, que já está ligada, então
+o aviso some **sem ação do admin**. `manifesto.json` deixou de pedir `setores_habitacionais`
+(sem bump de `versao`: não é schema); `listarSetoresHabitacionaisNucleo` e todo o corte por setor
+saíram. Lógica pura em `frontend/terrenos-nucleo.ts` (era `terrenos-setor.ts`), ligada em
+`_carregarTerrenos`. **Continua fail-closed**: sem ler parcelamentos nenhum lote aparece, com banner
+(as glebas seguem), porque sem saber o que é regularização mostrar tudo exibiria o que a regra
+esconde. O seletor de lote da Incorporação **não mudou** e segue excluindo também lotes de
+parcelamento com setor habitacional.
+
+**2. Parâmetros urbanísticos por lote (coeficientes e gabarito), no schema do app.** Pedido do autor
+depois de ver a planilha `Quadro de Áreas Urbitá Etapas 1 a 6 v05` (aba `DadosLotes`): registrar
+`coef_minimo`, `coef_maximo` e `gabarito_maximo` por **lote** sem levar a informação ao módulo
+imobiliário, com o dado único por lote (o id do lote é único na tabela) e a conferência de que o lote do app continua sendo o do módulo (carimbo).
+(A primeira versão deste item, com campos de negociação que eu mesmo inventei, foi descartada antes de
+qualquer release: não era o que o autor pediu.)
+
+- **Vínculo.** Tabela `lote_parametros` (`schema.json`, fim do arquivo): `imovel_nucleo_id` é o **id do
+  lote no módulo** (o mesmo de `GET /imoveis/:id`) e é **único** (`unicos`). Junto vai um **carimbo** do
+  lote no cadastro — `parcelamento_id`, `rua`, `numero_lote`, `quadra`, `conjunto`, `area_m2`, tirados
+  dos campos-fonte e **não** do `id_legivel` (que é derivado). A coluna Vínculo da aba compara o carimbo
+  com o lote de hoje: parcelamento/rua/número/quadra/conjunto diferentes → "Lote mudou" (edição
+  bloqueada até "Reconfirmar vínculo"); só a área diferente → alerta, valores seguem valendo.
+- **QA de leitura na Pinguim** (sessão filha, só GET): dos 63 lotes da etapa 1 da planilha, **63 casam
+  com o Núcleo por (rua, número) e por área**, sem ambiguidade; `rua` só existe no parcelamento da etapa
+  1 (nos outros é nula) e as etapas 2, 3, 5 e 6 ainda não têm lote no módulo. A restrição UNIQUE real em
+  lote não foi confirmada (os dados de hoje não violam, e o doc do módulo não a declara) — por isso a
+  unicidade que o app garante é a do **id**, não a de (rua, número).
+- **Backend** (`backend/rotas/lote-parametros.ts`): `GET /lote-parametros` (qualquer usuário do app),
+  `PUT /lote-parametros/:imovelId` (upsert; cadastro exige o carimbo mínimo — parcelamento, número e
+  área; recupera a corrida do primeiro cadastro) e `POST /lote-parametros/importar` (até 300 lotes,
+  resultado por lote), escrita só `escrita`/`admin`, parser numérico único, tetos das colunas, mínimo ≤ máximo.
+- **Tela.** Colunas Coef. mín./máx., Gabarito e Vínculo para lotes; modal "Parâmetros do lote" (o PUT e o
+  cache moram no Painel, que sobrevive ao modal sair da tela); **Importar coeficientes (CSV)** casa cada
+  linha pelo par rua + número (sem acento/caixa), confere a área e mostra o que entra ANTES de gravar —
+  só linha que casa com exatamente um lote. Dados da etapa 1 prontos em
+  `referencia/dados/urbita-etapa-1-coeficientes.csv` (63 lotes, `cmax`, `uos`, `uso`).
+- **Importação (regras que a revisão fixou).** Só vai o que a planilha traz (célula vazia ou coluna ausente = "não mexer", nunca "limpar"); o carimbo só no cadastro; linha de lote que já tem registro e mudou no módulo não entra; rua + número repetidos na planilha excluem todas as ocorrências; blocos de 300. O backend confere os invariantes (mínimo ≤ máximo, carimbo não apagável) contra a linha gravada e usa o parser estrito para o id do lote.
+- **Não feito, de propósito:** o coeficiente mínimo e o gabarito não existem na planilha (só `Cmax`) e
+  ficam vazios e editáveis; **os parâmetros ainda não alimentam o estudo** (hoje o estudo guarda os
+  coeficientes digitados em `estudos`); glebas não têm parâmetros.
+- **Sem migração e sem bump de `versao`** (tabela nova; o app só passa a ter a tabela depois de uma release
+  instalada). **O QA da Pinguim ainda NÃO pode receber estes dados**: a instância roda a `0.1.40` anterior,
+  sem a tabela, sem as rotas e sem a tela. Fica para o autor publicar a release (com este manifesto, que
+  também já traz a chave nova do módulo), instalar na Pinguim e importar o CSV da etapa 1 pela tela.
+
+Verificado: `validar-frontend.sh` e `validar-backend.sh` verdes. Mutações de controle nos casos de
+render (filtro de regularização, clique na linha, leitura falha, `.salvando` ligado no modal, campos
+bloqueados durante o PUT, cache atualizado no Painel com o modal fora da tela) reprovam o caso certo e
+deixam a suíte de função pura verde.
+
+**Fica para o autor:** publicar a release (Actions → release → Run workflow) com este manifesto — a `0.1.40`
+instalada na Pinguim pede `setores_habitacionais` e não tem a tabela nem a tela —, instalá-la na Pinguim
+("Incluir não homologadas") e importar `referencia/dados/urbita-etapa-1-coeficientes.csv` pela tela; conferir
+que a sincronização do `schema.json` cria `lote_parametros` na instância (a execução real do schema é do
+ambiente autenticado).
+
+---
+
 ## 2026-10-14 — Conferência do importador com os 4 formulários na Pinguim
 
 Pedido direto do autor. Os 4 formulários de `referencia/formularios/exemplos/` foram importados na Pinguim com o importador já com o id

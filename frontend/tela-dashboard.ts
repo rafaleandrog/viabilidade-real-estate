@@ -13,13 +13,18 @@ import {
 } from './estudo-status.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
-  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarSetoresHabitacionaisNucleo,
+  listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo, listarLoteParametros, salvarLoteParametros, importarLoteParametros,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
 } from './viabilidade-api.js';
 import {
-  coletarPaginas, idsSetoresUrbita, idsParcelamentosDosSetores, loteDoSetor,
-} from './terrenos-setor.js';
+  coletarPaginas, idsParcelamentosRegularizacao, loteForaDaRegularizacao,
+} from './terrenos-nucleo.js';
+import {
+  indexarParametros, MAX_ITENS_IMPORTACAO, statusVinculo, registrosOrfaos, ROTULO_STATUS, paraNumero, type LoteNucleo, type StatusVinculo,
+} from './lote-parametros.js';
+import './tela-lote-parametros.js';
+import './tela-lote-parametros-importar.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
 import './viabilidade-config-mercado.js';
@@ -190,9 +195,22 @@ export class ViabTelaDashboard extends LitElement {
   @state() private terrenosCarregando = false;
   @state() private terrenosDisponivel = true;
   @state() private terrenosMotivo = '';
-  /** Vazio = setor Urbitá resolvido. Preenchido = lotes escondidos (fail-closed) e este é o motivo. */
-  @state() private terrenosAvisoSetor = '';
+  /** Vazio = regularização resolvida. Preenchido = lotes escondidos (fail-closed) e este é o motivo. */
+  @state() private terrenosAvisoLotes = '';
   private terrenosCarregados = false;
+  /** Parâmetros urbanísticos por id do LOTE no módulo (tabela `lote_parametros`). */
+  @state() private parametros = new Map<number, any>();
+  /** Preenchido quando a leitura dos parâmetros falhou — a lista de terrenos segue valendo. */
+  @state() private parametrosAviso = '';
+  /** Lotes ATIVOS do módulo, sem o filtro de regularização: a importação casa contra todos. */
+  @state() private lotesTodos: LoteNucleo[] = [];
+  /** Lote cujo modal "Parâmetros do lote" está aberto. */
+  @state() private loteAberto: any = null;
+  /** Um PUT (ou a importação) está em voo. Vive aqui, e não no modal, para sobreviver a ele sair da tela. */
+  @state() private parametrosSalvando = false;
+  @state() private parametrosErro = '';
+  @state() private importarAberto = false;
+  @state() private importarResumo: { ok: number; falhas: string[] } | null = null;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
@@ -232,55 +250,159 @@ export class ViabTelaDashboard extends LitElement {
 
   updated(changed: Map<string, unknown>) {
     if (changed.has('aba') && this.aba === 'estudos') this._carregar();
-    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando) this._carregarTerrenos();
+    // Não recarrega com o PUT do modal em voo: o recarregamento zeraria `terrenoAberto` e o cache sob ele.
+    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados && !this.terrenosCarregando
+      && !this.parametrosSalvando) this._carregarTerrenos();
   }
 
-  // Glebas: todas. Lotes: só os do setor Urbitá (`frontend/terrenos-setor.ts`).
-  // Pagina tudo em 200 (teto do Núcleo) porque o corte por setor é no cliente — com
-  // a página única de 100 de antes, os lotes do setor podiam ficar fora da lista.
+  // Glebas: todas. Lotes: todos que não são de regularização fundiária (`frontend/terrenos-nucleo.ts`).
+  // Pagina tudo em 200 (teto do Núcleo) porque o corte é no cliente.
   private async _carregarTerrenos() {
     this.terrenosCarregando = true;
     this.terrenosDisponivel = true;
     this.terrenosMotivo = '';
-    this.terrenosAvisoSetor = '';
+    this.terrenosAvisoLotes = '';
+    this.parametrosAviso = '';
+    this.loteAberto = null;
+    this.parametrosErro = '';
     try {
       const POR = 200;
+      // Não derruba a aba: sem os parâmetros a lista de terrenos continua valendo.
+      // `urbiVerso.api` RESOLVE a resposta de erro (`{ erro: true, mensagem }`) em vez de lançar: sem
+      // este `throw` ela virava "lista vazia", e o modal abria em branco sobre um registro que existe.
+      const parametrosP = listarLoteParametros()
+        .then((r: any) => {
+          if (r?.erro || !Array.isArray(r?.dados)) throw new Error(r?.mensagem || 'resposta inesperada');
+          return indexarParametros(r.dados);
+        })
+        .catch((e: any) => {
+          this.parametrosAviso = `não foi possível carregar os parâmetros dos lotes (${e?.message || 'indisponível'}).`;
+          return new Map<number, any>();
+        });
       const [glebas, lotes] = await Promise.all([
         coletarPaginas((p) => listarGlebasNucleo('', p, POR), POR),
         coletarPaginas((p) => listarLotesNucleo('', p, POR), POR),
       ]);
-      let idsParcelamento: Set<number> | null = null;
-      // Falha de leitura (flag ainda não concedida, rede) deixa `terrenosCarregados` falso: voltar
-      // à aba tenta de novo, e conceder a permissão passa a valer sem recarregar o app. "Setor
-      // não encontrado" é resposta, não falha — fica carregado, para não repetir a varredura toda.
+      let idsRegularizacao: Set<number> | null = null;
+      // Falha de leitura (flag não concedida, rede) deixa `terrenosCarregados` falso: voltar à
+      // aba tenta de novo, e conceder a permissão passa a valer sem recarregar o app.
       let falhaTransitoria = false;
-      let etapa = 'os setores habitacionais';
       try {
-        const setores = await coletarPaginas((p) => listarSetoresHabitacionaisNucleo(p, POR), POR);
-        const idsSetor = idsSetoresUrbita(setores);
-        if (idsSetor.size === 0) {
-          this.terrenosAvisoSetor = 'o setor Urbitá não foi encontrado no Núcleo.';
-        } else {
-          etapa = 'os parcelamentos';
-          const parcelamentos = await coletarPaginas((p) => listarParcelamentosNucleo(p, POR), POR);
-          idsParcelamento = idsParcelamentosDosSetores(parcelamentos, idsSetor);
-        }
+        const parcelamentos = await coletarPaginas((p) => listarParcelamentosNucleo(p, POR), POR);
+        idsRegularizacao = idsParcelamentosRegularizacao(parcelamentos);
       } catch (e: any) {
         falhaTransitoria = true;
-        this.terrenosAvisoSetor = `não foi possível ler ${etapa} (${e?.message || 'indisponível'}). `
+        this.terrenosAvisoLotes = `não foi possível ler os parcelamentos (${e?.message || 'indisponível'}). `
           + 'Um administrador pode liberar a leitura em Admin → Apps → viabilidade → Núcleo.';
       }
       const g = glebas.map((o: any) => ({ ...o, _tipo: 'gleba' }));
       const l = lotes
-        .filter((o: any) => loteDoSetor(o, idsParcelamento))
+        .filter((o: any) => loteForaDaRegularizacao(o, idsRegularizacao))
         .map((o: any) => ({ ...o, _tipo: 'lote' }));
       this.terrenos = [...g, ...l];
-      this.terrenosCarregados = !falhaTransitoria;
+      this.lotesTodos = lotes.filter((o: any) => !o.removido_em) as LoteNucleo[];
+      this.parametros = await parametrosP;
+      // Falha ao ler os parâmetros também deixa a aba "não carregada": voltar a ela tenta de novo.
+      this.terrenosCarregados = !falhaTransitoria && !this.parametrosAviso;
     } catch (e: any) {
       this.terrenosDisponivel = false;
       this.terrenosMotivo = e?.message || 'Indisponível';
     }
     this.terrenosCarregando = false;
+  }
+
+  // O ciclo de salvamento do modal mora AQUI: se o modal sair da tela com o PUT em voo (troca de aba),
+  // o cache `parametros` ainda é atualizado e reabrir mostra o valor gravado. Fechar e erro só valem
+  // para o lote que foi salvo: se o usuário já abriu OUTRO, o resultado não toca o modal dele.
+  private async _salvarParametros(d: { imovelId: number; corpo: Record<string, any> }) {
+    if (this.parametrosSalvando) return;
+    const mesmoLote = () => this.loteAberto != null && Number(this.loteAberto.id) === d.imovelId;
+    this.parametrosSalvando = true;
+    this.parametrosErro = '';
+    let ambiguo = false;
+    try {
+      const res = await salvarLoteParametros(d.imovelId, d.corpo);
+      if (res?.erro || res?.imovel_nucleo_id == null) {
+        // INVARIANTE: o servidor viu o registro diferente do que o modal viu. O cache está velho: relê, fecha o
+        // modal (reabrir mostra o valor atual) e avisa, em vez de deixar a pessoa salvar contra a mesma base velha.
+        if (res?.codigo === 'INVARIANTE') {
+          urbiVerso.notificar(res?.mensagem || 'O lote foi alterado por outra pessoa.', 'alerta');
+          if (mesmoLote()) this.loteAberto = null;
+          ambiguo = true;
+          return;
+        }
+        if (mesmoLote()) this.parametrosErro = res?.mensagem || 'Erro ao salvar';
+        // Resposta de erro do servidor (400/403/…) não gravou nada; resposta sem corpo reconhecível pode ter.
+        ambiguo = !res?.erro;
+        return;
+      }
+      this.parametros = new Map(this.parametros).set(Number(res.imovel_nucleo_id), res);
+      urbiVerso.notificar('Parâmetros do lote salvos.', 'sucesso');
+      if (mesmoLote()) this.loteAberto = null;
+    } catch (e: any) {
+      if (mesmoLote()) this.parametrosErro = e?.message || 'Erro ao salvar';
+      ambiguo = true; // a requisição pode ter gravado e a resposta se perdido
+    } finally {
+      // Salvamento ambíguo: reabrir o modal mostraria o registro de antes e um novo Salvar desfaria o que
+      // ficou gravado. Relê o cache, e se não der, trata como importação: avisa e bloqueia a edição.
+      if (ambiguo) await this._reler('o salvamento');
+      this.parametrosSalvando = false;
+    }
+  }
+
+  /** Relê os parâmetros; se falhar, o cache é desconhecido: aviso, edição bloqueada e aba recarrega ao voltar. */
+  private async _reler(oque: string) {
+    try {
+      const atual = await listarLoteParametros();
+      if (atual?.erro || !Array.isArray(atual?.dados)) throw new Error(atual?.mensagem || 'resposta inesperada');
+      this.parametros = indexarParametros(atual.dados);
+    } catch (e: any) {
+      this.parametrosAviso = `${oque} pode ter gravado, mas a lista não pôde ser atualizada (${e?.message || 'indisponível'}). Volte a esta aba para recarregar.`;
+      this.terrenosCarregados = false;
+    }
+  }
+
+  // A importação segue a mesma regra: o Painel faz a requisição e relê os registros ao final, para o
+  // cache refletir exatamente o que ficou gravado (inclusive o que foi atualizado em vez de criado).
+  // O backend aceita até 300 lotes por chamada: uma planilha maior vai em blocos, e o resultado é o
+  // conjunto de todos.
+  private async _importarParametros(d: { itens: Record<string, any>[]; origem: string }) {
+    if (this.parametrosSalvando) return;
+    this.parametrosSalvando = true;
+    this.parametrosErro = '';
+    let enviou = false;
+    const resultados: any[] = [];
+    try {
+      for (let i = 0; i < d.itens.length; i += MAX_ITENS_IMPORTACAO) {
+        enviou = true;
+        const res = await importarLoteParametros(d.itens.slice(i, i + MAX_ITENS_IMPORTACAO));
+        if (res?.erro || !Array.isArray(res?.resultados)) {
+          // Os blocos anteriores já foram gravados: o resumo diz quantos, e o erro explica o resto.
+          this.parametrosErro = `${res?.mensagem || 'Erro ao importar'}${resultados.length ? ` (${resultados.filter((r) => r.ok).length} lote(s) de blocos anteriores já foram gravados)` : ''}`;
+          break;
+        }
+        resultados.push(...res.resultados);
+      }
+      const falhas = resultados.filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
+      if (resultados.length > 0) this.importarResumo = { ok: resultados.length - falhas.length, falhas };
+      if (this.importarResumo) {
+        urbiVerso.notificar(`${this.importarResumo.ok} lote(s) importado(s).`, falhas.length || this.parametrosErro ? 'alerta' : 'sucesso');
+      }
+    } catch (e: any) {
+      // Pedido rejeitado no meio: os blocos anteriores já foram gravados e o resumo precisa dizer quais.
+      this.parametrosErro = e?.message || 'Erro ao importar';
+      if (resultados.length > 0) {
+        const falhas = resultados.filter((r) => !r.ok).map((r) => `lote ${r.imovel_nucleo_id}: ${r.erro}`);
+        this.importarResumo = { ok: resultados.length - falhas.length, falhas };
+        this.parametrosErro += ` (${this.importarResumo.ok} lote(s) de blocos anteriores já foram gravados)`;
+      }
+    } finally {
+      // Qualquer pedido enviado pode ter gravado (inclusive um que falhou na volta): o cache é relido SEMPRE,
+      // sucesso ou falha. Se a releitura falha, o cache é desconhecido e o modal NÃO pode editar sobre ele —
+      // o próximo Salvar mandaria os valores antigos e desfaria o que já foi gravado.
+      if (enviou) await this._reler('a importação');
+      this.parametrosSalvando = false;
+    }
   }
 
   private async _carregar() {
@@ -769,14 +891,37 @@ export class ViabTelaDashboard extends LitElement {
       { id: 'tipo', label: 'Tipo', valor: (l: any) => (l._tipo === 'gleba' ? 'Gleba' : 'Lote') },
       { id: 'nome', label: 'Imóvel', valor: (l: any) => l.id_legivel || `#${l.id}` },
       { id: 'area', label: 'Área', alinhamento: 'direita', valor: (l: any) => `${fmtNum(Number(l.area) || 0)} m²` },
+      ...[
+        { id: 'coef_minimo', label: 'Coef. mín.' },
+        { id: 'coef_maximo', label: 'Coef. máx.' },
+        { id: 'gabarito_maximo', label: 'Gabarito máx.' },
+      ].map((c) => ({
+        id: c.id, label: c.label, alinhamento: 'direita',
+        valor: (l: any) => {
+          if (l._tipo !== 'lote') return '—';
+          const v = paraNumero(this.parametros.get(Number(l.id))?.[c.id]);
+          return v == null ? '—' : fmtNum(v, 2);
+        },
+      })),
+      {
+        id: 'vinculo', label: 'Vínculo', alinhamento: 'centro',
+        render: (l: any) => {
+          if (l._tipo !== 'lote') return html`<span>—</span>`;
+          const st: StatusVinculo = statusVinculo(this.parametros.get(Number(l.id)), l);
+          const cor = st === 'ok' ? 'sucesso' : st === 'sem-dados' ? 'padrao' : st === 'area' ? 'info' : 'alerta';
+          return html`<urbi-badge cor=${cor}>${ROTULO_STATUS[st]}</urbi-badge>`;
+        },
+      },
     ];
     const linhas = this.filtroTerreno
       ? this.terrenos.filter((t) => t._tipo === this.filtroTerreno)
       : this.terrenos;
+    const podeEditar = ['escrita', 'admin'].includes(urbiVerso.contexto()?.nivel ?? '');
+    const orfaos = registrosOrfaos([...this.parametros.values()], this.lotesTodos);
     return html`
-      ${this.terrenosAvisoSetor ? html`
+      ${this.terrenosAvisoLotes ? html`
         <urbi-banner variante="alerta">
-          Lotes ocultos: só os lotes do setor Urbitá são exibidos, e ${this.terrenosAvisoSetor}
+          Lotes ocultos: sem saber quais parcelamentos são de regularização fundiária, ${this.terrenosAvisoLotes}
         </urbi-banner>` : nothing}
       <div class="filtros-bar">
         <urbi-select
@@ -789,15 +934,47 @@ export class ViabTelaDashboard extends LitElement {
           ]}
           @urbi:select-change=${(e: CustomEvent) => { this.filtroTerreno = e.detail.valor; }}
         ></urbi-select>
+        ${podeEditar && !this.parametrosAviso ? html`
+          <urbi-botao variante="fantasma" @click=${() => { this.importarResumo = null; this.parametrosErro = ''; this.importarAberto = true; }}>
+            Importar coeficientes (CSV)
+          </urbi-botao>` : nothing}
       </div>
+      ${this.parametrosAviso ? html`
+        <urbi-banner variante="alerta">Parâmetros dos lotes indisponíveis: ${this.parametrosAviso}</urbi-banner>` : nothing}
+      ${orfaos.length ? html`
+        <urbi-banner variante="alerta">${orfaos.length} registro(s) de parâmetros apontam para lote que não existe mais (ou foi
+          removido) no módulo. Os valores ficam guardados, mas não aparecem na tabela.</urbi-banner>` : nothing}
       <urbi-tabela
         expandir
+        clicavel
         .colunas=${colunas}
         .linhas=${linhas}
-        mensagem-vazio=${this.terrenosAvisoSetor
+        @urbi:tabela-click=${(e: CustomEvent) => { const l = e.detail?.linha; if (l?.id != null && l._tipo === 'lote') this.loteAberto = l; }}
+        mensagem-vazio=${this.terrenosAvisoLotes
           ? 'Nenhuma gleba cadastrada no Núcleo (os lotes estão ocultos, veja o aviso acima).'
-          : 'Nenhuma gleba ou lote do setor Urbitá cadastrado no Núcleo.'}
+          : 'Nenhuma gleba ou lote (fora de regularização) cadastrado no Núcleo.'}
       ></urbi-tabela>
+      ${this.loteAberto ? html`
+        <viab-lote-parametros
+          .lote=${this.loteAberto}
+          .registro=${this.parametros.get(Number(this.loteAberto.id)) ?? null}
+          .status=${statusVinculo(this.parametros.get(Number(this.loteAberto.id)), this.loteAberto)}
+          .editavel=${!this.parametrosAviso && podeEditar}
+          .salvando=${this.parametrosSalvando}
+          .erro=${this.parametrosErro}
+          @viab-parametros-fechar=${() => { if (!this.parametrosSalvando) { this.loteAberto = null; this.parametrosErro = ''; } }}
+          @viab-parametros-salvar=${(e: CustomEvent) => this._salvarParametros(e.detail)}
+        ></viab-lote-parametros>` : nothing}
+      ${this.importarAberto ? html`
+        <viab-lote-parametros-importar
+          .lotes=${this.lotesTodos}
+          .registros=${this.parametros}
+          .importando=${this.parametrosSalvando}
+          .erro=${this.parametrosErro}
+          .resumoFinal=${this.importarResumo}
+          @viab-parametros-fechar=${() => { if (!this.parametrosSalvando) { this.importarAberto = false; this.importarResumo = null; this.parametrosErro = ''; } }}
+          @viab-parametros-importar=${(e: CustomEvent) => this._importarParametros(e.detail)}
+        ></viab-lote-parametros-importar>` : nothing}
     `;
   }
 

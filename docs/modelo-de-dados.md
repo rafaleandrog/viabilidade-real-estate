@@ -76,6 +76,7 @@ só unidades e preço.
 | `benchmarks` | Os valores de referência por tipo de empreendimento (`campo`, `valor`, `regra_comparacao`, `variacao_positiva_pct`, `variacao_negativa_pct`, `medidor_min`, `medidor_max`, `medidor_faixa1_ate`, `medidor_faixa2_ate`). Único por `[tipo_empreendimento, campo]`. Ver [Benchmarks](benchmarks). |
 | `avancado_curvas` | As curvas de distribuição, globais da instância (a Curva S padrão e as criadas pelo administrador). |
 | `mercado_regioes` | As regiões monitoradas (`nome`, `uf`, `palavras_chave`, `ativa`) e o estado da última coleta (`ultima_coleta_em`, `_status`, `_itens`, `_msg`). |
+| `lote_parametros` | Os parâmetros urbanísticos de um **lote** do módulo imobiliário, no schema do app, sem escrever nada no módulo. Um registro por lote, ligado pelo `imovel_nucleo_id` — o id do lote no módulo —, **único**. Valores: `coef_minimo`, `coef_maximo` (decimal 6,2), `gabarito_maximo` (decimal 8,2), `uos` e `uso` (texto, informativos) e `origem` (de onde veio o dado, por exemplo o nome do arquivo importado). **Carimbo** do lote no momento do cadastro: `parcelamento_id`, `rua`, `numero_lote`, `quadra`, `conjunto` e `area_m2`, tirados dos campos do lote — nunca do nome legível. A aba Terrenos compara o carimbo com o lote de hoje: parcelamento, rua, número, quadra ou conjunto diferentes marcam o vínculo como "Lote mudou" e bloqueiam a edição até reconfirmar; só a área diferente alerta (pode ser retificação) e o registro segue valendo. `carimbo_chave` é mantida pelo servidor (um resumo de tamanho fixo da identidade do lote) e serve só para a gravação conferir, num único comando, que ninguém reconfirmou o vínculo no meio; não é editável; `conteudo_chave` faz o mesmo para o conteúdo editável (coeficientes, gabarito, UOS, uso e origem). Registro geral da instância, não de um estudo; editável por quem tem nível de escrita no app. |
 | `mercado_coletas` | O que a rotina diária guardou por região (`tipo`, `titulo`, `resumo`, `url`, `fonte`, `publicado_em`, `relevancia`, `bruto`). |
 
 ## O que a duplicação de estudo copia
@@ -102,12 +103,13 @@ original não financia. `curva_id` copia direto, porque curvas são globais da i
 
 ## Referências lógicas — colunas de id sem chave estrangeira
 
-Três colunas guardam id de outra linha sem FK no banco, cada uma por um motivo, e nenhuma deve ser
+Quatro colunas guardam id de outra linha sem FK no banco, cada uma por um motivo, e nenhuma deve ser
 "corrigida" para `referencia`:
 
 | Coluna | Por quê |
 |---|---|
 | `estudo_imoveis.imovel_nucleo_id` | o alvo vive no Núcleo, fora do schema do app |
+| `lote_parametros.imovel_nucleo_id` | idem — e é o que garante que o dado de um lote não seja confundido com o de outro |
 | `estudos.permuta_fisica_produto_id` | quebra do ciclo com `preliminar_produtos` (abaixo) |
 | `estudos.permuta_fisica_nr_produto_id` | idem |
 
@@ -152,13 +154,12 @@ tipo de empreendimento e o identificador não muda quando o estudo é renomeado.
 ## Núcleo
 
 O app declara, no bloco `dependencias` do manifesto, uma dependência do módulo imobiliário da
-plataforma (`urbiverso/modulos-urbiverso::imobiliario`), com leitura de `imoveis`, `parcelamentos` e
-`setores_habitacionais`: glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de
-terreno da Incorporação os lotes de parcelamento em regularização fundiária ou vinculado a um
-setor habitacional; e, junto com `setores_habitacionais`, restringe a aba Terrenos do Painel aos
-lotes do setor Urbitá (o lote herda o setor pelo parcelamento). O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
+plataforma (`urbiverso/modulos-urbiverso::imobiliario`), com leitura de `imoveis` e `parcelamentos`:
+glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de terreno da Incorporação os
+lotes de parcelamento em regularização fundiária ou vinculado a um setor habitacional e tira da aba
+Terrenos do Painel os lotes de regularização (o lote herda isso pelo parcelamento). O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
 `modulos/imobiliario/*` do app e o frontend as chama pelo cliente de módulo, com os caminhos
-relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/setores-habitacionais`, `/imoveis/:id`). O app não consulta o
+relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não consulta o
 banco do módulo: guarda o id e o tipo do imóvel como referência lógica, sem FK, e a área somada no
 próprio estudo (abaixo). A permissão é ligada pelo
 administrador da instância, na aba Núcleo do app; sem ela os endpoints respondem 403 e

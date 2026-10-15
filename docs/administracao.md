@@ -20,22 +20,49 @@ análise de mercado for usada, cadastrar as regiões monitoradas.
 
 ### Permissão do Núcleo
 
-Em *Admin → Apps → viabilidade → Núcleo*, conceda ao app a leitura de **imóveis**,
-**parcelamentos** e **setores habitacionais**. Enquanto a de **imóveis** não existir, a criação de
-estudo avisa e só o terreno manual fica disponível. As outras duas têm efeitos separados:
+Em *Admin → Apps → viabilidade → Núcleo*, conceda ao app a leitura de **imóveis** e de
+**parcelamentos**. Enquanto a de **imóveis** não existir, a criação de
+estudo avisa e só o terreno manual fica disponível. A de parcelamentos tem dois efeitos:
 
 - **Parcelamentos** sustenta o filtro do seletor de lotes da Incorporação: lotes de parcelamento em
   regularização fundiária ou vinculado a um setor habitacional ficam de fora. Sem ela, o seletor
   avisa que a lista não está filtrada e mostra todos os lotes.
-- **Setores habitacionais** (junto com parcelamentos) alimenta a aba **Terrenos** do Painel, que lista
-  as glebas de qualquer origem e só os lotes cujo parcelamento pertence ao setor Urbitá — o setor
-  habitacional cujo nome ou *slug* contém "urbita", sem distinção de acento nem de maiúsculas. Sem
-  uma das duas leituras, ou sem um setor assim cadastrado, a aba esconde todos os lotes e avisa o
-  motivo, em vez de listá-los sem filtro; as glebas continuam. Conceder a permissão depois vale na
-  próxima vez que se abre a aba, sem recarregar o app.
+- Na aba **Terrenos** do Painel, a mesma leitura separa o que é regularização fundiária: a aba lista as
+  glebas de qualquer origem e os lotes cujo parcelamento **não** está marcado como regularização
+  (lote sem parcelamento também aparece). Sem a leitura de parcelamentos a aba não sabe quais lotes
+  esconder, então oculta todos os lotes e avisa o motivo, em vez de listá-los sem filtro; as glebas
+  continuam. Conceder a permissão depois vale na próxima vez que se abre a aba, sem recarregar o app.
 
-Um lote do setor Urbitá aparece na aba Terrenos, mas fica de fora do seletor de lotes da Incorporação,
-que exclui lotes de parcelamento vinculado a setor habitacional.
+O seletor de lotes da Incorporação é mais restrito que a aba Terrenos: além da regularização, exclui
+lotes de parcelamento vinculado a setor habitacional.
+
+### Parâmetros urbanísticos dos lotes
+
+Na aba **Terrenos** do Painel, cada lote tem **coeficiente de aproveitamento mínimo e máximo** e **gabarito máximo**,
+guardados no próprio app e ligados ao lote do módulo imobiliário pelo id dele, sem escrever nada no módulo. O id é
+único: um lote não pode ter dois registros. Quem tem nível de escrita edita um lote clicando na linha, ou importa vários
+de uma vez em **Importar coeficientes (CSV)**.
+
+- **Planilha de importação.** CSV com `;` ou `,`, com as colunas `logradouro` (ou `rua`) e `numero`, e ao menos uma de
+  `cmax`, `cmin` e `gabarito`; opcionais `area_m2`, `uos` e `uso`. Números com ponto ou vírgula decimal e **sem
+  separador de milhar**. O lote do módulo é achado pela rua e pelo número (sem distinguir acento ou caixa), e a área
+  da planilha, quando vem, é conferida contra a do módulo (tolerância de 0,01 m²). A tela mostra o que vai entrar
+  antes de gravar, e **só as linhas que casam com exatamente um lote entram**. Ficam de fora, e a tela lista até as
+  doze primeiras: linhas sem lote, com mais de um lote, **repetidas na planilha (nenhuma das ocorrências entra)**, com
+  área diferente, **célula numérica com texto que não é número**, sem nenhum valor, ou de um lote que já tem registro e **mudou no módulo** (esse se resolve no modal do
+  lote, com *Reconfirmar vínculo*).
+- **Importar de novo não apaga nada.** Célula vazia ou coluna ausente significam "não mexer": o CSV da etapa 1 traz só
+  o coeficiente máximo, e reimportá-lo não apaga o mínimo, o gabarito, a UOS ou o uso que alguém editou no modal. Só o
+  modal limpa um valor. O carimbo do lote é gravado no **cadastro** do registro; importar por cima de um registro que
+  já existe não o regrava. Planilhas com mais de 300 lotes são enviadas em blocos de 300.
+- **Status do vínculo.** Junto dos valores o app guarda um carimbo do lote (parcelamento, rua, número, quadra, conjunto
+  e área; o parcelamento pode ser vazio, e lote que ganha ou perde parcelamento depois conta como lote que mudou). A
+  coluna **Vínculo** compara o carimbo com o lote de hoje: *Conferido*; *Área mudou* (alerta, os valores
+  seguem valendo, pode ser retificação); *Lote mudou* (parcelamento, rua, número, quadra ou conjunto diferentes: a edição
+  fica bloqueada até **Reconfirmar vínculo**). Registros cujo lote não existe mais ou foi removido ficam guardados e são
+  contados num aviso.
+- **Etapas sem lote.** Só lotes que já existem no módulo recebem parâmetros: as linhas de uma etapa ainda sem lote
+  cadastrado aparecem como "sem lote" e entram quando o lote for criado, importando de novo.
 
 ### Parâmetros
 
@@ -128,6 +155,7 @@ dispara a manutenção. Dentro de um estudo, o que vale é a função de membro 
 | Benchmarks | `GET /benchmarks?tipo_empreendimento=…` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` (idempotente) | leitura para todos; escrita e semear só `admin` |
 | Curvas | `GET /avancado/curvas` (cria a Curva S se faltar) · `POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` | escrita só `admin` |
 | Regiões | `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` | escrita só `admin` |
+| Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` (o corpo da atualização leva `base`, o registro visto; alterado por outra pessoa no intervalo, `400`) · `POST /lote-parametros/importar` (`{ itens }`, até 300, resultado por lote) | leitura: qualquer usuário do app; escrita: `escrita` ou `admin` (`403 SEM_PERMISSAO`) |
 | Manutenção | `POST /manutencao/arquivar-inativos` → `{ ok, arquivados, prazo_dias }` | só `admin` (`403 SEM_PERMISSAO`) |
 
 Eventos publicados no barramento da instância: `estudo_criado`, `estudo_status_alterado` e

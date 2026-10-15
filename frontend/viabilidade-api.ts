@@ -353,8 +353,9 @@ export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Prom
   if (busca) qs.set('busca', busca);
   return imobiliario(`/lotes?${qs}`);
 }
-// Parcelamentos — usado só para descobrir quais parcelamentos ficam FORA do
-// seletor de lotes da Incorporação: os de regularização fundiária
+// Parcelamentos — usado para descobrir quais parcelamentos ficam FORA do
+// seletor de lotes da Incorporação e da aba Terrenos do Painel (esta só pelo
+// critério de regularização): os de regularização fundiária
 // (`regularizacao=true`) e os vinculados a setor habitacional
 // (`setor_habitacional_id` preenchido) — os dois critérios da #746. Não há
 // filtro server-side por essas colunas no Núcleo hoje (camposFiltro de `lotes`
@@ -364,15 +365,21 @@ export function listarParcelamentosNucleo(pagina = 1, porPagina = 200): Promise<
   const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   return imobiliario(`/parcelamentos?${qs}`);
 }
-// Setores habitacionais — a aba Terrenos do Painel só mostra lote do setor
-// Urbitá, e o nome do setor só existe nesta entidade (o parcelamento guarda só
-// o `setor_habitacional_id`). Exige a flag `setores_habitacionais: ["ler"]`.
-export function listarSetoresHabitacionaisNucleo(pagina = 1, porPagina = 200): Promise<any> {
-  const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
-  return imobiliario(`/setores-habitacionais?${qs}`);
-}
 export function buscarImovelNucleo(id: number): Promise<any> {
   return imobiliario(`/imoveis/${id}`);
+}
+
+// ── Parâmetros urbanísticos do lote (aba Terrenos do Painel) ──
+// Coeficiente mínimo e máximo e gabarito máximo, guardados no schema do app e ligados ao lote do módulo
+// imobiliário pelo id dele (único). Nada é escrito no módulo.
+export function listarLoteParametros(): Promise<any> {
+  return urbiVerso.api(`/lote-parametros`);
+}
+export function salvarLoteParametros(imovelId: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`/lote-parametros/${imovelId}`, { method: 'PUT', body: JSON.stringify(dados) });
+}
+export function importarLoteParametros(itens: Record<string, any>[]): Promise<any> {
+  return urbiVerso.api(`/lote-parametros/importar`, { method: 'POST', body: JSON.stringify({ itens }) });
 }
 
 // ── Apelo Comercial (IA) ──
