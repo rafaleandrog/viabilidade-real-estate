@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   areaDiverge, normalizarTexto, chaveRuaNumero, carimboDoLote, statusVinculo, registrosOrfaos, numeroPlanilha, lerCsv,
-  casarPlanilha, itensDaImportacao, formDoRegistro, corpoDoForm, validarForm, indexarParametros,
+  casarPlanilha, itensDaImportacao, formDoRegistro, corpoDoForm, validarForm, indexarParametros, usoDaUos, UOS_CATALOGO, areaMaxConstruida,
   type LoteNucleo,
 } from './lote-parametros.js';
 
@@ -157,11 +157,11 @@ test('casarPlanilha: coeficiente zero (EPC) é valor válido e importa; sem nenh
 
 test('formulário: ida e volta; cadastro leva o carimbo, atualização não; validações', () => {
   const f = formDoRegistro({ coef_maximo: '3.50', coef_minimo: null, uos: 'CSIIR 2' });
-  assert.deepEqual([f.coef_maximo, f.coef_minimo, f.uos, f.uso], [3.5, null, 'CSIIR 2', '']);
+  assert.deepEqual([f.coef_maximo, f.coef_minimo, f.uos, f.uso], [3.5, null, 'CSIIR 2', 'Misto']);
   const novo = corpoDoForm({ ...f, coef_minimo: 0 }, LOTE, false);
   assert.equal(novo.parcelamento_id, 12);
   assert.equal(novo.coef_minimo, 0, '0 não vira null');
-  assert.equal(novo.uso, null);
+  assert.equal(novo.uso, 'Misto', 'o uso derivado da UOS vai no corpo');
   assert.equal(novo.ausente, true, 'cadastro declara que o modal abriu sem registro');
   const reg = { ...carimboDoLote(LOTE), coef_maximo: '3.50', uos: 'CSIIR 2' };
   const upd = corpoDoForm(f, LOTE, true, reg);
@@ -206,4 +206,55 @@ test('areaDiverge: a tolerância de 0,01 m² vale em centésimos, sem erro de po
   const r = casarPlanilha([{ linha: 2, rua: 'Amsterdam', numero: '4910', area: 100.01, coef_maximo: 3, coef_minimo: null, gabarito_maximo: null, uos: '', uso: '' }],
     [{ ...LOTE, area: 100 }]);
   assert.equal(r[0].status, 'casado');
+});
+
+test('UOS do catálogo define o uso; fora do catálogo não há uso derivado', () => {
+  assert.equal(usoDaUos('CSIIR 2'), 'Misto');
+  assert.equal(usoDaUos(' csiir  2 '), 'Misto');
+  assert.equal(usoDaUos('RE 1'), 'Residencial');
+  assert.equal(usoDaUos('RO 2'), 'Residencial');
+  assert.equal(usoDaUos('CSII 1'), 'Comercial');
+  assert.equal(usoDaUos('CSIInd 3'), 'Comercial');
+  assert.equal(usoDaUos('ZZZ'), null);
+  assert.equal(usoDaUos(''), null);
+  for (const c of UOS_CATALOGO) assert.ok(['Residencial', 'Comercial', 'Misto'].includes(c.uso));
+});
+
+test('importação: UOS do catálogo grava o uso dela por cima do da planilha; fora do catálogo vale a planilha', () => {
+  const lote = { id: 7, rua: 'Amsterdam', numero_lote: '4910', area: '1464.91', parcelamento_id: 1 };
+  const linha = (uos: string, uso: string) => ({ linha: 2, rua: 'Amsterdam', numero: '4910', area: null,
+    coef_maximo: 3, coef_minimo: null, gabarito_maximo: null, uos, uso });
+  const [a] = itensDaImportacao([{ linha: linha('csiir 2', 'Residencial'), lote, status: 'casado' }], '');
+  assert.deepEqual([a.uos, a.uso], ['CSIIR 2', 'Misto']);
+  const [b] = itensDaImportacao([{ linha: linha('XPTO 9', 'Residencial'), lote, status: 'casado' }], '');
+  assert.deepEqual([b.uos, b.uso], ['XPTO 9', 'Residencial']);
+  const [c] = itensDaImportacao([{ linha: linha('', 'Misto'), lote, status: 'casado' }], '');
+  assert.deepEqual([c.uos, c.uso], [undefined, 'Misto']);
+});
+
+test('areaMaxConstruida: área do lote × coef. máximo, em 2 casas; null sem um dos dois', () => {
+  assert.equal(areaMaxConstruida('1464.91', '3.00'), 4394.73);
+  assert.equal(areaMaxConstruida(300, 3.5), 1050);
+  assert.equal(areaMaxConstruida(null, 3), null);
+  assert.equal(areaMaxConstruida(300, null), null);
+});
+
+test('formDoRegistro: UOS do catálogo em outra grafia ou com uso divergente chega coerente; fora do catálogo mantém o uso', () => {
+  const a = formDoRegistro({ uos: 'csiir  2', uso: 'Residencial' });
+  assert.deepEqual([a.uos, a.uso], ['CSIIR 2', 'Misto']);
+  const b = formDoRegistro({ uos: 'XPTO 9', uso: 'Residencial' });
+  assert.deepEqual([b.uos, b.uso], ['XPTO 9', 'Residencial']);
+  const c = formDoRegistro({ uos: null, uso: 'Comercial' });
+  assert.deepEqual([c.uos, c.uso], ['', 'Comercial']);
+});
+
+test('importação: linha sem UOS não troca o uso de um registro cuja UOS gravada é do catálogo', () => {
+  const lote = { id: 7, rua: 'Amsterdam', numero_lote: '4910', area: '1464.91', parcelamento_id: 1 };
+  const linha = { linha: 2, rua: 'Amsterdam', numero: '4910', area: null, coef_maximo: 3, coef_minimo: null, gabarito_maximo: null, uos: '', uso: 'Residencial' };
+  const reg = (uos: string | null) => new Map([[7, { ...carimboDoLote(lote), uos, uso: 'Misto' }]]);
+  const [a] = itensDaImportacao([{ linha, lote, status: 'casado' }], '', reg('CSIIR 2'));
+  assert.ok(!('uso' in a) && !('uos' in a), 'a UOS do catálogo gravada manda no uso');
+  assert.equal(a.coef_maximo, 3, 'o resto da linha entra');
+  const [b] = itensDaImportacao([{ linha, lote, status: 'casado' }], '', reg('XPTO 9'));
+  assert.equal(b.uso, 'Residencial', 'UOS gravada fora do catálogo: o uso da planilha entra');
 });

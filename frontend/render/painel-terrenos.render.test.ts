@@ -60,6 +60,12 @@ test('Terrenos: os parâmetros aparecem na linha do lote certo; clicar no lote a
   assert.equal(m.coefMax['LOTE-NORMAL'], '3,5', 'coeficiente máximo do lote com registro' + relato(a));
   assert.equal(m.coefMin['LOTE-NORMAL'], '1', 'coeficiente mínimo do lote com registro' + relato(a));
   assert.equal(m.gabarito['LOTE-NORMAL'], '12', 'gabarito do lote com registro' + relato(a));
+  assert.equal(m.areaMax['LOTE-NORMAL'], '1.050,00 m²', 'área máx. construída = área do lote (300) × coef. máx. (3,5)' + relato(a));
+  assert.equal(m.areaMax['LOTE-COM-SETOR'], '—', 'sem coef. máx. não há área máx. construída' + relato(a));
+  assert.match(m.vinculo['LOTE-SEM-PARCELAMENTO'], /Lote mudou/, 'carimbo de outra rua' + relato(a));
+  assert.equal(m.coefMax['LOTE-SEM-PARCELAMENTO'], '3,5', 'o coeficiente da identidade anterior segue visível' + relato(a));
+  assert.equal(m.areaMax['LOTE-SEM-PARCELAMENTO'], '—', 'com o vínculo a conferir, a área máx. não mistura o coeficiente antigo à área de hoje' + relato(a));
+  assert.equal(m.areaMax['GLEBA-A'], '—', 'gleba não tem área máx. construída de lote' + relato(a));
   assert.equal(m.coefMax['LOTE-COM-SETOR'], '—', 'lote sem registro não herda valor de outro' + relato(a));
   assert.equal(m.coefMax['GLEBA-A'], '—', 'gleba não tem parâmetro de lote' + relato(a));
   assert.match(m.vinculo['LOTE-NORMAL'], /Conferido/, 'carimbo bate com o lote de hoje' + relato(a));
@@ -96,8 +102,10 @@ test('Modal do lote: um pedido por Salvar, com carimbo só no cadastro; salvando
   assert.equal(m.fecharComSalvando, 0, 'fechar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.salvarComSalvando, 0, 'segundo Salvar com o Painel salvando é ignorado' + relato(a));
   assert.equal(m.cancelarDesabilitado, true, 'o botão Cancelar fica desabilitado enquanto salva' + relato(a));
-  assert.equal(m.camposTotal, 5, 'o modal tem os 5 campos de edição' + relato(a));
-  assert.equal(m.camposDesabilitadosLivre, 0, 'livre e com permissão, nenhum campo desabilitado' + relato(a));
+  assert.equal(m.camposTotal, 5, 'o modal tem 4 campos de edição e o uso, derivado da UOS' + relato(a));
+  assert.equal(m.camposDesabilitadosLivre, 1, 'livre e com permissão, só o uso (derivado da UOS) fica desabilitado' + relato(a));
+  assert.equal(m.usoDaUosEscolhida, 'Comercial', 'escolher a UOS preenche o uso' + relato(a));
+  assert.equal(m.uosLimpaLimpaUso, true, 'limpar a UOS limpa o uso' + relato(a));
   assert.equal(m.camposDesabilitadosSalvando, 5, 'com o PUT em voo TODOS os campos ficam desabilitados' + relato(a));
   assert.equal(m.camposBloqueadosPorVinculo, 5, 'com o vínculo a conferir (lote mudou) nenhum campo edita' + relato(a));
   assert.equal(m.fecharDepois, 1, 'depois de salvar, fechar volta a funcionar' + relato(a));

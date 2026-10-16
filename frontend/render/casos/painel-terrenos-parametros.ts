@@ -13,6 +13,10 @@ export const REGISTRO = {
   area_m2: '300.00', coef_minimo: '1.00', coef_maximo: '3.50', gabarito_maximo: '12.00', uos: 'CSIIR 2', uso: 'Misto',
 };
 
+// Registro do LOTE-SEM-PARCELAMENTO (id 4) com carimbo de outra rua: vínculo "Lote mudou". O coeficiente é da
+// identidade anterior, então a área máx. construída não pode multiplicá-lo pela área de hoje.
+export const REGISTRO_MUDOU = { ...REGISTRO, id: 57, imovel_nucleo_id: 4, parcelamento_id: null, rua: 'Outra', numero_lote: '4915' };
+
 // Registro cujo lote (id 999) não existe no módulo: tem que virar o aviso de órfãos, e só ele.
 export const REGISTRO_ORFAO = { ...REGISTRO, id: 56, imovel_nucleo_id: 999, numero_lote: '777' };
 
@@ -23,6 +27,7 @@ export interface MedidaParametros {
   coefMax: Record<string, string>;
   coefMin: Record<string, string>;
   gabarito: Record<string, string>;
+  areaMax: Record<string, string>;
   vinculo: Record<string, string>;
   modalAntes: boolean;
   gleba: boolean;
@@ -47,6 +52,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
   const coefMax = porLinha((l) => String(col('coef_maximo').valor(l)));
   const coefMin = porLinha((l) => String(col('coef_minimo').valor(l)));
   const gabarito = porLinha((l) => String(col('gabarito_maximo').valor(l)));
+  const areaMax = porLinha((l) => String(col('area_max_construida').valor(l)));
   const vinculo = porLinha((l) => textoDoTemplate(col('vinculo').render(l)));
   const banners = [...el.shadowRoot!.querySelectorAll('urbi-banner')].map((b: any) => b.textContent?.replace(/\s+/g, ' ').trim());
   const aviso = banners.find((t: string) => /Parâmetros dos lotes indisponíveis/.test(t)) ?? '';
@@ -62,7 +68,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
   for (let i = 0; i < 3; i++) { await el.updateComplete; await new Promise((r) => setTimeout(r, 0)); }
   const modal = el.shadowRoot!.querySelector('viab-lote-parametros') as any;
   return {
-    orfaos, aviso, carregada, coefMax, coefMin, gabarito, vinculo, modalAntes, gleba,
+    orfaos, aviso, carregada, coefMax, coefMin, gabarito, areaMax, vinculo, modalAntes, gleba,
     modalLote: modal?.lote?.id_legivel ?? '',
     modalCoefMax: String(modal?.registro?.coef_maximo ?? ''),
     modalStatus: modal?.status ?? '',
@@ -74,6 +80,6 @@ export const caso = {
   nome: 'painel-terrenos-parametros',
   exigir: [{ seletor: 'urbi-hospedeiro[slot="terrenos"]', minimo: 1 }],
   aceitaNaoReproduzido: [...aceitaNaoReproduzidoComFiltros, 'urbi-modal.title', 'urbi-banner.variante'],
-  montar: montarCaso('ok', [REGISTRO, REGISTRO_ORFAO]),
+  montar: montarCaso('ok', [REGISTRO, REGISTRO_ORFAO, REGISTRO_MUDOU]),
   medir: medirParametros,
 };

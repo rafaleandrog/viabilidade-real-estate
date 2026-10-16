@@ -3,12 +3,12 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { fmtNum } from './viab-format.js';
 import './viab-num.js';
 import {
-  formDoRegistro, corpoDoForm, validarForm, carimboDoLote, ROTULO_STATUS,
+  formDoRegistro, corpoDoForm, validarForm, carimboDoLote, ROTULO_STATUS, UOS_CATALOGO, uosDoCatalogo,
   type FormParametros, type LoteNucleo, type StatusVinculo,
 } from './lote-parametros.js';
 
 // Modal "Parâmetros do lote" da aba Terrenos do Painel: coeficiente mínimo e máximo, gabarito máximo
-// (e UOS/uso, informativos). Um registro por lote do módulo, no schema do app (`lote_parametros`),
+// (e UOS/uso, informativos — a UOS é escolhida no catálogo e o uso sai dela). Um registro por lote do módulo, no schema do app (`lote_parametros`),
 // ligado pelo id do lote. O módulo é só leitura aqui — nada disto volta para ele.
 //
 // O PUT NÃO mora aqui: o modal pode sair da tela (cancelar, troca de aba) com a requisição em voo, e o
@@ -84,14 +84,36 @@ export class ViabLoteParametros extends LitElement {
     this._pedir({ ...corpoDoForm(this.form, this.lote, true, this.registro), ...carimboDoLote(this.lote) });
   };
 
-  private _texto(campo: string, rotulo: string, placeholder = ''): TemplateResult {
+  /** Trocar a UOS reescreve o uso; "Não definida" limpa os dois. */
+  private _escolherUos(valor: string) {
+    const c = uosDoCatalogo(valor);
+    this.form = { ...this.form, uos: c?.uos ?? '', uso: c?.uso ?? '' };
+  }
+
+  private _uos(): TemplateResult {
+    const atual = String(this.form.uos ?? '').trim();
+    const doCatalogo = uosDoCatalogo(atual);
+    // Registro antigo com UOS fora do catálogo (digitada ou importada): continua visível e selecionada.
+    const legado = atual && !doCatalogo ? [{ valor: atual, rotulo: `${atual} (fora do catálogo)` }] : [];
+    return html`
+      <urbi-select
+        label="UOS (zoneamento)"
+        ?desabilitado=${this._bloqueado}
+        .valor=${doCatalogo?.uos ?? atual}
+        .opcoes=${[{ valor: '', rotulo: 'Não definida' }, ...legado,
+          ...UOS_CATALOGO.map((c) => ({ valor: c.uos, rotulo: c.uos }))]}
+        @urbi:select-change=${(e: CustomEvent) => this._escolherUos(e.detail.valor)}
+      ></urbi-select>`;
+  }
+
+  /** O uso é derivado da UOS, nunca digitado. */
+  private _uso(): TemplateResult {
     return html`
       <urbi-input
-        label=${rotulo}
-        placeholder=${placeholder}
-        ?desabilitado=${this._bloqueado}
-        .valor=${String(this.form[campo] ?? '')}
-        @urbi:input-change=${(e: CustomEvent) => this._set(campo, e.detail.valor)}
+        label="Uso"
+        placeholder="Definido pela UOS"
+        desabilitado
+        .valor=${String(this.form.uso ?? '')}
       ></urbi-input>`;
   }
 
@@ -134,8 +156,8 @@ export class ViabLoteParametros extends LitElement {
           ${this._num('coef_minimo', 'Coeficiente de aproveitamento mínimo')}
           ${this._num('coef_maximo', 'Coeficiente de aproveitamento máximo')}
           ${this._num('gabarito_maximo', 'Gabarito máximo (pavimentos)')}
-          ${this._texto('uos', 'UOS (zoneamento)', 'Ex: CSIIR 2')}
-          ${this._texto('uso', 'Uso', 'Ex: Misto')}
+          ${this._uos()}
+          ${this._uso()}
         </div>
         ${(this.erroLocal || this.erro) ? html`<urbi-banner variante="erro">${this.erroLocal || this.erro}</urbi-banner>` : nothing}
         <div class="acoes">

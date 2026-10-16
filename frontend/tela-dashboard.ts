@@ -21,7 +21,7 @@ import {
   coletarPaginas, idsParcelamentosRegularizacao, loteForaDaRegularizacao,
 } from './terrenos-nucleo.js';
 import {
-  indexarParametros, MAX_ITENS_IMPORTACAO, statusVinculo, registrosOrfaos, ROTULO_STATUS, paraNumero, type LoteNucleo, type StatusVinculo,
+  indexarParametros, MAX_ITENS_IMPORTACAO, statusVinculo, registrosOrfaos, ROTULO_STATUS, paraNumero, areaMaxConstruida, type LoteNucleo, type StatusVinculo,
 } from './lote-parametros.js';
 import './tela-lote-parametros.js';
 import './tela-lote-parametros-importar.js';
@@ -903,6 +903,17 @@ export class ViabTelaDashboard extends LitElement {
           return v == null ? '—' : fmtNum(v, 2);
         },
       })),
+      {
+        // Área do lote no módulo × coeficiente máximo do registro.
+        id: 'area_max_construida', label: 'Área máx. construída', alinhamento: 'direita',
+        valor: (l: any) => {
+          if (l._tipo !== 'lote') return '—';
+          const reg = this.parametros.get(Number(l.id));
+          // Lote que mudou no módulo: o coeficiente é da identidade anterior e não se mistura à área de hoje.
+          if (statusVinculo(reg, l) === 'identificacao') return '—';
+          return fmtM2(areaMaxConstruida(l.area, reg?.coef_maximo));
+        },
+      },
       {
         id: 'vinculo', label: 'Vínculo', alinhamento: 'centro',
         render: (l: any) => {
