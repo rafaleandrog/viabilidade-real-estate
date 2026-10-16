@@ -13,6 +13,10 @@ export const REGISTRO = {
   area_m2: '300.00', coef_minimo: '1.00', coef_maximo: '3.50', gabarito_maximo: '12.00', uos: 'CSIIR 2', uso: 'Misto',
 };
 
+// Registro do LOTE-SEM-PARCELAMENTO (id 4) com carimbo de outra rua: vínculo "Lote mudou". O coeficiente é da
+// identidade anterior, então a área máx. construída não pode multiplicá-lo pela área de hoje.
+export const REGISTRO_MUDOU = { ...REGISTRO, id: 57, imovel_nucleo_id: 4, parcelamento_id: null, rua: 'Outra', numero_lote: '4915' };
+
 // Registro cujo lote (id 999) não existe no módulo: tem que virar o aviso de órfãos, e só ele.
 export const REGISTRO_ORFAO = { ...REGISTRO, id: 56, imovel_nucleo_id: 999, numero_lote: '777' };
 
@@ -76,6 +80,6 @@ export const caso = {
   nome: 'painel-terrenos-parametros',
   exigir: [{ seletor: 'urbi-hospedeiro[slot="terrenos"]', minimo: 1 }],
   aceitaNaoReproduzido: [...aceitaNaoReproduzidoComFiltros, 'urbi-modal.title', 'urbi-banner.variante'],
-  montar: montarCaso('ok', [REGISTRO, REGISTRO_ORFAO]),
+  montar: montarCaso('ok', [REGISTRO, REGISTRO_ORFAO, REGISTRO_MUDOU]),
   medir: medirParametros,
 };

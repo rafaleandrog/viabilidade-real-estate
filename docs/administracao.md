@@ -42,7 +42,8 @@ Na aba **Terrenos** do Painel, cada lote tem **coeficiente de aproveitamento mí
 guardados no próprio app e ligados ao lote do módulo imobiliário pelo id dele, sem escrever nada no módulo. O id é
 único: um lote não pode ter dois registros. Quem tem nível de escrita edita um lote clicando na linha, ou importa vários
 de uma vez em **Importar coeficientes (CSV)**. A tabela mostra também a **área máxima construída** de cada lote: a área
-do lote no módulo multiplicada pelo coeficiente máximo (vazia quando não há coeficiente máximo).
+do lote no módulo multiplicada pelo coeficiente máximo (vazia quando não há coeficiente máximo ou quando o lote mudou
+no módulo e o vínculo ainda não foi reconfirmado).
 
 - **Planilha de importação.** CSV com `;` ou `,`, com as colunas `logradouro` (ou `rua`) e `numero`, e ao menos uma de
   `cmax`, `cmin` e `gabarito`; opcionais `area_m2`, `uos` e `uso`. Números com ponto ou vírgula decimal e **sem
