@@ -323,3 +323,33 @@ test('#850 revisão (rodada 2, App do Codex): venda pós-entrega com carteira fr
   const efetivos = componentesEfetivosSafra(comps, FIM_OBRA + 3, FIM_OBRA);
   assert.ok(perto(soma(efetivos.map((c) => c.participacaoPct)), 100, 1e-9));
 });
+
+test('#850 revisão (rodada 3, App do Codex): com componentes gravados, o destino vem deles, mesmo com espelho divergente', () => {
+  const componentes = [
+    { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 20, sinalPct: 0, prazoMeses: 24, defasagemMeses: 24, taxaMensal: 0 },
+    { tipo: 'concentrado', participacaoPct: 17.5, mesPagamento: FIM_OBRA + 1, taxaMensal: 0 },
+    { tipo: 'carteira_pos_marco', participacaoPct: 52.5, marcoMes: FIM_OBRA, carenciaMeses: 6, prazoMeses: 120, taxaMensal: 0 },
+  ];
+  const espelho = {
+    entrada: [{ pct: 10, parcelas: 1, descontoPct: 0 }],
+    parcelas: [{ pct: 20, parcelas: 24, periodicidade: 'mensal' }],
+  };
+  // Espelho dizendo 100% banco, e espelho dizendo 60% com prazo 12 — os dois contradizem os componentes.
+  for (const repasse of [{ pct_banco: 100 }, { pct_banco: 60, carteira_parcelas: 12, carteira_carencia_meses: 0 }]) {
+    const form = formularioPagamento({ ...espelho, repasse, componentes });
+    assert.equal(form.repasse.pct_banco, 25);
+    assert.equal(form.repasse.carteira_parcelas, 120);
+    assert.equal(form.repasse.carteira_carencia_meses, 6);
+    const gravado = fluxoPagamentoParaSalvar(form, CRONO, 0);
+    const cart = gravado.componentes.find((c) => c.tipo === 'carteira_pos_marco');
+    assert.ok(cart && perto(cart.participacaoPct, 52.5, 1e-9), `repasse ${JSON.stringify(repasse)}: a carteira sumiu`);
+  }
+  // Só banco nos componentes: o espelho que dizia carteira volta a 100%.
+  const soBanco = formularioPagamento({ ...espelho, repasse: { pct_banco: 40, carteira_parcelas: 12 }, componentes: [
+    { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+    { tipo: 'prazo_fixo', participacaoPct: 20, sinalPct: 0, prazoMeses: 24, defasagemMeses: 24, taxaMensal: 0 },
+    { tipo: 'concentrado', participacaoPct: 70, mesPagamento: FIM_OBRA + 1, taxaMensal: 0 },
+  ] });
+  assert.equal(soBanco.repasse.pct_banco, 100);
+});

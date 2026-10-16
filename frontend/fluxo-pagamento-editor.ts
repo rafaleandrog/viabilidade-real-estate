@@ -79,17 +79,22 @@ export interface FormularioPagamento {
 /**
  * #850 — o destino do saldo de chaves que o formulário carrega.
  *
- * 1. Gravado no espelho (`repasse.pct_banco` e os campos da carteira): é ele,
- *    copiado CRU. Só chaves presentes — ausência é "100% banco", e escrever
- *    100 por default mudaria o JSON de todo plano antigo no primeiro Aplicar
- *    sem mudar número nenhum. E sem `Number()`: o valor sujo segue sujo até
- *    `erroDestinoSaldoChaves` o recusar, em vez de virar 0 calado.
- * 2. Ausente no espelho mas com `carteira_pos_marco` nos `componentes`
- *    gravados (plano escrito pela API): o destino é DERIVADO dos componentes —
- *    a fatia do banco é `concentrado / (concentrado + carteira)`. Sem isto o
- *    primeiro Aplicar regeneraria o saldo inteiro como `concentrado` e
- *    trocaria a carteira de N parcelas por um repasse único, sem aviso.
- *    Achado de revisão.
+ * **Com `componentes` gravados que tenham saldo de chaves (`concentrado` ou
+ * `carteira_pos_marco`), o destino SAI DOS COMPONENTES** — a fatia do banco é
+ * `concentrado / (concentrado + carteira)`, e o prazo e a carência são os da
+ * carteira. O espelho (`repasse.pct_banco` e afins) é ignorado nesse caso.
+ *
+ * Por quê: são os componentes que o motor calcula. Um espelho que os
+ * contradiz — `pct_banco` ausente, ou `pct_banco: 100` gravado pela API ao
+ * lado de uma carteira — fazia o primeiro Aplicar, sem edição nenhuma,
+ * regenerar o saldo inteiro como `concentrado` e apagar a carteira. Foram
+ * três achados de revisão da mesma classe (espelho ausente, carteiras
+ * múltiplas, espelho explícito divergente); enumerar os casos não convergia,
+ * então a fonte passou a ser uma só (armadilha 14 do `CLAUDE.md`).
+ *
+ * Sem saldo de chaves nos componentes (ou sem componentes), o espelho é
+ * copiado CRU — só as chaves presentes, e sem `Number()`: o valor sujo segue
+ * sujo até `erroDestinoSaldoChaves` o recusar, em vez de virar 0 calado.
  */
 function destinoDoPlano(fp: any, componentes: ComponentePagamento[] | null): Partial<FormularioPagamento['repasse']> {
   const r = fp?.repasse;
@@ -98,18 +103,21 @@ function destinoDoPlano(fp: any, componentes: ComponentePagamento[] | null): Par
   for (const k of ['pct_banco', 'carteira_parcelas', 'carteira_carencia_meses'] as const) {
     if (objeto[k] !== undefined && objeto[k] !== null) out[k] = objeto[k];
   }
-  if (out.pct_banco !== undefined || !componentes) return out as any;
+  if (!componentes) return out as any;
   const carteiras = carteirasGravadas(componentes);
-  if (carteiras.length === 0) return out as any;
   const somaCarteira = carteiras.reduce((s, c) => s + n(c.participacaoPct), 0);
   const somaBanco = componentes.filter((c) => c?.tipo === 'concentrado').reduce((s, c) => s + n(c.participacaoPct), 0);
   const saldo = somaCarteira + somaBanco;
-  const primeira = carteiras[0] as Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>;
-  return {
-    pct_banco: saldo > 0 ? (somaBanco / saldo) * 100 : 100,
-    carteira_parcelas: primeira.prazoMeses,
-    carteira_carencia_meses: primeira.carenciaMeses,
-  };
+  if (saldo <= 0) return out as any;
+  if (carteiras.length === 0) {
+    // Só banco: 100%. Os campos da carteira gravados (inertes) seguem como estão.
+    const { pct_banco: _ignorado, ...resto } = out;
+    return (out.pct_banco === undefined ? resto : { ...resto, pct_banco: 100 }) as any;
+  }
+  // Normalizado a 1e-9: a fatia é derivada, e o ruído de ponto flutuante da
+  // divisão não deve aparecer no campo nem no JSON gravado.
+  const pctBanco = Math.round((somaBanco / saldo) * 100 * 1e9) / 1e9;
+  return { pct_banco: pctBanco, carteira_parcelas: carteiras[0].prazoMeses, carteira_carencia_meses: carteiras[0].carenciaMeses };
 }
 
 /** As carteiras próprias com participação de um plano gravado. */

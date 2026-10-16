@@ -30,7 +30,9 @@ loteamento. A antecipação de recebíveis, pedida junto, é a #851 e vai em PR 
   rota (`validarFluxoPagamento`) e no modal, e o leitor do motor (`destinoSaldoChaves`) é
   fail-closed. O `CARTEIRA_RESSURGE` só confere a carteira a partir do 1º vencimento.
 - **Plano gravado pela API.**
-  - Com carteira e sem `pct_banco`, o formulário deriva o destino dos componentes.
+  - Com componentes gravados que tenham saldo de chaves, o formulário tira o destino deles e
+    ignora o espelho. A fonte única fechou três achados da mesma classe: espelho ausente, carteiras
+    múltiplas e espelho divergente.
   - Com carteiras de prazos diferentes, o modal recusa salvar.
   - Num plano só canônico (sem linhas de entrada e de parcelamento), o destino não é editável.
 - **Tela.** O bloco "Repasse" do modal virou "Saldo de chaves", com Repasse bancário (%), Nº de

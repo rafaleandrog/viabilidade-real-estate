@@ -55,7 +55,9 @@ fatia do saldo de chaves que vai ao banco, ausente vale 100, e com ele abaixo de
 carteira própria em `carteira_parcelas` (inteiro ≥ 1) parcelas depois de `carteira_carencia_meses`
 (inteiro ≥ 0) meses da entrega. Esses três, quando presentes, precisam ser números nessas faixas, e
 `pct_banco` abaixo de 100 exige `carteira_parcelas`: fora disso o salvamento é recusado com
-`400 FLUXO_PAGAMENTO_INVALIDO`, e o modal confere a mesma regra antes de aplicar. O percentual do
+`400 FLUXO_PAGAMENTO_INVALIDO`, e o modal confere a mesma regra antes de aplicar. Quando o plano tem
+`componentes` com saldo de chaves, o modal lê o destino deles (a fatia do `concentrado` sobre
+`concentrado + carteira_pos_marco`), e não destes campos. O percentual do
 saldo de chaves é derivado (`100 − Σ entrada − Σ parcelas`) e não é persistido — quem somar `entrada` e
 `parcelas` pela API não fecha 100 % por construção. O mesmo campo aceita o contrato canônico
 `componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco`, `concentrado` ou `carteira_pos_marco`,
