@@ -41,7 +41,8 @@ lotes de parcelamento vinculado a setor habitacional.
 Na aba **Terrenos** do Painel, cada lote tem **coeficiente de aproveitamento mínimo e máximo** e **gabarito máximo**,
 guardados no próprio app e ligados ao lote do módulo imobiliário pelo id dele, sem escrever nada no módulo. O id é
 único: um lote não pode ter dois registros. Quem tem nível de escrita edita um lote clicando na linha, ou importa vários
-de uma vez em **Importar coeficientes (CSV)**.
+de uma vez em **Importar coeficientes (CSV)**. A tabela mostra também a **área máxima construída** de cada lote: a área
+do lote no módulo multiplicada pelo coeficiente máximo (vazia quando não há coeficiente máximo).
 
 - **Planilha de importação.** CSV com `;` ou `,`, com as colunas `logradouro` (ou `rua`) e `numero`, e ao menos uma de
   `cmax`, `cmin` e `gabarito`; opcionais `area_m2`, `uos` e `uso`. Números com ponto ou vírgula decimal e **sem
@@ -51,6 +52,11 @@ de uma vez em **Importar coeficientes (CSV)**.
   doze primeiras: linhas sem lote, com mais de um lote, **repetidas na planilha (nenhuma das ocorrências entra)**, com
   área diferente, **célula numérica com texto que não é número**, sem nenhum valor, ou de um lote que já tem registro e **mudou no módulo** (esse se resolve no modal do
   lote, com *Reconfirmar vínculo*).
+- **UOS e uso.** No modal, a **UOS** é escolhida numa lista (as UOS da LUOS do DF: RE, RO, CSIIR, CSII e CSIInd) e o
+  **uso** é preenchido sozinho a partir dela: RE e RO dão *Residencial*, CSIIR dá *Misto*, CSII e CSIInd dão
+  *Comercial*. O uso não é editável. Um registro antigo com UOS fora da lista continua aparecendo, marcado como *fora
+  do catálogo*, com o uso que já tinha. Na importação vale o mesmo: uma UOS da lista grava o uso dela, e a coluna `uso`
+  da planilha só conta quando a UOS não está na lista.
 - **Importar de novo não apaga nada.** Célula vazia ou coluna ausente significam "não mexer": o CSV da etapa 1 traz só
   o coeficiente máximo, e reimportá-lo não apaga o mínimo, o gabarito, a UOS ou o uso que alguém editou no modal. Só o
   modal limpa um valor. O carimbo do lote é gravado no **cadastro** do registro; importar por cima de um registro que

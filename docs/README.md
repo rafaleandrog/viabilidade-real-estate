@@ -36,7 +36,7 @@ monitoradas**. A aba **Estudos** lista os estudos aos quais você tem acesso, co
 status e as colunas Nome, Status, Nível, Área do terreno, Área líquida de venda, VGV, Margem, ROI e
 Criador. Na linha de cada estudo ficam as ações que a sua função permite: os botões de transição
 de status, **Duplicar** e **Remover**; clicar na linha abre o estudo, e é no cabeçalho do estudo
-aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e os lotes que não são de regularização fundiária. Para cada lote ela mostra os **parâmetros urbanísticos** que o app guarda por conta própria — coeficiente de aproveitamento mínimo e máximo e gabarito máximo — e o status do vínculo com o lote do módulo; clicar num lote abre a edição, e quem tem nível de escrita também **importa os coeficientes de uma planilha CSV**. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
+aberto que se **renomeia**. A aba **Terrenos** mostra as glebas do Núcleo e os lotes que não são de regularização fundiária. Para cada lote ela mostra os **parâmetros urbanísticos** que o app guarda por conta própria — coeficiente de aproveitamento mínimo e máximo e gabarito máximo —, a **área máxima construída** (área do lote × coeficiente máximo) e o status do vínculo com o lote do módulo; clicar num lote abre a edição, e quem tem nível de escrita também **importa os coeficientes de uma planilha CSV**. As outras três são telas de configuração: **Benchmark** ([Benchmarks](benchmarks)), **Curvas**
 (curvas de distribuição de custos no tempo, usadas pelo estudo Avançado) e **Regiões monitoradas**
 ([Análise de Mercado](analise-mercado)).
 

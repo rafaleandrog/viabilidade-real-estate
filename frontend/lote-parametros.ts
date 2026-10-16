@@ -249,11 +249,52 @@ export function itensDaImportacao(
     if (r.linha.coef_maximo != null) item.coef_maximo = r.linha.coef_maximo;
     if (r.linha.coef_minimo != null) item.coef_minimo = r.linha.coef_minimo;
     if (r.linha.gabarito_maximo != null) item.gabarito_maximo = r.linha.gabarito_maximo;
-    if (r.linha.uos) item.uos = r.linha.uos;
-    if (r.linha.uso) item.uso = r.linha.uso;
+    // UOS do catálogo vai na grafia do catálogo e leva o uso dela; fora do catálogo, vale o que a planilha traz.
+    const uos = uosDoCatalogo(r.linha.uos);
+    if (r.linha.uos) item.uos = uos?.uos ?? r.linha.uos;
+    const uso = uos?.uso ?? r.linha.uso;
+    if (uso) item.uso = uso;
     if (origem) item.origem = origem;
     return item;
   });
+}
+
+/**
+ * Área máxima construída do lote: área do lote no módulo × coeficiente de aproveitamento máximo, em 2 casas.
+ * `null` sem uma das duas.
+ */
+export function areaMaxConstruida(area: unknown, coefMaximo: unknown): number | null {
+  const a = paraNumero(area); const c = paraNumero(coefMaximo);
+  return a == null || c == null ? null : Math.round(a * c * 100) / 100;
+}
+
+// ── UOS → uso ───────────────────────────────────────────────────────────────
+
+export type UsoLote = 'Residencial' | 'Comercial' | 'Misto';
+
+/**
+ * Catálogo das UOS (LUOS do DF) que o modal oferece, com o uso que cada uma implica. O uso não é digitado:
+ * sai daqui. RE e RO têm o residencial como uso exclusivo/obrigatório; CSIIR admite residencial junto do não
+ * residencial; CSII e CSIInd não admitem residencial.
+ */
+export const UOS_CATALOGO: ReadonlyArray<{ uos: string; uso: UsoLote }> = [
+  { uos: 'RE 1', uso: 'Residencial' }, { uos: 'RE 2', uso: 'Residencial' }, { uos: 'RE 3', uso: 'Residencial' },
+  { uos: 'RO 1', uso: 'Residencial' }, { uos: 'RO 2', uso: 'Residencial' },
+  { uos: 'CSIIR 1', uso: 'Misto' }, { uos: 'CSIIR 1 NO', uso: 'Misto' },
+  { uos: 'CSIIR 2', uso: 'Misto' }, { uos: 'CSIIR 2 NO', uso: 'Misto' }, { uos: 'CSIIR 3', uso: 'Misto' },
+  { uos: 'CSII 1', uso: 'Comercial' }, { uos: 'CSII 2', uso: 'Comercial' }, { uos: 'CSII 3', uso: 'Comercial' },
+  { uos: 'CSIInd 1', uso: 'Comercial' }, { uos: 'CSIInd 2', uso: 'Comercial' }, { uos: 'CSIInd 3', uso: 'Comercial' },
+];
+
+/** UOS do catálogo que casa com o texto (sem acento, caixa ou espaço extra), ou `null`. */
+export function uosDoCatalogo(v: unknown): { uos: string; uso: UsoLote } | null {
+  const n = normalizarTexto(v);
+  return n ? UOS_CATALOGO.find((c) => normalizarTexto(c.uos) === n) ?? null : null;
+}
+
+/** Uso implicado pela UOS; `null` quando a UOS não está no catálogo (valor antigo, digitado ou importado). */
+export function usoDaUos(v: unknown): UsoLote | null {
+  return uosDoCatalogo(v)?.uso ?? null;
 }
 
 // ── Formulário do modal ─────────────────────────────────────────────────────

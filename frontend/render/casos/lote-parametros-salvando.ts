@@ -15,6 +15,8 @@ export interface MedidaSalvando {
   salvarComSalvando: number;
   cancelarDesabilitado: boolean;
   camposTotal: number;
+  usoDaUosEscolhida: string;
+  uosLimpaLimpaUso: boolean;
   camposDesabilitadosLivre: number;
   camposDesabilitadosSalvando: number;
   camposBloqueadosPorVinculo: number;
@@ -33,7 +35,7 @@ export const caso = {
   exigir: [{ seletor: '#ancora-lote', minimo: 1 }],
   aceitaNaoReproduzido: [
     'urbi-modal.title', 'urbi-botao.variante', 'urbi-botao.desabilitado', 'urbi-botao.carregando', 'urbi-input.label', 'urbi-input.placeholder',
-    'urbi-input.desabilitado', 'urbi-banner.variante',
+    'urbi-input.desabilitado', 'urbi-banner.variante', 'urbi-select.label', 'urbi-select.opcoes', 'urbi-select.desabilitado',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el: any = document.createElement('viab-lote-parametros');
@@ -53,12 +55,18 @@ export const caso = {
     const eventos = { salvar: [] as any[], fechar: 0 };
     el.addEventListener('viab-parametros-salvar', (e: CustomEvent) => { eventos.salvar.push(e.detail); });
     el.addEventListener('viab-parametros-fechar', () => { eventos.fechar++; });
-    const campos = () => [...el.shadowRoot.querySelectorAll('urbi-input, viab-num')] as any[];
+    const campos = () => [...el.shadowRoot.querySelectorAll('urbi-input, urbi-select, viab-num')] as any[];
     const desab = () => campos().filter((c) => c.hasAttribute('desabilitado')).length;
 
     el.form = { ...el.form, coef_maximo: 3.5 };
     await el.updateComplete;
     const livre = desab();
+    // Escolher a UOS preenche o uso; "Não definida" limpa os dois.
+    el._escolherUos('CSII 1'); await el.updateComplete;
+    const usoDaUosEscolhida = String(el.form.uso);
+    el._escolherUos(''); await el.updateComplete;
+    const uosLimpaLimpaUso = el.form.uos === '' && el.form.uso === '';
+    el._escolherUos('CSIIR 2'); await el.updateComplete;
     el._salvar();                                    // cadastro: pede para salvar, com o carimbo
     const novo = eventos.salvar[0];
     const aposPrimeiro = eventos.salvar.length;
@@ -108,6 +116,7 @@ export const caso = {
       fecharComSalvando: durante.fechar,
       salvarComSalvando: durante.salvar,
       cancelarDesabilitado: durante.desab,
+      usoDaUosEscolhida, uosLimpaLimpaUso,
       camposTotal: campos().length,
       camposDesabilitadosLivre: livre,
       camposDesabilitadosSalvando: durante.campos,

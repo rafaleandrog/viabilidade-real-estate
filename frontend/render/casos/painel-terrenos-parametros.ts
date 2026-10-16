@@ -23,6 +23,7 @@ export interface MedidaParametros {
   coefMax: Record<string, string>;
   coefMin: Record<string, string>;
   gabarito: Record<string, string>;
+  areaMax: Record<string, string>;
   vinculo: Record<string, string>;
   modalAntes: boolean;
   gleba: boolean;
@@ -47,6 +48,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
   const coefMax = porLinha((l) => String(col('coef_maximo').valor(l)));
   const coefMin = porLinha((l) => String(col('coef_minimo').valor(l)));
   const gabarito = porLinha((l) => String(col('gabarito_maximo').valor(l)));
+  const areaMax = porLinha((l) => String(col('area_max_construida').valor(l)));
   const vinculo = porLinha((l) => textoDoTemplate(col('vinculo').render(l)));
   const banners = [...el.shadowRoot!.querySelectorAll('urbi-banner')].map((b: any) => b.textContent?.replace(/\s+/g, ' ').trim());
   const aviso = banners.find((t: string) => /Parâmetros dos lotes indisponíveis/.test(t)) ?? '';
@@ -62,7 +64,7 @@ export async function medirParametros(raiz: HTMLElement): Promise<MedidaParametr
   for (let i = 0; i < 3; i++) { await el.updateComplete; await new Promise((r) => setTimeout(r, 0)); }
   const modal = el.shadowRoot!.querySelector('viab-lote-parametros') as any;
   return {
-    orfaos, aviso, carregada, coefMax, coefMin, gabarito, vinculo, modalAntes, gleba,
+    orfaos, aviso, carregada, coefMax, coefMin, gabarito, areaMax, vinculo, modalAntes, gleba,
     modalLote: modal?.lote?.id_legivel ?? '',
     modalCoefMax: String(modal?.registro?.coef_maximo ?? ''),
     modalStatus: modal?.status ?? '',

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   areaDiverge, normalizarTexto, chaveRuaNumero, carimboDoLote, statusVinculo, registrosOrfaos, numeroPlanilha, lerCsv,
-  casarPlanilha, itensDaImportacao, formDoRegistro, corpoDoForm, validarForm, indexarParametros,
+  casarPlanilha, itensDaImportacao, formDoRegistro, corpoDoForm, validarForm, indexarParametros, usoDaUos, UOS_CATALOGO, areaMaxConstruida,
   type LoteNucleo,
 } from './lote-parametros.js';
 
@@ -206,4 +206,35 @@ test('areaDiverge: a tolerância de 0,01 m² vale em centésimos, sem erro de po
   const r = casarPlanilha([{ linha: 2, rua: 'Amsterdam', numero: '4910', area: 100.01, coef_maximo: 3, coef_minimo: null, gabarito_maximo: null, uos: '', uso: '' }],
     [{ ...LOTE, area: 100 }]);
   assert.equal(r[0].status, 'casado');
+});
+
+test('UOS do catálogo define o uso; fora do catálogo não há uso derivado', () => {
+  assert.equal(usoDaUos('CSIIR 2'), 'Misto');
+  assert.equal(usoDaUos(' csiir  2 '), 'Misto');
+  assert.equal(usoDaUos('RE 1'), 'Residencial');
+  assert.equal(usoDaUos('RO 2'), 'Residencial');
+  assert.equal(usoDaUos('CSII 1'), 'Comercial');
+  assert.equal(usoDaUos('CSIInd 3'), 'Comercial');
+  assert.equal(usoDaUos('ZZZ'), null);
+  assert.equal(usoDaUos(''), null);
+  for (const c of UOS_CATALOGO) assert.ok(['Residencial', 'Comercial', 'Misto'].includes(c.uso));
+});
+
+test('importação: UOS do catálogo grava o uso dela por cima do da planilha; fora do catálogo vale a planilha', () => {
+  const lote = { id: 7, rua: 'Amsterdam', numero_lote: '4910', area: '1464.91', parcelamento_id: 1 };
+  const linha = (uos: string, uso: string) => ({ linha: 2, rua: 'Amsterdam', numero: '4910', area: null,
+    coef_maximo: 3, coef_minimo: null, gabarito_maximo: null, uos, uso });
+  const [a] = itensDaImportacao([{ linha: linha('csiir 2', 'Residencial'), lote, status: 'casado' }], '');
+  assert.deepEqual([a.uos, a.uso], ['CSIIR 2', 'Misto']);
+  const [b] = itensDaImportacao([{ linha: linha('XPTO 9', 'Residencial'), lote, status: 'casado' }], '');
+  assert.deepEqual([b.uos, b.uso], ['XPTO 9', 'Residencial']);
+  const [c] = itensDaImportacao([{ linha: linha('', 'Misto'), lote, status: 'casado' }], '');
+  assert.deepEqual([c.uos, c.uso], [undefined, 'Misto']);
+});
+
+test('areaMaxConstruida: área do lote × coef. máximo, em 2 casas; null sem um dos dois', () => {
+  assert.equal(areaMaxConstruida('1464.91', '3.00'), 4394.73);
+  assert.equal(areaMaxConstruida(300, 3.5), 1050);
+  assert.equal(areaMaxConstruida(null, 3), null);
+  assert.equal(areaMaxConstruida(300, null), null);
 });
