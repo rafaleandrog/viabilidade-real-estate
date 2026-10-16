@@ -422,7 +422,10 @@ export class ViabFluxoVer extends LitElement {
     // contar uma história diferente da tabela de Resultados.
     return fundingDoEstudo(
       this.operacoes, calc.fluxoMensal, receitaLiquida, resultadoFinal, mesRepasse(d.crono), d.taxa,
-      { custosRaw: d.custos, linhasCusto: calc.linhasCusto, cronograma: d.crono },
+      {
+        custosRaw: d.custos, linhasCusto: calc.linhasCusto, cronograma: d.crono,
+        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
+      },
     );
   }
 

@@ -11,7 +11,7 @@ import {
 import { calcularFluxo, taxaDescontoOuPadrao, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
 import {
-  fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao,
+  fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao, indicadoresAntecipacao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
   reordenarDentroDoTipo, camadasComOrdemAlterada, eDivida, riscoTarifaDuplicada,
   PADRAO_EXPOSICAO_MINIMA, PADRAO_PERCENTUAL_FINANCIAVEL, PADRAO_AMORTIZAR_COM_CAIXA,
@@ -36,7 +36,9 @@ import './viab-num.js';
 //    `_renderCamposDivida`/o painel genérico de investidor;
 //  · `divida`                 — calendário + Price com carência, campos da
 //    planilha `fluxo_investidor_FORMULAS`;
-//  · `equity`                 — aporte + retorno, em dois modos.
+//  · `equity`                 — aporte + retorno, em dois modos;
+//  · `antecipacao_recebiveis` — cessão de parte da carteira (#851), cega ao
+//    caixa; o valor sai do lastro e da taxa de desconto.
 //
 // Para `divida`/`equity`, a tela mostra os campos de ENTRADA e o painel
 // "visão do investidor" (investimento, retorno, TIR, VPL, payback) —
@@ -67,9 +69,12 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'financiamento_producao', rotulo: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
   { valor: 'divida', rotulo: 'Dívida / Capital de giro', icone: 'fa-solid fa-file-invoice-dollar' },
   { valor: 'equity', rotulo: 'Equity', icone: 'fa-solid fa-handshake' },
+  // #851: cessão de parte da carteira de recebíveis (CRI, FIDC, banco), que
+  // paga à vista o valor presente das parcelas cedidas.
+  { valor: 'antecipacao_recebiveis', rotulo: 'Antecipação de recebíveis', icone: 'fa-solid fa-forward' },
 ];
 
-// #586: as QUATRO abas da tela, com os nomes LITERAIS do pedido do autor
+// #586: as abas da tela (quatro na #586, e a Antecipação na #851), com os nomes LITERAIS do pedido do autor
 // (2026-08-26, item 9) e nesta ordem. `Dívida` aqui é só "Dívida" — o rótulo do
 // TIPO continua "Dívida / Capital de giro" (`TIPOS` acima), que é o que aparece
 // no badge do card e na coluna Tipo da tabela de Operações. Os dois textos
@@ -85,11 +90,17 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
 // Restringir o TIPO do campo para excluir `financiamento_producao` é o que
 // torna a rota genérica um erro de COMPILAÇÃO se alguém reatribuir `tipo` a
 // esta aba por engano — não só "deixar de chamar certo".
-const ABAS: { id: string; label: string; icone: string; tipo?: 'divida' | 'equity' }[] = [
+/** Os tipos que vivem numa aba de LISTA (com "Adicionar"): todos menos o Financiamento à produção. */
+type TipoListavel = 'divida' | 'equity' | 'antecipacao_recebiveis';
+
+const ABAS: { id: string; label: string; icone: string; tipo?: TipoListavel }[] = [
   { id: 'operacoes', label: 'Operações', icone: 'fa-solid fa-table-list' },
   { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
   { id: 'divida', label: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar', tipo: 'divida' },
   { id: 'equity', label: 'Equity', icone: 'fa-solid fa-handshake', tipo: 'equity' },
+  // #851: o `id` é o próprio tipo, como nas duas acima — clicar na linha da
+  // tabela de Operações navega por `tipo`.
+  { id: 'antecipacao_recebiveis', label: 'Antecipação', icone: 'fa-solid fa-forward', tipo: 'antecipacao_recebiveis' },
 ];
 
 const MODOS_RETORNO: { valor: string; rotulo: string }[] = [
@@ -294,7 +305,10 @@ export class ViabFunding extends LitElement {
     this.funding = fundingDoEstudo(
       efetivas, this.calc.fluxoMensal, this.receitaLiquida,
       resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
-      { custosRaw: this.custos, linhasCusto: this.calc.linhasCusto, cronograma: this.crono },
+      {
+        custosRaw: this.custos, linhasCusto: this.calc.linhasCusto, cronograma: this.crono,
+        recebimentoPorSafraMensal: this.calc.recebimentoPorSafraMensal,
+      },
     );
   }
 
@@ -318,7 +332,7 @@ export class ViabFunding extends LitElement {
   /** Nome padrão por tipo, no formato do #341 (maior sufixo + 1, não contagem). */
   private _nomePadrao(tipo: TipoOperacao): string {
     if (tipo === 'financiamento_producao') return 'Financiamento à produção';
-    const rotulo = tipo === 'divida' ? 'Dívida' : 'Equity';
+    const rotulo = tipo === 'divida' ? 'Dívida' : tipo === 'equity' ? 'Equity' : 'Antecipação';
     const usados = this.operacoes
       .filter((o) => o.tipo === tipo)
       .map((o) => /^(\d+)/.exec(String(o.nome ?? ''))?.[1])
@@ -401,6 +415,9 @@ export class ViabFunding extends LitElement {
     try {
       const defaults = tipo === 'financiamento_producao'
         ? this._defaultsFinanciamentoProducao()
+        : tipo === 'antecipacao_recebiveis'
+          // A cessão típica de loteamento: depois das chaves, metade do lastro.
+          ? { cronograma_evento: 'pos_obra', pct_carteira_cedida: 50, taxa_anual: 18 }
         : eDivida(tipo)
           ? { taxa_anual: 12, periodo_amortizacao_meses: 36, periodo_carencia_meses: 12, aporte_meses: 1 }
           : { modo_retorno: 'permuta_financeira', pct_retorno: 0 };
@@ -473,11 +490,11 @@ export class ViabFunding extends LitElement {
     ></viab-num>`;
   }
 
-  private _renderAncora(o: any): TemplateResult {
+  private _renderAncora(o: any, rotulo = 'Mês do aporte'): TemplateResult {
     const evento = String(this._valor(o, 'cronograma_evento') ?? 'customizado');
     return html`
       <div class="sel-campo p2">
-        <span class="sel-rotulo">Mês do aporte</span>
+        <span class="sel-rotulo">${rotulo}</span>
         <urbi-select .valor=${evento} .opcoes=${EVENTOS_ANCORA.map((e) => ({ valor: e.valor, rotulo: e.rotulo }))}
           ?desabilitado=${!this.editavel}
           @urbi:select-change=${(e: CustomEvent) => this._set(o, 'cronograma_evento', e.detail.valor)}
@@ -640,6 +657,68 @@ export class ViabFunding extends LitElement {
     `;
   }
 
+  /**
+   * #851 — Antecipação de recebíveis. O mês da cessão é uma âncora do
+   * cronograma, como o aporte das outras operações; o valor NÃO é digitado:
+   * sai do lastro (as parcelas futuras das vendas feitas até a cessão) e da
+   * taxa de desconto.
+   */
+  private _renderCamposAntecipacao(o: any): TemplateResult {
+    return html`
+      <div class="secao">
+        <h4>Cessão</h4>
+        <div class="grid">
+          ${this._renderAncora(o, 'Mês da cessão')}
+          ${this._num(o, 'pct_carteira_cedida', 'Carteira cedida', '%')}
+          ${this._num(o, 'taxa_anual', 'Taxa de desconto', '% a.a.')}
+        </div>
+        <p class="nota">Cede esse percentual de tudo o que as vendas feitas até o mês da cessão ainda
+          vão pagar depois dele — parcelas, saldo a repassar e carteira própria —, descontado o que
+          outra antecipação anterior já cedeu. O cessionário paga à vista o valor presente dessas
+          parcelas à taxa de desconto; a partir do mês seguinte, as parcelas cedidas passam a ir para
+          ele. Só os planos de pagamento já aplicados entram no lastro.</p>
+      </div>
+      <div class="secao">
+        <h4>Tarifas e custos</h4>
+        <div class="grid">
+          ${this._num(o, 'taxa_estruturacao_pct', 'Estruturação', '%')}
+          ${this._num(o, 'taxa_administracao_mensal', 'Administração', 'R$/mês')}
+          ${this._num(o, 'outros_encargos_iniciais', 'Outros custos', 'R$')}
+        </div>
+        <p class="nota">A estruturação (sobre o valor presente) e os outros custos são cobrados no mês
+          da cessão; a administração, todo mês enquanto houver parcela cedida a receber. Entram nas
+          saídas e no custo efetivo — não reduzem o lastro.</p>
+      </div>
+    `;
+  }
+
+  /** #851 — o que a antecipação rende e custa, lido de `indicadoresAntecipacao`. */
+  private _renderIndicadoresAntecipacao(o: any): TemplateResult {
+    const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id));
+    if (!serie) return html`${nothing}`;
+    const ind = indicadoresAntecipacao(serie);
+    const card = (rot: string, val: string, classe = '') =>
+      html`<div class="ind-card ${classe}"><div class="rot">${rot}</div><div class="val">${val}</div></div>`;
+    return html`
+      <div class="secao resultado-antecipacao">
+        <h4>Resultado da antecipação</h4>
+        ${ind.valorFace > 0 ? html`
+          <div class="ind">
+            ${card('Parcelas cedidas (face)', fmtR$Kpi(ind.valorFace))}
+            ${card('Valor presente', fmtR$Kpi(ind.valorPresente), 'pos')}
+            ${card('Recebido líquido', fmtR$Kpi(ind.valorLiquido), 'pos')}
+            ${card('Deságio', `${fmtR$Kpi(ind.desagio)} (${fmtPct(ind.desagioPct * 100)})`, 'neg')}
+            ${card('Tarifas', fmtR$Kpi(ind.tarifas), ind.tarifas > 0 ? 'neg' : '')}
+            ${card('Custo efetivo', ind.custoEfetivoAnual === null ? '—' : `${fmtPct(ind.custoEfetivoAnual * 100)} a.a.`)}
+          </div>` : html`
+          <p class="nota">Nenhuma parcela a ceder. Ou não há, até o mês da cessão, venda com parcela a
+            receber depois dele; ou o percentual cedido é zero; ou os Grupos de receita ainda estão
+            com o plano de pagamento no formato antigo — só os planos já aplicados entram no lastro
+            (abra o Fluxo de pagamento de cada Grupo, em Receitas, e clique em Aplicar).</p>`}
+      </div>
+    `;
+  }
+
   /** Painel "visão do investidor" — o que dá nome ao documento do autor (planilha `fluxo_investidor_FORMULAS`). */
   private _renderIndicadores(o: any): TemplateResult {
     const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id));
@@ -768,9 +847,11 @@ export class ViabFunding extends LitElement {
         </div>
 
         ${o.tipo === 'financiamento_producao' ? this._renderCamposFinanciamentoProducao(o)
+          : o.tipo === 'antecipacao_recebiveis' ? this._renderCamposAntecipacao(o)
           : eDivida(o.tipo) ? this._renderCamposDivida(o) : this._renderCamposEquity(o)}
         ${o.tipo === 'financiamento_producao' && serie
           ? this._renderIndicadoresFinanciamentoProducao(serie)
+          : o.tipo === 'antecipacao_recebiveis' ? this._renderIndicadoresAntecipacao(o)
           : this._renderIndicadores(o)}
 
         ${this.editavel ? html`
@@ -841,6 +922,10 @@ export class ViabFunding extends LitElement {
           // O FàP não tem `valor` digitado: o principal sai do custo financiável
           // pelo `percentual_financiavel` (§4.3). Mostrar 0 seria mentira.
           ? `${n(l.percentual_financiavel)}% do custo`
+          // #851: a antecipação também não tem `valor` digitado — mostra o
+          // percentual cedido, que é o que o usuário escolheu.
+          : l.tipo === 'antecipacao_recebiveis'
+            ? `${fmtPctEntrada(n(l.pct_carteira_cedida))} da carteira`
           : (n(l.valor) > 0 ? fmtR$(n(l.valor)) : '—')),
       },
       {
@@ -860,7 +945,9 @@ export class ViabFunding extends LitElement {
             : (n(l.taxa_anual) > 0 ? `${fmtPctEntrada(n(l.taxa_anual))} a.a.` : '—');
           const titulo = l.tipo === 'equity'
             ? `Equity — ${MODOS_RETORNO.find((m) => m.valor === l.modo_retorno)?.rotulo ?? 'retorno'}`
-            : 'Juros nominais da operação, ao ano';
+            : l.tipo === 'antecipacao_recebiveis'
+              ? 'Taxa de desconto da antecipação, ao ano'
+              : 'Juros nominais da operação, ao ano';
           return html`<span title=${titulo}>${texto}</span>`;
         },
       },
@@ -887,7 +974,7 @@ export class ViabFunding extends LitElement {
    * defeito nº 1 do CLAUDE.md: um `ABAS` editado de volta para despachar FàP
    * para cá vira `TS2345`, não lista vazia calada.
    */
-  private _renderAbaTipo(tipo: 'divida' | 'equity'): TemplateResult {
+  private _renderAbaTipo(tipo: TipoListavel): TemplateResult {
     const lista = this._operacoesDoTipo(tipo);
     const t = TIPOS.find((x) => x.valor === tipo)!;
     return html`
@@ -1005,7 +1092,8 @@ export class ViabFunding extends LitElement {
              vezes. Aviso, não trava: as duas representações (linha de custo
              do projeto × tarifa da operação) são legítimas isoladamente. -->
         <urbi-banner variante="alerta" icone="fa-solid fa-triangle-exclamation">
-          Há tarifa configurada numa operação de <strong>Dívida</strong> e, ao mesmo tempo, uma
+          Há tarifa configurada numa operação de <strong>Dívida</strong> ou de
+          <strong>Antecipação de recebíveis</strong> e, ao mesmo tempo, uma
           linha de custo em "Taxas bancárias" ou "Estruturação de dívida" no grupo Financeiro.
           Confira se não é a <strong>mesma</strong> tarifa lançada duas vezes — uma vez como custo
           do projeto, outra como encargo da operação.

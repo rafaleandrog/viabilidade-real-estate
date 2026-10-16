@@ -76,7 +76,7 @@ Rodada 7 eliminou de propósito.
 
 | Entidade vigente | Onde mora | Spec |
 |---|---|---|
-| **Operação de funding** — três tipos independentes, **sem waterfall, sem prioridades, sem competição por caixa**: `financiamento_producao` (única por estudo), `divida` e `equity` (quantas quiser, nomeáveis) | tabela `avancado_funding_operacoes` (migração `029`); motor `frontend/funding-motor.ts`; tela `frontend/tela-funding.ts`; rotas `backend/rotas/funding.ts` | [Fluxo do Investidor](funding) para `divida` e `equity` |
+| **Operação de funding** — tipos independentes, **sem waterfall, sem prioridades, sem competição por caixa**: `financiamento_producao` (única por estudo), `divida`, `equity` e, desde a #851, `antecipacao_recebiveis` (quantas quiser, nomeáveis) | tabela `avancado_funding_operacoes` (migração `029`); motor `frontend/funding-motor.ts`; tela `frontend/tela-funding.ts`; rotas `backend/rotas/funding.ts` | [Fluxo do Investidor](funding) para `divida` e `equity` |
 
 ⚠️ **`financiamento_producao` tem SPEC PRÓPRIA, e ela continua vigente.** A **§4.3** de
 Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`) — gatilho de exposição mínima,

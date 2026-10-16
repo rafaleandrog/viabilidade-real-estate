@@ -402,7 +402,7 @@
       "acesso_externo": "restrito",
       "colunas": {
         "estudo_id":                     { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
-        "tipo":                          { "tipo": "texto", "limite": 30, "opcoes": ["financiamento_producao", "divida", "equity"], "obrigatorio": true },
+        "tipo":                          { "tipo": "texto", "limite": 30, "opcoes": ["financiamento_producao", "divida", "equity", "antecipacao_recebiveis"], "obrigatorio": true },
         "nome":                          { "tipo": "texto", "limite": 100, "obrigatorio": true },
         "ordem":                         { "tipo": "inteiro", "padrao": 0 },
         "valor":                         { "tipo": "decimal", "precisao": 15, "escala": 2, "padrao": 0 },
@@ -423,7 +423,8 @@
         "taxa_estruturacao_pct":         { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "taxa_administracao_mensal":     { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 },
         "outros_encargos_iniciais":      { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 },
-        "ativo":                         { "tipo": "booleano", "padrao": true }
+        "ativo":                         { "tipo": "booleano", "padrao": true },
+        "pct_carteira_cedida":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 }
       },
       "indices": [["estudo_id"]]
     },

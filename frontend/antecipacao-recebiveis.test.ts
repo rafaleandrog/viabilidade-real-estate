@@ -1,0 +1,242 @@
+// #851 — antecipação de recebíveis como operação de Funding.
+//
+// O que estes testes provam, na ordem do critério de aceite da issue:
+//  1. golden: lastro conhecido, cessão de 50% a 18% a.a. → VP, deságio e custo
+//     efetivo conferem com cálculo independente;
+//  2. taxa 0 → VP = face, deságio 0;
+//  3. cessões sobre o mesmo lastro nunca passam de 100% dele;
+//  4. a operação aparece no fluxo alavancado e não altera o desalavancado;
+//  5. o lastro vem do motor do fluxo (`recebimentoPorSafraMensal`) e só das
+//     safras vendidas até a cessão.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  fundingDoEstudo, indicadoresAntecipacao, recebiveisFuturosDeSafras, riscoTarifaDuplicada,
+  simularAntecipacao, simularDivida,
+  taxaMensalEquivalente, tirAnual, tranchesDeInvestimento, type OperacaoFunding,
+} from './funding-motor.js';
+import { calcularFluxo } from './fluxo-caixa-motor.js';
+import { validarFunding } from './fluxo-invariantes.js';
+import type { EventoCrono } from './fluxo-shared.js';
+
+const soma = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
+const perto = (a: number, b: number, tol = 0.02) => Math.abs(a - b) <= tol;
+
+const antecipacao = (over: Partial<OperacaoFunding> = {}): OperacaoFunding => ({
+  id: 1, tipo: 'antecipacao_recebiveis', nome: 'Cessão', valor: 0, inicio_mes: 2,
+  pct_carteira_cedida: 50, taxa_anual: 18, ...over,
+});
+
+test('#851: o lastro é o que as safras até a cessão ainda vão pagar DEPOIS dela', () => {
+  const porSafra = {
+    0: [100, 10, 10, 10, 10, 0],
+    2: [0, 0, 50, 20, 20, 0],
+    4: [0, 0, 0, 0, 70, 30],   // venda depois da cessão: fora do lastro
+  };
+  assert.deepEqual(recebiveisFuturosDeSafras(porSafra, 2, 6), [0, 0, 0, 30, 30, 0]);
+  // A fração já cedida por uma cessão anterior sai do lastro.
+  assert.deepEqual(recebiveisFuturosDeSafras(porSafra, 2, 6, { 0: 0.5 }), [0, 0, 0, 25, 25, 0]);
+});
+
+test('#851 critério 1 (golden): VP, deságio, saldo e custo efetivo contra cálculo independente', () => {
+  const prazo = 20;
+  const lastro = new Array<number>(prazo).fill(0);
+  for (let k = 3; k <= 14; k++) lastro[k] = 10_000; // 12 parcelas depois da cessão no mês 2
+  const s = simularAntecipacao(antecipacao(), lastro, prazo);
+
+  const i = Math.pow(1.18, 1 / 12) - 1;
+  assert.ok(perto(taxaMensalEquivalente(0.18), i, 1e-12));
+  let vp = 0;
+  for (let k = 3; k <= 14; k++) vp += 5_000 / Math.pow(1 + i, k - 2);
+  vp = Math.round(vp * 100) / 100;
+
+  assert.equal(s.entradas[2], vp);
+  assert.equal(soma(s.entradas), vp);
+  assert.ok(perto(soma(s.saidas), 60_000), 'as parcelas cedidas somam metade do lastro');
+  assert.ok(perto(soma(s.juros), 60_000 - vp), 'deságio = face − VP');
+  assert.equal(s.saldo[14], 0, 'o lastro zera na última parcela cedida');
+  assert.ok(s.saldo.every((v) => v >= 0));
+  const ind = indicadoresAntecipacao(s);
+  assert.ok(perto(ind.valorFace, 60_000));
+  assert.equal(ind.valorPresente, vp);
+  assert.equal(ind.valorLiquido, vp, 'sem tarifas, o líquido é o próprio VP');
+  // Sem tarifas o custo efetivo é a própria taxa de desconto.
+  assert.ok(ind.custoEfetivoAnual !== null && perto(ind.custoEfetivoAnual, 0.18, 0.001), `custo ${ind.custoEfetivoAnual}`);
+
+  // Com tarifas o custo efetivo sobe, e o líquido cai.
+  const comTarifas = indicadoresAntecipacao(simularAntecipacao(
+    antecipacao({ taxa_estruturacao_pct: 2, outros_encargos_iniciais: 500, taxa_administracao_mensal: 100 }), lastro, prazo));
+  assert.ok(perto(comTarifas.valorLiquido, vp - Math.round(vp * 2) / 100 - 500));
+  assert.ok(perto(comTarifas.tarifas, Math.round(vp * 2) / 100 + 500 + 12 * 100));
+  assert.ok(comTarifas.custoEfetivoAnual! > 0.18);
+});
+
+test('#851 critério 2: taxa zero → valor presente igual à face, deságio zero', () => {
+  const lastro = [0, 0, 0, 1_000, 1_000, 1_000];
+  const ind = indicadoresAntecipacao(simularAntecipacao(antecipacao({ taxa_anual: 0, pct_carteira_cedida: 100 }), lastro, 6));
+  assert.equal(ind.valorPresente, 3_000);
+  assert.equal(ind.desagio, 0);
+});
+
+test('#851: sem lastro (ou 0% cedido) a operação sai zerada, sem erro', () => {
+  for (const s of [
+    simularAntecipacao(antecipacao(), new Array(10).fill(0), 10),
+    simularAntecipacao(antecipacao({ pct_carteira_cedida: 0 }), [0, 0, 0, 500, 500, 0, 0, 0, 0, 0], 10),
+  ]) {
+    assert.equal(soma(s.entradas), 0);
+    assert.equal(soma(s.saidas), 0);
+  }
+});
+
+test('#851 critério 3: duas cessões sobre o mesmo lastro nunca passam de 100%, e a ordem do array não importa', () => {
+  const prazo = 12;
+  const porSafra = { 0: [0, 0, 0, 0, 1_000, 1_000, 1_000, 1_000, 0, 0, 0, 0] };
+  const livre = new Array<number>(prazo).fill(0);
+  const ops = [
+    antecipacao({ id: 2, inicio_mes: 3, pct_carteira_cedida: 80 }),
+    antecipacao({ id: 1, inicio_mes: 1, pct_carteira_cedida: 80 }),
+  ];
+  const f = fundingDoEstudo(ops, livre, livre, 0, 0, 12, { recebimentoPorSafraMensal: porSafra })!;
+  const primeira = f.operacoes.find((s) => s.operacao.id === 1)!;
+  const segunda = f.operacoes.find((s) => s.operacao.id === 2)!;
+  // A primeira (mês 1) cede 80%; a segunda (mês 3) cede 80% dos 20% restantes.
+  assert.ok(perto(soma(primeira.saidas), 3_200));
+  assert.ok(perto(soma(segunda.saidas), 640));
+  assert.ok(soma(primeira.saidas) + soma(segunda.saidas) <= 4_000 + 0.01);
+  // Mesma resposta com o array na outra ordem.
+  const g = fundingDoEstudo([...ops].reverse(), livre, livre, 0, 0, 12, { recebimentoPorSafraMensal: porSafra })!;
+  assert.deepEqual(g.operacoes.find((s) => s.operacao.id === 2)!.saidas, segunda.saidas);
+  // Sem o lastro no contexto, nada a ceder.
+  const semLastro = fundingDoEstudo(ops, livre, livre, 0, 0, 12, {})!;
+  assert.equal(soma(semLastro.noFluxo.entradas), 0);
+});
+
+const CRONO: EventoCrono[] = [
+  { evento: 'lancamento', inicio_mes: 0, duracao_meses: 3 },
+  { evento: 'obra', inicio_mes: 3, duracao_meses: 12 }, // entrega no mês 14
+  { evento: 'pos_obra', inicio_mes: 15, duracao_meses: 12 },
+];
+
+test('#851 critérios 4 e 5: lastro do motor do fluxo, entra no alavancado e não mexe no desalavancado', () => {
+  const linha = {
+    id: 1, nome: 'Lotes', tipologias: [{ id: 1, quantidade: 20, area_privativa_m2: 300, preco_m2: 1_000 }],
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: {
+      componentes: [
+        { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+        { tipo: 'carteira_pos_marco', participacaoPct: 90, marcoMes: 14, carenciaMeses: 0, prazoMeses: 60 },
+      ],
+    },
+  };
+  const calc = calcularFluxo({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO, jurosTabelaAaEstudo: 12,
+    linhasReceita: [linha], linhasCusto: [], areaTerreno: 0,
+  });
+  // O lastro por safra soma exatamente a receita bruta canônica.
+  const porSafra = calc.recebimentoPorSafraMensal;
+  const totalPorSafra = soma(Object.values(porSafra).map((serie) => soma(serie)));
+  assert.ok(perto(totalPorSafra, soma(calc.receitaBrutaMensal), 0.5));
+
+  const cessao = antecipacao({ inicio_mes: 16, pct_carteira_cedida: 50, taxa_anual: 20 });
+  const f = fundingDoEstudo([cessao], calc.fluxoMensal, calc.receitaMensal, 0, 15, 12, {
+    cronograma: CRONO, recebimentoPorSafraMensal: porSafra,
+  })!;
+  const s = f.operacoes[0];
+  // O que se cede é 50% do que as vendas até o mês 16 pagam depois dele.
+  const esperado = recebiveisFuturosDeSafras(porSafra, 16, calc.prazo).map((v) => v * 0.5);
+  assert.ok(perto(soma(s.saidas), soma(esperado), 0.5));
+  assert.ok(s.entradas[16] > 0 && s.entradas[16] < soma(s.saidas), 'o VP fica abaixo da face');
+  // Linhas do fluxo alavancado; o livre é o mesmo de antes.
+  assert.ok(f.noFluxo.linhasEntrada.some((l) => /Antecipação/.test(l.nome) && /valor antecipado/.test(l.nome)));
+  assert.ok(f.noFluxo.linhasSaida.some((l) => /parcelas cedidas/.test(l.nome)));
+  calc.fluxoMensal.forEach((v, t) => assert.ok(perto(f.noFluxo.fluxoMensal[t], v + f.noFluxo.entradas[t] - f.noFluxo.saidas[t])));
+  // Não é tranche de investidor (fica fora do Retorno por parte).
+  assert.deepEqual(tranchesDeInvestimento(f), []);
+  // As invariantes de funding não acusam nada: o lastro zera, nada negativo.
+  assert.deepEqual(validarFunding(f, calc.fluxoMensal, undefined, calc.receitaMensal).filter((d) => d.severidade === 'erro'), []);
+});
+
+test('#851 revisão: o custo efetivo não explode com cessão em mês tardio — nem a TIR da dívida com aporte tardio', () => {
+  for (const m of [2, 10, 24, 60]) {
+    const prazo = m + 20;
+    const lastro = new Array<number>(prazo).fill(0);
+    for (let k = m + 1; k <= m + 12; k++) lastro[k] = 10_000;
+    const ind = indicadoresAntecipacao(simularAntecipacao(antecipacao({ inicio_mes: m }), lastro, prazo));
+    assert.ok(ind.custoEfetivoAnual !== null && perto(ind.custoEfetivoAnual, 0.18, 0.001), `m=${m}: ${ind.custoEfetivoAnual}`);
+    const divida = simularDivida({
+      id: 9, tipo: 'divida', nome: 'd', valor: 1_000_000, inicio_mes: m, taxa_anual: 18,
+      periodo_amortizacao_meses: 12, periodo_carencia_meses: 0,
+    }, prazo);
+    const tir = tirAnual(divida.fluxoInvestidor);
+    assert.ok(tir !== null && perto(tir, 0.18, 0.001), `dívida m=${m}: ${tir}`);
+  }
+});
+
+test('#851 revisão: taxa de desconto negativa no rascunho não gera NaN', () => {
+  const s = simularAntecipacao(antecipacao({ taxa_anual: -150 }), [0, 0, 0, 100, 100, 0], 6);
+  assert.ok([...s.entradas, ...s.saidas, ...s.saldo, ...s.juros].every((v) => Number.isFinite(v)));
+});
+
+test('#851 revisão: as tarifas saem do caixa e a face com tarifas é exata', () => {
+  const prazo = 20;
+  const lastro = new Array<number>(prazo).fill(0);
+  for (let k = 3; k <= 14; k++) lastro[k] = 10_000.37;
+  const op = antecipacao({ taxa_estruturacao_pct: 2, outros_encargos_iniciais: 500, taxa_administracao_mensal: 100 });
+  const s = simularAntecipacao(op, lastro, prazo);
+  const vp = s.entradas[2];
+  const estruturacao = Math.round(vp * 2) / 100;
+  // No mês da cessão: estruturação + outros custos saem do caixa.
+  assert.equal(s.saidas[2], Math.round((estruturacao + 500) * 100) / 100);
+  // Depois: cada parcela cedida + a administração.
+  for (let k = 3; k <= 14; k++) assert.equal(s.saidas[k], Math.round((Math.round(lastro[k] * 50) / 100 + 100) * 100) / 100);
+  const face = Math.round(soma(lastro.map((v) => Math.round(v * 50) / 100)) * 100) / 100;
+  // Σ juros é EXATAMENTE face − VP (o último mês fecha o deságio sem resíduo).
+  assert.equal(Math.round(soma(s.juros) * 100) / 100, Math.round((face - vp) * 100) / 100);
+  const ind = indicadoresAntecipacao(s);
+  assert.equal(ind.valorFace, face, 'a face não pode incluir as tarifas');
+  assert.equal(ind.desagio, Math.round((face - vp) * 100) / 100);
+  assert.equal(ind.tarifas, Math.round((estruturacao + 500 + 12 * 100) * 100) / 100);
+});
+
+test('#851 revisão: a venda do PRÓPRIO mês da cessão entra no lastro e sai do retido da cessão seguinte', () => {
+  const prazo = 10;
+  const porSafra = { 3: [0, 0, 0, 0, 1_000, 1_000, 1_000, 0, 0, 0] };
+  const livre = new Array<number>(prazo).fill(0);
+  const ops = [
+    antecipacao({ id: 1, inicio_mes: 3, pct_carteira_cedida: 50, taxa_anual: 0 }),
+    antecipacao({ id: 2, inicio_mes: 4, pct_carteira_cedida: 100, taxa_anual: 0 }),
+  ];
+  const f = fundingDoEstudo(ops, livre, livre, 0, 0, 12, { recebimentoPorSafraMensal: porSafra })!;
+  assert.equal(soma(f.operacoes.find((s) => s.operacao.id === 1)!.saidas), 1_500, 'a safra do mês 3 entra na cessão do mês 3');
+  // A segunda cede 100% do que sobrou: metade das parcelas dos meses 5 e 6.
+  assert.equal(soma(f.operacoes.find((s) => s.operacao.id === 2)!.saidas), 1_000);
+});
+
+test('#851 revisão: cessões sucessivas não cedem um centavo além do lastro (arredondamento cumulativo)', () => {
+  const prazo = 6;
+  const porSafra = { 0: [0, 0, 0, 100.01, 100.01, 0] };
+  const livre = new Array<number>(prazo).fill(0);
+  const ops = [
+    antecipacao({ id: 1, inicio_mes: 1, pct_carteira_cedida: 50, taxa_anual: 0 }),
+    antecipacao({ id: 2, inicio_mes: 2, pct_carteira_cedida: 100, taxa_anual: 0 }),
+  ];
+  const f = fundingDoEstudo(ops, livre, livre, 0, 0, 12, { recebimentoPorSafraMensal: porSafra })!;
+  const a = f.operacoes.find((s) => s.operacao.id === 1)!;
+  const b = f.operacoes.find((s) => s.operacao.id === 2)!;
+  for (const k of [3, 4]) {
+    assert.equal(a.saidas[k], 50.01, `mês ${k}: a primeira leva o arredondado de 50,005`);
+    assert.equal(b.saidas[k], 50, `mês ${k}: a segunda leva o resto, não 50,01 de novo`);
+    assert.equal(Math.round((a.saidas[k] + b.saidas[k]) * 100), 10_001, `mês ${k}: soma = a parcela, nem um centavo a mais`);
+  }
+  // Uma cessão só não muda: sem cessão anterior, é o round2 de p × lastro.
+  const so = simularAntecipacao(antecipacao({ inicio_mes: 1, pct_carteira_cedida: 50, taxa_anual: 0 }), porSafra[0], prazo);
+  assert.equal(so.saidas[3], 50.01);
+});
+
+test('#851 revisão: tarifa numa antecipação também acende o aviso de tarifa duplicada', () => {
+  const custo = [{ grupo: 'financeiro', categoria: 'Taxas bancárias', orcamento_valor: 10_000 }];
+  assert.equal(riscoTarifaDuplicada([antecipacao({ taxa_estruturacao_pct: 2 })], custo), true);
+  assert.equal(riscoTarifaDuplicada([antecipacao({ taxa_administracao_mensal: 300 })], custo), true);
+  assert.equal(riscoTarifaDuplicada([antecipacao({ outros_encargos_iniciais: 5_000 })], custo), true);
+  assert.equal(riscoTarifaDuplicada([antecipacao()], custo), false, 'sem tarifa na antecipação, sem aviso');
+});

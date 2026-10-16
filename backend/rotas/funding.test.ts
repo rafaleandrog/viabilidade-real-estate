@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  validarCamposOperacao, conflitoFinanciamentoUnico, somaRetornoExcede, remocaoFinanciamentoBloqueada,
+  validarCamposOperacao, TIPOS_OPERACAO, conflitoFinanciamentoUnico, somaRetornoExcede, remocaoFinanciamentoBloqueada,
 } from './funding.js';
 
 // #355 — validação das operações de Funding. Só lógica pura: as rotas em si
@@ -280,4 +280,15 @@ test('#435 estudo sem equity ainda aceita a primeira operação inteira', () => 
     )),
     /Sobra 0\.00%/,
   );
+});
+
+test('#851: antecipacao_recebiveis é tipo válido e pct_carteira_cedida fica entre 0 e 100', () => {
+  assert.equal(validarCamposOperacao({ tipo: 'antecipacao_recebiveis', pct_carteira_cedida: 50, taxa_anual: 18 }), null);
+  assert.equal(validarCamposOperacao({ tipo: 'antecipacao_recebiveis', pct_carteira_cedida: 0 }), null);
+  assert.match(validarCamposOperacao({ tipo: 'antecipacao_recebiveis', pct_carteira_cedida: 101 })!, /pct_carteira_cedida/);
+  assert.match(validarCamposOperacao({ tipo: 'antecipacao_recebiveis', pct_carteira_cedida: -1 })!, /pct_carteira_cedida/);
+  assert.match(validarCamposOperacao({ tipo: 'antecipacao_recebiveis', pct_carteira_cedida: 'x' })!, /pct_carteira_cedida/);
+  // `ativo: false` continua exclusivo do Financiamento à produção.
+  assert.match(validarCamposOperacao({ tipo: 'antecipacao_recebiveis', ativo: false })!, /ativo/);
+  assert.ok(TIPOS_OPERACAO.includes('antecipacao_recebiveis'));
 });

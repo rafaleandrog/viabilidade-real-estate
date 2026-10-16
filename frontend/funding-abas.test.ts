@@ -30,7 +30,7 @@ const fonte = readFileSync(new URL('./tela-funding.ts', import.meta.url), 'utf8'
 // Um tipo novo que ninguém pusesse numa aba sumiria da UI e QUEBRARIA a
 // identidade, sem nada mais ficar vermelho: as operações continuariam no banco,
 // contariam na tabela compilada, e não apareceriam em aba nenhuma.
-const TIPOS_COM_ABA = ['financiamento_producao', 'divida', 'equity'];
+const TIPOS_COM_ABA = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
 
 test('#586 critério 2: a aba Operações lista a UNIÃO exata das outras três abas', () => {
   const operacoes = [

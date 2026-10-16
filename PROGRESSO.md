@@ -4,6 +4,38 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-16 — Antecipação de recebíveis como operação de Funding (#851)
+
+Segundo assunto do mesmo pedido do autor da carteira própria (#850, já mergeada). Decisões do autor
+na sessão: o deságio fica só no Funding e no fluxo alavancado, e a Proforma, a TIR e o VPL do
+projeto continuam desalavancados; o lastro é um percentual da carteira existente no mês da cessão.
+
+- **Tipo novo** `antecipacao_recebiveis` em `avancado_funding_operacoes`, com a coluna
+  `pct_carteira_cedida`. Migração `042` no-op e `versao` 0.1.40 → 0.1.41. O mês, a taxa de desconto
+  (`taxa_anual`) e as três tarifas reaproveitam as colunas que já existiam.
+- **Lastro.** `calcularFluxo` passou a expor `recebimentoPorSafraMensal`: os pagamentos de cada
+  safra, mês a mês, só das linhas com plano canônico. O lastro de uma cessão no mês `m` é o que as
+  safras `≤ m` pagam depois de `m` (`recebiveisFuturosDeSafras`).
+- **Motor** (`simularAntecipacao`):
+  - entrada no mês da cessão = valor presente das parcelas cedidas à taxa de desconto;
+  - saídas = estruturação e outros custos no mês da cessão, depois parcelas cedidas e administração;
+  - `juros` = deságio, e `saldo` = valor presente remanescente, que zera na última parcela.
+  - É cega ao caixa. Entre antecipações, a ordem cronológica decide quanto do lastro ainda é da
+    empresa, então duas cessões nunca passam de 100%, sem invariante extra.
+- **Fiação.** O lastro chega por `contexto.recebimentoPorSafraMensal` nas três telas e no
+  `conferir-estudo`. A regra nova do `guard-fiacao-funding.mjs` reprova o consumidor que não o
+  passa.
+- **Tela.**
+  - Aba **Antecipação** com mês da cessão, carteira cedida, taxa de desconto e tarifas.
+  - Painel **Resultado da antecipação**: face, valor presente, recebido líquido, deságio, tarifas e
+    custo efetivo (TIR da série).
+  - Fica fora do Retorno por parte, como o Financiamento à produção.
+  - Caso de render novo: `funding-antecipacao`.
+- **Fora:** coobrigação, que só muda número quando houver inadimplência no motor (ver `ideias.md`).
+  Linhas de receita com plano legado não entram no lastro.
+- **Do autor:** sincronizar o `schema.json` e rodar a `042` na instância, e testar pela tela na
+  Pinguim.
+
 ## 2026-10-16 — Saldo de chaves: repasse bancário parcial e carteira própria (#850)
 
 Pedido do autor, com plano aprovado na sessão: escolher como o repasse se comporta, porque nem todo o

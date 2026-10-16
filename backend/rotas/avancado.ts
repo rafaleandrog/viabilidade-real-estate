@@ -1958,6 +1958,9 @@ export const CAMPOS_OPERACAO = [
   // #478: tarifas/estruturação/encargos — só `divida` (motor ignora nas
   // outras duas). Whitelisted igual às demais: sem isso a tela grava no vazio.
   'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
+  // #851: o percentual cedido da antecipação de recebíveis. Sem esta entrada a
+  // tela gravaria no vazio e a cópia de estudo perderia o campo.
+  'pct_carteira_cedida',
   // #587: `ativo` — genérico na coluna, mas `validarCamposOperacao`
   // (`./funding.ts`) só aceita em `financiamento_producao`. Sem esta entrada
   // a duplicação de estudo (`copia`, abaixo) apagaria o estado ligado/

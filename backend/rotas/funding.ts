@@ -12,7 +12,7 @@ import {
 // `avancado_funding_operacoes`, as OPERAÇÕES de captação do estudo Avançado.
 //
 // Substituem as rotas de `avancado_capital_instrumentos` (modelo de 4
-// instrumentos com waterfall, descartado). O modelo novo tem 3 tipos:
+// instrumentos com waterfall, descartado). O modelo novo tem 4 tipos:
 //
 //  · `financiamento_producao` — ÚNICO por estudo (regra do autor). Decisão de
 //    2026-08-12: preserva o modelo de exposição mínima/catch-up
@@ -24,13 +24,16 @@ import {
 //    `amortizar_com_caixa_disponivel`, `custo_linha_ids`) e não usa os campos
 //    de calendário (`inicio_mes`/`distribuir_aporte`/`aporte_meses`/
 //    `periodo_amortizacao_meses`/`periodo_carencia_meses`) — a rota aceita
-//    esses campos porque o shape da tabela é único para os 3 tipos, mas o
+//    esses campos porque o shape da tabela é único para todos os tipos, mas o
 //    motor os ignora para este tipo;
 //  · `divida`                 — calendário + Price com carência, quantas o
 //    usuário quiser;
 //  · `equity`                 — aporte + retorno, em dois modos
 //    (`permuta_financeira` = % da receita líquida mês a mês;
-//     `resultado_final`    = % do resultado, pago no repasse).
+//     `resultado_final`    = % do resultado, pago no repasse);
+//  · `antecipacao_recebiveis` — (#851) cessão de um % do lastro de recebíveis
+//    num mês, com o projeto recebendo o valor presente das parcelas cedidas;
+//    usa `pct_carteira_cedida`, `taxa_anual` (desconto) e as três tarifas.
 //
 // Diferente do modelo antigo, aqui os campos são COLUNAS, não um `config` JSON
 // solto — o shape é fixo e conhecido, então dá para validar campo a campo em
@@ -60,10 +63,10 @@ export const rotasFunding: ReturnType<typeof Router> = Router();
 
 // #590: exportadas para o mesmo teste de igualdade exata contra `schema.json`
 // que fechou a divergência de `UNIDADES_ORCAMENTO` em avancado.ts (item 4 do
-// critério de aceite — varredura de vizinhos). As três já batiam com
+// critério de aceite — varredura de vizinhos). As três listas já batiam com
 // `avancado_funding_operacoes` no schema; a exportação é o que torna essa
 // conferência automática em vez de manual.
-export const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity'];
+export const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
 export const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
 export const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
 
@@ -74,10 +77,11 @@ const CAMPOS_NAO_NEGATIVOS = [
   'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
   'exposicao_minima', 'percentual_financiavel',
   'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
+  'pct_carteira_cedida',
 ];
 
 /** Campos percentuais que não fazem sentido acima de 100 (%). */
-const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct'];
+const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct', 'pct_carteira_cedida'];
 
 /** Default de `modo_retorno` — o mesmo do banco (`schema.json`) e do motor. */
 const MODO_RETORNO_PADRAO = 'permuta_financeira';
@@ -223,7 +227,7 @@ export function conflitoFinanciamentoUnico<T extends Record<string, any>>(
  * Três armadilhas, cada uma com caso de teste próprio:
  *  · `modo_retorno` tem DEFAULT (`permuta_financeira`) no banco e no motor —
  *    sem aplicá-lo aqui, uma linha gravada sem o campo escaparia das duas somas;
- *  · só `tipo === 'equity'` entra — a coluna existe para os 3 tipos, com
+ *  · só `tipo === 'equity'` entra — a coluna existe para todos os tipos, com
  *    default 0, e somar as outras contaria linha que não distribui receita;
  *  · `ignorarId` é o que faz o PATCH não contar a própria operação duas vezes.
  *    O chamador passa o estado FINAL (`{ ...atual, ...payload }`) em `novo`.

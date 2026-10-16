@@ -106,12 +106,13 @@ venda posterior à entrega.
 ### Funding
 
 As operações que financiam o projeto, cada uma independente das outras: **Dívida** (ou capital de
-giro), **Equity** e **Financiamento à produção**. Dívida e Equity pedem nome, valor, o início (uma
+giro), **Equity**, **Financiamento à produção** e **Antecipação de recebíveis**. Dívida e Equity pedem nome, valor, o início (uma
 fase do cronograma ou um mês específico) e a taxa ou o retorno — o Equity pode ser remunerado como
 percentual do resultado final ou como permuta financeira sobre a receita líquida. O Financiamento à
 produção não tem valor nem início digitados: a janela vem do Cronograma e o principal, da base
-financiável; é a única operação com o interruptor **Ativo**. As regras de cada tipo estão em
-[Funding](funding).
+financiável; é a única operação com o interruptor **Ativo**. A Antecipação de recebíveis cede, num
+mês escolhido, um percentual do que as vendas já feitas ainda vão pagar, e recebe à vista o valor
+presente dessas parcelas à taxa de desconto. As regras de cada tipo estão em [Funding](funding).
 
 ### Resultados
 
