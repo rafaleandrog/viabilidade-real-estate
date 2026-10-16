@@ -11,7 +11,7 @@ import {
   pctRepasseDerivado, destinoSaldoChaves, parcelasAoLongoObra, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import {
-  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoDeNascimento,
+  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoDeNascimento, planoSoCanonico,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -840,14 +840,6 @@ export class ViabFluxoReceitas extends LitElement {
   // as existentes inclusive. Decisão do autor de 2026-08-26.
 
   /**
-   * #460 — destino do resíduo de um Parcelamento "Ao longo da obra" sem prazo
-   * (venda contratada no mês do marco ou depois): rolar para o Repasse
-   * (`concentrado`) ou virar caixa imediato (o comportamento de sempre).
-   * Escrever a chave é o que marca "o usuário escolheu" — `formularioPagamento`
-   * só a propaga quando já existia no persistido (ver a nota de contrato em
-   * `FormularioPagamento`).
-   */
-  /**
    * #850: o destino do saldo de chaves. Baixar o repasse bancário de 100% sem
    * prazo de carteira gravado preenche 120 parcelas — o prazo típico de
    * loteamento — para o plano nascer válido; o usuário troca em seguida.
@@ -864,6 +856,14 @@ export class ViabFluxoReceitas extends LitElement {
     this.pagForm = { ...f, repasse };
   }
 
+  /**
+   * #460 — destino do resíduo de um Parcelamento "Ao longo da obra" sem prazo
+   * (venda contratada no mês do marco ou depois): rolar para o Repasse
+   * (`concentrado`) ou virar caixa imediato (o comportamento de sempre).
+   * Escrever a chave é o que marca "o usuário escolheu" — `formularioPagamento`
+   * só a propaga quando já existia no persistido (ver a nota de contrato em
+   * `FormularioPagamento`).
+   */
   private _setResiduoAteMarco(valor: ResiduoAteMarco) {
     this.pagForm = { ...this.pagForm, residuoAteMarco: valor };
   }
@@ -912,6 +912,11 @@ export class ViabFluxoReceitas extends LitElement {
     const f = this.pagForm;
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
+    // #850: o destino do saldo de chaves só é editável quando há saldo e o
+    // plano tem espelho (linhas de entrada/parcelamento) — num plano só
+    // canônico o controle não teria efeito (`planoSoCanonico`).
+    const soCanonico = planoSoCanonico(f);
+    const editaDestino = repasse > 0 && !soCanonico;
     const erroPagamento = erroFormularioPagamento(f, this.crono);
     // #585: o bloco de juros SAIU deste modal — campo, texto e o aviso de
     // "N taxas diferentes gravadas". Com uma taxa por ESTUDO não há mais o que
@@ -1055,15 +1060,20 @@ export class ViabFluxoReceitas extends LitElement {
                   <span class="sec">Saldo de chaves</span><br />
                   <span class="derivado">${fmtPctEntrada(repasse)}</span>
                 </div>
+                ${editaDestino ? html`
                 <viab-num label="Repasse bancário" sufixo="%" casas-minimas="2" ?desabilitado=${dis}
                   .valor=${destinoSaldoChaves(f).pctBanco}
-                  @urbi:input-numero-change=${(ev: CustomEvent) => this._setRepasse('pct_banco', ev.detail.valor ?? 100)}></viab-num>
+                  @urbi:input-numero-change=${(ev: CustomEvent) => this._setRepasse('pct_banco', ev.detail.valor ?? 100)}></viab-num>` : nothing}
               </div>
-              ${destinoSaldoChaves(f).pctBanco < 100 ? html`
+              ${soCanonico ? html`
+                <p class="sec">Este plano foi gravado só como componentes, sem linhas de entrada e de
+                  parcelamento, e por isso o destino do saldo de chaves não é editável aqui. Para
+                  mudá-lo, monte o plano com linhas de entrada e de parcelamento.</p>` : nothing}
+              ${editaDestino && destinoSaldoChaves(f).pctBanco < 100 ? html`
                 <div class="pag-linha carteira-propria">
                   <div class="repasse-box">
                     <span class="sec">Carteira própria</span><br />
-                    <span class="derivado">${fmtPctEntrada(repasse * (100 - destinoSaldoChaves(f).pctBanco) / 100)}</span>
+                    <span class="derivado">${fmtPctEntrada(repasse - repasse * destinoSaldoChaves(f).pctBanco / 100)}</span>
                   </div>
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0" ?desabilitado=${dis}
                     .valor=${n(f.repasse?.carteira_parcelas)}

@@ -753,14 +753,23 @@ export function pctRepasseDerivado(fp: any): number {
  * digitação é `erroFormularioPagamento`.
  */
 export function destinoSaldoChaves(fp: any): { pctBanco: number; prazoMeses: number; carenciaMeses: number } {
-  const r = fp?.repasse ?? {};
-  const bruto = r.pct_banco;
-  const pctBanco = bruto === undefined || bruto === null || !Number.isFinite(Number(bruto))
-    ? 100
-    : Math.min(100, Math.max(0, Number(bruto)));
-  const prazo = Math.round(n(r.carteira_parcelas));
-  const carencia = Math.round(n(r.carteira_carencia_meses));
-  return { pctBanco, prazoMeses: prazo >= 1 ? prazo : 1, carenciaMeses: carencia >= 0 ? carencia : 0 };
+  const r = fp?.repasse;
+  // Fail-closed (armadilha 14 do `CLAUDE.md`): só NÚMERO vale. `Number('')`,
+  // `Number(false)` e `Number([])` valem 0 — lidos assim, um `pct_banco` sujo
+  // mandaria o saldo inteiro para a carteira. Qualquer coisa que não seja um
+  // número no domínio cai no comportamento de antes da #850 (100% banco), e
+  // quem recusa a escrita é `erroDestinoSaldoChaves`.
+  const objeto = r !== null && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const pctBanco = num(objeto.pct_banco) && objeto.pct_banco >= 0 && objeto.pct_banco <= 100
+    ? objeto.pct_banco : 100;
+  const prazo = objeto.carteira_parcelas;
+  const carencia = objeto.carteira_carencia_meses;
+  return {
+    pctBanco,
+    prazoMeses: num(prazo) && Number.isInteger(prazo) && prazo >= 1 ? prazo : 1,
+    carenciaMeses: num(carencia) && Number.isInteger(carencia) && carencia >= 0 ? carencia : 0,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1020,9 +1029,15 @@ export function componentesDoLegado(
     // sempre) e a carteira própria. Sem `repasse.pct_banco` no espelho a
     // divisão é 100/0 — exatamente o componente que este adaptador sempre
     // produziu, para todo plano gravado antes da #850.
+    //
+    // ⚠️ Sem `round2`: percentual é derivada NÃO monetária (contrato C7) e
+    // carrega precisão plena. E com 100% banco o `concentrado` recebe
+    // `pctRepasse` CRU, pelo atalho — a mesma participação de antes, bit a bit,
+    // inclusive para percentual com mais de duas casas (33,333% de entrada →
+    // 66,667% de repasse, não 66,67%). Achado de revisão.
     const destino = destinoSaldoChaves(fp);
-    const pctBanco = round2(pctRepasse * destino.pctBanco / 100);
-    const pctCarteira = round2(pctRepasse - pctBanco);
+    const pctBanco = destino.pctBanco >= 100 ? pctRepasse : pctRepasse * destino.pctBanco / 100;
+    const pctCarteira = pctRepasse - pctBanco;
     if (pctBanco > 0) {
       const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
       componentes.push({ tipo: 'concentrado', participacaoPct: pctBanco, mesPagamento: mesRepasse, taxaMensal, rotulo: 'repasse (legado)' });
@@ -1553,6 +1568,11 @@ export function receitaBrutaSafra(
  * para essa venda. Vendas anteriores ou NO próprio mês da entrega continuam
  * pelos componentes normais; contratos antigos (de safras anteriores) não
  * são afetados — cada safra é tratada isoladamente, como em todo este motor.
+ *
+ * ⚠️ #850: a exceção é a CARTEIRA PRÓPRIA. Com `carteira_pos_marco` no plano,
+ * a fração dela continua financiada também na venda Após-chaves (a partir de
+ * `safra + 1`); só o resto chega à vista. Quem aplica a regra é
+ * `componentesEfetivosSafra`; esta função só diz se a venda é Após-chaves.
  */
 export function ehVendaAposChaves(safra: number, mesEntrega: number): boolean {
   return safra > mesEntrega;
@@ -1561,7 +1581,8 @@ export function ehVendaAposChaves(safra: number, mesEntrega: number): boolean {
 /**
  * Os componentes que valem para UMA safra. Duas regras, as duas por safra:
  *
- *  1. venda Após-chaves → 100% à vista (ver `ehVendaAposChaves`);
+ *  1. venda Após-chaves → à vista no mês, exceto a fração da carteira
+ *     própria, que segue financiada (#850; ver `ehVendaAposChaves`);
  *  2. repasse (`concentrado`) com `mesPagamento` ANTERIOR à safra → pago no
  *     próprio mês da venda: `Math.max(mesPagamento, safra)`. Receber antes de
  *     vender não existe, e `pagamentosConcentrado` lança nesse caso — a

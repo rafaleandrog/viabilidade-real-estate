@@ -9,15 +9,16 @@
 //  5. a fronteira de escrita aceita e valida o tipo novo.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
-  calcularFluxo, calcularRecebiveisComponentes, componentesDoLegado, componentesEfetivosSafra,
+  calcularFluxo, calcularRecebiveisComponentes, componentesDoLegado, consolidarCarteiraClientes, componentesEfetivosSafra,
   destinoSaldoChaves, pctRepasseDerivado, pagamentosCarteiraPosMarco, pagamentosConcentrado, pmt, primeiroVencimentoCarteira,
   taxaMensalDeAnual, ultimoMesRecebivelLinha, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
 import { validarComponentesSafra, validarFluxoCalc, validarSafrasReceita } from './fluxo-invariantes.js';
-import { erroComponentePagamento } from './fluxo-pagamento-contrato.js';
+import { erroComponentePagamento, erroDestinoSaldoChaves } from './fluxo-pagamento-contrato.js';
 import {
-  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
+  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoSoCanonico,
 } from './fluxo-pagamento-editor.js';
 import type { EventoCrono } from './fluxo-shared.js';
 
@@ -191,4 +192,94 @@ test('#850: o formulário valida o destino do saldo e o plano gravado sobrevive 
   // Plano antigo, sem o campo, não ganha `pct_banco` no Aplicar.
   const antigo = fluxoPagamentoParaSalvar(formularioPagamento(plano()), CRONO, 12);
   assert.equal('pct_banco' in antigo.repasse, false);
+});
+
+// ─── Rodada 1 da revisão do PR: um teste por bloqueante consertado ───────────
+
+test('#850 revisão: com 100% banco a participação do repasse é a de antes, sem arredondar (percentual fracionário)', () => {
+  const fracionado = {
+    entrada: [{ pct: 33.333, parcelas: 1, descontoPct: 0 }],
+    parcelas: [],
+    repasse: { apos_entrega_meses: 0 },
+  };
+  const comps = componentesDoLegado(fracionado, CRONO, 12);
+  const banco = comps.find((c) => c.tipo === 'concentrado')!;
+  assert.equal(banco.participacaoPct, pctRepasseDerivado(fracionado), 'o repasse foi arredondado');
+  assert.equal(comps.some((c) => c.tipo === 'carteira_pos_marco'), false);
+  // Com pct_banco fracionado as duas partes fecham o saldo sem perder nada.
+  const meio = componentesDoLegado({ ...fracionado, repasse: { pct_banco: 50, carteira_parcelas: 12 } }, CRONO, 12);
+  assert.ok(perto(soma(meio.map((c) => c.participacaoPct)), 100, 1e-9));
+  // Resíduo minúsculo de repasse não some.
+  const minusculo = componentesDoLegado({ entrada: [{ pct: 20, parcelas: 1 }], parcelas: [{ pct: 79.996, parcelas: 10 }], repasse: {} }, CRONO, 12);
+  assert.ok(perto(minusculo.find((c) => c.tipo === 'concentrado')!.participacaoPct, 0.004, 1e-9));
+});
+
+test('#850 revisão: `pct_banco` que não é número falha fechado (100% banco) e a fronteira de escrita o recusa', () => {
+  for (const sujo of ['', '50', false, [], null, NaN, -1, 101, '0x10']) {
+    assert.equal(destinoSaldoChaves({ repasse: { pct_banco: sujo, carteira_parcelas: 12 } }).pctBanco, 100, `pct_banco ${JSON.stringify(sujo)}`);
+  }
+  assert.equal(destinoSaldoChaves({ repasse: { pct_banco: 40, carteira_parcelas: '12' } }).prazoMeses, 1);
+  assert.equal(destinoSaldoChaves({ repasse: [{ pct: 30 }] }).pctBanco, 100);
+  for (const sujo of ['', '50', false, -1, 101]) {
+    assert.ok(erroDestinoSaldoChaves({ pct_banco: sujo, carteira_parcelas: 12 }), `aceitou pct_banco ${JSON.stringify(sujo)}`);
+  }
+  assert.match(erroDestinoSaldoChaves({ pct_banco: 40 })!, /carteira_parcelas/);
+  assert.match(erroDestinoSaldoChaves({ pct_banco: 40, carteira_parcelas: 1.5 })!, /carteira_parcelas/);
+  assert.match(erroDestinoSaldoChaves({ pct_banco: 40, carteira_parcelas: 12, carteira_carencia_meses: -1 })!, /carencia/);
+  assert.equal(erroDestinoSaldoChaves({ pct_banco: 40, carteira_parcelas: 12, carteira_carencia_meses: 0 }), null);
+  assert.equal(erroDestinoSaldoChaves(undefined), null);
+  assert.equal(erroDestinoSaldoChaves([{ pct: 30, mesesAposObra: 3 }]), null, 'repasse legado em lista');
+  // O formulário NÃO converte o valor sujo em 0 — ele segue sujo até a validação recusá-lo.
+  const form = formularioPagamento({ ...plano(), repasse: { pct_banco: '' } });
+  assert.equal(form.repasse.pct_banco as unknown, '');
+  assert.match(erroFormularioPagamento(form, CRONO)!, /repasse bancário/);
+});
+
+test('#850 revisão: carteira gravada pela API sem o espelho sobrevive ao Aplicar do modal', () => {
+  const pelaApi = {
+    entrada: [{ pct: 10, parcelas: 1, descontoPct: 0 }],
+    parcelas: [{ pct: 20, parcelas: 24, periodicidade: 'mensal' }],
+    repasse: { apos_entrega_meses: 0 },
+    componentes: [
+      { tipo: 'imediato', participacaoPct: 10, descontoPct: 0 },
+      { tipo: 'prazo_fixo', participacaoPct: 20, sinalPct: 0, prazoMeses: 24, defasagemMeses: 24, taxaMensal: 0 },
+      { tipo: 'concentrado', participacaoPct: 17.5, mesPagamento: FIM_OBRA + 1, taxaMensal: 0 },
+      { tipo: 'carteira_pos_marco', participacaoPct: 52.5, marcoMes: FIM_OBRA, carenciaMeses: 6, prazoMeses: 120, taxaMensal: 0 },
+    ],
+  };
+  const form = formularioPagamento(pelaApi);
+  assert.ok(perto(form.repasse.pct_banco!, 25, 1e-9));
+  assert.equal(form.repasse.carteira_parcelas, 120);
+  assert.equal(form.repasse.carteira_carencia_meses, 6);
+  const gravado = fluxoPagamentoParaSalvar(form, CRONO, 0);
+  const tipos = gravado.componentes.map((c) => c.tipo);
+  assert.ok(tipos.includes('carteira_pos_marco'), `a carteira virou ${tipos.join(', ')}`);
+  const cart = gravado.componentes.find((c) => c.tipo === 'carteira_pos_marco')!;
+  assert.ok(perto(cart.participacaoPct, 52.5, 1e-9));
+  assert.ok(cart.tipo === 'carteira_pos_marco' && cart.prazoMeses === 120 && cart.carenciaMeses === 6);
+});
+
+test('#850 revisão: plano só canônico é reconhecido, e nele o destino do saldo não é editável', () => {
+  const soComponentes = formularioPagamento({
+    entrada: [], parcelas: [],
+    componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }],
+  });
+  assert.equal(planoSoCanonico(soComponentes), true);
+  assert.equal(planoSoCanonico(formularioPagamento(plano())), false);
+  // A tela esconde o controle nesse caso; a regra que ela usa está ligada ao template.
+  const tela = readFileSync(new URL('./tela-fluxo-receitas.ts', import.meta.url), 'utf8');
+  assert.match(tela, /const soCanonico = planoSoCanonico\(f\);/);
+  assert.match(tela, /\$\{editaDestino \? html`\s*<viab-num label="Repasse bancário"/);
+});
+
+test('#850 revisão: `consolidarCarteiraClientes` soma a carteira própria no total', () => {
+  const comps: ComponentePagamento[] = [
+    { tipo: 'imediato', participacaoPct: 30, descontoPct: 0 },
+    carteira({ participacaoPct: 70, prazoMeses: 6 }),
+  ];
+  const r = consolidarCarteiraClientes(comps, [{ safra: 3, valorContratado: 1_000 }], FIM_OBRA);
+  const pico = r.mensal.find((p) => p.carteiraPropria > 0)!;
+  assert.equal(pico.total, pico.carteiraPropria);
+  assert.ok(r.carteiraMaxima > 700);
+  assert.equal(r.mensal.at(-1)!.total, 0);
 });

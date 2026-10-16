@@ -104,3 +104,42 @@ export function erroComponentePagamento(c: unknown): string | null {
   }
   return null;
 }
+
+/**
+ * #850 — o destino do saldo de chaves, gravado no espelho legado
+ * (`fluxo_pagamento.repasse`). `null` quando o objeto é aceitável; senão a
+ * mensagem.
+ *
+ * É a fonte ÚNICA desta regra, pelo mesmo motivo do `erroComponentePagamento`
+ * acima: `validarFluxoPagamento` (a fronteira de escrita) e
+ * `erroFormularioPagamento` (o modal) a chamam, e o leitor do motor
+ * (`destinoSaldoChaves`) é fail-closed sobre o mesmo domínio. Três leitores
+ * com regras diferentes para o mesmo campo foram o achado mais caro da
+ * armadilha 14 do `CLAUDE.md`.
+ *
+ * Os três campos são opcionais (ausente = 100% banco). Presente, tem de ser
+ * NÚMERO — `typeof`, nunca `Number(v)`: `Number('')` vale 0 e mandaria o saldo
+ * inteiro para a carteira. Com `pct_banco < 100` a carteira existe, e o prazo
+ * passa a ser obrigatório.
+ */
+export function erroDestinoSaldoChaves(repasse: unknown): string | null {
+  // O espelho legado já teve `repasse` como lista (`[{ pct, mesesAposObra }]`)
+  // e como `null`; nenhum dos dois carrega o destino, e os dois continuam
+  // aceitos sem reinterpretação.
+  if (!repasse || typeof repasse !== 'object' || Array.isArray(repasse)) return null;
+  const r = repasse as Record<string, unknown>;
+  const presente = (k: string) => r[k] !== undefined && r[k] !== null;
+  if (presente('pct_banco') && !percentual(r.pct_banco)) {
+    return 'repasse.pct_banco (repasse bancário) deve ser um percentual entre 0 e 100 do saldo de chaves';
+  }
+  if (presente('carteira_parcelas') && (!inteiro(r.carteira_parcelas) || r.carteira_parcelas < 1)) {
+    return 'repasse.carteira_parcelas (carteira própria) deve ser um número inteiro de parcelas maior que zero';
+  }
+  if (presente('carteira_carencia_meses') && (!inteiro(r.carteira_carencia_meses) || r.carteira_carencia_meses < 0)) {
+    return 'repasse.carteira_carencia_meses (carência da carteira própria) deve ser um número inteiro de meses, zero ou mais';
+  }
+  if (presente('pct_banco') && (r.pct_banco as number) < 100 && !presente('carteira_parcelas')) {
+    return 'com repasse bancário abaixo de 100%, a carteira própria precisa de repasse.carteira_parcelas';
+  }
+  return null;
+}
