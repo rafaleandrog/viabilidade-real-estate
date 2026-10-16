@@ -72,7 +72,7 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'antecipacao_recebiveis', rotulo: 'Antecipação de recebíveis', icone: 'fa-solid fa-forward' },
 ];
 
-// #586: as QUATRO abas da tela, com os nomes LITERAIS do pedido do autor
+// #586: as abas da tela (quatro na #586, e a Antecipação na #851), com os nomes LITERAIS do pedido do autor
 // (2026-08-26, item 9) e nesta ordem. `Dívida` aqui é só "Dívida" — o rótulo do
 // TIPO continua "Dívida / Capital de giro" (`TIPOS` acima), que é o que aparece
 // no badge do card e na coluna Tipo da tabela de Operações. Os dois textos
@@ -698,7 +698,7 @@ export class ViabFunding extends LitElement {
     const card = (rot: string, val: string, classe = '') =>
       html`<div class="ind-card ${classe}"><div class="rot">${rot}</div><div class="val">${val}</div></div>`;
     return html`
-      <div class="secao">
+      <div class="secao resultado-antecipacao">
         <h4>Resultado da antecipação</h4>
         ${ind.valorFace > 0 ? html`
           <div class="ind">
@@ -709,8 +709,10 @@ export class ViabFunding extends LitElement {
             ${card('Tarifas', fmtR$Kpi(ind.tarifas), ind.tarifas > 0 ? 'neg' : '')}
             ${card('Custo efetivo', ind.custoEfetivoAnual === null ? '—' : `${fmtPct(ind.custoEfetivoAnual * 100)} a.a.`)}
           </div>` : html`
-          <p class="nota">Nenhuma parcela a ceder: no mês da cessão não há venda com parcela futura no
-            lastro (ou o percentual cedido é zero).</p>`}
+          <p class="nota">Nenhuma parcela a ceder. Ou não há, até o mês da cessão, venda com parcela a
+            receber depois dele; ou o percentual cedido é zero; ou os Grupos de receita ainda estão
+            com o plano de pagamento no formato antigo — só os planos já aplicados entram no lastro
+            (abra o Fluxo de pagamento de cada Grupo, em Receitas, e clique em Aplicar).</p>`}
       </div>
     `;
   }

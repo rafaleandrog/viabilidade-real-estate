@@ -1039,7 +1039,9 @@ export function janelaDivida(op: OperacaoParaHorizonte): { m0: number; nTranches
  * #446 — o último mês (0-based, **inclusivo**) em que a operação ainda
  * movimenta caixa. É o termo que faltava no `Math.max` do horizonte.
  *
- * Os três tipos não se calculam do mesmo jeito:
+ * Os tipos não se calculam do mesmo jeito (a `antecipacao_recebiveis` cai na
+ * regra de `equity`: as parcelas que ela cede já estão no horizonte, que cobre
+ * todo recebível):
  *
  * - **`divida`** — `janelaDivida(op).fim`, a quitação contratual. É o buraco
  *   principal que a #446 fecha: uma amortização de 120 meses dentro de um

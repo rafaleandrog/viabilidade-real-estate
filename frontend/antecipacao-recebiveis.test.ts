@@ -11,8 +11,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  fundingDoEstudo, indicadoresAntecipacao, recebiveisFuturosDeSafras, simularAntecipacao,
-  taxaMensalEquivalente, tranchesDeInvestimento, type OperacaoFunding,
+  fundingDoEstudo, indicadoresAntecipacao, recebiveisFuturosDeSafras, simularAntecipacao, simularDivida,
+  taxaMensalEquivalente, tirAnual, tranchesDeInvestimento, type OperacaoFunding,
 } from './funding-motor.js';
 import { calcularFluxo } from './fluxo-caixa-motor.js';
 import { validarFunding } from './fluxo-invariantes.js';
@@ -153,4 +153,60 @@ test('#851 critérios 4 e 5: lastro do motor do fluxo, entra no alavancado e nã
   assert.deepEqual(tranchesDeInvestimento(f), []);
   // As invariantes de funding não acusam nada: o lastro zera, nada negativo.
   assert.deepEqual(validarFunding(f, calc.fluxoMensal, undefined, calc.receitaMensal).filter((d) => d.severidade === 'erro'), []);
+});
+
+test('#851 revisão: o custo efetivo não explode com cessão em mês tardio — nem a TIR da dívida com aporte tardio', () => {
+  for (const m of [2, 10, 24, 60]) {
+    const prazo = m + 20;
+    const lastro = new Array<number>(prazo).fill(0);
+    for (let k = m + 1; k <= m + 12; k++) lastro[k] = 10_000;
+    const ind = indicadoresAntecipacao(simularAntecipacao(antecipacao({ inicio_mes: m }), lastro, prazo));
+    assert.ok(ind.custoEfetivoAnual !== null && perto(ind.custoEfetivoAnual, 0.18, 0.001), `m=${m}: ${ind.custoEfetivoAnual}`);
+    const divida = simularDivida({
+      id: 9, tipo: 'divida', nome: 'd', valor: 1_000_000, inicio_mes: m, taxa_anual: 18,
+      periodo_amortizacao_meses: 12, periodo_carencia_meses: 0,
+    }, prazo);
+    const tir = tirAnual(divida.fluxoInvestidor);
+    assert.ok(tir !== null && perto(tir, 0.18, 0.001), `dívida m=${m}: ${tir}`);
+  }
+});
+
+test('#851 revisão: taxa de desconto negativa no rascunho não gera NaN', () => {
+  const s = simularAntecipacao(antecipacao({ taxa_anual: -150 }), [0, 0, 0, 100, 100, 0], 6);
+  assert.ok([...s.entradas, ...s.saidas, ...s.saldo, ...s.juros].every((v) => Number.isFinite(v)));
+});
+
+test('#851 revisão: as tarifas saem do caixa e a face com tarifas é exata', () => {
+  const prazo = 20;
+  const lastro = new Array<number>(prazo).fill(0);
+  for (let k = 3; k <= 14; k++) lastro[k] = 10_000.37;
+  const op = antecipacao({ taxa_estruturacao_pct: 2, outros_encargos_iniciais: 500, taxa_administracao_mensal: 100 });
+  const s = simularAntecipacao(op, lastro, prazo);
+  const vp = s.entradas[2];
+  const estruturacao = Math.round(vp * 2) / 100;
+  // No mês da cessão: estruturação + outros custos saem do caixa.
+  assert.equal(s.saidas[2], Math.round((estruturacao + 500) * 100) / 100);
+  // Depois: cada parcela cedida + a administração.
+  for (let k = 3; k <= 14; k++) assert.equal(s.saidas[k], Math.round((Math.round(lastro[k] * 50) / 100 + 100) * 100) / 100);
+  const face = Math.round(soma(lastro.map((v) => Math.round(v * 50) / 100)) * 100) / 100;
+  // Σ juros é EXATAMENTE face − VP (o último mês fecha o deságio sem resíduo).
+  assert.equal(Math.round(soma(s.juros) * 100) / 100, Math.round((face - vp) * 100) / 100);
+  const ind = indicadoresAntecipacao(s);
+  assert.equal(ind.valorFace, face, 'a face não pode incluir as tarifas');
+  assert.equal(ind.desagio, Math.round((face - vp) * 100) / 100);
+  assert.equal(ind.tarifas, Math.round((estruturacao + 500 + 12 * 100) * 100) / 100);
+});
+
+test('#851 revisão: a venda do PRÓPRIO mês da cessão entra no lastro e sai do retido da cessão seguinte', () => {
+  const prazo = 10;
+  const porSafra = { 3: [0, 0, 0, 0, 1_000, 1_000, 1_000, 0, 0, 0] };
+  const livre = new Array<number>(prazo).fill(0);
+  const ops = [
+    antecipacao({ id: 1, inicio_mes: 3, pct_carteira_cedida: 50, taxa_anual: 0 }),
+    antecipacao({ id: 2, inicio_mes: 4, pct_carteira_cedida: 100, taxa_anual: 0 }),
+  ];
+  const f = fundingDoEstudo(ops, livre, livre, 0, 0, 12, { recebimentoPorSafraMensal: porSafra })!;
+  assert.equal(soma(f.operacoes.find((s) => s.operacao.id === 1)!.saidas), 1_500, 'a safra do mês 3 entra na cessão do mês 3');
+  // A segunda cede 100% do que sobrou: metade das parcelas dos meses 5 e 6.
+  assert.equal(soma(f.operacoes.find((s) => s.operacao.id === 2)!.saidas), 1_000);
 });

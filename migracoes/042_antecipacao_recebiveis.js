@@ -12,8 +12,9 @@
 // `039_financiamento_producao_ativo.js`. A coluna é aditiva, com padrão 0, e o
 // sincronizador de schema do SDK materializa o default; nenhuma operação
 // existente é antecipação, então não há dado a transformar e nenhum número
-// muda. A migração existe para carregar o degrau de `versao` que a coluna nova
-// exige (a regra do repositório: mudança de schema vem com migração e bump).
+// muda. A migração existe para carregar o degrau de `versao`: a coluna e a
+// opção nova mudam o schema, e o SDK bumpa a `versao` nesse caso; o guard deste
+// repositório só aceita bump com migração nova, então o degrau vem com esta.
 
 export default async function ({ dados }) {
   void dados;

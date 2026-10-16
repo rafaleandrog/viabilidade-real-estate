@@ -161,7 +161,9 @@ const REGRAS = [
     // Fixtures e casos de render montam estudos sem antecipação; o dano é nas
     // telas e no `conferir-estudo`, que leem estudo real.
     ignorar: (arq) => arq.endsWith('funding-motor.ts') || arq.includes('/fixtures/') || arq.includes('/render/'),
-    exige: /recebimentoPorSafraMensal\s*:/,
+    // O VALOR tem de vir de um FluxoCalc (`<calc>.recebimentoPorSafraMensal`):
+    // só a chave aceitaria `recebimentoPorSafraMensal: {}`, que é o mesmo dano.
+    exige: /recebimentoPorSafraMensal\s*:\s*[\w.!?]+\.recebimentoPorSafraMensal\b/,
     comoConsertar: 'Passe `recebimentoPorSafraMensal: <calc>.recebimentoPorSafraMensal` no contexto de `fundingDoEstudo`.',
     dano: 'toda antecipação de recebíveis do estudo sai zerada — sem valor antecipado e sem parcelas cedidas',
   },

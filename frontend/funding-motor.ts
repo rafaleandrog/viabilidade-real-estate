@@ -102,7 +102,16 @@ export function pmtPrice(taxaMensal: number, nper: number, principal: number): n
  * positivo nos de recebimento. Bisseção (robusta, sem risco de não-convergência
  * do Newton-Raphson). `null` quando não há troca de sinal — não existe TIR.
  */
-export function tirMensal(fluxo: number[]): number | null {
+export function tirMensal(fluxoCompleto: number[]): number | null {
+  // Os meses ZERADOS do começo saem antes da bisseção. Eles não mudam a TIR
+  // (deslocar um fluxo no tempo não muda a taxa que zera o VPL), mas o VPL é
+  // descontado a t=0 e o critério de parada é ABSOLUTO (|VPL| < 0,01): com uma
+  // operação que só começa no mês 10 ou depois, uma taxa absurda já leva o VPL
+  // abaixo de 1 centavo, e a bisseção parava ali — medido: aporte no mês 24 a
+  // 18% a.a. devolvia 7,7e10 % a.a., em Dívida e em Antecipação. Achado da
+  // revisão da #851; o defeito era anterior a ela.
+  const inicio = fluxoCompleto.findIndex((v) => v !== 0);
+  const fluxo = inicio <= 0 ? fluxoCompleto : fluxoCompleto.slice(inicio);
   const temNegativo = fluxo.some((v) => v < 0);
   const temPositivo = fluxo.some((v) => v > 0);
   if (!temNegativo || !temPositivo) return null;
@@ -335,7 +344,9 @@ export function simularAntecipacao(op: OperacaoFunding, lastro: number[], prazo:
   const m = Math.max(0, Math.floor(n(op.inicio_mes)));
   const p = Math.min(100, Math.max(0, n(op.pct_carteira_cedida))) / 100;
   if (m >= prazo || p <= 0) return vazia();
-  const i = taxaMensalEquivalente(n(op.taxa_anual) / 100);
+  // Piso em zero: a rota recusa taxa negativa, mas a prévia da tela lê o
+  // rascunho antes de salvar, e uma taxa de −100% ou menos daria NaN/Infinity.
+  const i = taxaMensalEquivalente(Math.max(0, n(op.taxa_anual)) / 100);
 
   const cedido = lastro.map((v, k) => (k > m ? round2(p * v) : 0));
   const ultimo = cedido.reduce((u, v, k) => (v > 0 ? k : u), -1);
@@ -1182,7 +1193,7 @@ export function fundingDoEstudo(
 
   const rotulo = (s: SerieOperacao) => {
     const nome = s.operacao.nome || TIPO_LABEL[s.operacao.tipo];
-    if (s.operacao.tipo === 'antecipacao_recebiveis') return `${nome} (Antecipação)`;
+    if (s.operacao.tipo === 'antecipacao_recebiveis') return s.operacao.nome ? `${nome} (Antecipação)` : nome;
     return eDivida(s.operacao.tipo) ? nome : `${nome} (Equity)`;
   };
   const sufixoEntrada = (t: TipoOperacao) => (t === 'antecipacao_recebiveis'

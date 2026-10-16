@@ -37,8 +37,10 @@ export const caso = {
   nome: 'funding-antecipacao',
   exigir: [
     { seletor: 'urbi-abas', minimo: 1 },
-    // os seis cards do Resultado da antecipação
-    { seletor: 'div.ind-card', minimo: 6 },
+    // os seis cards do Resultado da antecipação — DENTRO do painel dela: o
+    // painel genérico "Visão do investidor" também tem 6 cards, e contar só
+    // `div.ind-card` deixava passar a troca de um pelo outro (achado de revisão).
+    { seletor: 'div.resultado-antecipacao div.ind-card', minimo: 6 },
     // pct cedido, taxa de desconto e as três tarifas (o mês da cessão é customizado, + 1)
     { seletor: 'viab-num', minimo: 6 },
   ],

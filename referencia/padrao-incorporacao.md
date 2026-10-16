@@ -2094,8 +2094,9 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > [Fluxo do Investidor](fluxo-investidor-formulas.md). Ver o bloco de comportamento vigente abaixo,
 > que é a fonte de verdade desta seção.
 >
-> ✅ **Comportamento vigente desde a #355 (2026-08-12).** O funding existe e roda: três operações
-> independentes — `financiamento_producao` (única por estudo), `divida` e `equity` —, **sem
+> ✅ **Comportamento vigente desde a #355 (2026-08-12).** O funding existe e roda: operações
+> independentes — `financiamento_producao` (única por estudo), `divida`, `equity` e, desde a #851,
+> `antecipacao_recebiveis` —, **sem
 > waterfall, sem prioridades e sem competição por caixa**. Motor: `frontend/funding-motor.ts`;
 > tela: `frontend/tela-funding.ts` (aba "Funding"); rotas: `backend/rotas/funding.ts`; tabela
 > `avancado_funding_operacoes` (migração `029`). A spec de `divida`/`equity` é

@@ -34,8 +34,9 @@ varredura do caixa disponível.
 ## Para usuários
 
 Na página **Funding**, a aba **Operações** lista as operações do estudo. Cada linha traz **Tipo**,
-**Nome**, **Valor** (no financiamento à produção, o percentual do custo financiável — o principal
-não é digitado), **Início** e **Taxa / retorno**. Para dívida e equity, o **Mês do aporte** é
+**Nome**, **Valor** (no financiamento à produção, o percentual do custo financiável, e na
+antecipação de recebíveis, o percentual da carteira cedida — nos dois o valor não é digitado),
+**Início** e **Taxa / retorno** (na antecipação, a taxa de desconto). Para dívida e equity, o **Mês do aporte** é
 uma **âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras, com o mês
 derivado mostrado ao lado, só para leitura — ou um **Mês específico** digitado; assim a operação
 acompanha o cronograma quando ele muda. A janela do financiamento à produção vem sempre do Cronograma (a obra). Acima da lista há um
@@ -101,7 +102,8 @@ O valor não é digitado: ele sai do lastro e da taxa.
 
 - **O lastro.** É tudo o que as vendas contratadas até o mês da cessão ainda vão pagar **depois**
   dele: parcelas, saldo a repassar e carteira própria. Só entram os planos de pagamento já
-  aplicados.
+  aplicados. A parcela entra cheia: se houver permuta financeira sobre a receita, ela continua
+  saindo do projeto, que segue devendo ao permutante.
 - **Duas antecipações.** Cada uma cede um percentual do que **ainda é da empresa**. Se uma cessão
   anterior já cedeu 80% de uma venda, a seguinte, com 50%, cede metade dos 20% que sobraram. Assim
   duas cessões nunca passam de 100% do lastro.
