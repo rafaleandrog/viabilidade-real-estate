@@ -49,15 +49,19 @@ Pós-chaves do Grupo; ausente vale 12, e a tela só o grava quando difere de 12.
 não tem campo próprio: é 0% nos três primeiros períodos com `pos_chaves_meses: 1`.
 
 **Fluxo de pagamento** (`avancado_fases.fluxo_pagamento`): o JSON legado mantém `comissao`,
-`entrada` e `parcelas` como listas de linhas e `repasse: { apos_entrega_meses }`; o percentual do
-repasse é derivado (`100 − Σ entrada − Σ parcelas`) e não é persistido — quem somar `entrada` e
+`entrada` e `parcelas` como listas de linhas e `repasse: { apos_entrega_meses, pct_banco,
+carteira_parcelas, carteira_carencia_meses }` — os três últimos opcionais: `pct_banco` (0 a 100) é a
+fatia do saldo de chaves que vai ao banco, ausente vale 100, e com ele abaixo de 100 o restante vira
+carteira própria em `carteira_parcelas` (inteiro ≥ 1) parcelas depois de `carteira_carencia_meses`
+(inteiro ≥ 0) meses da entrega. O percentual do saldo de chaves é derivado (`100 − Σ entrada − Σ parcelas`) e não é persistido — quem somar `entrada` e
 `parcelas` pela API não fecha 100 % por construção. O mesmo campo aceita o contrato canônico
-`componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`,
+`componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco`, `concentrado` ou `carteira_pos_marco`,
 cujas `participacaoPct` fecham 100 %, com `taxaMensal` e `sinalPct` por componente. Cada componente
 traz, como número, os campos que o cálculo lê: `participacaoPct` (0 a 100) em todos; `descontoPct`
 (0 a 100) no `imediato`; `sinalPct` (0 a 100) e `defasagemMeses` (inteiro ≥ 0) no `prazo_fixo` e
 no `ate_marco`, mais `prazoMeses` (inteiro ≥ 1) no primeiro e `marcoMes` (inteiro ≥ 0) no
-segundo; `mesPagamento` (inteiro ≥ 0) no `concentrado`. Componente sem algum deles, com texto no
+segundo; `mesPagamento` (inteiro ≥ 0) no `concentrado`; `marcoMes` e `carenciaMeses` (inteiros ≥ 0) e
+`prazoMeses` (inteiro ≥ 1) na `carteira_pos_marco`. Componente sem algum deles, com texto no
 lugar do número ou fora da faixa é recusado com `400 FLUXO_PAGAMENTO_INVALIDO`, e a mensagem nomeia
 o campo recusado. O modal de pagamento confere a mesma regra antes de aplicar. `taxaMensal` é opcional: o cálculo usa a taxa de tabela do estudo. A tela grava os
 componentes em toda escrita e preserva taxa e sinal que o espelho legado não sabe representar. Um

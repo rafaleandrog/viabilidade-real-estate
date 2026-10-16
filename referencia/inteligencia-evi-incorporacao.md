@@ -1216,6 +1216,13 @@ O padrão não admite:
 
 O repasse é recebimento de cliente. Não é liberação de financiamento à produção.
 
+> **Evolução dependente de issue (#850, decisão do autor em 2026-10-16).** O app passou a
+> representar um repasse **parcial**: o saldo de chaves se divide entre o banco (repasse integral
+> no 1º mês Após-chaves, como aqui) e uma **carteira própria** financiada pela empresa, que também
+> financia vendas Após-chaves. O padrão descrito neste documento não muda — com repasse bancário de
+> 100%, o comportamento do app é o deste padrão. A dinâmica funcional está em
+> `referencia/padrao-incorporacao.md`; a antecipação de recebíveis é a #851.
+
 ### 4.11 Carteira por safra
 
 A carteira real deve ser calculada a partir do saldo de cada safra e componente.
@@ -2013,6 +2020,9 @@ Repasse é recebimento do cliente. Financiamento à produção é dívida da inc
 ### 11 — Antecipar ou parcelar o repasse
 
 Neste padrão, o repasse ocorre integralmente no primeiro mês Após-chaves. Antecipação e fracionamento não fazem parte do modelo.
+
+> Evolução dependente de issue: a carteira própria (#850) e a antecipação de recebíveis (#851) são
+> extensões do app decididas pelo autor; ver a nota da seção do repasse, acima.
 
 ### 12 — Colocar a primeira parcela recorrente no mês da venda sem regra explícita
 

@@ -23,7 +23,19 @@ export interface FormularioPagamento {
   // em 1 mês após o fim da obra, sempre). O campo sobrevive só como
   // passagem para não descartar o valor persistido de estudo legado — sem
   // migração, sem efeito no cálculo, sem controle editável na UI.
-  repasse: { apos_entrega_meses: number };
+  /**
+   * `apos_entrega_meses` é só passado adiante (o mês do repasse é travado em
+   * fim da obra + 1). Os três campos da #850 dizem o DESTINO do saldo de
+   * chaves: `pct_banco` é a fatia (% do saldo) que vai ao banco no repasse;
+   * o resto é carteira própria, em `carteira_parcelas` parcelas após
+   * `carteira_carencia_meses` meses de carência. Ausente = 100% banco.
+   */
+  repasse: {
+    apos_entrega_meses: number;
+    pct_banco?: number;
+    carteira_parcelas?: number;
+    carteira_carencia_meses?: number;
+  };
   /**
    * #431 — MEMÓRIA do que este formulário não sabe editar. Não é campo
    * editável e não tem controle na tela: é o array canônico que veio
@@ -98,7 +110,18 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
     parcelas: parcelas.length || !semCanonicos
       ? parcelas
       : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
-    repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses) },
+    repasse: {
+      apos_entrega_meses: n(fp.repasse?.apos_entrega_meses),
+      // #850: só carregados quando gravados — ausência é "100% banco", e
+      // escrever 100 por default mudaria o JSON de todo plano antigo no
+      // primeiro Aplicar sem mudar nenhum número.
+      ...(fp.repasse?.pct_banco !== undefined && fp.repasse?.pct_banco !== null
+        ? { pct_banco: n(fp.repasse.pct_banco) } : {}),
+      ...(fp.repasse?.carteira_parcelas !== undefined && fp.repasse?.carteira_parcelas !== null
+        ? { carteira_parcelas: n(fp.repasse.carteira_parcelas) } : {}),
+      ...(fp.repasse?.carteira_carencia_meses !== undefined && fp.repasse?.carteira_carencia_meses !== null
+        ? { carteira_carencia_meses: n(fp.repasse.carteira_carencia_meses) } : {}),
+    },
     componentes,
     // #460: mesmo padrão — a chave só nasce no formulário se já existia no
     // persistido. Ver a nota de contrato em `FormularioPagamento`.
@@ -154,7 +177,7 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
  */
 const CAMPOS_DO_ESPELHO = [
   'tipo', 'participacaoPct', 'descontoPct', 'sinalPct', 'prazoMeses',
-  'defasagemMeses', 'marcoMes', 'mesPagamento',
+  'defasagemMeses', 'marcoMes', 'mesPagamento', 'carenciaMeses',
 ] as const;
 
 /**
@@ -369,6 +392,20 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
   // agora, e quem a valida e a aba Financeiro. A defesa de dominio do motor
   // (`taxaMensalDeAnual`, que devolve 0 para aa <= -100 em vez de NaN)
   // continua onde estava, e e ela que impede o NaN de virar `null` no JSON.
+  // #850: o destino do saldo de chaves. `pct_banco` é % do SALDO, e a
+  // carteira própria só precisa de prazo quando existe (banco < 100%).
+  const r = form.repasse ?? ({} as FormularioPagamento['repasse']);
+  if (r.pct_banco !== undefined) {
+    if (!percentualValido(r.pct_banco)) return 'O repasse bancário deve ficar entre 0% e 100% do saldo de chaves.';
+    if (Number(r.pct_banco) < 100) {
+      if (!Number.isInteger(Number(r.carteira_parcelas)) || Number(r.carteira_parcelas) < 1) {
+        return 'A carteira própria deve ter ao menos uma parcela mensal.';
+      }
+      if (!Number.isInteger(Number(r.carteira_carencia_meses ?? 0)) || Number(r.carteira_carencia_meses ?? 0) < 0) {
+        return 'A carência da carteira própria deve ser um número inteiro de meses, zero ou mais.';
+      }
+    }
+  }
   const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
     return `Entrada e parcelamento somam ${somaInformada.toFixed(2)}%; o total não pode superar 100%.`;

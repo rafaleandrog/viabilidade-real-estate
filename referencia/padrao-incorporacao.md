@@ -747,7 +747,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > O que mudou é que `absorcaoMensal` devolve `pctTotal`/`pctDescartado`/`mesesDescartados` ao lado
 > de `pcts` (`frontend/fluxo-shared.ts:365-376`, acumulados em `:424-432` no modo `personalizado`
 > e em `:439-457` no `distribuido`), `calcularFluxo` emite `console.warn`
-> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2467-2485`) e o painel de Reconciliação acusa
+> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2621-2639`) e o painel de Reconciliação acusa
 > **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
 > ou o total que a curva declarou quando houve descarte —
 > `frontend/fluxo-invariantes.ts:343-376` (`divergenciasAbsorcao`), chamada por `validarProduto:418`).
@@ -1624,7 +1624,7 @@ Com taxa zero, o repasse é apenas a soma dos principais.
 
 **Comportamento vigente — divergência conhecida da planilha EVI de 25/09/2026.** O app capitaliza
 o repasse por `mês do pagamento − mês da venda` períodos (`mesesDeJuros` em
-`pagamentosConcentrado`, `frontend/fluxo-caixa-motor.ts:1235`): o principal só rende juros
+`pagamentosConcentrado`, `frontend/fluxo-caixa-motor.ts:1289`): o principal só rende juros
 a partir do mês seguinte à venda. A planilha atual capitaliza `mês do pagamento − mês da venda + 1`:
 `Saldo Para Repasse` recebe a venda e já rende `Juros Saldo Repasse` no próprio mês da venda. Medido
 no estudo Avançado 15 da Pinguim, o repasse do app multiplicado por `(1 + taxa mensal)` reproduz o da
@@ -1905,7 +1905,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2187`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2339`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2269,7 +2269,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2496`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2650`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
@@ -2621,6 +2621,14 @@ Receita Bruta — VGV
 - a convenção de juros é explícita;
 - não é funding;
 - não recebe contratos novos depois da entrega.
+
+> **Comportamento vigente (#850).** As invariantes acima valem para a parte **bancária** do saldo de
+> chaves, que é o `concentrado`. Desde a #850 o plano pode mandar só uma fração do saldo ao banco
+> (`fluxo_pagamento.repasse.pct_banco`, ausente = 100%); o restante vira o componente
+> `carteira_pos_marco` (`frontend/fluxo-caixa-motor.ts`, `pagamentosCarteiraPosMarco`): juros de
+> tabela até o mês anterior ao 1º vencimento, `max(fim da obra + 1 + carência, safra + 1)`, e Price em
+> `prazoMeses` parcelas. Com carteira própria no plano, a venda Após-chaves continua financiada
+> nessa fração (`componentesEfetivosSafra`), e o resto dela segue à vista. Com 100% banco nada muda.
 
 ### 21.7 Invariantes de funding
 

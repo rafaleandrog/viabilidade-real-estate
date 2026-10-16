@@ -742,6 +742,27 @@ export function pctRepasseDerivado(fp: any): number {
   return Math.max(0, 100 - somaEntrada - somaParcelas);
 }
 
+/**
+ * #850 — o destino do saldo de chaves, lido do espelho legado
+ * (`fluxo_pagamento.repasse`): quanto dele (% do SALDO, não do total) vai ao
+ * banco no repasse, e em que prazo a carteira própria amortiza o resto.
+ *
+ * Ausente = 100% banco — o comportamento anterior à #850, que é o de todo
+ * plano já gravado. Valor fora de [0, 100] é corrigido para a borda, e prazo
+ * inválido cai em 1 parcela: este leitor alimenta o motor, e quem RECUSA a
+ * digitação é `erroFormularioPagamento`.
+ */
+export function destinoSaldoChaves(fp: any): { pctBanco: number; prazoMeses: number; carenciaMeses: number } {
+  const r = fp?.repasse ?? {};
+  const bruto = r.pct_banco;
+  const pctBanco = bruto === undefined || bruto === null || !Number.isFinite(Number(bruto))
+    ? 100
+    : Math.min(100, Math.max(0, Number(bruto)));
+  const prazo = Math.round(n(r.carteira_parcelas));
+  const carencia = Math.round(n(r.carteira_carencia_meses));
+  return { pctBanco, prazoMeses: prazo >= 1 ? prazo : 1, carenciaMeses: carencia >= 0 ? carencia : 0 };
+}
+
 // ─────────────────────────────────────────────────────────────────
 // #230 — Contrato de componentes de pagamento (EVI-010 + emenda Calliandra)
 // ─────────────────────────────────────────────────────────────────
@@ -804,6 +825,22 @@ export type ComponentePagamento =
       // Só em cópia de cálculo, nunca persistido: o repasse estava configurado
       // antes desta venda e é pago no mês dela (`componentesEfetivosSafra`).
       antecipadoParaVenda?: true;
+    }
+  | {
+      // #850 — a parte do saldo de chaves que NÃO vai ao banco: a empresa fica
+      // com a carteira e financia o comprador direto (o caso comum de
+      // loteamento). Os juros de tabela correm da safra até o mês anterior ao
+      // 1º vencimento — como no `concentrado` —, e dali o saldo amortiza em
+      // Price, `prazoMeses` parcelas. O 1º vencimento é ABSOLUTO, ancorado no
+      // marco (fim da obra), e não relativo à venda como no `prazo_fixo`:
+      // `max(marcoMes + 1 + carenciaMeses, safra + 1)` (`primeiroVencimentoCarteira`).
+      tipo: 'carteira_pos_marco';
+      participacaoPct: number;
+      marcoMes: number;
+      carenciaMeses: number;
+      prazoMeses: number;
+      taxaMensal: number;
+      rotulo?: string;
     };
 
 // ─────────────────────────────────────────────────────────────────
@@ -883,7 +920,7 @@ export function taxaAnualDeMensal(mensal: number): number {
  * fecha nos dois sentidos: tipo conhecido e financiado recebe, todo o resto
  * não.
  */
-export const TIPOS_FINANCIADOS: ReadonlySet<string> = new Set(['prazo_fixo', 'ate_marco', 'concentrado']);
+export const TIPOS_FINANCIADOS: ReadonlySet<string> = new Set(['prazo_fixo', 'ate_marco', 'concentrado', 'carteira_pos_marco']);
 
 export function taxaMensalDoEstudo(jurosTabelaAaEstudo: number): number {
   return taxaMensalDeAnual(Number(jurosTabelaAaEstudo) || 0);
@@ -979,8 +1016,24 @@ export function componentesDoLegado(
 
   const pctRepasse = pctRepasseDerivado(fp);
   if (pctRepasse > 0) {
-    const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
-    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal, rotulo: 'repasse (legado)' });
+    // #850: o saldo de chaves se divide entre o banco (o `concentrado` de
+    // sempre) e a carteira própria. Sem `repasse.pct_banco` no espelho a
+    // divisão é 100/0 — exatamente o componente que este adaptador sempre
+    // produziu, para todo plano gravado antes da #850.
+    const destino = destinoSaldoChaves(fp);
+    const pctBanco = round2(pctRepasse * destino.pctBanco / 100);
+    const pctCarteira = round2(pctRepasse - pctBanco);
+    if (pctBanco > 0) {
+      const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
+      componentes.push({ tipo: 'concentrado', participacaoPct: pctBanco, mesPagamento: mesRepasse, taxaMensal, rotulo: 'repasse (legado)' });
+    }
+    if (pctCarteira > 0) {
+      componentes.push({
+        tipo: 'carteira_pos_marco', participacaoPct: pctCarteira, marcoMes: fimObra,
+        carenciaMeses: destino.carenciaMeses, prazoMeses: destino.prazoMeses, taxaMensal,
+        rotulo: 'carteira própria',
+      });
+    }
   }
 
   return componentes;
@@ -1066,6 +1119,7 @@ export function componentesPagamento(
       if (fimObra !== null) {
         if (c?.tipo === 'ate_marco') saida.marcoMes = fimObra;
         if (c?.tipo === 'concentrado') saida.mesPagamento = fimObra + REPASSE_MESES_APOS_ENTREGA;
+        if (c?.tipo === 'carteira_pos_marco') saida.marcoMes = fimObra;
       }
       return saida;
     }) as ComponentePagamento[];
@@ -1253,6 +1307,67 @@ export function pagamentosConcentrado(
   return [{ safra, mes: c.mesPagamento, tipo: 'concentrado', valor }];
 }
 
+/**
+ * #850: o mês do 1º vencimento da carteira própria para a safra `safra` —
+ * `marcoMes + 1 + carenciaMeses` para quem comprou até a entrega, e nunca
+ * antes do mês seguinte à venda (a venda Após-chaves começa a pagar em
+ * `safra + 1`, a convenção de defasagem 1 do `prazo_fixo`).
+ */
+export function primeiroVencimentoCarteira(
+  c: Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>,
+  safra: number,
+): number {
+  return Math.max(c.marcoMes + 1 + c.carenciaMeses, safra + 1);
+}
+
+/**
+ * #850: pagamentos da carteira própria de UMA safra. O principal capitaliza
+ * aos juros de tabela da safra até o mês ANTERIOR ao 1º vencimento (mesma
+ * convenção do `concentrado`: sem juros no mês da contratação) e o saldo
+ * capitalizado amortiza em Price, `prazoMeses` parcelas mensais. Com
+ * `prazoMeses = 1` e vencimento no mês M, o pagamento é exatamente o do
+ * `concentrado` pago em M: `principal × (1+i)^(M − safra)`.
+ */
+export function pagamentosCarteiraPosMarco(
+  c: Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>,
+  safra: number,
+  valorContratado: number,
+): PagamentoSafra[] {
+  const principal = round2(valorContratado * (c.participacaoPct / 100));
+  if (principal <= 0) return [];
+  const primeiro = primeiroVencimentoCarteira(c, safra);
+  // Sem `round2` aqui, de propósito: o capitalizado é intermediário da PMT, e
+  // arredondá-lo antes desviava 1 centavo da identidade com o `concentrado`.
+  const capitalizado = principal * Math.pow(1 + c.taxaMensal, primeiro - 1 - safra);
+  const parcelaBruta = pmt(c.taxaMensal, c.prazoMeses, capitalizado);
+  const totalParcelas = round2(parcelaBruta * c.prazoMeses);
+  const parcela = round2(parcelaBruta);
+  const out: PagamentoSafra[] = [];
+  let parcelasAnteriores = 0;
+  for (let k = 1; k <= c.prazoMeses; k++) {
+    const valorParcela = k === c.prazoMeses ? round2(totalParcelas - parcelasAnteriores) : parcela;
+    out.push({ safra, mes: primeiro + (k - 1), tipo: 'parcela', valor: valorParcela });
+    parcelasAnteriores = round2(parcelasAnteriores + valorParcela);
+  }
+  return out;
+}
+
+/** Os pagamentos das três famílias que amortizam em parcelas (sem `concentrado`). */
+function pagamentosParcelados(
+  c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' | 'ate_marco' | 'carteira_pos_marco' }>,
+  safra: number,
+  valorContratado: number,
+): PagamentoSafra[] {
+  if (c.tipo === 'prazo_fixo') return pagamentosPrazoFixo(c, safra, valorContratado);
+  if (c.tipo === 'ate_marco') return pagamentosAteMarco(c, safra, valorContratado);
+  return pagamentosCarteiraPosMarco(c, safra, valorContratado);
+}
+
+/** O sinal do componente parcelado — a carteira própria não tem sinal. */
+function sinalPctDe(c: ComponentePagamento): number {
+  return c.tipo === 'prazo_fixo' || c.tipo === 'ate_marco' ? c.sinalPct : 0;
+}
+
 /** Saldo devedor de UMA safra em UM mês (#236). */
 export interface SaldoSafra {
   safra: number;
@@ -1318,13 +1433,11 @@ export function carteiraSaldoSafra(
     return out;
   }
 
-  const pagamentos = c.tipo === 'prazo_fixo'
-    ? pagamentosPrazoFixo(c, safra, valorContratado)
-    : pagamentosAteMarco(c, safra, valorContratado);
+  const pagamentos = pagamentosParcelados(c, safra, valorContratado);
   if (pagamentos.length === 0) return [];
 
   const valor = valorContratado * (c.participacaoPct / 100);
-  const sinal = round2(valor * (c.sinalPct / 100));
+  const sinal = round2(valor * (sinalPctDe(c) / 100));
   const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
   let ultimoMes = safra;
@@ -1382,13 +1495,11 @@ export function jurosSafra(
     return round2(pagamentos[0].valor - principal);
   }
 
-  const pagamentos = c.tipo === 'prazo_fixo'
-    ? pagamentosPrazoFixo(c, safra, valorContratado)
-    : pagamentosAteMarco(c, safra, valorContratado);
+  const pagamentos = pagamentosParcelados(c, safra, valorContratado);
   if (pagamentos.length === 0) return 0;
 
   const valor = valorContratado * (c.participacaoPct / 100);
-  const sinal = round2(valor * (c.sinalPct / 100));
+  const sinal = round2(valor * (sinalPctDe(c) / 100));
   const principal = round2(valor - sinal);
   const totalParcelas = round2(pagamentos
     .filter((p) => p.tipo === 'parcela')
@@ -1424,9 +1535,7 @@ export function receitaBrutaSafra(
     } else if (c.tipo === 'concentrado') {
       total += pagamentosConcentrado(c, safra, valorContratado).reduce((s, p) => s + p.valor, 0);
     } else {
-      const pagamentos = c.tipo === 'prazo_fixo'
-        ? pagamentosPrazoFixo(c, safra, valorContratado)
-        : pagamentosAteMarco(c, safra, valorContratado);
+      const pagamentos = pagamentosParcelados(c, safra, valorContratado);
       total += pagamentos.reduce((s, p) => s + p.valor, 0);
     }
   }
@@ -1475,7 +1584,23 @@ export function componentesEfetivosSafra(
   mesEntrega: number,
 ): ComponentePagamento[] {
   if (ehVendaAposChaves(safra, mesEntrega)) {
-    return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+    // #850 (decisão do autor): com carteira própria no plano, a venda
+    // Após-chaves continua financiada — é o loteamento que segue vendendo lote
+    // a prazo com a infraestrutura pronta. A parte da carteira amortiza a
+    // partir de `safra + 1` (`primeiroVencimentoCarteira`); todo o resto chega
+    // à vista no mês, como sempre (inclusive o que seria repasse bancário: o
+    // banco paga no ato quando a obra já está entregue).
+    const carteiras = componentes.filter(
+      (c): c is Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }> =>
+        c.tipo === 'carteira_pos_marco' && c.participacaoPct > 0,
+    );
+    const pctCarteira = carteiras.reduce((soma, c) => soma + c.participacaoPct, 0);
+    if (pctCarteira <= 0) return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+    const aVista = round2(100 - pctCarteira);
+    return [
+      ...(aVista > 0 ? [{ tipo: 'imediato' as const, participacaoPct: aVista, descontoPct: 0 }] : []),
+      ...carteiras,
+    ];
   }
   if (!componentes.some((c) => c.tipo === 'concentrado' && c.mesPagamento < safra)) return componentes;
   return componentes.map((c) => (c.tipo === 'concentrado' && c.mesPagamento < safra
@@ -1495,6 +1620,7 @@ export interface CarteiraClientesMensal {
   prazoFixo: number;
   ateMarco: number;
   concentrado: number;
+  carteiraPropria: number;
   total: number;
 }
 
@@ -1525,6 +1651,7 @@ export interface SeriesComponentesReceita {
   tabelaLongaObra: number[];
   repasse: number[];
   aposChaves: number[];
+  carteiraPropria: number[];
   outros: number[];
 }
 
@@ -1532,6 +1659,7 @@ export interface SeriesComponentesCarteira {
   tabelaCurta: number[];
   tabelaLongaObra: number[];
   saldoARepassar: number[];
+  carteiraPropria: number[];
 }
 
 // #349: estes dois mapas ficaram SEM CONSUMIDOR quando a tabela e a exportação
@@ -1546,6 +1674,7 @@ export const ROTULOS_COMPONENTES_RECEITA: Record<keyof SeriesComponentesReceita,
   tabelaLongaObra: 'Tabela longa — Obra',
   repasse: 'Repasse',
   aposChaves: 'Após-chaves',
+  carteiraPropria: 'Carteira própria',
   outros: 'Legado / não classificado',
 };
 
@@ -1553,6 +1682,7 @@ export const ROTULOS_COMPONENTES_CARTEIRA: Record<keyof SeriesComponentesCarteir
   tabelaCurta: 'Curta',
   tabelaLongaObra: 'Longa — Obra',
   saldoARepassar: 'Saldo a repassar',
+  carteiraPropria: 'Carteira própria',
 };
 
 /** #460: os dois destinos declarados para o resíduo de um `ate_marco` sem
@@ -1617,6 +1747,7 @@ function pagamentosComponenteSafra(
   }
   if (componente.tipo === 'prazo_fixo') return pagamentosPrazoFixo(componente, safra, valorContratado);
   if (componente.tipo === 'ate_marco') return pagamentosAteMarco(componente, safra, valorContratado);
+  if (componente.tipo === 'carteira_pos_marco') return pagamentosCarteiraPosMarco(componente, safra, valorContratado);
   return pagamentosConcentrado(componente, safra, valorContratado);
 }
 
@@ -1644,10 +1775,10 @@ export function calcularRecebiveisComponentes(
   const vazia = () => new Array<number>(tamanho).fill(0);
   const receitaPorComponenteMensal: SeriesComponentesReceita = {
     aVista: vazia(), tabelaCurta: vazia(), tabelaLongaObra: vazia(),
-    repasse: vazia(), aposChaves: vazia(), outros: vazia(),
+    repasse: vazia(), aposChaves: vazia(), carteiraPropria: vazia(), outros: vazia(),
   };
   const carteiraPorComponenteMensal: SeriesComponentesCarteira = {
-    tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(),
+    tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(), carteiraPropria: vazia(),
   };
 
   const deposita = (serie: number[], mes: number, valor: number) => {
@@ -1670,10 +1801,12 @@ export function calcularRecebiveisComponentes(
       const chaveReceita: keyof SeriesComponentesReceita = aposChaves ? 'aposChaves'
         : componente.tipo === 'imediato' || antecipado ? 'aVista'
           : componente.tipo === 'prazo_fixo' ? 'tabelaCurta'
-            : componente.tipo === 'ate_marco' ? 'tabelaLongaObra' : 'repasse';
+            : componente.tipo === 'ate_marco' ? 'tabelaLongaObra'
+              : componente.tipo === 'carteira_pos_marco' ? 'carteiraPropria' : 'repasse';
       const chaveCarteira: keyof SeriesComponentesCarteira | null = componente.tipo === 'prazo_fixo'
         ? 'tabelaCurta' : componente.tipo === 'ate_marco'
-          ? 'tabelaLongaObra' : componente.tipo === 'concentrado' && !antecipado ? 'saldoARepassar' : null;
+          ? 'tabelaLongaObra' : componente.tipo === 'carteira_pos_marco'
+            ? 'carteiraPropria' : componente.tipo === 'concentrado' && !antecipado ? 'saldoARepassar' : null;
       const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado);
       const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado);
       const pagamentosComJuros = pagamentos.filter((p) => p.tipo !== 'sinal');
@@ -1689,6 +1822,18 @@ export function calcularRecebiveisComponentes(
       const principalFinanciado = round2(
         pagamentosComJuros.reduce((soma, p) => soma + p.valor, 0) - jurosTotal,
       );
+      // #850: a carteira própria chega ao 1º vencimento com juros JÁ
+      // capitalizados (do mês da venda até a entrega mais a carência). Eles são
+      // pagos antes da amortização — a imputação de qualquer financiamento —,
+      // então cada parcela abate primeiro o juro acumulado. Sem isto o juro
+      // capitalizado inteiro cairia na ÚLTIMA parcela, e o principal dela
+      // sairia negativo.
+      let jurosPendentes = 0;
+      if (componente.tipo === 'carteira_pos_marco' && pagamentosComJuros.length > 0) {
+        const primeiro = pagamentosComJuros[0].mes;
+        const capitalizado = saldos.get(primeiro - 1) ?? principalFinanciado;
+        jurosPendentes = Math.max(0, round2(capitalizado - principalFinanciado));
+      }
 
       for (const pagamento of pagamentos) {
         let jurosPagamento = 0;
@@ -1700,7 +1845,9 @@ export function calcularRecebiveisComponentes(
             const saldoAnterior = pagamento.mes === contratacao.safra
               ? principalFinanciado
               : saldos.get(pagamento.mes - 1) ?? 0;
-            jurosPagamento = round2(Math.min(pagamento.valor, saldoAnterior * componente.taxaMensal));
+            const devido = saldoAnterior * componente.taxaMensal + jurosPendentes;
+            jurosPagamento = round2(Math.min(pagamento.valor, devido));
+            jurosPendentes = Math.max(0, round2(devido - jurosPagamento));
             jurosAlocados = round2(jurosAlocados + jurosPagamento);
           }
         }
@@ -1789,9 +1936,10 @@ export function consolidarCarteiraClientes(
       if (componente.tipo === 'imediato') continue;
       const campo: keyof Parcial = componente.tipo === 'prazo_fixo'
         ? 'prazoFixo'
-        : componente.tipo === 'ate_marco' ? 'ateMarco' : 'concentrado';
+        : componente.tipo === 'ate_marco' ? 'ateMarco'
+          : componente.tipo === 'carteira_pos_marco' ? 'carteiraPropria' : 'concentrado';
       for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
-        const atual = porMes.get(ponto.mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0 };
+        const atual = porMes.get(ponto.mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0, carteiraPropria: 0 };
         atual[campo] = round2(atual[campo] + ponto.saldo);
         porMes.set(ponto.mes, atual);
         ultimoMes = Math.max(ultimoMes, ponto.mes);
@@ -1801,11 +1949,11 @@ export function consolidarCarteiraClientes(
 
   const mensal: CarteiraClientesMensal[] = [];
   for (let mes = 0; mes <= ultimoMes; mes++) {
-    const parcial = porMes.get(mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0 };
+    const parcial = porMes.get(mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0, carteiraPropria: 0 };
     mensal.push({
       mes,
       ...parcial,
-      total: round2(parcial.prazoFixo + parcial.ateMarco + parcial.concentrado),
+      total: round2(parcial.prazoFixo + parcial.ateMarco + parcial.concentrado + parcial.carteiraPropria),
     });
   }
 
@@ -1866,6 +2014,10 @@ export function ultimoMesRecebivelLinha(
         ultimo = Math.max(ultimo, ultimaSafraFinanciada + c.defasagemMeses + c.prazoMeses - 1);
       } else if (c.tipo === 'ate_marco') {
         ultimo = Math.max(ultimo, c.marcoMes);
+      } else if (c.tipo === 'carteira_pos_marco') {
+        // #850: a carteira também financia a venda Após-chaves, então a pior
+        // safra é a ÚLTIMA venda, não a da entrega.
+        ultimo = Math.max(ultimo, primeiroVencimentoCarteira(c, ultimoMesVenda) + c.prazoMeses - 1);
       } else {
         ultimo = Math.max(ultimo, c.mesPagamento);
       }
@@ -2384,12 +2536,14 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
       tabelaLongaObra: soma(c.receitaPorComponenteMensal.tabelaLongaObra),
       repasse: soma(c.receitaPorComponenteMensal.repasse),
       aposChaves: soma(c.receitaPorComponenteMensal.aposChaves),
+      carteiraPropria: soma(c.receitaPorComponenteMensal.carteiraPropria),
       outros: soma(c.receitaPorComponenteMensal.outros),
     },
     carteiraPorComponenteMensal: {
       tabelaCurta: ultimo(c.carteiraPorComponenteMensal.tabelaCurta),
       tabelaLongaObra: ultimo(c.carteiraPorComponenteMensal.tabelaLongaObra),
       saldoARepassar: ultimo(c.carteiraPorComponenteMensal.saldoARepassar),
+      carteiraPropria: ultimo(c.carteiraPorComponenteMensal.carteiraPropria),
     },
     custoMensal: soma(c.custoMensal),
     fluxoMensal: soma(c.fluxoMensal),
@@ -2836,10 +2990,10 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const vazia = () => new Array<number>(prazo).fill(0);
   const receitaPorComponenteMensal: SeriesComponentesReceita = {
     aVista: vazia(), tabelaCurta: vazia(), tabelaLongaObra: vazia(),
-    repasse: vazia(), aposChaves: vazia(), outros: vazia(),
+    repasse: vazia(), aposChaves: vazia(), carteiraPropria: vazia(), outros: vazia(),
   };
   const carteiraPorComponenteMensal: SeriesComponentesCarteira = {
-    tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(),
+    tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(), carteiraPropria: vazia(),
   };
   for (const linha of linhasReceita) {
     const brutoLinha = recebimentoBrutoMensal(linha, crono, prazo, config.jurosTabelaAaEstudo);

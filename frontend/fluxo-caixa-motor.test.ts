@@ -1416,10 +1416,10 @@ test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas',
       mesmaSoma(la.itens![j].mensal, lm.itens![j].mensal, `venda tipologia ${lm.itens![j].nome}`);
     }
   }
-  for (const chave of ['aVista', 'tabelaCurta', 'tabelaLongaObra', 'repasse', 'aposChaves', 'outros'] as const) {
+  for (const chave of ['aVista', 'tabelaCurta', 'tabelaLongaObra', 'repasse', 'aposChaves', 'carteiraPropria', 'outros'] as const) {
     mesmaSoma(anual.receitaPorComponenteMensal[chave], mensal.receitaPorComponenteMensal[chave], `componente ${chave}`);
   }
-  for (const chave of ['tabelaCurta', 'tabelaLongaObra', 'saldoARepassar'] as const) {
+  for (const chave of ['tabelaCurta', 'tabelaLongaObra', 'saldoARepassar', 'carteiraPropria'] as const) {
     periodos.forEach((p, k) => assert.equal(
       anual.carteiraPorComponenteMensal[chave][k], mensal.carteiraPorComponenteMensal[chave][p.fim] ?? 0));
   }
@@ -1971,7 +1971,7 @@ test('#236: carteira consolidada soma componentes, calcula a máxima e termina e
 test('#236: carteira vazia tem máxima zero e nenhum mês de ocorrência', () => {
   const r = consolidarCarteiraClientes([], [], 24);
   assert.deepEqual(r, {
-    mensal: [{ mes: 0, prazoFixo: 0, ateMarco: 0, concentrado: 0, total: 0 }],
+    mensal: [{ mes: 0, prazoFixo: 0, ateMarco: 0, concentrado: 0, carteiraPropria: 0, total: 0 }],
     carteiraMaxima: 0,
     mesCarteiraMaxima: null,
   });

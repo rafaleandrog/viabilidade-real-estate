@@ -23,7 +23,9 @@
  *    `new Array(NaN)` (`RangeError`); negativo emite parcela ANTES da venda;
  *  - `descontoPct` (imediato): `1 − descontoPct / 100` — ausente vira `NaN`;
  *  - `prazoMeses`, `marcoMes`, `mesPagamento`: as âncoras que já eram
- *    exigidas.
+ *    exigidas;
+ *  - `carenciaMeses` (carteira_pos_marco, #850): soma no 1º vencimento — ausente
+ *    vira `NaN` no horizonte, como `defasagemMeses`.
  *
  * ⚠️ Fail-closed: `typeof === 'number'`, nunca `Number(v)`. `Number('')` vale
  * 0, `Number('12')` vale 12 — e o motor não converte: `safra + '12'` é
@@ -38,7 +40,7 @@
  * mês da venda (`componentesEfetivosSafra`).
  */
 
-export const TIPOS_COMPONENTE = ['imediato', 'prazo_fixo', 'ate_marco', 'concentrado'] as const;
+export const TIPOS_COMPONENTE = ['imediato', 'prazo_fixo', 'ate_marco', 'concentrado', 'carteira_pos_marco'] as const;
 
 function numero(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v);
@@ -71,6 +73,21 @@ export function erroComponentePagamento(c: unknown): string | null {
   if (tipo === 'concentrado') {
     if (!inteiro(comp.mesPagamento) || comp.mesPagamento < 0) {
       return 'concentrado requer mesPagamento inteiro não negativo';
+    }
+    return null;
+  }
+  if (tipo === 'carteira_pos_marco') {
+    // #850: o 1º vencimento é `marcoMes + 1 + carenciaMeses` e a última
+    // parcela soma `prazoMeses` — os três entram no horizonte do fluxo, então
+    // ausente ou fracionário vira `NaN` lá, como nas âncoras dos outros tipos.
+    if (!inteiro(comp.marcoMes) || comp.marcoMes < 0) {
+      return 'carteira_pos_marco requer marcoMes inteiro não negativo';
+    }
+    if (!inteiro(comp.carenciaMeses) || comp.carenciaMeses < 0) {
+      return 'carteira_pos_marco requer carenciaMeses inteiro não negativo';
+    }
+    if (!inteiro(comp.prazoMeses) || comp.prazoMeses < 1) {
+      return 'carteira_pos_marco requer prazoMeses inteiro maior que zero';
     }
     return null;
   }

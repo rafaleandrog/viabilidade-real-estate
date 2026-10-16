@@ -4,6 +4,35 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-16 — Saldo de chaves: repasse bancário parcial e carteira própria (#850)
+
+Pedido do autor, com plano aprovado na sessão: escolher como o repasse se comporta, porque nem todo o
+saldo de chaves passa pelo banco. Muitas vezes a empresa fica com a carteira, sobretudo em
+loteamento. A antecipação de recebíveis, pedida junto, é a #851 e vai em PR próprio (R3).
+
+- **Modelo.** Componente canônico novo `carteira_pos_marco` (`frontend/fluxo-caixa-motor.ts`). Os
+  juros de tabela do estudo correm da safra até o mês anterior ao 1º vencimento,
+  `max(fim da obra + 1 + carência, safra + 1)`, e dali o saldo amortiza em Price. Com uma parcela
+  só, o pagamento é idêntico ao do `concentrado` (há teste).
+- **Espelho legado.** `fluxo_pagamento.repasse` ganhou `pct_banco` (% do saldo; ausente = 100), além
+  de `carteira_parcelas` e `carteira_carencia_meses`. `componentesDoLegado` divide o saldo entre
+  `concentrado` e carteira. Com 100% banco, ou sem o campo, o plano gerado é idêntico ao de antes,
+  então nenhum número de estudo existente muda; as baselines de KPI seguem verdes. Não há schema nem
+  migração: é JSON.
+- **Venda Após-chaves.** Decisão do autor: com carteira no plano, a fração da carteira segue
+  financiada a partir de `safra + 1`, e o resto vai à vista. Sem carteira, nada muda.
+- **Juros na carteira.** Cada parcela paga primeiro os juros capitalizados até o 1º vencimento. Sem
+  isso o juro acumulado cairia todo na última parcela, com o principal negativo.
+- **Séries e indicadores.** `carteiraPropria` entra nas séries de receita e de carteira por
+  componente, na carteira de clientes e na carteira máxima, e não na série de repasse.
+- **Validação.** O contrato de escrita (`erroComponentePagamento`) valida o tipo novo. O
+  `CARTEIRA_RESSURGE` só confere a carteira a partir do 1º vencimento.
+- **Tela.** O bloco "Repasse" do modal virou "Saldo de chaves", com Repasse bancário (%), Nº de
+  parcelas e Carência (meses). Caso de render novo: `modal-pagamento-carteira`.
+- **Fora, registrado em `ideias.md`:** inadimplência, distrato e PDD, e coobrigação. O resíduo
+  "Rola para o Repasse" de um plano sem banco continua indo à vista (comportamento de antes).
+- **Do autor:** testar pela tela na Pinguim depois da release.
+
 ## 2026-10-14 — Aba Terrenos: lotes fora de regularização, e parâmetros urbanísticos por lote
 
 Pedido direto do autor, sem issue. Dois assuntos na mesma aba, entregues juntos por pedido: (1) a aba

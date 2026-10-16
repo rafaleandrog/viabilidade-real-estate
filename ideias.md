@@ -14,6 +14,8 @@ Ideia que não cabe numa linha deixou de ser ideia — abra a issue.
 - **Copiar os documentos ao duplicar um estudo**: levar as fontes do apelo comercial e os anexos do empreendimento junto com a cópia.
 - **Exposição máxima após funding, a partir do lançamento**: um KPI ao lado da exposição máxima atual, igual ao da planilha EVI (mínimo do fluxo acumulado alavancado nos meses a partir do lançamento).
 - **VPL com data-base escolhível e séries de FC descontado e endividamento**: origem do tempo no início do projeto ou no lançamento, e as séries mensais que a planilha EVI mostra.
+- **Inadimplência, distrato e PDD na carteira própria**: hoje toda parcela é recebida; uma premissa de perda esperada e de distrato (Lei 13.786/2018) mudaria o caixa da carteira e daria sentido à coobrigação na antecipação.
+- **Coobrigação na antecipação de recebíveis**: distinguir cessão com e sem coobrigação, que só muda número quando houver inadimplência no motor.
 - **Resultado após funding na Análise Financeira**: uma linha ao lado do Resultado desalavancado, deduzindo os juros do financiamento à produção.
 
 ## Aprovadas
