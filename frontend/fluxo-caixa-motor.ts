@@ -417,6 +417,8 @@ export interface FluxoCalc {
   jurosClientes: number;
   carteiraClientesMaxima: number;
   mesCarteiraClientesMaxima: number | null;
+  /** #851 — recebimentos por safra, somados entre as linhas canônicas (ver `RecebimentoPorSafra`). */
+  recebimentoPorSafraMensal: RecebimentoPorSafra;
   // #237/#241: mesma Receita Bruta canônica, aberta por linha de receita e
   // tipologia. `linhasReceita` permanece sendo o recebimento líquido que
   // alimenta o fluxo (incluindo deduções de permuta financeira).
@@ -1673,7 +1675,22 @@ export interface RecebiveisComponentesCalc {
   carteiraPorComponenteMensal: SeriesComponentesCarteira;
   carteiraMaxima: number;
   mesCarteiraMaxima: number | null;
+  /** #851 — o lastro da antecipação: os pagamentos de cada safra, mês a mês. */
+  recebimentoPorSafraMensal: RecebimentoPorSafra;
 }
+
+/**
+ * #851 — os recebimentos do contrato canônico abertos por SAFRA (mês da venda):
+ * `[safra] → série mensal` do que aquela safra paga em cada mês (sinal,
+ * parcelas, repasse e carteira própria). É o lastro de uma antecipação de
+ * recebíveis: no mês da cessão `m`, o que se cede é o que as safras `≤ m`
+ * ainda vão pagar depois de `m` (`recebiveisFuturosDeSafras`, em
+ * `funding-motor.ts`). Esparso — só as safras com venda têm entrada.
+ *
+ * Só as linhas com `fluxo_pagamento.componentes` entram: a linha legada não é
+ * calculada por safra, e não tem lastro identificável.
+ */
+export type RecebimentoPorSafra = Record<number, number[]>;
 
 /** #241: categorias econômicas estáveis compartilhadas por motor, tela e
  * exportações. `outros` preserva estudos legados sem reclassificá-los. */
@@ -1813,6 +1830,7 @@ export function calcularRecebiveisComponentes(
     tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(), carteiraPropria: vazia(),
   };
 
+  const recebimentoPorSafraMensal: RecebimentoPorSafra = {};
   const deposita = (serie: number[], mes: number, valor: number) => {
     if (valor === 0) return;
     if (mes >= 0 && mes < serie.length) serie[mes] = round2(serie[mes] + valor);
@@ -1885,6 +1903,10 @@ export function calcularRecebiveisComponentes(
         }
         const principalPagamento = round2(pagamento.valor - jurosPagamento);
         deposita(bruto, pagamento.mes, pagamento.valor);
+        deposita(
+          recebimentoPorSafraMensal[contratacao.safra] ??= new Array<number>(tamanho).fill(0),
+          pagamento.mes, pagamento.valor,
+        );
         deposita(receitaPorComponenteMensal[chaveReceita], pagamento.mes, pagamento.valor);
         deposita(principal, pagamento.mes, principalPagamento);
         deposita(juros, pagamento.mes, jurosPagamento);
@@ -1918,6 +1940,7 @@ export function calcularRecebiveisComponentes(
     carteiraPorComponenteMensal,
     carteiraMaxima,
     mesCarteiraMaxima,
+    recebimentoPorSafraMensal,
   };
 }
 
@@ -3027,9 +3050,14 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const carteiraPorComponenteMensal: SeriesComponentesCarteira = {
     tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(), carteiraPropria: vazia(),
   };
+  const recebimentoPorSafraMensal: RecebimentoPorSafra = {};
   for (const linha of linhasReceita) {
     const brutoLinha = recebimentoBrutoMensal(linha, crono, prazo, config.jurosTabelaAaEstudo);
     const detalhe = recebiveisComponentesLinha(linha, crono, prazo, config.jurosTabelaAaEstudo);
+    for (const [safra, serie] of Object.entries(detalhe?.recebimentoPorSafraMensal ?? {})) {
+      const alvo = recebimentoPorSafraMensal[Number(safra)] ??= new Array<number>(prazo).fill(0);
+      for (let mes = 0; mes < prazo; mes++) alvo[mes] = round2(alvo[mes] + (serie[mes] ?? 0));
+    }
     for (let mes = 0; mes < prazo; mes++) {
       receitaBrutaMensal[mes] = round2(receitaBrutaMensal[mes] + (brutoLinha[mes] ?? 0));
       principalRecebidoMensal[mes] = round2(principalRecebidoMensal[mes]
@@ -3141,6 +3169,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     jurosClientes,
     carteiraClientesMaxima,
     mesCarteiraClientesMaxima,
+    recebimentoPorSafraMensal,
     linhasReceitaBruta: calcReceitasBrutas,
     linhasVendasContratadas: calcVendasContratadas,
     linhasReceita: linhasReceitaFinal,

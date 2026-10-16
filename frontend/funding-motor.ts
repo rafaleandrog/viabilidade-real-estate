@@ -143,7 +143,7 @@ export const PADRAO_AMORTIZAR_COM_CAIXA = true;
 // Operações
 // ─────────────────────────────────────────────────────────────────────────
 
-export type TipoOperacao = 'financiamento_producao' | 'divida' | 'equity';
+export type TipoOperacao = 'financiamento_producao' | 'divida' | 'equity' | 'antecipacao_recebiveis';
 export type ModoRetorno = 'permuta_financeira' | 'resultado_final';
 
 /** Uma linha de `avancado_funding_operacoes`, como o motor a lê. */
@@ -198,6 +198,14 @@ export interface OperacaoFunding {
    * muda.
    */
   ativo?: boolean;
+  // ── antecipacao_recebiveis (#851) ──
+  /**
+   * Percentual (50 = 50%) do lastro AINDA DA EMPRESA no mês da cessão
+   * (`inicio_mes`) que é cedido: as parcelas futuras das vendas contratadas
+   * até ali, descontado o que cessões anteriores já cederam. A taxa de
+   * desconto é `taxa_anual`; as tarifas são as mesmas três da `divida`.
+   */
+  pct_carteira_cedida?: number;
 }
 
 /**
@@ -262,6 +270,149 @@ export interface SerieOperacao {
 
 export function eDivida(tipo: TipoOperacao): boolean {
   return tipo === 'financiamento_producao' || tipo === 'divida';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// #851 — Antecipação de recebíveis
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * O que as safras vendidas até `mesCessao` (inclusive) ainda vão pagar DEPOIS
+ * dele, mês a mês, ponderado pela fração de cada safra que AINDA é da empresa
+ * (`retido`, 1 = nada cedido). Puro: `retido` não é mutado aqui.
+ */
+export function recebiveisFuturosDeSafras(
+  porSafra: Record<number, number[]>,
+  mesCessao: number,
+  prazo: number,
+  retido: Record<number, number> = {},
+): number[] {
+  const out = new Array<number>(Math.max(0, prazo)).fill(0);
+  for (const [chave, serie] of Object.entries(porSafra ?? {})) {
+    const safra = Number(chave);
+    if (!(safra <= mesCessao)) continue;
+    const fracao = retido[safra] ?? 1;
+    if (fracao <= 0) continue;
+    for (let k = mesCessao + 1; k < out.length; k++) out[k] += fracao * (serie[k] ?? 0);
+  }
+  return out;
+}
+
+/**
+ * Antecipação de recebíveis — a cessão de parte da carteira a uma
+ * securitizadora (CRI), FIDC ou banco, que paga à vista o valor presente das
+ * parcelas cedidas.
+ *
+ * No mês da cessão `m` (`inicio_mes`), com `p = pct_carteira_cedida` e `i` a
+ * taxa de desconto mensal equivalente a `taxa_anual`:
+ *
+ *   R_k        = p × lastro(k), k > m          → as parcelas cedidas
+ *   VP         = Σ R_k / (1 + i)^(k − m)        → o que o cessionário paga
+ *   entrada(m) = VP                              (o projeto recebe)
+ *   saída(m)   = estruturação% × VP + outros custos iniciais
+ *   saída(k)   = R_k + administração mensal (enquanto houver lastro)
+ *   juros(k)   = saldo(k−1) × i                  → Σ juros = deságio = Σ R − VP
+ *   saldo      = VP remanescente do lastro, que zera na última parcela cedida
+ *
+ * O lastro é o que as safras `≤ m` ainda vão pagar depois de `m`, na fração
+ * que ainda é da empresa (`recebiveisFuturosDeSafras`). Classe de leitura de
+ * caixa: CEGA — lê só os recebíveis, que não dependem de funding, e nunca o
+ * caixa do projeto, então não há competição por caixa. A visão do
+ * "investidor" (`saídas − entradas`) é a do cessionário, e a TIR dela é o
+ * CUSTO EFETIVO da antecipação para a incorporadora, com as tarifas.
+ */
+export function simularAntecipacao(op: OperacaoFunding, lastro: number[], prazo: number): SerieOperacao {
+  const entradas = serieZerada(prazo);
+  const saidas = serieZerada(prazo);
+  const juros = serieZerada(prazo);
+  const saldo = serieZerada(prazo);
+  const tarifas = serieZerada(prazo);
+  const vazia = (): SerieOperacao => ({
+    operacao: op, entradas, saidas, juros, saldo, tarifas,
+    fluxoInvestidor: serieZerada(prazo),
+  });
+
+  const m = Math.max(0, Math.floor(n(op.inicio_mes)));
+  const p = Math.min(100, Math.max(0, n(op.pct_carteira_cedida))) / 100;
+  if (m >= prazo || p <= 0) return vazia();
+  const i = taxaMensalEquivalente(n(op.taxa_anual) / 100);
+
+  const cedido = lastro.map((v, k) => (k > m ? round2(p * v) : 0));
+  const ultimo = cedido.reduce((u, v, k) => (v > 0 ? k : u), -1);
+  if (ultimo < 0) return vazia();
+
+  let vp = 0;
+  for (let k = m + 1; k <= ultimo; k++) vp += cedido[k] / Math.pow(1 + i, k - m);
+  vp = round2(vp);
+  entradas[m] = vp;
+  const estruturacao = round2(vp * n(op.taxa_estruturacao_pct) / 100);
+  const iniciais = round2(estruturacao + n(op.outros_encargos_iniciais));
+  tarifas[m] = iniciais;
+  saidas[m] = iniciais;
+  saldo[m] = vp;
+
+  const adm = round2(n(op.taxa_administracao_mensal));
+  let aberto = vp;
+  let jurosAcumulados = 0;
+  for (let k = m + 1; k <= ultimo; k++) {
+    // O último mês fecha o deságio exato (Σ R − VP), sem resíduo de arredondamento.
+    const j = k === ultimo
+      ? round2(cedido.reduce((a, v) => a + v, 0) - vp - jurosAcumulados)
+      : round2(aberto * i);
+    jurosAcumulados = round2(jurosAcumulados + j);
+    juros[k] = j;
+    aberto = k === ultimo ? 0 : round2(aberto + j - cedido[k]);
+    saldo[k] = Math.max(0, aberto);
+    tarifas[k] = adm;
+    saidas[k] = round2(cedido[k] + adm);
+  }
+
+  return {
+    operacao: op,
+    entradas,
+    saidas,
+    fluxoInvestidor: saidas.map((v, t) => round2(v - entradas[t])),
+    juros,
+    saldo,
+    tarifas,
+  };
+}
+
+/** Os números de UMA antecipação que a tela mostra (#851). */
+export interface IndicadoresAntecipacao {
+  /** Σ das parcelas cedidas — o valor de face do lastro. */
+  valorFace: number;
+  /** O valor presente pago pelo cessionário, antes das tarifas. */
+  valorPresente: number;
+  /** O que de fato entra: valor presente − estruturação − outros custos iniciais. */
+  valorLiquido: number;
+  /** Face − valor presente. */
+  desagio: number;
+  /** Deságio / face, fração 0–1, precisão plena. */
+  desagioPct: number;
+  /** Estruturação + outros + administração. */
+  tarifas: number;
+  /** TIR anual da série da operação (custo efetivo, com tarifas); `null` sem troca de sinal. */
+  custoEfetivoAnual: number | null;
+}
+
+export function indicadoresAntecipacao(s: SerieOperacao): IndicadoresAntecipacao {
+  const soma = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
+  const valorPresente = soma(s.entradas);
+  const tarifas = soma(s.tarifas);
+  const valorFace = round2(soma(s.saidas) - tarifas);
+  const desagio = round2(valorFace - valorPresente);
+  const m = s.entradas.findIndex((v) => v > 0);
+  const valorLiquido = m < 0 ? 0 : round2(valorPresente - (s.tarifas[m] ?? 0));
+  return {
+    valorFace,
+    valorPresente,
+    valorLiquido,
+    desagio,
+    desagioPct: valorFace > 0 ? desagio / valorFace : 0,
+    tarifas,
+    custoEfetivoAnual: tirAnual(s.fluxoInvestidor),
+  };
 }
 
 /**
@@ -859,6 +1010,7 @@ const TIPO_LABEL: Record<TipoOperacao, string> = {
   financiamento_producao: 'Financiamento à produção',
   divida: 'Dívida',
   equity: 'Equity',
+  antecipacao_recebiveis: 'Antecipação de recebíveis',
 };
 
 /**
@@ -870,6 +1022,12 @@ export interface ContextoFinanciamentoProducao {
   linhasCusto?: { id: any; mensal: number[] }[];
   custosRaw?: any[];
   cronograma?: EventoCrono[];
+  /**
+   * #851 — o lastro da antecipação de recebíveis: `FluxoCalc.recebimentoPorSafraMensal`.
+   * Sem ele uma antecipação não tem o que ceder e sai zerada; quem garante que
+   * as telas o passam é `scripts/guard-fiacao-funding.mjs`.
+   */
+  recebimentoPorSafraMensal?: Record<number, number[]>;
 }
 
 /**
@@ -954,10 +1112,32 @@ export function fundingDoEstudo(
   // Passada 1 — cegas ao caixa.
   operacoes.forEach((op, idx) => {
     if (op.tipo === 'financiamento_producao') { indicesDirigidas.push(idx); return; }
+    if (op.tipo === 'antecipacao_recebiveis') return; // passada própria, logo abaixo
     series[idx] = eDivida(op.tipo)
       ? simularDivida(op, prazo)
       : simularEquity(op, receitaLiquidaMensal, resultadoFinal, mesRepasseValor, prazo);
   });
+
+  // #851 — antecipações, também cegas ao caixa, mas em ORDEM CRONOLÓGICA entre
+  // si: cada uma cede um percentual do que AINDA é da empresa, então a segunda
+  // enxerga o que a primeira já cedeu. Não é prioridade de pagamento — é o
+  // mesmo lastro não podendo ser vendido duas vezes, e por isso duas cessões
+  // nunca passam de 100% dele. Empate de mês segue a ordem do array.
+  const retido: Record<number, number> = {};
+  const porSafra = contexto?.recebimentoPorSafraMensal ?? {};
+  operacoes
+    .map((op, idx) => ({ op, idx }))
+    .filter(({ op }) => op.tipo === 'antecipacao_recebiveis')
+    .sort((a, b) => Math.floor(n(a.op.inicio_mes)) - Math.floor(n(b.op.inicio_mes)) || a.idx - b.idx)
+    .forEach(({ op, idx }) => {
+      const m = Math.max(0, Math.floor(n(op.inicio_mes)));
+      series[idx] = simularAntecipacao(op, recebiveisFuturosDeSafras(porSafra, m, prazo, retido), prazo);
+      const p = Math.min(100, Math.max(0, n(op.pct_carteira_cedida))) / 100;
+      for (const chave of Object.keys(porSafra)) {
+        const safra = Number(chave);
+        if (safra <= m) retido[safra] = (retido[safra] ?? 1) * (1 - p);
+      }
+    });
 
   // Caixa que a passada 2 enxerga. Mesma disciplina de arredondamento da
   // costura final `fluxoMensal` (C7): round2 na composição por período.
@@ -1002,16 +1182,21 @@ export function fundingDoEstudo(
 
   const rotulo = (s: SerieOperacao) => {
     const nome = s.operacao.nome || TIPO_LABEL[s.operacao.tipo];
+    if (s.operacao.tipo === 'antecipacao_recebiveis') return `${nome} (Antecipação)`;
     return eDivida(s.operacao.tipo) ? nome : `${nome} (Equity)`;
   };
+  const sufixoEntrada = (t: TipoOperacao) => (t === 'antecipacao_recebiveis'
+    ? 'valor antecipado' : eDivida(t) ? 'liberações' : 'aporte');
+  const sufixoSaida = (t: TipoOperacao) => (t === 'antecipacao_recebiveis'
+    ? 'parcelas cedidas e tarifas' : eDivida(t) ? 'parcelas' : 'retorno');
 
   const linhasEntrada = series
     .filter((s) => s.entradas.some((v) => Math.abs(v) > 0.005))
-    .map((s) => linha(`${rotulo(s)} — ${eDivida(s.operacao.tipo) ? 'liberações' : 'aporte'}`, s.entradas));
+    .map((s) => linha(`${rotulo(s)} — ${sufixoEntrada(s.operacao.tipo)}`, s.entradas));
 
   const linhasSaida = series
     .filter((s) => s.saidas.some((v) => Math.abs(v) > 0.005))
-    .map((s) => linha(`Funding · ${rotulo(s)} — ${eDivida(s.operacao.tipo) ? 'parcelas' : 'retorno'}`, s.saidas));
+    .map((s) => linha(`Funding · ${rotulo(s)} — ${sufixoSaida(s.operacao.tipo)}`, s.saidas));
 
   const soma = (pegar: (s: SerieOperacao) => number[]): number[] => {
     const out = serieZerada(prazo);

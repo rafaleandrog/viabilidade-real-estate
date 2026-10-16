@@ -166,7 +166,10 @@ export async function conferir(id: number): Promise<Conferencia> {
     const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
     out.funding = fundingDoEstudo(
       ops, calc.fluxoMensal, receitaLiquida, resultadoFinal, mesRepasse(d.crono), d.taxa,
-      { custosRaw: d.custos, linhasCusto: calc.linhasCusto, cronograma: d.crono },
+      {
+        custosRaw: d.custos, linhasCusto: calc.linhasCusto, cronograma: d.crono,
+        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
+      },
     );
   }
 

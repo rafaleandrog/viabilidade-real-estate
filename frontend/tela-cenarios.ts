@@ -297,7 +297,10 @@ export class ViabTelaCenarios extends LitElement {
     return fundingDoEstudo(
       this.operacoes, calc.fluxoMensal, receitaLiquida, resultadoFinal,
       mesRepasse(this.crono), this.baseConfig?.taxaDescontoAa ?? 12,
-      { custosRaw: this.baseConfig!.linhasCusto, linhasCusto: calc.linhasCusto, cronograma: this.crono },
+      {
+        custosRaw: this.baseConfig!.linhasCusto, linhasCusto: calc.linhasCusto, cronograma: this.crono,
+        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
+      },
     );
   }
 

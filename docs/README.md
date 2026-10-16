@@ -72,8 +72,8 @@ Indiretos e Financeiro; a distribuição de cada custo no tempo é linear ou por
 catálogo, o preço do terreno pode também acompanhar a receita das vendas — a que entra em caixa
 ou o VGV vendido —, e três linhas não escolhem: a corretagem sai no mês da venda, a permuta física na entrega
 das unidades e a permuta financeira conforme a receita entra); **Viabilidade** (Receitas —
-absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity e financiamento
-à produção); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise
+absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity, financiamento
+à produção e antecipação de recebíveis); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise
 de mercado** (os números do estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
 [Estudo Avançado](avancado), [Funding](funding) e [Análise de Mercado](analise-mercado).
 

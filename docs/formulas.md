@@ -228,7 +228,8 @@ a leitura `= Resultado`.
 
 ## Funding
 
-As fórmulas de dívida, equity e financiamento à produção estão em [Funding](funding). Duas coisas
+As fórmulas de dívida, equity, financiamento à produção e antecipação de recebíveis estão em
+[Funding](funding). Duas coisas
 que o fluxo de caixa mantém: `fluxo após funding = fluxo livre do projeto + entradas de funding −
 saídas de funding`, conferido pela reconciliação da aba Fluxo de Caixa — que também acusa saldo de
 dívida negativo, dívida que não zera no horizonte e caixa acumulado negativo depois do funding; e

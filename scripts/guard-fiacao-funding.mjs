@@ -153,6 +153,19 @@ const REGRAS = [
     dano: 'o horizonte não cobre a quitação da operação, a série é cortada e `saldoFinal` exibe um saldo truncado',
   },
   {
+    // #851: sem o lastro, uma antecipação de recebíveis não tem o que ceder e
+    // sai zerada — a mesma classe de defeito de fiação: a função pura existe e
+    // está testada, e a tela pode simplesmente não passar o dado.
+    nome: 'lastro da antecipação de recebíveis (#851)',
+    consumidor: (src) => src.includes('fundingDoEstudo(') && src.includes('calcularFluxo('),
+    // Fixtures e casos de render montam estudos sem antecipação; o dano é nas
+    // telas e no `conferir-estudo`, que leem estudo real.
+    ignorar: (arq) => arq.endsWith('funding-motor.ts') || arq.includes('/fixtures/') || arq.includes('/render/'),
+    exige: /recebimentoPorSafraMensal\s*:/,
+    comoConsertar: 'Passe `recebimentoPorSafraMensal: <calc>.recebimentoPorSafraMensal` no contexto de `fundingDoEstudo`.',
+    dano: 'toda antecipação de recebíveis do estudo sai zerada — sem valor antecipado e sem parcelas cedidas',
+  },
+  {
     nome: '4º argumento de validarFunding (#445)',
     // ⚠️ Por que guard, e não parâmetro obrigatório: `receitaLiquidaMensal` é
     // opcional POR DESENHO (`fluxo-invariantes.ts`), e a fixture da #469

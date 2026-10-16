@@ -1,12 +1,12 @@
 ---
 titulo: Funding
-descricao: As três operações de captação do estudo Avançado — Dívida, Equity e Financiamento à produção —, o que cada uma pede, como cada uma é calculada mês a mês e como entram no Fluxo de Caixa.
+descricao: As operações de captação do estudo Avançado — Dívida, Equity, Financiamento à produção e Antecipação de recebíveis —, o que cada uma pede, como cada uma é calculada mês a mês e como entram no Fluxo de Caixa.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
 # Funding
 
-> Três operações independentes — dívida por calendário, equity com retorno sobre receita ou resultado, e financiamento à produção liberado por medição de obra — sem waterfall, sem prioridade e sem competição por caixa entre elas.
+> Operações independentes — dívida por calendário, equity com retorno sobre receita ou resultado, financiamento à produção liberado por medição de obra e antecipação da carteira de recebíveis — sem waterfall, sem prioridade e sem competição por caixa entre elas.
 
 ## O que é
 
@@ -22,6 +22,7 @@ com a decisão sobre como financiá-lo.
 | **Dívida / Capital de giro** | quantas quiser, com nome | aporte num mês (ou em tranches), carência e amortização Price por calendário |
 | **Equity** | quantas quiser, com nome | aporte num mês e retorno em um de dois modos: percentual da receita líquida mês a mês, ou percentual do resultado final no repasse |
 | **Financiamento à produção** | uma | liberação contra a medição dos custos elegíveis da obra, com gatilho de exposição mínima e amortização por varredura de caixa |
+| **Antecipação de recebíveis** | quantas quiser, com nome | cessão de um percentual da carteira de recebíveis num mês: o projeto recebe à vista o valor presente das parcelas cedidas, e elas passam a ir para quem comprou |
 
 Dívida e equity seguem a planilha do investidor: os pagamentos **não são limitados pelo caixa do
 projeto** — a parcela é capada pelo saldo devedor e o retorno do equity sai como percentual da
@@ -41,7 +42,7 @@ acompanha o cronograma quando ele muda. A janela do financiamento à produção 
 aviso permanente: o app simula contratos privados e não valida a legalidade da captação — uma
 oferta ao público pode ter obrigações regulatórias próprias.
 
-As abas **Dívida** e **Equity** editam as operações daquele tipo. Havendo mais de uma, cada uma
+As abas **Dívida**, **Equity** e **Antecipação** editam as operações daquele tipo. Havendo mais de uma, cada uma
 ganha sua própria sub-aba, identificada pelo nome — criar uma nova operação já abre nela; com uma
 só, o formulário aparece direto, sem sub-navegação.
 
@@ -85,6 +86,43 @@ o percentual financiável autoriza sobre o acumulado até ali — a primeira lib
 fica por conta do incorporador. Não há parcela contratual: o saldo é amortizado por **varredura do
 caixa** disponível, calculado sem a liberação do próprio mês.
 
+### Antecipação de recebíveis
+
+É a cessão de parte da carteira de recebíveis a uma securitizadora (CRI), um fundo (FIDC) ou um
+banco, que paga à vista o valor presente das parcelas cedidas. Informe:
+
+- o **Mês da cessão** (âncora do cronograma ou mês específico);
+- a **Carteira cedida**, em percentual;
+- a **Taxa de desconto** anual;
+- opcionalmente, **Estruturação** (percentual do valor presente), **Administração** (R$ por mês) e
+  **Outros custos** (R$).
+
+O valor não é digitado: ele sai do lastro e da taxa.
+
+- **O lastro.** É tudo o que as vendas contratadas até o mês da cessão ainda vão pagar **depois**
+  dele: parcelas, saldo a repassar e carteira própria. Só entram os planos de pagamento já
+  aplicados.
+- **Duas antecipações.** Cada uma cede um percentual do que **ainda é da empresa**. Se uma cessão
+  anterior já cedeu 80% de uma venda, a seguinte, com 50%, cede metade dos 20% que sobraram. Assim
+  duas cessões nunca passam de 100% do lastro.
+- **No mês da cessão:** o projeto recebe o valor presente das parcelas cedidas à taxa de desconto,
+  e paga a estruturação e os outros custos.
+- **Nos meses seguintes:** as parcelas cedidas saem do caixa, porque agora vão para o cessionário,
+  junto com a administração.
+- **Deságio e custo efetivo.** O deságio é a diferença entre as parcelas cedidas e o valor
+  presente. O **custo efetivo** é a taxa anual da operação inteira, com as tarifas.
+
+A aba mostra, em **Resultado da antecipação**:
+- as parcelas cedidas (face);
+- o valor presente;
+- o recebido líquido;
+- o deságio, em reais e em percentual da face;
+- as tarifas;
+- o custo efetivo.
+
+Quem compra assume o risco das parcelas. Como o app não modela inadimplência, a cessão com ou sem
+coobrigação dá os mesmos números, e não há campo para isso.
+
 ### Onde o funding aparece
 
 - **Resultados → Fluxo de Caixa**: as liberações e aportes como receita, as parcelas e retornos
@@ -92,9 +130,11 @@ caixa** disponível, calculado sem a liberação do próprio mês.
   leitura desalavancada.
 - **Resultados → Análise Financeira**: TIR, VPL e payback do projeto continuam desalavancados; o
   quadro **Retorno por parte** mostra, para cada dívida e cada equity, o que o investidor põe e
-  recebe — o financiamento à produção não entra ali, porque o banco não é investidor do projeto: o
-  custo dele é custo do projeto.
-- **Resultados → Proforma**: não recebe funding — é a proforma desalavancada.
+  recebe — o financiamento à produção e a antecipação de recebíveis não entram ali: nenhum dos dois
+  é investidor do projeto, e o custo deles é custo do projeto.
+- **Resultados → Proforma**: não recebe funding — é a proforma desalavancada. O deságio de uma
+  antecipação, portanto, não aparece como despesa financeira na Proforma: ele está no fluxo
+  alavancado e no Resultado da antecipação.
 - **Cenários**: comparam o cenário simulado com o real já com o funding.
 
 Para cada dívida e cada equity o app calcula, na visão do investidor: investimento total, retorno
@@ -109,7 +149,7 @@ Rotas do estudo (membro com alçada de edição para escrever):
 | Rota | O que faz |
 |---|---|
 | `GET /estudos/:id/avancado/funding` | lista as operações do estudo |
-| `POST /estudos/:id/avancado/funding` | cria uma operação (`tipo`: `divida`, `equity` ou `financiamento_producao`) |
+| `POST /estudos/:id/avancado/funding` | cria uma operação (`tipo`: `divida`, `equity`, `financiamento_producao` ou `antecipacao_recebiveis`) |
 | `PATCH /estudos/:id/avancado/funding/:oid` | altera uma operação |
 | `DELETE /estudos/:id/avancado/funding/:oid` | remove uma operação |
 
@@ -120,6 +160,8 @@ Dívida: `distribuir_aporte`, `aporte_meses`,
 `taxa_estruturacao_pct`, `taxa_administracao_mensal`, `outros_encargos_iniciais`. Equity:
 `modo_retorno` (`permuta_financeira` ou `resultado_final`) e `pct_retorno`. Financiamento à
 produção: `exposicao_minima`, `percentual_financiavel`, `amortizar_com_caixa_disponivel`, `custo_linha_ids`.
+Antecipação de recebíveis: `pct_carteira_cedida` (0 a 100), `taxa_anual` (a taxa de desconto) e as
+três tarifas da dívida; o mês da cessão é o `inicio_mes`.
 Só pode haver uma operação de `financiamento_producao` por estudo. Valores monetários saem com duas
 casas; percentuais são guardados como percentual.
 

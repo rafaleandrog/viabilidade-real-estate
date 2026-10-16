@@ -60,9 +60,10 @@ const CARDS: { arquivo: string; chamadas: number; quais: string }[] = [
       + 'é a paridade Avançado do critério 8: um monetário em cada nível',
   },
   {
-    arquivo: 'tela-funding.ts', chamadas: 13,
+    arquivo: 'tela-funding.ts', chamadas: 18,
     quais: 'os 6 .ind-card monetários da Visão do investidor (Investimento, Retorno total, '
-      + 'Lucro, VPL, Juros pagos, Saldo final) mais os 7 do resumo de Financiamento à produção',
+      + 'Lucro, VPL, Juros pagos, Saldo final), os 7 do resumo de Financiamento à produção e '
+      + 'os 5 do Resultado da antecipação (#851: face, valor presente, recebido líquido, deságio, tarifas)',
   },
 ];
 
@@ -147,8 +148,8 @@ const PCT_ENTRADA: { arquivo: string; chamadas: number; motivo: string }[] = [
   },
   {
     // #586: entrou com a tabela compilada da aba Operações do Funding.
-    arquivo: 'tela-funding.ts', chamadas: 2,
-    motivo: 'a coluna "Taxa / retorno" da urbi-tabela da aba Operações — CÉLULA DE TABELA, não card. As duas chamadas são os dois ramos da mesma célula: `taxa_anual` (Dívida e Financiamento à produção) e `pct_retorno` (Equity), ambos % DIGITADA pelo usuário e por isso em 2 casas. O contrato do CLAUDE.md manda o oposto do card justamente aqui: tabela mantém a precisão de entrada',
+    arquivo: 'tela-funding.ts', chamadas: 3,
+    motivo: 'duas CÉLULAS DE TABELA da aba Operações, não card. Na coluna "Taxa / retorno", os dois ramos da mesma célula: `taxa_anual` (Dívida, Financiamento à produção e Antecipação) e `pct_retorno` (Equity); na coluna "Valor", o `pct_carteira_cedida` da Antecipação (#851). Os três são % DIGITADA pelo usuário e por isso em 2 casas. O contrato do CLAUDE.md manda o oposto do card justamente aqui: tabela mantém a precisão de entrada',
   },
 ];
 

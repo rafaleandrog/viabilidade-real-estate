@@ -63,7 +63,7 @@ export const rotasFunding: ReturnType<typeof Router> = Router();
 // critério de aceite — varredura de vizinhos). As três já batiam com
 // `avancado_funding_operacoes` no schema; a exportação é o que torna essa
 // conferência automática em vez de manual.
-export const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity'];
+export const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
 export const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
 export const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
 
@@ -74,10 +74,11 @@ const CAMPOS_NAO_NEGATIVOS = [
   'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
   'exposicao_minima', 'percentual_financiavel',
   'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
+  'pct_carteira_cedida',
 ];
 
 /** Campos percentuais que não fazem sentido acima de 100 (%). */
-const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct'];
+const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct', 'pct_carteira_cedida'];
 
 /** Default de `modo_retorno` — o mesmo do banco (`schema.json`) e do motor. */
 const MODO_RETORNO_PADRAO = 'permuta_financeira';

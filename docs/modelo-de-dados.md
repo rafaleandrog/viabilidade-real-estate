@@ -36,7 +36,7 @@ resultado ou indicador nenhum. Continuam no schema porque removê-las é mudanç
 | `avancado_fases` | A fase de vendas, dona da **absorção** (`absorcao` JSON) e do **fluxo de pagamento** (`fluxo_pagamento` JSON). |
 | `avancado_alocacoes` | A alocação de venda: `unidades` de uma `tipologia_id` numa `fase_id`, a um `preco_m2`. Pode haver várias por tipologia. A trava de saldo vale no estudo inteiro: Σ unidades alocadas da tipologia em todas as fases ≤ `quantidade` do catálogo. A permuta física sai de dentro dessas alocações: Σ unidades em permuta física da tipologia ≤ Σ unidades alocadas, conferido ao gravar a permuta e ao reduzir ou excluir alocação ou grupo. |
 | `avancado_linhas_custo` | As linhas de custo, nos cinco grupos (terreno, obra, diretos, indireto, financeiro), com unidade de orçamento, valor canônico e ancoragem ao cronograma. |
-| `avancado_funding_operacoes` | As operações de funding: `financiamento_producao` (uma por estudo), `divida` e `equity` (quantas quiser). Ver [Funding](funding). |
+| `avancado_funding_operacoes` | As operações de funding: `financiamento_producao` (uma por estudo), `divida`, `equity` e `antecipacao_recebiveis` (quantas quiser). Ver [Funding](funding). |
 | `avancado_cenarios` | Os cenários simulados sobre o estudo (`nome`, `preco_venda_pct`, `custo_obra_pct`, `ordem`). |
 | `avancado_linhas_receita`, `avancado_capital_instrumentos` | Tabelas de modelos anteriores, mantidas no schema sem leitor nem escritor no app. Não copie nem alimente. |
 
