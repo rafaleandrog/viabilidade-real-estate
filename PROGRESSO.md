@@ -25,8 +25,14 @@ loteamento. A antecipação de recebíveis, pedida junto, é a #851 e vai em PR 
   isso o juro acumulado cairia todo na última parcela, com o principal negativo.
 - **Séries e indicadores.** `carteiraPropria` entra nas séries de receita e de carteira por
   componente, na carteira de clientes e na carteira máxima, e não na série de repasse.
-- **Validação.** O contrato de escrita (`erroComponentePagamento`) valida o tipo novo. O
-  `CARTEIRA_RESSURGE` só confere a carteira a partir do 1º vencimento.
+- **Validação.** O contrato de escrita (`erroComponentePagamento`) valida o tipo novo, e
+  `erroDestinoSaldoChaves` valida os campos do destino em `repasse`. Os dois são a mesma regra na
+  rota (`validarFluxoPagamento`) e no modal, e o leitor do motor (`destinoSaldoChaves`) é
+  fail-closed. O `CARTEIRA_RESSURGE` só confere a carteira a partir do 1º vencimento.
+- **Plano gravado pela API.**
+  - Com carteira e sem `pct_banco`, o formulário deriva o destino dos componentes.
+  - Com carteiras de prazos diferentes, o modal recusa salvar.
+  - Num plano só canônico (sem linhas de entrada e de parcelamento), o destino não é editável.
 - **Tela.** O bloco "Repasse" do modal virou "Saldo de chaves", com Repasse bancário (%), Nº de
   parcelas e Carência (meses). Caso de render novo: `modal-pagamento-carteira`.
 - **Fora, registrado em `ideias.md`:** inadimplência, distrato e PDD, e coobrigação. O resíduo

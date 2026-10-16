@@ -1127,6 +1127,14 @@ export function componentesPagamento(
   const fimObra = fluxoPagamento?.ancorasVivas === true && obra
     ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1
     : null;
+  // #850: a âncora da CARTEIRA PRÓPRIA é sempre a entrega VIGENTE, viva ou não
+  // — ao contrário do `mesPagamento` do `concentrado` acima. A tela define a
+  // carência como relativa à entrega e não oferece campo para o marco, e o
+  // tipo nasceu agora: não há dado gravado com marco customizado a preservar.
+  // Congelá-lo no primeiro Aplicar faria a carteira cobrar antes da entrega
+  // depois de a obra ser alongada. Achado P1 do App do Codex. Sem evento de
+  // obra o persistido fica, pelo mesmo motivo do caso acima.
+  const fimObraVigente = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : null;
   if (Array.isArray(fluxoPagamento?.componentes)) {
     return fluxoPagamento.componentes.map((c: any) => {
       const saida: any = { ...c };
@@ -1134,8 +1142,8 @@ export function componentesPagamento(
       if (fimObra !== null) {
         if (c?.tipo === 'ate_marco') saida.marcoMes = fimObra;
         if (c?.tipo === 'concentrado') saida.mesPagamento = fimObra + REPASSE_MESES_APOS_ENTREGA;
-        if (c?.tipo === 'carteira_pos_marco') saida.marcoMes = fimObra;
       }
+      if (fimObraVigente !== null && c?.tipo === 'carteira_pos_marco') saida.marcoMes = fimObraVigente;
       return saida;
     }) as ComponentePagamento[];
   }
@@ -1617,7 +1625,10 @@ export function componentesEfetivosSafra(
     );
     const pctCarteira = carteiras.reduce((soma, c) => soma + c.participacaoPct, 0);
     if (pctCarteira <= 0) return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
-    const aVista = round2(100 - pctCarteira);
+    // Sem `round2`: percentual em precisão plena (C7). Arredondar só o
+    // complemento fazia os componentes somarem 100,0035% com carteira de mais
+    // de duas casas — recebimento acima do contratado. Achado do App do Codex.
+    const aVista = 100 - pctCarteira;
     return [
       ...(aVista > 0 ? [{ tipo: 'imediato' as const, participacaoPct: aVista, descontoPct: 0 }] : []),
       ...carteiras,

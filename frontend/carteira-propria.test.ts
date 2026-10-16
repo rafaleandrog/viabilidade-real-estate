@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  calcularFluxo, calcularRecebiveisComponentes, componentesDoLegado, consolidarCarteiraClientes, componentesEfetivosSafra,
+  calcularFluxo, calcularRecebiveisComponentes, componentesDoLegado, componentesPagamento, consolidarCarteiraClientes, componentesEfetivosSafra,
   destinoSaldoChaves, pctRepasseDerivado, pagamentosCarteiraPosMarco, pagamentosConcentrado, pmt, primeiroVencimentoCarteira,
   taxaMensalDeAnual, ultimoMesRecebivelLinha, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
@@ -282,4 +282,44 @@ test('#850 revisão: `consolidarCarteiraClientes` soma a carteira própria no to
   assert.equal(pico.total, pico.carteiraPropria);
   assert.ok(r.carteiraMaxima > 700);
   assert.equal(r.mensal.at(-1)!.total, 0);
+});
+
+test('#850 revisão (rodada 2): carteiras gravadas com prazos diferentes não são fundidas no Aplicar — o modal recusa', () => {
+  const duas = formularioPagamento({
+    entrada: [{ pct: 30, parcelas: 1, descontoPct: 0 }], parcelas: [], repasse: { apos_entrega_meses: 0 },
+    componentes: [
+      { tipo: 'imediato', participacaoPct: 30, descontoPct: 0 },
+      { tipo: 'carteira_pos_marco', participacaoPct: 20, marcoMes: FIM_OBRA, carenciaMeses: 0, prazoMeses: 24, taxaMensal: 0 },
+      { tipo: 'carteira_pos_marco', participacaoPct: 50, marcoMes: FIM_OBRA, carenciaMeses: 6, prazoMeses: 120, taxaMensal: 0 },
+    ],
+  });
+  assert.match(erroFormularioPagamento(duas, CRONO)!, /carteiras próprias com prazos/);
+  // Duas carteiras IGUAIS cabem no espelho (somam numa só, mesmo prazo).
+  const iguais = formularioPagamento({
+    entrada: [{ pct: 30, parcelas: 1, descontoPct: 0 }], parcelas: [], repasse: { apos_entrega_meses: 0 },
+    componentes: [
+      { tipo: 'imediato', participacaoPct: 30, descontoPct: 0 },
+      { tipo: 'carteira_pos_marco', participacaoPct: 20, marcoMes: FIM_OBRA, carenciaMeses: 0, prazoMeses: 24, taxaMensal: 0 },
+      { tipo: 'carteira_pos_marco', participacaoPct: 50, marcoMes: FIM_OBRA, carenciaMeses: 0, prazoMeses: 24, taxaMensal: 0 },
+    ],
+  });
+  assert.equal(erroFormularioPagamento(iguais, CRONO), null);
+});
+
+test('#850 revisão (rodada 2, App do Codex): a carteira segue a entrega VIGENTE depois do Aplicar', () => {
+  const gravado = fluxoPagamentoParaSalvar(
+    formularioPagamento(plano({ pct_banco: 0, carteira_parcelas: 12, carteira_carencia_meses: 2 })), CRONO, 12);
+  assert.equal('ancorasVivas' in gravado, false, 'o Aplicar não deixa o plano com âncoras vivas');
+  const obraMaior: EventoCrono[] = CRONO.map((e) => (e.evento === 'obra' ? { ...e, duracao_meses: 30 } : e));
+  const cart = componentesPagamento(gravado, obraMaior, 12).find((c) => c.tipo === 'carteira_pos_marco')!;
+  assert.ok(cart.tipo === 'carteira_pos_marco');
+  assert.equal(cart.marcoMes, 3 + 30 - 1, 'a carteira ficou presa ao fim de obra antigo');
+  assert.equal(primeiroVencimentoCarteira(cart, 5), 3 + 30 - 1 + 1 + 2);
+});
+
+test('#850 revisão (rodada 2, App do Codex): venda pós-entrega com carteira fracionária soma 100% exatos', () => {
+  const comps = componentesDoLegado(
+    { entrada: [{ pct: 33.333, parcelas: 1 }], parcelas: [], repasse: { pct_banco: 50, carteira_parcelas: 12 } }, CRONO, 12);
+  const efetivos = componentesEfetivosSafra(comps, FIM_OBRA + 3, FIM_OBRA);
+  assert.ok(perto(soma(efetivos.map((c) => c.participacaoPct)), 100, 1e-9));
 });

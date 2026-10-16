@@ -99,7 +99,7 @@ function destinoDoPlano(fp: any, componentes: ComponentePagamento[] | null): Par
     if (objeto[k] !== undefined && objeto[k] !== null) out[k] = objeto[k];
   }
   if (out.pct_banco !== undefined || !componentes) return out as any;
-  const carteiras = componentes.filter((c) => c?.tipo === 'carteira_pos_marco');
+  const carteiras = carteirasGravadas(componentes);
   if (carteiras.length === 0) return out as any;
   const somaCarteira = carteiras.reduce((s, c) => s + n(c.participacaoPct), 0);
   const somaBanco = componentes.filter((c) => c?.tipo === 'concentrado').reduce((s, c) => s + n(c.participacaoPct), 0);
@@ -110,6 +110,25 @@ function destinoDoPlano(fp: any, componentes: ComponentePagamento[] | null): Par
     carteira_parcelas: primeira.prazoMeses,
     carteira_carencia_meses: primeira.carenciaMeses,
   };
+}
+
+/** As carteiras próprias com participação de um plano gravado. */
+function carteirasGravadas(componentes: ComponentePagamento[] | null): Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>[] {
+  return (componentes ?? []).filter(
+    (c): c is Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }> =>
+      c?.tipo === 'carteira_pos_marco' && n(c.participacaoPct) > 0,
+  );
+}
+
+/**
+ * O espelho representa UMA carteira própria (um prazo e uma carência). Um
+ * plano gravado pela API com carteiras de prazos ou carências diferentes não
+ * cabe nele: o Aplicar as fundiria numa só e perderia a outra. `true` nesse
+ * caso, e o modal recusa salvar (achado de revisão).
+ */
+function carteirasIrrepresentaveis(componentes: ComponentePagamento[] | null): boolean {
+  const assinaturas = new Set(carteirasGravadas(componentes).map((c) => `${c.prazoMeses}|${c.carenciaMeses}`));
+  return assinaturas.size > 1;
 }
 
 /**
@@ -444,6 +463,9 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
     if (destinoInvalido.includes('pct_banco')) return 'O repasse bancário deve ficar entre 0% e 100% do saldo de chaves.';
     if (destinoInvalido.includes('carencia')) return 'A carência da carteira própria deve ser um número inteiro de meses, zero ou mais.';
     return 'A carteira própria deve ter ao menos uma parcela mensal.';
+  }
+  if (!planoSoCanonico(form) && carteirasIrrepresentaveis(form.componentes)) {
+    return 'O plano gravado nesta linha tem carteiras próprias com prazos ou carências diferentes, e este formulário representa uma só. Para salvar, monte o plano de novo com linhas de entrada e de parcelamento e uma carteira própria.';
   }
   const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
