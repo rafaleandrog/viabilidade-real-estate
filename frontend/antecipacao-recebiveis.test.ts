@@ -11,7 +11,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  fundingDoEstudo, indicadoresAntecipacao, recebiveisFuturosDeSafras, simularAntecipacao, simularDivida,
+  fundingDoEstudo, indicadoresAntecipacao, recebiveisFuturosDeSafras, riscoTarifaDuplicada,
+  simularAntecipacao, simularDivida,
   taxaMensalEquivalente, tirAnual, tranchesDeInvestimento, type OperacaoFunding,
 } from './funding-motor.js';
 import { calcularFluxo } from './fluxo-caixa-motor.js';
@@ -209,4 +210,33 @@ test('#851 revisão: a venda do PRÓPRIO mês da cessão entra no lastro e sai d
   assert.equal(soma(f.operacoes.find((s) => s.operacao.id === 1)!.saidas), 1_500, 'a safra do mês 3 entra na cessão do mês 3');
   // A segunda cede 100% do que sobrou: metade das parcelas dos meses 5 e 6.
   assert.equal(soma(f.operacoes.find((s) => s.operacao.id === 2)!.saidas), 1_000);
+});
+
+test('#851 revisão: cessões sucessivas não cedem um centavo além do lastro (arredondamento cumulativo)', () => {
+  const prazo = 6;
+  const porSafra = { 0: [0, 0, 0, 100.01, 100.01, 0] };
+  const livre = new Array<number>(prazo).fill(0);
+  const ops = [
+    antecipacao({ id: 1, inicio_mes: 1, pct_carteira_cedida: 50, taxa_anual: 0 }),
+    antecipacao({ id: 2, inicio_mes: 2, pct_carteira_cedida: 100, taxa_anual: 0 }),
+  ];
+  const f = fundingDoEstudo(ops, livre, livre, 0, 0, 12, { recebimentoPorSafraMensal: porSafra })!;
+  const a = f.operacoes.find((s) => s.operacao.id === 1)!;
+  const b = f.operacoes.find((s) => s.operacao.id === 2)!;
+  for (const k of [3, 4]) {
+    assert.equal(a.saidas[k], 50.01, `mês ${k}: a primeira leva o arredondado de 50,005`);
+    assert.equal(b.saidas[k], 50, `mês ${k}: a segunda leva o resto, não 50,01 de novo`);
+    assert.equal(Math.round((a.saidas[k] + b.saidas[k]) * 100), 10_001, `mês ${k}: soma = a parcela, nem um centavo a mais`);
+  }
+  // Uma cessão só não muda: sem cessão anterior, é o round2 de p × lastro.
+  const so = simularAntecipacao(antecipacao({ inicio_mes: 1, pct_carteira_cedida: 50, taxa_anual: 0 }), porSafra[0], prazo);
+  assert.equal(so.saidas[3], 50.01);
+});
+
+test('#851 revisão: tarifa numa antecipação também acende o aviso de tarifa duplicada', () => {
+  const custo = [{ grupo: 'financeiro', categoria: 'Taxas bancárias', orcamento_valor: 10_000 }];
+  assert.equal(riscoTarifaDuplicada([antecipacao({ taxa_estruturacao_pct: 2 })], custo), true);
+  assert.equal(riscoTarifaDuplicada([antecipacao({ taxa_administracao_mensal: 300 })], custo), true);
+  assert.equal(riscoTarifaDuplicada([antecipacao({ outros_encargos_iniciais: 5_000 })], custo), true);
+  assert.equal(riscoTarifaDuplicada([antecipacao()], custo), false, 'sem tarifa na antecipação, sem aviso');
 });

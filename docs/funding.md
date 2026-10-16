@@ -113,6 +113,8 @@ O valor não é digitado: ele sai do lastro e da taxa.
   junto com a administração.
 - **Deságio e custo efetivo.** O deságio é a diferença entre as parcelas cedidas e o valor
   presente. O **custo efetivo** é a taxa anual da operação inteira, com as tarifas.
+- **Tarifa contada duas vezes.** Como na Dívida, se uma tarifa da antecipação for informada e
+  também houver uma linha de custo financeiro do mesmo tipo no Orçamento, a página avisa.
 
 A aba mostra, em **Resultado da antecipação**:
 - as parcelas cedidas (face);

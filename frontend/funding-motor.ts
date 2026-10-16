@@ -330,7 +330,12 @@ export function recebiveisFuturosDeSafras(
  * "investidor" (`saídas − entradas`) é a do cessionário, e a TIR dela é o
  * CUSTO EFETIVO da antecipação para a incorporadora, com as tarifas.
  */
-export function simularAntecipacao(op: OperacaoFunding, lastro: number[], prazo: number): SerieOperacao {
+export function simularAntecipacao(
+  op: OperacaoFunding,
+  lastro: number[],
+  prazo: number,
+  jaCedido: number[] = [],
+): SerieOperacao {
   const entradas = serieZerada(prazo);
   const saidas = serieZerada(prazo);
   const juros = serieZerada(prazo);
@@ -348,7 +353,15 @@ export function simularAntecipacao(op: OperacaoFunding, lastro: number[], prazo:
   // rascunho antes de salvar, e uma taxa de −100% ou menos daria NaN/Infinity.
   const i = taxaMensalEquivalente(Math.max(0, n(op.taxa_anual)) / 100);
 
-  const cedido = lastro.map((v, k) => (k > m ? round2(p * v) : 0));
+  // Arredondamento CUMULATIVO entre cessões: `jaCedido[k]` é o exato que as
+  // antecipações anteriores já levaram do mês k, e esta leva a diferença dos
+  // arredondados. Arredondar cada uma por si cederia, somadas, até um centavo
+  // a mais que o lastro (100,01 cedido 50% e depois 100% daria 50,01 + 50,01).
+  const cedido = lastro.map((v, k) => {
+    if (k <= m) return 0;
+    const antes = jaCedido[k] ?? 0;
+    return round2(round2(antes + p * v) - round2(antes));
+  });
   const ultimo = cedido.reduce((u, v, k) => (v > 0 ? k : u), -1);
   if (ultimo < 0) return vazia();
 
@@ -434,17 +447,19 @@ export function indicadoresAntecipacao(s: SerieOperacao): IndicadoresAntecipacao
  * operações de dívida (que agora inclui as três tarifas). Um estudo que
  * lance a MESMA tarifa como linha de custo "Taxas bancárias"/"Estruturação
  * de dívida" **e** preencha as colunas novas de uma operação `divida` paga a
- * tarifa duas vezes no fluxo alavancado.
+ * tarifa duas vezes no fluxo alavancado. A antecipação de recebíveis (#851)
+ * usa as mesmas três colunas de tarifa e entra no mesmo alavancado, então
+ * conta igual.
  *
  * Escolha deste PR: **avisar, não travar** — as duas representações são
  * legítimas isoladamente (uma é custo do projeto, a outra é encargo da
  * operação de financiamento), e o app não tem como saber se o usuário
  * pretendia as duas ou só uma. `true` quando há tarifa configurada em
- * QUALQUER operação `divida` E QUALQUER linha de custo financeiro nas duas
+ * QUALQUER operação `divida` ou `antecipacao_recebiveis` E QUALQUER linha de custo financeiro nas duas
  * categorias-alvo tem orçamento não-zero.
  */
 export function riscoTarifaDuplicada(operacoes: OperacaoFunding[], linhasCusto: any[]): boolean {
-  const temTarifaOperacao = (operacoes ?? []).some((op) => op.tipo === 'divida' && (
+  const temTarifaOperacao = (operacoes ?? []).some((op) => (op.tipo === 'divida' || op.tipo === 'antecipacao_recebiveis') && (
     n(op.taxa_estruturacao_pct) > 0 || n(op.taxa_administracao_mensal) > 0 || n(op.outros_encargos_iniciais) > 0
   ));
   if (!temTarifaOperacao) return false;
@@ -1135,6 +1150,7 @@ export function fundingDoEstudo(
   // mesmo lastro não podendo ser vendido duas vezes, e por isso duas cessões
   // nunca passam de 100% dele. Empate de mês segue a ordem do array.
   const retido: Record<number, number> = {};
+  const cedidoAcumulado = serieZerada(prazo); // exato, para o arredondamento cumulativo
   const porSafra = contexto?.recebimentoPorSafraMensal ?? {};
   operacoes
     .map((op, idx) => ({ op, idx }))
@@ -1142,8 +1158,10 @@ export function fundingDoEstudo(
     .sort((a, b) => Math.floor(n(a.op.inicio_mes)) - Math.floor(n(b.op.inicio_mes)) || a.idx - b.idx)
     .forEach(({ op, idx }) => {
       const m = Math.max(0, Math.floor(n(op.inicio_mes)));
-      series[idx] = simularAntecipacao(op, recebiveisFuturosDeSafras(porSafra, m, prazo, retido), prazo);
+      const lastro = recebiveisFuturosDeSafras(porSafra, m, prazo, retido);
+      series[idx] = simularAntecipacao(op, lastro, prazo, cedidoAcumulado);
       const p = Math.min(100, Math.max(0, n(op.pct_carteira_cedida))) / 100;
+      for (let k = m + 1; k < prazo; k++) cedidoAcumulado[k] += p * lastro[k];
       for (const chave of Object.keys(porSafra)) {
         const safra = Number(chave);
         if (safra <= m) retido[safra] = (retido[safra] ?? 1) * (1 - p);

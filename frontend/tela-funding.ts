@@ -36,7 +36,9 @@ import './viab-num.js';
 //    `_renderCamposDivida`/o painel genérico de investidor;
 //  · `divida`                 — calendário + Price com carência, campos da
 //    planilha `fluxo_investidor_FORMULAS`;
-//  · `equity`                 — aporte + retorno, em dois modos.
+//  · `equity`                 — aporte + retorno, em dois modos;
+//  · `antecipacao_recebiveis` — cessão de parte da carteira (#851), cega ao
+//    caixa; o valor sai do lastro e da taxa de desconto.
 //
 // Para `divida`/`equity`, a tela mostra os campos de ENTRADA e o painel
 // "visão do investidor" (investimento, retorno, TIR, VPL, payback) —
@@ -1090,7 +1092,8 @@ export class ViabFunding extends LitElement {
              vezes. Aviso, não trava: as duas representações (linha de custo
              do projeto × tarifa da operação) são legítimas isoladamente. -->
         <urbi-banner variante="alerta" icone="fa-solid fa-triangle-exclamation">
-          Há tarifa configurada numa operação de <strong>Dívida</strong> e, ao mesmo tempo, uma
+          Há tarifa configurada numa operação de <strong>Dívida</strong> ou de
+          <strong>Antecipação de recebíveis</strong> e, ao mesmo tempo, uma
           linha de custo em "Taxas bancárias" ou "Estruturação de dívida" no grupo Financeiro.
           Confira se não é a <strong>mesma</strong> tarifa lançada duas vezes — uma vez como custo
           do projeto, outra como encargo da operação.
