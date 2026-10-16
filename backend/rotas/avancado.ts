@@ -4,7 +4,7 @@ import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estud
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
-import { erroComponentePagamento } from '../../frontend/fluxo-pagamento-contrato.js';
+import { erroComponentePagamento, erroDestinoSaldoChaves } from '../../frontend/fluxo-pagamento-contrato.js';
 import { fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
 import { normalizarLinhasPagamento } from '../../frontend/fluxo-caixa-motor.js';
 
@@ -257,6 +257,11 @@ export function validarAbsorcao(a: any): string | null {
 export function validarFluxoPagamento(fp: any): string | null {
   if (fp === null || fp === undefined) return null; // ausente = default
   if (typeof fp !== 'object') return 'fluxo_pagamento deve ser um objeto';
+  // #850: o destino do saldo de chaves (`repasse.pct_banco` e a carteira
+  // própria) vale nos dois shapes — é o espelho que o modal lê para montar o
+  // plano. Mesma regra do modal, pela função compartilhada.
+  const destinoInvalido = erroDestinoSaldoChaves(fp.repasse);
+  if (destinoInvalido) return destinoInvalido;
   // #230: o contrato novo é opt-in (`componentes`). O JSON legado continua
   // aceito sem reinterpretação; a soma de 100% só é obrigatória no shape novo.
   if (fp.componentes !== undefined) {

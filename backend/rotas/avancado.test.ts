@@ -793,3 +793,18 @@ test('validarAbsorcao: pos_chaves_meses opcional, inteiro de 1 a 12', () => {
   assert.ok(validarAbsorcao({ pos_chaves_meses: 3 }));
   assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: true }));
 });
+
+test('#850: validarFluxoPagamento recusa destino do saldo de chaves inválido, nos dois shapes', () => {
+  // Legado sem `componentes` e canônico: a mesma regra (`erroDestinoSaldoChaves`).
+  assert.match(validarFluxoPagamento({ entrada: [], parcelas: [], repasse: { pct_banco: '' } })!, /pct_banco/);
+  assert.match(validarFluxoPagamento({ repasse: { pct_banco: 40 }, componentes: [
+    { tipo: 'imediato', participacaoPct: 100, descontoPct: 0 },
+  ] })!, /carteira_parcelas/);
+  assert.equal(validarFluxoPagamento({ repasse: { pct_banco: 40, carteira_parcelas: 120, carteira_carencia_meses: 0 }, componentes: [
+    { tipo: 'imediato', participacaoPct: 30, descontoPct: 0 },
+    { tipo: 'concentrado', participacaoPct: 28, mesPagamento: 23 },
+    { tipo: 'carteira_pos_marco', participacaoPct: 42, marcoMes: 22, carenciaMeses: 0, prazoMeses: 120 },
+  ] }), null);
+  // O repasse legado em lista continua aceito sem reinterpretação.
+  assert.equal(validarFluxoPagamento({ repasse: [{ pct: 30, mesesAposObra: 3 }] }), null);
+});

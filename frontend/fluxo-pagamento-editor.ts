@@ -3,7 +3,7 @@ import {
   type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import type { EventoCrono } from './fluxo-shared.js';
-import { erroComponentePagamento } from './fluxo-pagamento-contrato.js';
+import { erroComponentePagamento, erroDestinoSaldoChaves } from './fluxo-pagamento-contrato.js';
 
 const n = (v: any): number => Number(v) || 0;
 const lista = (v: any): any[] => Array.isArray(v)
@@ -23,7 +23,19 @@ export interface FormularioPagamento {
   // em 1 mês após o fim da obra, sempre). O campo sobrevive só como
   // passagem para não descartar o valor persistido de estudo legado — sem
   // migração, sem efeito no cálculo, sem controle editável na UI.
-  repasse: { apos_entrega_meses: number };
+  /**
+   * `apos_entrega_meses` é só passado adiante (o mês do repasse é travado em
+   * fim da obra + 1). Os três campos da #850 dizem o DESTINO do saldo de
+   * chaves: `pct_banco` é a fatia (% do saldo) que vai ao banco no repasse;
+   * o resto é carteira própria, em `carteira_parcelas` parcelas após
+   * `carteira_carencia_meses` meses de carência. Ausente = 100% banco.
+   */
+  repasse: {
+    apos_entrega_meses: number;
+    pct_banco?: number;
+    carteira_parcelas?: number;
+    carteira_carencia_meses?: number;
+  };
   /**
    * #431 — MEMÓRIA do que este formulário não sabe editar. Não é campo
    * editável e não tem controle na tela: é o array canônico que veio
@@ -64,6 +76,81 @@ export interface FormularioPagamento {
  * legado; ele garante que o motor vigente continue calculando exatamente o
  * mesmo fluxo enquanto `componentes` passa a ser a fonte canônica persistida.
  */
+/**
+ * #850 — o destino do saldo de chaves que o formulário carrega.
+ *
+ * **Com `componentes` gravados que tenham saldo de chaves (`concentrado` ou
+ * `carteira_pos_marco`), o destino SAI DOS COMPONENTES** — a fatia do banco é
+ * `concentrado / (concentrado + carteira)`, e o prazo e a carência são os da
+ * carteira. O espelho (`repasse.pct_banco` e afins) é ignorado nesse caso.
+ *
+ * Por quê: são os componentes que o motor calcula. Um espelho que os
+ * contradiz — `pct_banco` ausente, ou `pct_banco: 100` gravado pela API ao
+ * lado de uma carteira — fazia o primeiro Aplicar, sem edição nenhuma,
+ * regenerar o saldo inteiro como `concentrado` e apagar a carteira. Foram
+ * três achados de revisão da mesma classe (espelho ausente, carteiras
+ * múltiplas, espelho explícito divergente); enumerar os casos não convergia,
+ * então a fonte passou a ser uma só (armadilha 14 do `CLAUDE.md`).
+ *
+ * Sem saldo de chaves nos componentes (ou sem componentes), o espelho é
+ * copiado CRU — só as chaves presentes, e sem `Number()`: o valor sujo segue
+ * sujo até `erroDestinoSaldoChaves` o recusar, em vez de virar 0 calado.
+ */
+function destinoDoPlano(fp: any, componentes: ComponentePagamento[] | null): Partial<FormularioPagamento['repasse']> {
+  const r = fp?.repasse;
+  const objeto = r !== null && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  const out: Record<string, unknown> = {};
+  for (const k of ['pct_banco', 'carteira_parcelas', 'carteira_carencia_meses'] as const) {
+    if (objeto[k] !== undefined && objeto[k] !== null) out[k] = objeto[k];
+  }
+  if (!componentes) return out as any;
+  const carteiras = carteirasGravadas(componentes);
+  const somaCarteira = carteiras.reduce((s, c) => s + n(c.participacaoPct), 0);
+  const somaBanco = componentes.filter((c) => c?.tipo === 'concentrado').reduce((s, c) => s + n(c.participacaoPct), 0);
+  const saldo = somaCarteira + somaBanco;
+  if (saldo <= 0) return out as any;
+  if (carteiras.length === 0) {
+    // Só banco: 100%. Os campos da carteira gravados (inertes) seguem como estão.
+    const { pct_banco: _ignorado, ...resto } = out;
+    return (out.pct_banco === undefined ? resto : { ...resto, pct_banco: 100 }) as any;
+  }
+  // Normalizado a 1e-9: a fatia é derivada, e o ruído de ponto flutuante da
+  // divisão não deve aparecer no campo nem no JSON gravado.
+  const pctBanco = Math.round((somaBanco / saldo) * 100 * 1e9) / 1e9;
+  return { pct_banco: pctBanco, carteira_parcelas: carteiras[0].prazoMeses, carteira_carencia_meses: carteiras[0].carenciaMeses };
+}
+
+/** As carteiras próprias com participação de um plano gravado. */
+function carteirasGravadas(componentes: ComponentePagamento[] | null): Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>[] {
+  return (componentes ?? []).filter(
+    (c): c is Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }> =>
+      c?.tipo === 'carteira_pos_marco' && n(c.participacaoPct) > 0,
+  );
+}
+
+/**
+ * O espelho representa UMA carteira própria (um prazo e uma carência). Um
+ * plano gravado pela API com carteiras de prazos ou carências diferentes não
+ * cabe nele: o Aplicar as fundiria numa só e perderia a outra. `true` nesse
+ * caso, e o modal recusa salvar (achado de revisão).
+ */
+function carteirasIrrepresentaveis(componentes: ComponentePagamento[] | null): boolean {
+  const assinaturas = new Set(carteirasGravadas(componentes).map((c) => `${c.prazoMeses}|${c.carenciaMeses}`));
+  return assinaturas.size > 1;
+}
+
+/**
+ * O plano é só canônico: tem `componentes` gravados e nenhuma linha de
+ * entrada ou parcelamento no espelho. Nesse plano `componentesParaSalvar`
+ * devolve o gravado como está, então um controle do espelho — como o destino
+ * do saldo de chaves — não teria efeito nenhum. A tela usa isto para não
+ * oferecer o controle (#850, achado de revisão).
+ */
+export function planoSoCanonico(form: FormularioPagamento): boolean {
+  return Array.isArray(form.componentes) && form.componentes.length > 0
+    && form.entrada.length === 0 && form.parcelas.length === 0;
+}
+
 export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
   const fp = fluxoPagamento ?? {};
   // #431: o array canônico persistido, se houver. É ele que decide se os
@@ -98,7 +185,7 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
     parcelas: parcelas.length || !semCanonicos
       ? parcelas
       : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
-    repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses) },
+    repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses), ...destinoDoPlano(fp, componentes) },
     componentes,
     // #460: mesmo padrão — a chave só nasce no formulário se já existia no
     // persistido. Ver a nota de contrato em `FormularioPagamento`.
@@ -154,7 +241,7 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
  */
 const CAMPOS_DO_ESPELHO = [
   'tipo', 'participacaoPct', 'descontoPct', 'sinalPct', 'prazoMeses',
-  'defasagemMeses', 'marcoMes', 'mesPagamento',
+  'defasagemMeses', 'marcoMes', 'mesPagamento', 'carenciaMeses',
 ] as const;
 
 /**
@@ -194,7 +281,13 @@ function camposSoCanonicos(doador: any): string[] {
 
 /** Assinatura de um componente restrita ao que o espelho legado enxerga. */
 function projecaoDoEspelho(c: any): string {
-  return JSON.stringify(CAMPOS_DO_ESPELHO.map((k) => (c?.[k] === undefined ? null : c[k])));
+  // #850: número normalizado a 1e-9. O destino do saldo de chaves pode ser
+  // DERIVADO dos componentes (`destinoDoPlano`), e a ida e volta
+  // `banco / saldo × 100 × saldo / 100` devolve a participação com ruído de
+  // ponto flutuante na 15ª casa. Comparado cru, esse ruído tirava o plano do
+  // caso 2 (persistido verbatim) e o regenerava com o ruído.
+  const norm = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 1e9) / 1e9 : v);
+  return JSON.stringify(CAMPOS_DO_ESPELHO.map((k) => (c?.[k] === undefined ? null : norm(c[k]))));
 }
 
 /**
@@ -369,6 +462,19 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
   // agora, e quem a valida e a aba Financeiro. A defesa de dominio do motor
   // (`taxaMensalDeAnual`, que devolve 0 para aa <= -100 em vez de NaN)
   // continua onde estava, e e ela que impede o NaN de virar `null` no JSON.
+  // #850: o destino do saldo de chaves. `pct_banco` é % do SALDO, e a
+  // carteira própria só precisa de prazo quando existe (banco < 100%).
+  // A regra é a da fronteira de escrita (`erroDestinoSaldoChaves`), a mesma
+  // função; aqui só traduzida para a frase da tela.
+  const destinoInvalido = erroDestinoSaldoChaves(form.repasse);
+  if (destinoInvalido) {
+    if (destinoInvalido.includes('pct_banco')) return 'O repasse bancário deve ficar entre 0% e 100% do saldo de chaves.';
+    if (destinoInvalido.includes('carencia')) return 'A carência da carteira própria deve ser um número inteiro de meses, zero ou mais.';
+    return 'A carteira própria deve ter ao menos uma parcela mensal.';
+  }
+  if (!planoSoCanonico(form) && carteirasIrrepresentaveis(form.componentes)) {
+    return 'O plano gravado nesta linha tem carteiras próprias com prazos ou carências diferentes, e este formulário representa uma só. Para salvar, monte o plano de novo com linhas de entrada e de parcelamento e uma carteira própria.';
+  }
   const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
     return `Entrada e parcelamento somam ${somaInformada.toFixed(2)}%; o total não pode superar 100%.`;

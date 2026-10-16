@@ -8,10 +8,10 @@ import {
   type EventoCrono,
 } from './fluxo-shared.js';
 import {
-  pctRepasseDerivado, parcelasAoLongoObra, type ResiduoAteMarco,
+  pctRepasseDerivado, destinoSaldoChaves, parcelasAoLongoObra, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import {
-  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoDeNascimento,
+  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoDeNascimento, planoSoCanonico,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -840,6 +840,23 @@ export class ViabFluxoReceitas extends LitElement {
   // as existentes inclusive. Decisão do autor de 2026-08-26.
 
   /**
+   * #850: o destino do saldo de chaves. Baixar o repasse bancário de 100% sem
+   * prazo de carteira gravado preenche 120 parcelas — o prazo típico de
+   * loteamento — para o plano nascer válido; o usuário troca em seguida.
+   */
+  private _setRepasse(campo: 'pct_banco' | 'carteira_parcelas' | 'carteira_carencia_meses', valor: number) {
+    const f = this.pagForm;
+    const repasse: any = { ...f.repasse, [campo]: valor };
+    if (campo === 'pct_banco' && valor < 100 && repasse.carteira_parcelas === undefined) {
+      repasse.carteira_parcelas = 120;
+    }
+    if (campo === 'pct_banco' && valor < 100 && repasse.carteira_carencia_meses === undefined) {
+      repasse.carteira_carencia_meses = 0;
+    }
+    this.pagForm = { ...f, repasse };
+  }
+
+  /**
    * #460 — destino do resíduo de um Parcelamento "Ao longo da obra" sem prazo
    * (venda contratada no mês do marco ou depois): rolar para o Repasse
    * (`concentrado`) ou virar caixa imediato (o comportamento de sempre).
@@ -895,6 +912,11 @@ export class ViabFluxoReceitas extends LitElement {
     const f = this.pagForm;
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
+    // #850: o destino do saldo de chaves só é editável quando há saldo e o
+    // plano tem espelho (linhas de entrada/parcelamento) — num plano só
+    // canônico o controle não teria efeito (`planoSoCanonico`).
+    const soCanonico = planoSoCanonico(f);
+    const editaDestino = repasse > 0 && !soCanonico;
     const erroPagamento = erroFormularioPagamento(f, this.crono);
     // #585: o bloco de juros SAIU deste modal — campo, texto e o aviso de
     // "N taxas diferentes gravadas". Com uma taxa por ESTUDO não há mais o que
@@ -939,7 +961,7 @@ export class ViabFluxoReceitas extends LitElement {
           <div>
             <p class="sec juros-vigente">Juros de tabela em vigor: <strong>${fmtPct(jurosEstudoAA)} a.a.</strong>
               — valor único do estudo, editado em <strong>Viabilidade → Financeiro</strong>. Vale
-              para entrada parcelada, parcelamento e repasse de todas as linhas de receita.</p>
+              para entrada parcelada, parcelamento, repasse e carteira própria de todas as linhas de receita.</p>
             ${planoLegado ? html`
               <p class="sec plano-legado">⚠️ <strong>Neste Grupo os juros ainda nao estao
                 valendo.</strong> O plano de pagamento dele nunca foi aplicado, entao o calculo
@@ -1023,15 +1045,43 @@ export class ViabFluxoReceitas extends LitElement {
                   @click=${() => this._addLinha('parcelas')}>Adicionar parcelamento</urbi-botao>` : nothing}
             </div>
             <div class="pag-secao">
-              <h4>Repasse</h4>
-              <p class="sec">Evento de liquidação concentrada — o saldo que restar após entrada e
-                parcelamento é pago de uma vez, sempre no 1º mês após o fim da obra.</p>
+              <h4>Saldo de chaves</h4>
+              <!-- #850: o saldo (o que restar após entrada e parcelamento) se
+                   divide entre o banco e a carteira própria. 100% banco é o
+                   comportamento de sempre. -->
+              <p class="sec">O saldo que restar após entrada e parcelamento. A parte do
+                <strong>repasse bancário</strong> (em % do saldo) é paga de uma vez no 1º mês após o fim da obra; o
+                restante fica em <strong>carteira própria</strong> — financiamento direto ao
+                comprador, em parcelas mensais com os juros de tabela do estudo, começando após a
+                entrega e a carência (em meses). Com carteira própria, a venda feita depois da entrega também
+                é financiada nessa parte, a partir do mês seguinte à venda.</p>
               <div class="pag-linha">
                 <div class="repasse-box">
-                  <span class="sec">Repasse</span><br />
+                  <span class="sec">Saldo de chaves</span><br />
                   <span class="derivado">${fmtPctEntrada(repasse)}</span>
                 </div>
+                ${editaDestino ? html`
+                <viab-num label="Repasse bancário" sufixo="%" casas-minimas="2" ?desabilitado=${dis}
+                  .valor=${destinoSaldoChaves(f).pctBanco}
+                  @urbi:input-numero-change=${(ev: CustomEvent) => this._setRepasse('pct_banco', ev.detail.valor ?? 100)}></viab-num>` : nothing}
               </div>
+              ${soCanonico ? html`
+                <p class="sec">Este plano foi gravado só como componentes, sem linhas de entrada e de
+                  parcelamento, e por isso o destino do saldo de chaves não é editável aqui. Para
+                  mudá-lo, monte o plano com linhas de entrada e de parcelamento.</p>` : nothing}
+              ${editaDestino && destinoSaldoChaves(f).pctBanco < 100 ? html`
+                <div class="pag-linha carteira-propria">
+                  <div class="repasse-box">
+                    <span class="sec">Carteira própria</span><br />
+                    <span class="derivado">${fmtPctEntrada(repasse - repasse * destinoSaldoChaves(f).pctBanco / 100)}</span>
+                  </div>
+                  <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0" ?desabilitado=${dis}
+                    .valor=${n(f.repasse?.carteira_parcelas)}
+                    @urbi:input-numero-change=${(ev: CustomEvent) => this._setRepasse('carteira_parcelas', ev.detail.valor ?? 0)}></viab-num>
+                  <viab-num label="Carência (meses)" casas-decimais="0" ?desabilitado=${dis}
+                    .valor=${n(f.repasse?.carteira_carencia_meses)}
+                    @urbi:input-numero-change=${(ev: CustomEvent) => this._setRepasse('carteira_carencia_meses', ev.detail.valor ?? 0)}></viab-num>
+                </div>` : nothing}
               <!-- #460: destino do resíduo de um "Ao longo da obra" sem prazo
                    (venda no mês do marco ou depois). 'imediato' preserva todo
                    estudo existente; 'concentrado' é a regra da EVI — rola

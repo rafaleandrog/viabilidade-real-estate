@@ -161,6 +161,17 @@ cresce por desenho. Uma venda contratada depois do mês do repasse configurado (
 recebe o repasse no próprio mês da venda, sem juros e como recebimento à vista — o pagamento nunca
 cai antes da contratação, e o repasse do Grupo continua sendo um pagamento único.
 
+A **carteira própria** (componente `carteira_pos_marco`) é a parte do saldo de chaves que não vai
+ao banco. Com `p` o repasse bancário em % do saldo, o saldo de chaves `S = 100 − Σ entrada − Σ
+parcelas` se divide em `S × p/100` no concentrado e `S × (1 − p/100)` na carteira própria. Para a
+safra `s`, o 1º vencimento é `v = max(fim da obra + 1 + carência, s + 1)`; o principal capitaliza
+até `v − 1`, `P' = principal_s × (1 + taxa)^(v − 1 − s)`, e paga `n` parcelas `PMT(taxa, n, P')`
+de `v` a `v + n − 1`. Com uma parcela só, o pagamento é o mesmo de um concentrado pago em `v`. Cada
+parcela abate primeiro os juros acumulados até ali e só depois o principal. Antes do 1º vencimento
+o saldo cresce por desenho, então a reconciliação só confere a monotonicidade dali em diante. Venda
+depois da entrega com carteira própria no plano: a parte da carteira vence a partir de `s + 1`, e o
+restante (`100 − participação da carteira`) é recebido à vista no mês da venda.
+
 - **Itemizada por linha de custo, em blocos canônicos.** Cada linha cadastrada em Custos aparece
   pelo nome que o usuário deu (fora do Terreno, o nome é a categoria escolhida), na ordem: Terreno
   → Projetos e aprovações → Outorga → Incorporação e registro → Construção → Gestão da construção →

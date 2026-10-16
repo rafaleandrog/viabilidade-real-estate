@@ -86,7 +86,7 @@ reconciliação.
 
 | Sub-aba | O que se informa |
 |---|---|
-| **Receitas** | A **absorção de vendas** — quanto do estoque se vende em cada mês, em percentual acumulado, a partir de uma curva que pode ser substituída — e o **fluxo de pagamento** de cada safra de vendas: **Sinal**, **Nº parcelas**, o que é pago **Ao longo da obra**, o **Desconto** e o **Resíduo sem prazo** (o saldo nas chaves: caixa imediato, o padrão, ou rolando para o repasse). |
+| **Receitas** | A **absorção de vendas** — quanto do estoque se vende em cada mês, em percentual acumulado, a partir de uma curva que pode ser substituída — e o **fluxo de pagamento** de cada safra de vendas: **Sinal**, **Nº parcelas**, o que é pago **Ao longo da obra**, o **Desconto**, o **Resíduo sem prazo** (o que o parcelamento ao longo da obra não alcança: caixa imediato, o padrão, ou rolando para o repasse) e o **Saldo de chaves** — o que restar após entrada e parcelamento, dividido entre o **Repasse bancário** (% do saldo, pago de uma vez no 1º mês após o fim da obra) e a **carteira própria** (o restante, financiado direto ao comprador em **Nº parcelas** mensais após uma **Carência (meses)** contada da entrega). |
 | **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL; `0` é uma taxa válida e não desconta nada, de modo que o VPL iguala a soma do fluxo; estudo sem taxa gravada usa 12% a.a.) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota de imposto aparece aqui só para leitura. |
 
 A **Absorção de vendas** de cada Grupo distribui o percentual vendido em até quatro períodos que vêm
@@ -97,8 +97,9 @@ período espalha o seu percentual por igual pelos meses que tem. O Pós-chaves c
 ele não depende da duração da fase Pós-obras do Cronograma, que é de custo. Uma janela curta
 concentra as vendas das chaves em poucos meses. O atalho **À vista, mês único (1º mês das chaves)**
 vende o Grupo inteiro no primeiro mês depois da entrega: ele zera os três primeiros períodos e põe
-a janela em 1 mês. Com o plano de pagamento do Grupo já aplicado, toda venda feita depois da entrega
-é recebida à vista, qualquer que seja o plano. Num Grupo com **Plano não migrado** o atalho fica
+a janela em 1 mês. Com o plano de pagamento do Grupo já aplicado, a venda feita depois da entrega
+é recebida à vista — exceto a parte da **carteira própria**, quando o plano tem uma, que continua
+financiada. Num Grupo com **Plano não migrado** o atalho fica
 indisponível até o **Fluxo de Pagamento** ser aplicado, porque o plano antigo não recebe à vista a
 venda posterior à entrega.
 
@@ -130,11 +131,25 @@ parcela. Uma venda contratada depois do mês do repasse do Grupo (e antes da ent
 repasse no próprio mês da venda, sem juros, como recebimento à vista (fora da série de repasse), e
 a reconciliação avisa, porque o mês configurado não é o que o fluxo usa.
 
+A **carteira própria** é a parte do saldo de chaves que não vai ao banco: a empresa fica com o
+contrato e financia o comprador direto — o caso comum de loteamento, que costuma ter 0% de repasse
+bancário e o saldo inteiro em 120 ou mais parcelas. Os juros de tabela do estudo correm do mês da
+venda até o mês anterior ao 1º vencimento (que é o 1º mês após o fim da obra mais a carência), e
+dali o saldo amortiza em parcelas iguais (tabela Price). Ela entra na carteira de clientes e na
+carteira máxima, e não na série de repasse. Com carteira própria no plano, a venda contratada
+**depois da entrega** também é financiada nessa parte, a partir do mês seguinte à venda; o
+restante dela continua chegando à vista no mês da venda. Sem carteira própria (repasse bancário de
+100%, o padrão), toda venda depois da entrega é recebida à vista. O **Resíduo sem prazo** "Rola
+para o Repasse" rola só para a parte bancária: com repasse bancário de 0% não há repasse, e esse
+resíduo é recebido à vista. Num plano gravado só como componentes (sem linhas de entrada e de
+parcelamento), o destino do saldo de chaves não é editável no modal.
+
 A **reconciliação** confere o fluxo contra regras que o cálculo deve respeitar: a venda bruta
 contratada recomposta linha a linha, mês a mês, com o mesmo arredondamento do fluxo; os
 componentes de pagamento somando 100% em cada safra; a carteira de cada componente zerando no
 último vencimento; e a carteira dos componentes que amortizam nunca voltando a crescer — o saldo a
-repassar fica fora desta última, porque capitaliza até o repasse. Cada aviso aparece uma vez por
+repassar fica fora desta última, porque capitaliza até o repasse, e a carteira própria só entra
+nela a partir do 1º vencimento, porque até ali ela também capitaliza. Cada aviso aparece uma vez por
 componente, na primeira safra em que acontece, e um aviso numa safra não esconde os das safras
 seguintes.
 

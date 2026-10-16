@@ -20,7 +20,7 @@
 
 import type { FluxoCalc, ComponentePagamento, ResiduoAteMarco } from './fluxo-caixa-motor.js';
 import {
-  carteiraSaldoSafra, componentesIntegradosSafra, componentesPagamento,
+  carteiraSaldoSafra, primeiroVencimentoCarteira, componentesIntegradosSafra, componentesPagamento,
   linhasReceitaComPermutaReservada, vendaBrutaContratadaMensal, vendaLiquidaContratadaMensal,
 } from './fluxo-caixa-motor.js';
 import {
@@ -816,7 +816,14 @@ export function validarComponentesSafra(
     // monotonicidade continua valendo para os tipos que amortizam; o
     // `CARTEIRA_NAO_ZERA` acima continua valendo para todos.
     if (c.tipo === 'concentrado') continue;
+    // #850: a carteira própria também capitaliza por desenho até o 1º
+    // vencimento (a obra e a carência) — a monotonicidade só vale dali em
+    // diante, quando ela amortiza.
+    const inicioAmortizacao = c.tipo === 'carteira_pos_marco'
+      ? primeiroVencimentoCarteira(c, safra) - 1
+      : -Infinity;
     for (let i = 1; i < saldos.length; i++) {
+      if (saldos[i - 1].mes < inicioAmortizacao) continue;
       if (saldos[i].saldo > saldos[i - 1].saldo + tol) {
         out.push({
           codigo: 'CARTEIRA_RESSURGE', severidade: 'erro', linha, safra, mes: saldos[i].mes,

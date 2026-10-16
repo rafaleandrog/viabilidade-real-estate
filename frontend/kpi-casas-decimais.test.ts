@@ -142,8 +142,8 @@ const PCT_ENTRADA: { arquivo: string; chamadas: number; motivo: string }[] = [
     motivo: 'o piso de resultado final DIGITADO no benchmark, dentro de um urbi-banner — não é card',
   },
   {
-    arquivo: 'tela-fluxo-receitas.ts', chamadas: 2,
-    motivo: 'as duas derivadas de % DIGITADA: pós-obra numa <td> (:700) e o repasse dentro de div.repasse-box (:1043) — uma caixa com forma de card exibindo derivada de valor digitado. Se ela conta como card de KPI é decisão do autor (registrada no PR da #581); enquanto não decidida, mantém as 2 casas do valor digitado',
+    arquivo: 'tela-fluxo-receitas.ts', chamadas: 3,
+    motivo: 'as três derivadas de % DIGITADA: pós-obra numa <td>, o saldo de chaves e a carteira própria (#850) dentro de div.repasse-box — uma caixa com forma de card exibindo derivada de valor digitado. Se ela conta como card de KPI é decisão do autor (registrada no PR da #581); enquanto não decidida, mantém as 2 casas do valor digitado',
   },
   {
     // #586: entrou com a tabela compilada da aba Operações do Funding.
