@@ -908,8 +908,7 @@ export class ViabTelaDashboard extends LitElement {
         id: 'area_max_construida', label: 'Área máx. construída', alinhamento: 'direita',
         valor: (l: any) => {
           if (l._tipo !== 'lote') return '—';
-          const v = areaMaxConstruida(l.area, this.parametros.get(Number(l.id))?.coef_maximo);
-          return v == null ? '—' : `${fmtNum(v)} m²`;
+          return fmtM2(areaMaxConstruida(l.area, this.parametros.get(Number(l.id))?.coef_maximo));
         },
       },
       {

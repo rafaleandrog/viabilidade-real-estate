@@ -61,12 +61,18 @@ export const caso = {
     el.form = { ...el.form, coef_maximo: 3.5 };
     await el.updateComplete;
     const livre = desab();
-    // Escolher a UOS preenche o uso; "Não definida" limpa os dois.
-    el._escolherUos('CSII 1'); await el.updateComplete;
+    // Escolher a UOS preenche o uso; "Não definida" limpa os dois. O evento sai do `urbi-select` da tela:
+    // chamar `_escolherUos` direto deixaria a ligação do template sem cobertura.
+    const escolher = async (valor: string) => {
+      el.shadowRoot.querySelector('urbi-select').dispatchEvent(
+        new CustomEvent('urbi:select-change', { detail: { valor }, bubbles: true, composed: true }));
+      await el.updateComplete;
+    };
+    await escolher('CSII 1');
     const usoDaUosEscolhida = String(el.form.uso);
-    el._escolherUos(''); await el.updateComplete;
+    await escolher('');
     const uosLimpaLimpaUso = el.form.uos === '' && el.form.uso === '';
-    el._escolherUos('CSIIR 2'); await el.updateComplete;
+    await escolher('CSIIR 2');
     el._salvar();                                    // cadastro: pede para salvar, com o carimbo
     const novo = eventos.salvar[0];
     const aposPrimeiro = eventos.salvar.length;

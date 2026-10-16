@@ -54,11 +54,12 @@ do lote no módulo multiplicada pelo coeficiente máximo (vazia quando não há 
   lote, com *Reconfirmar vínculo*).
 - **UOS e uso.** No modal, a **UOS** é escolhida numa lista (as UOS da LUOS do DF: RE, RO, CSIIR, CSII e CSIInd) e o
   **uso** é preenchido sozinho a partir dela: RE e RO dão *Residencial*, CSIIR dá *Misto*, CSII e CSIInd dão
-  *Comercial*. O uso não é editável. Um registro antigo com UOS fora da lista continua aparecendo, marcado como *fora
-  do catálogo*, com o uso que já tinha. Na importação vale o mesmo: uma UOS da lista grava o uso dela, e a coluna `uso`
-  da planilha só conta quando a UOS não está na lista.
+  *Comercial*. O uso não é editável. Um registro antigo com UOS da lista abre com o uso dela (e salvar o grava); com UOS
+  fora da lista continua aparecendo, marcado como *fora do catálogo*, com o uso que já tinha. Na importação vale o
+  mesmo: uma UOS da lista grava o uso dela; a coluna `uso` da planilha só conta quando nem a linha nem o registro já
+  gravado têm UOS da lista.
 - **Importar de novo não apaga nada.** Célula vazia ou coluna ausente significam "não mexer": o CSV da etapa 1 traz só
-  o coeficiente máximo, e reimportá-lo não apaga o mínimo, o gabarito, a UOS ou o uso que alguém editou no modal. Só o
+  o coeficiente máximo, e reimportá-lo não apaga o mínimo, o gabarito, a UOS ou o uso já gravados. Só o
   modal limpa um valor. O carimbo do lote é gravado no **cadastro** do registro; importar por cima de um registro que
   já existe não o regrava. Planilhas com mais de 300 lotes são enviadas em blocos de 300.
 - **Status do vínculo.** Junto dos valores o app guarda um carimbo do lote (parcelamento, rua, número, quadra, conjunto

@@ -250,9 +250,11 @@ export function itensDaImportacao(
     if (r.linha.coef_minimo != null) item.coef_minimo = r.linha.coef_minimo;
     if (r.linha.gabarito_maximo != null) item.gabarito_maximo = r.linha.gabarito_maximo;
     // UOS do catálogo vai na grafia do catálogo e leva o uso dela; fora do catálogo, vale o que a planilha traz.
+    // Linha sem UOS sobre um registro cuja UOS gravada é do catálogo: o uso é o dela, e o da planilha não entra.
     const uos = uosDoCatalogo(r.linha.uos);
     if (r.linha.uos) item.uos = uos?.uos ?? r.linha.uos;
-    const uso = uos?.uso ?? r.linha.uso;
+    const uosMantida = !r.linha.uos && uosDoCatalogo(registro?.uos) != null;
+    const uso = uos?.uso ?? (uosMantida ? '' : r.linha.uso);
     if (uso) item.uso = uso;
     if (origem) item.origem = origem;
     return item;
@@ -303,10 +305,17 @@ export type FormParametros = Record<string, string | number | null>;
 const NUMERICOS = ['coef_minimo', 'coef_maximo', 'gabarito_maximo'] as const;
 const TEXTOS = ['uos', 'uso'] as const;
 
+/**
+ * Registro → formulário do modal. UOS do catálogo vem na grafia do catálogo e com o uso dela, mesmo que o
+ * registro guarde outra grafia ou um uso divergente (importação antiga): o modal mostra o par coerente, e
+ * Salvar o grava. UOS fora do catálogo mantém o uso que o registro tem.
+ */
 export function formDoRegistro(r: any | null): FormParametros {
   const f: FormParametros = {};
   for (const c of TEXTOS) f[c] = r?.[c] ?? '';
   for (const c of NUMERICOS) f[c] = paraNumero(r?.[c]);
+  const uos = uosDoCatalogo(f.uos);
+  if (uos) { f.uos = uos.uos; f.uso = uos.uso; }
   return f;
 }
 

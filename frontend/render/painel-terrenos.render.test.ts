@@ -60,7 +60,7 @@ test('Terrenos: os parâmetros aparecem na linha do lote certo; clicar no lote a
   assert.equal(m.coefMax['LOTE-NORMAL'], '3,5', 'coeficiente máximo do lote com registro' + relato(a));
   assert.equal(m.coefMin['LOTE-NORMAL'], '1', 'coeficiente mínimo do lote com registro' + relato(a));
   assert.equal(m.gabarito['LOTE-NORMAL'], '12', 'gabarito do lote com registro' + relato(a));
-  assert.equal(m.areaMax['LOTE-NORMAL'], '1.050 m²', 'área máx. construída = área do lote (300) × coef. máx. (3,5)' + relato(a));
+  assert.equal(m.areaMax['LOTE-NORMAL'], '1.050,00 m²', 'área máx. construída = área do lote (300) × coef. máx. (3,5)' + relato(a));
   assert.equal(m.areaMax['LOTE-COM-SETOR'], '—', 'sem coef. máx. não há área máx. construída' + relato(a));
   assert.equal(m.areaMax['GLEBA-A'], '—', 'gleba não tem área máx. construída de lote' + relato(a));
   assert.equal(m.coefMax['LOTE-COM-SETOR'], '—', 'lote sem registro não herda valor de outro' + relato(a));
