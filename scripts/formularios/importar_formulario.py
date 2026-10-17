@@ -891,6 +891,13 @@ def reler(api, m, eid):
             cart = [c for c in (comp or []) if isinstance(c, dict) and c.get('tipo') == 'carteira_pos_marco']
             if isinstance(comp, list) and comp and not cart:
                 div.append(f'grupo "{nome}": carteira própria pedida, mas os componentes não têm carteira_pos_marco')
+            # os termos do componente canônico, que é o que o motor lê; o marco não entra porque o motor o
+            # reprojeta sempre do fim da obra vigente (`componentesPagamento`)
+            for c in cart:
+                for campo, ped in (('prazoMeses', g.get('carteira_parcelas')),
+                                   ('carenciaMeses', g.get('carteira_carencia_meses') or 0)):
+                    if not igual(ped, c.get(campo)):
+                        div.append(f'grupo "{nome}": carteira_pos_marco.{campo} pedido {ped!r}, gravado {c.get(campo)!r}')
         if isinstance(comp, list) and comp:
             ent = [(float(q.get('pct') or 0), 0.0) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Entrada']
             par_ = [(float(q.get('pct') or 0), float(q.get('sinal_pct') or 0)) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Parcelamento']
@@ -976,9 +983,21 @@ def reler(api, m, eid):
         elif o.get('valor') is not None and not igual(o['valor'], g.get('valor')):
             div.append(f'funding {tipo} "{o["nome"]}".valor: enviado {o["valor"]!r}, gravado {g.get("valor")!r}')
         if tipo == 'antecipacao_recebiveis' and g is not None:
-            for c, col in (('pct_cedida', 'pct_carteira_cedida'), ('taxa_anual', 'taxa_anual')):
-                if o.get(c) is not None and not igual(o[c], g.get(col)):
-                    div.append(f'funding antecipação "{o["nome"]}".{col}: enviado {o[c]!r}, gravado {g.get(col)!r}')
+            # tudo o que decide o valor e o momento da cessão; tarifa em branco é gravada como 0
+            for c, col in (('pct_cedida', 'pct_carteira_cedida'), ('taxa_anual', 'taxa_anual'),
+                           ('estruturacao_pct', 'taxa_estruturacao_pct'), ('administracao_mensal', 'taxa_administracao_mensal'),
+                           ('outros_encargos', 'outros_encargos_iniciais')):
+                ped = o.get(c) if o.get(c) is not None else (None if c in ('pct_cedida', 'taxa_anual') else 0)
+                if ped is not None and not igual(ped, g.get(col) or 0):
+                    div.append(f'funding antecipação "{o["nome"]}".{col}: enviado {ped!r}, gravado {g.get(col)!r}')
+            ap = str(o.get('aporte') or '')
+            if ap.startswith('fase:'):
+                if not g.get('fase_ancora_id'):
+                    div.append(f'funding antecipação "{o["nome"]}": âncora na fase "{ap[5:].strip()}" pedida, gravada sem fase')
+            elif ap and str(g.get('cronograma_evento') or 'customizado') != ap:
+                div.append(f'funding antecipação "{o["nome"]}".cronograma_evento: enviado {ap!r}, gravado {g.get("cronograma_evento")!r}')
+            if ap == 'customizado' and o.get('mes') is not None and not igual(o['mes'], g.get('inicio_mes')):
+                div.append(f'funding antecipação "{o["nome"]}".inicio_mes: enviado {o["mes"]!r}, gravado {g.get("inicio_mes")!r}')
         if tipo == 'financiamento_producao' and o.get('base_financiavel') and g is not None:
             pedidos_ids = len(rotulos_da_base(o['base_financiavel']))
             if len(g.get('custo_linha_ids') or []) != pedidos_ids:
