@@ -891,7 +891,7 @@ def reler(api, m, eid):
             cart = [c for c in (comp or []) if isinstance(c, dict) and c.get('tipo') == 'carteira_pos_marco']
             if isinstance(comp, list) and comp and not cart:
                 div.append(f'grupo "{nome}": carteira própria pedida, mas os componentes não têm carteira_pos_marco')
-        else:
+        if isinstance(comp, list) and comp:
             ent = [(float(q.get('pct') or 0), 0.0) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Entrada']
             par_ = [(float(q.get('pct') or 0), float(q.get('sinal_pct') or 0)) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Parcelamento']
             repasse = round(100 - sum(x[0] for x in ent + par_), 6)
