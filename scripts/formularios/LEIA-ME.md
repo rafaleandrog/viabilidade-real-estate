@@ -16,7 +16,8 @@ impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os 
 
 1. **Valida a planilha, lista todos os problemas de uma vez e para antes de escrever.** Barra: duas unidades preenchidas no mesmo campo; Σ % dos
    produtos ≠ 100; grupo ou tipologia que não existe; alocado acima do catálogo; Σ do pagamento acima de 100; categoria de custo com
-   unidade que a tela não aceita; custo obrigatório ausente; valor na linha errada; item com dados e sem nome (tipologia, grupo, fase, dívida, equity, cenário); nome repetido; janela pós-chaves fora de 1 a 12; permuta com valor zero.
+   unidade que a tela não aceita; custo obrigatório ausente; valor na linha errada; item com dados e sem nome (tipologia, grupo, fase, dívida, equity, antecipação, cenário); nome repetido; janela pós-chaves fora de 1 a 12; permuta com valor zero;
+   repasse bancário abaixo de 100% sem o nº de parcelas da carteira própria; antecipação sem % cedido ou sem mês da cessão.
 2. **Cria o estudo** pelas rotas do app, na ordem que o app exige (parâmetros antes do cronograma, tipologias antes das alocações…).
 3. **Leva o pagamento ao formato canônico** (`aplicar-pagamento-canonico.ts`). Em instância com a normalização na API é um passo sem efeito.
 4. **Relê** o que foi gravado e compara com a planilha (estudo, parâmetros, cronograma, produtos, tipologias, absorção e pagamento de cada grupo, alocações, custos, funding, cenários). Campo que a API não devolve conta como divergência, não como silêncio.
@@ -39,6 +40,18 @@ falha HTTP em alguma chamada, conversão do pagamento que falhou, divergência n
 
 Região de mercado, apelo comercial (texto e tipo), imagem principal e vínculo com imóvel do Núcleo (a origem do terreno tem de ser `manual`).
 Esses vão pela tela.
+
+## Saldo de chaves e antecipação de recebíveis (formulário Avançado)
+
+- **Seção 6, por grupo:** `grupos[n].repasse_banco_pct` (% do saldo de chaves pago pelo banco; vazio = 100%, como
+  antes), `grupos[n].carteira_parcelas` (nº de parcelas da carteira própria, obrigatório com repasse < 100%) e
+  `grupos[n].carteira_carencia_meses` (meses após a entrega até a 1ª parcela; vazio = 0). O importador grava os três em
+  `fluxo_pagamento.repasse` (`pct_banco`, `carteira_parcelas`, `carteira_carencia_meses`), e a conversão canônica gera o
+  componente `carteira_pos_marco`. A taxa da carteira é o campo Juros de tabela do estudo.
+- **Seção 10, até três antecipações:** `funding.antecipacao[n].nome`, `.aporte` (mês da cessão: evento, `fase: <nome>` ou
+  `customizado` com `.mes`), `.pct_cedida`, `.taxa_anual` (taxa de desconto), `.estruturacao_pct`, `.administracao_mensal`
+  e `.outros_encargos`. Viram uma operação `antecipacao_recebiveis`. Não há campo de valor: o app calcula o valor
+  presente das parcelas cedidas.
 
 ## Chaves técnicas
 

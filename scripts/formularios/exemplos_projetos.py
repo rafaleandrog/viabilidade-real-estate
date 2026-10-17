@@ -81,6 +81,7 @@ def avanc_inc(derivados):
     ex.update(
         gr1_nome='Residencial', gr1_pre=P(10), gr1_lanc=P(25), gr1_obra=P(45), gr1_janela=6, gr1_corr='Não', gr1_resid='imediato',
         gr2_nome='Lojas', gr2_pre=0, gr2_lanc=0, gr2_obra=P(50), gr2_janela=12, gr2_corr='Não', gr2_resid='concentrado',
+        gr2_banco=P(40), gr2_cart_parc=60, gr2_cart_car=3,     # saldo de chaves das lojas: 40% banco, 60% carteira própria
         pg1_grupo='Residencial', pg1_linha='Entrada', pg1_pct=P(10), pg1_parc=1, pg1_desc=0,
         pg2_grupo='Residencial', pg2_linha='Parcelamento', pg2_pct=P(20), pg2_sinal=0, pg2_obra='Sim',
         pg3_grupo='Residencial', pg3_linha='Parcelamento', pg3_pct=P(10), pg3_parc=24, pg3_sinal=0, pg3_obra='Não',
@@ -185,6 +186,8 @@ def avanc_lot(derivados):
               dv1_taxa=P(14), dv1_amort=48, dv1_carencia=18, dv1_estr=P(2), dv1_adm=5000, dv1_outros=50_000,
               eq1_nome='Fundo de investimento imobiliário', eq1_valor=14_000_000, eq1_aporte='planejamento',
               eq1_modo='permuta_financeira', eq1_pct=P(10),
+              an1_nome='Cessão da carteira à securitizadora', an1_aporte='pos_obra', an1_pct=P(50), an1_taxa=P(15),
+              an1_estr=P(1.5), an1_adm=4000, an1_outros=30_000,
               ce1_nome='Otimista — preço +5%, obra −3%', ce1_preco=P(5), ce1_obra=P(-3),
               ce2_nome='Pessimista — preço −10%, obra +8%', ce2_preco=P(-10), ce2_obra=P(8))
     return ex

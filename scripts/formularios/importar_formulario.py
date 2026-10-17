@@ -320,6 +320,7 @@ def _validar_avancado(m, erros, avisos):
                 E(f'Fase {n}: duração deve ser um inteiro ≥ 1 (veio {f["duracao_meses"]})')
     sem_nome('funding.divida', 'Dívida')
     sem_nome('funding.equity', 'Equity')
+    sem_nome('funding.antecipacao', 'Antecipação de recebíveis')
     sem_nome('cenarios', 'Cenário')
     sem_nome('funding.financiamento_producao', 'Financiamento à produção')
 
@@ -356,6 +357,19 @@ def _validar_avancado(m, erros, avisos):
             A(f'Grupo "{g["nome"]}": há pré-lançamento e a absorção de pré está em branco (vale 0%)')
         if not tem_pre and g.get('pre_lancamento_pct'):
             E(f'Grupo "{g["nome"]}": absorção de pré-lançamento sem pré-lançamento')
+        # saldo de chaves (#850) — espelha `erroDestinoSaldoChaves` (frontend/fluxo-pagamento-contrato.ts)
+        banco, parc, car = g.get('repasse_banco_pct'), g.get('carteira_parcelas'), g.get('carteira_carencia_meses')
+        if banco is not None and not (0 <= banco <= 100):
+            E(f'Grupo "{g["nome"]}": repasse bancário deve ficar entre 0% e 100% do saldo de chaves (veio {banco})')
+        if parc is not None and not (float(parc).is_integer() and parc >= 1):
+            E(f'Grupo "{g["nome"]}": nº de parcelas da carteira própria deve ser um inteiro ≥ 1 (veio {parc})')
+        if car is not None and not (float(car).is_integer() and car >= 0):
+            E(f'Grupo "{g["nome"]}": carência da carteira própria deve ser um inteiro ≥ 0 (veio {car})')
+        if banco is not None and banco < 100 and parc is None:
+            E(f'Grupo "{g["nome"]}": repasse bancário abaixo de 100% exige o nº de parcelas da carteira própria')
+        if (banco is None or banco >= 100) and (parc is not None or car is not None):
+            A(f'Grupo "{g["nome"]}": parcelas/carência da carteira preenchidas com repasse bancário de 100%: '
+              'não há carteira própria, e elas são ignoradas')
     por_grupo = defaultdict(float)
     parcelamentos = defaultdict(int)
     for n, q in sorted(m['pagamento'].items()):
@@ -463,15 +477,28 @@ def _validar_avancado(m, erros, avisos):
             elif len(achadas) > 1:
                 E(f'Base financiável: "{rot}" é ambíguo ({len(achadas)} linhas); use "Categoria / Subcategoria" para escolher uma só')
     fases_nomes = {f['nome'] for f in m['fases'].values() if f.get('nome')}
-    for d in ('funding.divida', 'funding.equity'):
+    for d in ('funding.divida', 'funding.equity', 'funding.antecipacao'):
         for n, o in sorted(m[d].items()):
-            if o.get('nome') and not o.get('valor'):
+            if d != 'funding.antecipacao' and o.get('nome') and not o.get('valor'):
                 E(f'{d} {n}: falta o valor')
             ap = str(o.get('aporte') or '')
             if ap.startswith('fase:') and ap[5:].strip() not in fases_nomes:
                 E(f'{d} {n}: fase "{ap[5:].strip()}" não existe nas fases customizadas')
             elif ap and not ap.startswith('fase:') and ap not in EVENTOS_ANCORA:
                 E(f'{d} {n}: âncora "{ap}" inválida; use um de: {", ".join(EVENTOS_ANCORA)} ou fase:<nome>')
+    for n, o in sorted(m['funding.antecipacao'].items()):
+        if not o.get('nome'):
+            continue
+        pc = o.get('pct_cedida')
+        if pc is None or not (0 < pc <= 100):
+            E(f'funding.antecipacao {n}: carteira cedida deve ficar entre 0% (exclusivo) e 100% (veio {pc!r})')
+        if not o.get('aporte'):
+            E(f'funding.antecipacao {n}: falta o mês da cessão (evento, fase ou customizado)')
+        elif o.get('aporte') == 'customizado' and o.get('mes') is None:
+            E(f'funding.antecipacao {n}: mês da cessão customizado exige o mês')
+        for c in ('taxa_anual', 'estruturacao_pct', 'administracao_mensal', 'outros_encargos'):
+            if o.get(c) is not None and o[c] < 0:
+                E(f'funding.antecipacao {n}: {c} não pode ser negativo (veio {o[c]})')
     for n, o in sorted(m['funding.divida'].items()):
         am, ca = o.get('amortizacao_meses'), o.get('carencia_meses')
         if am and ca is not None and am > 0 and ca >= am:
@@ -634,7 +661,12 @@ def escrever_avancado(api, m, eid):
             else:
                 parcelas.append({'periodicidade': 'mensal', 'parcelas': q.get('parcelas', 0), 'ao_longo_obra': bool(q.get('ao_longo_obra', False)),
                                  'juros': True, 'pct': q.get('pct', 0), 'sinalPct': q.get('sinal_pct', 0)})
-        fluxo = {'entrada': entradas, 'parcelas': parcelas, 'repasse': {'apos_entrega_meses': 1},
+        repasse = {'apos_entrega_meses': 1}
+        banco = g.get('repasse_banco_pct')
+        if banco is not None and banco < 100:          # carteira própria (#850); vazio ou 100% = tudo no banco, como antes
+            repasse.update(pct_banco=banco, carteira_parcelas=int(g['carteira_parcelas']),
+                           carteira_carencia_meses=int(g.get('carteira_carencia_meses') or 0))
+        fluxo = {'entrada': entradas, 'parcelas': parcelas, 'repasse': repasse,
                  'residuoAteMarco': g.get('residuo_sem_prazo', 'imediato')}
         api.chamar('PATCH', f'{base}/fases/{fid}', {'absorcao': absorcao, 'fluxo_pagamento': fluxo})
     for n, a in ordenados(m['alocacoes']):
@@ -739,6 +771,16 @@ def escrever_avancado(api, m, eid):
             if o.get(c) is not None:
                 d[col] = o[c]
         api.chamar('POST', f'{base}/funding', d)
+    for n, o in ordenados(m['funding.antecipacao']):
+        if not o.get('nome'):
+            continue
+        d = {'tipo': 'antecipacao_recebiveis', 'nome': o['nome'], 'ordem': n, 'valor': 0, **anc(o)}
+        for c, col in (('mes', 'inicio_mes'), ('pct_cedida', 'pct_carteira_cedida'), ('taxa_anual', 'taxa_anual'),
+                       ('estruturacao_pct', 'taxa_estruturacao_pct'), ('administracao_mensal', 'taxa_administracao_mensal'),
+                       ('outros_encargos', 'outros_encargos_iniciais')):
+            if o.get(c) is not None:
+                d[col] = o[c]
+        api.chamar('POST', f'{base}/funding', d)
     for n, c in ordenados(m['cenarios']):
         if c.get('nome'):
             api.chamar('POST', f'{base}/cenarios', {'nome': c['nome'], 'preco_venda_pct': c.get('preco_venda_pct', 0),
@@ -839,11 +881,24 @@ def reler(api, m, eid):
         comp = fp.get('componentes')
         if not (isinstance(comp, list) and comp):
             div.append(f'grupo "{nome}": fluxo de pagamento SEM componentes (o motor calcula sem juros)')
+        banco_ped = g.get('repasse_banco_pct')
+        if banco_ped is not None and banco_ped < 100:
+            rep = fp.get('repasse') if isinstance(fp.get('repasse'), dict) else {}
+            for c, ped in (('pct_banco', banco_ped), ('carteira_parcelas', g.get('carteira_parcelas')),
+                           ('carteira_carencia_meses', g.get('carteira_carencia_meses') or 0)):
+                if not igual(ped, rep.get(c)):
+                    div.append(f'grupo "{nome}": repasse.{c} pedido {ped!r}, gravado {rep.get(c)!r}')
+            cart = [c for c in (comp or []) if isinstance(c, dict) and c.get('tipo') == 'carteira_pos_marco']
+            if isinstance(comp, list) and comp and not cart:
+                div.append(f'grupo "{nome}": carteira própria pedida, mas os componentes não têm carteira_pos_marco')
         else:
             ent = [(float(q.get('pct') or 0), 0.0) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Entrada']
             par_ = [(float(q.get('pct') or 0), float(q.get('sinal_pct') or 0)) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Parcelamento']
             repasse = round(100 - sum(x[0] for x in ent + par_), 6)
-            esperado = sorted(round(x[0], 2) for x in ent + par_ + ([(repasse, 0.0)] if repasse > 0.005 else []))
+            banco = g.get('repasse_banco_pct')
+            banco = 100.0 if banco is None or banco >= 100 else float(banco)
+            saldo = [repasse * banco / 100, repasse * (100 - banco) / 100]     # banco (concentrado) e carteira própria
+            esperado = sorted(round(x[0], 2) for x in ent + par_ + [(v, 0.0) for v in saldo if v > 0.005])
             gravado = sorted(round(float(c.get('participacaoPct') or 0), 2) for c in comp)
             if esperado != gravado:
                 div.append(f'grupo "{nome}": participações do pagamento pedidas {esperado}, gravadas {gravado}')
@@ -906,7 +961,8 @@ def reler(api, m, eid):
         else:
             restantes.remove(achou)
     ops = api.lista(f'/estudos/{eid}/avancado/funding')
-    pedidas_f = [(t, o) for t, lista in (('financiamento_producao', 'funding.financiamento_producao'), ('divida', 'funding.divida'), ('equity', 'funding.equity'))
+    pedidas_f = [(t, o) for t, lista in (('financiamento_producao', 'funding.financiamento_producao'), ('divida', 'funding.divida'),
+                                         ('equity', 'funding.equity'), ('antecipacao_recebiveis', 'funding.antecipacao'))
                  for _, o in ordenados(m[lista]) if o.get('nome')]
     if len(ops) != len(pedidas_f):
         div.append(f'funding: pedidas {len(pedidas_f)}, gravadas {len(ops)}')
@@ -916,6 +972,10 @@ def reler(api, m, eid):
             div.append(f'funding {tipo} "{o["nome"]}" não foi gravado')
         elif o.get('valor') is not None and not igual(o['valor'], g.get('valor')):
             div.append(f'funding {tipo} "{o["nome"]}".valor: enviado {o["valor"]!r}, gravado {g.get("valor")!r}')
+        if tipo == 'antecipacao_recebiveis' and g is not None:
+            for c, col in (('pct_cedida', 'pct_carteira_cedida'), ('taxa_anual', 'taxa_anual')):
+                if o.get(c) is not None and not igual(o[c], g.get(col)):
+                    div.append(f'funding antecipação "{o["nome"]}".{col}: enviado {o[c]!r}, gravado {g.get(col)!r}')
         if tipo == 'financiamento_producao' and o.get('base_financiavel') and g is not None:
             pedidos_ids = len(rotulos_da_base(o['base_financiavel']))
             if len(g.get('custo_linha_ids') or []) != pedidos_ids:
