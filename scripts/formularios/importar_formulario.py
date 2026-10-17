@@ -393,6 +393,11 @@ def _validar_avancado(m, erros, avisos):
     for gnome, soma in por_grupo.items():
         if soma > 100.01:
             E(f'Grupo "{gnome}": Σ % do pagamento = {soma:.2f} (> 100)')
+    for gnome, g in grupos.items():
+        banco = g.get('repasse_banco_pct')
+        if banco is not None and banco < 100 and por_grupo[gnome] >= 99.995:
+            A(f'Grupo "{gnome}": repasse bancário abaixo de 100% num grupo sem saldo de chaves (Σ pagamento = 100%): '
+              'a carteira própria fica vazia')
         if parcelamentos[gnome] > 4:
             E(f'Grupo "{gnome}": mais de 4 linhas de Parcelamento')
     alocado = defaultdict(int)
@@ -881,13 +886,20 @@ def reler(api, m, eid):
         comp = fp.get('componentes')
         if not (isinstance(comp, list) and comp):
             div.append(f'grupo "{nome}": fluxo de pagamento SEM componentes (o motor calcula sem juros)')
+        ent = [(float(q.get('pct') or 0), 0.0) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Entrada']
+        par_ = [(float(q.get('pct') or 0), float(q.get('sinal_pct') or 0)) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Parcelamento']
+        repasse = round(100 - sum(x[0] for x in ent + par_), 6)              # saldo de chaves derivado
         banco_ped = g.get('repasse_banco_pct')
+        banco = 100.0 if banco_ped is None or banco_ped >= 100 else float(banco_ped)
+        esp_banco, esp_cart = repasse * banco / 100, repasse * (100 - banco) / 100
         if banco_ped is not None and banco_ped < 100:
             rep = fp.get('repasse') if isinstance(fp.get('repasse'), dict) else {}
             for c, ped in (('pct_banco', banco_ped), ('carteira_parcelas', g.get('carteira_parcelas')),
                            ('carteira_carencia_meses', g.get('carteira_carencia_meses') or 0)):
                 if not igual(ped, rep.get(c)):
                     div.append(f'grupo "{nome}": repasse.{c} pedido {ped!r}, gravado {rep.get(c)!r}')
+        # sem saldo de chaves não há carteira a conferir: o app não cria o componente, e está certo
+        if esp_cart > 0.005:
             cart = [c for c in (comp or []) if isinstance(c, dict) and c.get('tipo') == 'carteira_pos_marco']
             if isinstance(comp, list) and comp and not cart:
                 div.append(f'grupo "{nome}": carteira própria pedida, mas os componentes não têm carteira_pos_marco')
@@ -899,19 +911,18 @@ def reler(api, m, eid):
                     if not igual(ped, c.get(campo)):
                         div.append(f'grupo "{nome}": carteira_pos_marco.{campo} pedido {ped!r}, gravado {c.get(campo)!r}')
         if isinstance(comp, list) and comp:
-            ent = [(float(q.get('pct') or 0), 0.0) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Entrada']
-            par_ = [(float(q.get('pct') or 0), float(q.get('sinal_pct') or 0)) for _, q in ordenados(m['pagamento']) if q.get('grupo') == nome and q.get('linha') == 'Parcelamento']
-            repasse = round(100 - sum(x[0] for x in ent + par_), 6)
-            banco = g.get('repasse_banco_pct')
-            banco = 100.0 if banco is None or banco >= 100 else float(banco)
-            saldo = [repasse * banco / 100, repasse * (100 - banco) / 100]     # banco (concentrado) e carteira própria
-            esperado = sorted(round(x[0], 2) for x in ent + par_ + [(v, 0.0) for v in saldo if v > 0.005])
+            esperado = sorted(round(x[0], 2) for x in ent + par_ + [(v, 0.0) for v in (esp_banco, esp_cart) if v > 0.005])
             # participação de até meio centésimo não conta dos dois lados: o motor pode gravar uma fatia ínfima
             # (repasse bancário de 99,999%), e a lista esperada já a descarta
             gravado = sorted(round(float(c.get('participacaoPct') or 0), 2) for c in comp
                              if float(c.get('participacaoPct') or 0) > 0.005)
             if esperado != gravado:
                 div.append(f'grupo "{nome}": participações do pagamento pedidas {esperado}, gravadas {gravado}')
+            # a lista ordenada não vê o TIPO: banco e carteira trocados dariam a mesma lista
+            for tipo, esp in (('concentrado', esp_banco), ('carteira_pos_marco', esp_cart)):
+                grv = sum(float(c.get('participacaoPct') or 0) for c in comp if isinstance(c, dict) and c.get('tipo') == tipo)
+                if abs(grv - esp) > 0.01:
+                    div.append(f'grupo "{nome}": {tipo} pedido {round(esp, 2)}% do preço, gravado {round(grv, 2)}%')
             sinal_esp = round(sum(a * b / 100 for a, b in par_), 4)
             sinal_grv = round(sum(float(c.get('participacaoPct') or 0) * float(c.get('sinalPct') or 0) / 100 for c in comp), 4)
             if abs(sinal_esp - sinal_grv) > 0.01:
