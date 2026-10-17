@@ -16,7 +16,7 @@ antecipação de recebíveis) precisavam chegar às planilhas usadas para preenc
 - `importar_formulario.py`: valida os campos novos antes de escrever, grava `fluxo_pagamento.repasse`
   com `pct_banco`, `carteira_parcelas` e `carteira_carencia_meses` (vazio ou 100% = como antes), cria
   as operações `antecipacao_recebiveis` e confere as duas coisas na releitura.
-- Exemplos: as Lojas do Aurora Parque passam a ter 40% de repasse e 60% de carteira própria em 60x;
+- Exemplos: o saldo de chaves das Lojas do Aurora Parque passa a ser 40% repasse bancário e 60% carteira própria em 60x;
   o Vale do Sol ganha uma cessão de 50% no início do pós-obra a 15% a.a.
 - Os quatro formulários e os exemplos foram regenerados; os Preliminares não mudam de conteúdo e
   ficaram como estavam.

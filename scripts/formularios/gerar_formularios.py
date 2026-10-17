@@ -874,7 +874,8 @@ def avancado(tipo, ex):
            '(zona de referência). Sem pré-lançamento, deixe a absorção de pré em branco.')
     f.nota('Saldo de chaves = o Repasse acima. "Repasse bancário" é a parte dele paga pelo banco no mês seguinte ao fim da obra '
            '(vazio = 100%, tudo no banco). O resto vira carteira própria: a empresa financia o comprador em N parcelas mensais '
-           'Price com os Juros de tabela, a partir do mês seguinte ao fim da obra + a carência. Loteamento sem banco: 0%.')
+           'Price com os Juros de tabela, a partir do mês seguinte ao fim da obra + a carência (nunca antes do mês seguinte à '
+           'venda): também a venda feita depois da entrega tem essa parte financiada. Loteamento sem banco: 0%.')
     for g in range(1, N_GRP + 1):
         k = f'gr{g}'
         f.grupo(f'Grupo de venda {g}')
@@ -1078,7 +1079,7 @@ def avancado(tipo, ex):
         f.campo(f'{k}_mes', f'Antecipação {a_} — Mês (só customizado)', 'mês (inteiro ≥ 0)', f'funding.antecipacao[{a_}].mes',
                 F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_mes'))
         f.campo(f'{k}_pct', f'Antecipação {a_} — Carteira cedida', '% do que as vendas até a cessão ainda vão pagar',
-                f'funding.antecipacao[{a_}].pct_cedida', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_pct'))
+                f'funding.antecipacao[{a_}].pct_cedida', F_PCT, minimo=0.0001, maximo=1, ex=ex.get(f'{k}_pct'))
         f.campo(f'{k}_taxa', f'Antecipação {a_} — Taxa de desconto', '% a.a.', f'funding.antecipacao[{a_}].taxa_anual', F_PCT,
                 minimo=0, maximo=1, ex=ex.get(f'{k}_taxa'))
         f.campo(f'{k}_estr', f'Antecipação {a_} — Estruturação', '% do valor presente (no mês da cessão)',

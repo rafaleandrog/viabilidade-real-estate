@@ -899,7 +899,10 @@ def reler(api, m, eid):
             banco = 100.0 if banco is None or banco >= 100 else float(banco)
             saldo = [repasse * banco / 100, repasse * (100 - banco) / 100]     # banco (concentrado) e carteira própria
             esperado = sorted(round(x[0], 2) for x in ent + par_ + [(v, 0.0) for v in saldo if v > 0.005])
-            gravado = sorted(round(float(c.get('participacaoPct') or 0), 2) for c in comp)
+            # participação de até meio centésimo não conta dos dois lados: o motor pode gravar uma fatia ínfima
+            # (repasse bancário de 99,999%), e a lista esperada já a descarta
+            gravado = sorted(round(float(c.get('participacaoPct') or 0), 2) for c in comp
+                             if float(c.get('participacaoPct') or 0) > 0.005)
             if esperado != gravado:
                 div.append(f'grupo "{nome}": participações do pagamento pedidas {esperado}, gravadas {gravado}')
             sinal_esp = round(sum(a * b / 100 for a, b in par_), 4)
