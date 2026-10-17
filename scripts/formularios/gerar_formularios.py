@@ -872,6 +872,10 @@ def avancado(tipo, ex):
     f.secao(f'6 · Grupos de venda (Viabilidade › Receitas) — {N_GRP} vagas; absorção = % das unidades vendido em cada período')
     f.nota('Pós-chaves = 100% − Pré − Lançamento − Obra e Repasse = 100% − Σ % do grupo na seção de Pagamento: ambos calculados '
            '(zona de referência). Sem pré-lançamento, deixe a absorção de pré em branco.')
+    f.nota('Saldo de chaves = o Repasse acima. "Repasse bancário" é a parte dele paga pelo banco no mês seguinte ao fim da obra '
+           '(vazio = 100%, tudo no banco). O resto vira carteira própria: a empresa financia o comprador em N parcelas mensais '
+           'Price com os Juros de tabela, a partir do mês seguinte ao fim da obra + a carência (nunca antes do mês seguinte à '
+           'venda): também a venda feita depois da entrega tem essa parte financiada. Loteamento sem banco: 0%.')
     for g in range(1, N_GRP + 1):
         k = f'gr{g}'
         f.grupo(f'Grupo de venda {g}')
@@ -889,11 +893,17 @@ def avancado(tipo, ex):
                 ex=ex.get(f'{k}_corr'))
         f.campo(f'{k}_resid', f'Grupo {g} — Resíduo sem prazo', 'lista: imediato | concentrado',
                 f'grupos[{g}].residuo_sem_prazo', F_TXT, lista=['imediato', 'concentrado'], ex=ex.get(f'{k}_resid'))
+        f.campo(f'{k}_banco', f'Grupo {g} — Repasse bancário', '% do saldo de chaves (vazio = 100%)',
+                f'grupos[{g}].repasse_banco_pct', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_banco'))
+        f.campo(f'{k}_cart_parc', f'Grupo {g} — Carteira própria: nº de parcelas (só com repasse < 100%)', 'inteiro (≥ 1)',
+                f'grupos[{g}].carteira_parcelas', F_INT, minimo=1, inteiro=True, ex=ex.get(f'{k}_cart_parc'))
+        f.campo(f'{k}_cart_car', f'Grupo {g} — Carteira própria: carência após a entrega', 'meses (inteiro ≥ 0; vazio = 0)',
+                f'grupos[{g}].carteira_carencia_meses', F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_cart_car'))
 
     # ── Pagamento ──
     N_PAG = 10
     f.secao(f'7 · Fluxo de pagamento por grupo — {N_PAG} vagas (uma linha por condição; até 4 de Parcelamento por grupo)')
-    f.nota('Os juros vêm do campo "Juros de tabela". Nome do grupo exatamente como na seção 6. Σ % do grupo ≤ 100%; o que sobrar é o repasse.')
+    f.nota('Os juros vêm do campo "Juros de tabela". Nome do grupo exatamente como na seção 6. Σ % do grupo ≤ 100%; o que sobrar é o saldo de chaves (banco × carteira própria: seção 6).')
     for j in range(1, N_PAG + 1):
         k = f'pg{j}'
         f.grupo(f'Condição de pagamento {j}')
@@ -993,7 +1003,8 @@ def avancado(tipo, ex):
                 ex=ex.get(f'{pn}_cor'))
 
     # ── Funding ──
-    f.secao('10 · Funding (operações) — 1 financiamento à produção + 3 dívidas + 3 equities; deixe em branco o que não existir')
+    f.secao('10 · Funding (operações) — 1 financiamento à produção + 3 dívidas + 3 equities + 3 antecipações de recebíveis; '
+            'deixe em branco o que não existir')
     f.grupo('Financiamento à produção (no máximo um por estudo)')
     f.campo('fp_nome', 'Financiamento à produção — Nome', 'texto', 'funding.financiamento_producao.nome', F_TXT,
             ex=ex.get('fp_nome'))
@@ -1054,6 +1065,29 @@ def avancado(tipo, ex):
                 ex=ex.get(f'{k}_modo'))
         f.campo(f'{k}_pct', f'Equity {q} — % de retorno', '% (do resultado final ou da receita líquida)',
                 f'funding.equity[{q}].pct_retorno', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_pct'))
+
+    f.nota('Antecipação de recebíveis: cessão de parte da carteira a securitizadora/CRI/FIDC. Não tem campo de valor — o app '
+           'calcula o valor presente das parcelas cedidas à taxa de desconto. Com âncora num evento, a cessão é no INÍCIO dele; '
+           'cedem-se as parcelas que vencem depois desse mês, das vendas feitas até ele. Uma antecipação posterior cede o % do '
+           'que a anterior não cedeu. Entra só no Funding/Fluxo alavancado, nunca na Proforma nem na TIR/VPL do projeto.')
+    for a_ in (1, 2, 3):
+        k = f'an{a_}'
+        f.grupo(f'Antecipação de recebíveis {a_}')
+        f.campo(f'{k}_nome', f'Antecipação {a_} — Nome', 'texto', f'funding.antecipacao[{a_}].nome', F_TXT, ex=ex.get(f'{k}_nome'))
+        f.campo(f'{k}_aporte', f'Antecipação {a_} — Mês da cessão', 'evento, fase ("fase: <nome>") ou customizado',
+                f'funding.antecipacao[{a_}].aporte', F_TXT, lista_ref='cronograma', aviso=True, ex=ex.get(f'{k}_aporte'))
+        f.campo(f'{k}_mes', f'Antecipação {a_} — Mês (só customizado)', 'mês (inteiro ≥ 0)', f'funding.antecipacao[{a_}].mes',
+                F_INT, minimo=0, inteiro=True, ex=ex.get(f'{k}_mes'))
+        f.campo(f'{k}_pct', f'Antecipação {a_} — Carteira cedida', '% do que as vendas até a cessão ainda vão pagar',
+                f'funding.antecipacao[{a_}].pct_cedida', F_PCT, minimo=0.0001, maximo=1, ex=ex.get(f'{k}_pct'))
+        f.campo(f'{k}_taxa', f'Antecipação {a_} — Taxa de desconto', '% a.a.', f'funding.antecipacao[{a_}].taxa_anual', F_PCT,
+                minimo=0, maximo=1, ex=ex.get(f'{k}_taxa'))
+        f.campo(f'{k}_estr', f'Antecipação {a_} — Estruturação', '% do valor presente (no mês da cessão)',
+                f'funding.antecipacao[{a_}].estruturacao_pct', F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_estr'))
+        f.campo(f'{k}_adm', f'Antecipação {a_} — Administração', 'R$/mês (enquanto houver parcela cedida)',
+                f'funding.antecipacao[{a_}].administracao_mensal', F_RS, minimo=0, ex=ex.get(f'{k}_adm'))
+        f.campo(f'{k}_outros', f'Antecipação {a_} — Outros custos', 'R$ (no mês da cessão)',
+                f'funding.antecipacao[{a_}].outros_encargos', F_RS, minimo=0, ex=ex.get(f'{k}_outros'))
 
     # ── Cenários ──
     N_CEN = 5
@@ -1132,13 +1166,17 @@ def avancado(tipo, ex):
         f.calc(f'{k}_sp', f'Grupo {g} — Σ % do pagamento', '% do preço', f'IF({r(k+"_nome")}="","",{soma_pg})', F_PCT)
         f.calc(f'{k}_rep', f'Grupo {g} — Repasse', '% (= 100% − Σ pagamento)', f'IF({r(k+"_nome")}="","",1-{r(k+"_sp")})', F_PCT,
                chave='calculado (repasse)')
+        f.calc(f'{k}_cart', f'Grupo {g} — Carteira própria', '% do preço (= Repasse × (100% − Repasse bancário))',
+               f'IF({r(k+"_nome")}="","",{r(k+"_rep")}*(1-IF({r(k+"_banco")}="",1,N({r(k+"_banco")}))))', F_PCT,
+               chave='calculado (carteira própria)')
         f.calc(f'{k}_vgv', f'Grupo {g} — VGV de tabela', 'R$',
                f'IF({r(k+"_nome")}="","",' + '+'.join(f'IF({r(f"al{j}_grupo")}={r(k+"_nome")},{r(f"al{j}_vgv")},0)' for j in range(1, N_AL + 1)) + ')', F_RS)
         f.calc(f'{k}_alerta', f'Grupo {g} — conferência', 'alerta',
                f'IF({r(k+"_nome")}="","",IF(N({r(k+"_pre")})+N({r(k+"_lanc")})+N({r(k+"_obra")})>1.00001,"⚠ absorção > 100%",'
                f'IF({r(k+"_sp")}>1.00001,"⚠ Σ pagamento > 100%",IF(AND({r("tem_pre")}="Não",N({r(k+"_pre")})>0),"⚠ absorção de pré sem pré-lançamento",'
                f'IF(' + '+'.join(f'IF(AND({r(f"pg{j}_grupo")}={r(k+"_nome")},{r(f"pg{j}_linha")}="Parcelamento"),1,0)' for j in range(1, N_PAG + 1)) +
-               '>4,"⚠ mais de 4 parcelamentos","OK"))))) ')
+               '>4,"⚠ mais de 4 parcelamentos",'
+               f'IF(AND({r(k+"_banco")}<>"",N({r(k+"_banco")})<0.99999,{r(k+"_cart_parc")}=""),"⚠ repasse < 100% sem nº de parcelas da carteira","OK")))))) ')
 
     f.grupo('Custos convertidos em R$ (quando dá para converter sem o fluxo)')
     for k_ in range(1, N_CU + 1):

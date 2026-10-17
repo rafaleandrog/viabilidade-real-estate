@@ -4,6 +4,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-17 — Formulários do Avançado com carteira própria e antecipação de recebíveis
+
+Pedido do autor: os campos novos das duas entregas anteriores (saldo de chaves com carteira própria e
+antecipação de recebíveis) precisavam chegar às planilhas usadas para preencher o app.
+
+- `gerar_formularios.py`: a seção 6 do Avançado ganha, por grupo, **Repasse bancário** (% do saldo de
+  chaves), **nº de parcelas** e **carência** da carteira própria; a seção 10 ganha três blocos de
+  **Antecipação de recebíveis** (nome, mês da cessão, % cedido, taxa de desconto e as três tarifas). A
+  zona calculada mostra a carteira própria em % do preço e acusa repasse < 100% sem parcelas.
+- `importar_formulario.py`: valida os campos novos antes de escrever, grava `fluxo_pagamento.repasse`
+  com `pct_banco`, `carteira_parcelas` e `carteira_carencia_meses` (vazio ou 100% = como antes), cria
+  as operações `antecipacao_recebiveis` e confere as duas coisas na releitura.
+- Exemplos: o saldo de chaves das Lojas do Aurora Parque passa a ser 40% repasse bancário e 60% carteira própria em 60x;
+  o Vale do Sol ganha uma cessão de 50% no início do pós-obra a 15% a.a.
+- Os quatro formulários e os exemplos foram regenerados; os Preliminares não mudam de conteúdo e
+  ficaram como estavam.
+- **Fica com o autor:** importar um formulário com os campos novos numa instância (`--executar`), que
+  precisa das credenciais de QA.
+
+---
+
 ## 2026-10-16 — Antecipação de recebíveis como operação de Funding (#851)
 
 Segundo assunto do mesmo pedido do autor da carteira própria (#850, já mergeada). Decisões do autor
