@@ -150,7 +150,7 @@ test('2.6 — as metas padrão não reprovam um estudo saudável em massa', () =
 //
 // Achado DECLARATIVO, sem teste automatizado e sem correção nesta leva —
 // fora do escopo aprovado (Fases 0–1 do handoff cobrem só os itens acima).
-// A Análise de Sensibilidade (`frontend/tela-proforma.ts`, `_variaveis`)
+// A Análise de Sensibilidade (`frontend/tela-proforma.ts`, `_renderSensibilidade`)
 // lista as variáveis estressadas em ordem fixa por tipo de empreendimento,
 // sem ranquear por impacto no resultado (o "tornado de alavancas" do
 // handoff, §4.2, é o que resolveria isso — Fase 2, dependente do campo

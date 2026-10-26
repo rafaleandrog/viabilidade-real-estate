@@ -94,7 +94,8 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
-    // `_init()` (connectedCallback) reseta `varSens` depois de dois `await`,
+    // `_init()` (no `connectedCallback` e na troca de estudo) reseta `varSens`
+    // para o preço,
     // então forçá-la ANTES de montar não sobrevive. Espera o assentamento e
     // seleciona, como a escolha no seletor faria.
     await new Promise((r) => setTimeout(r, 0));

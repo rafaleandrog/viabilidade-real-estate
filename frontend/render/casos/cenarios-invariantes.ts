@@ -46,8 +46,8 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
-    // `_init()` (connectedCallback) reseta `varSens` DEPOIS de dois
-    // `await` — forçá-la antes de montar não sobrevive. Espera o assentamento
+    // `_init()` (no `connectedCallback` e na troca de estudo) reseta
+    // `varSens` para o preço — forçá-la antes de montar não sobrevive. Espera o assentamento
     // (mesma técnica de `terreno-nucleo-filtro-regularizacao.ts`) e então
     // seleciona a variável PELO SELETOR: o evento sai do `urbi-select`, e é
     // isso que prova a fiação do dropdown — atribuir `varSens` direto deixaria

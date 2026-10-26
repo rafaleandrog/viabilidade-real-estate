@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, catalogoEfetivo, produtoCompoeCatalogo,
   resumoCatalogoProdutos, tipoProdutoEfetivo, aplicarFatorPreco,
-  totaisPorTipoProdutos, areaTotalProdutos, eficienciaParaFaixa, roiParaFaixa,
+  totaisPorTipoProdutos, areaTotalProdutos, eficienciaParaFaixa, roiParaFaixa, fatoresDe,
   type ProformaInput,
 } from './proforma.js';
 import { varianteFaixa, montarMedidor } from './medidor-faixas.js';
@@ -2064,4 +2064,39 @@ test('rev1: a normalização é SÓ do Loteamento — a Incorporação continua 
   const lot = calcularProforma({ ...LOT, produtos });
   assert.ok(perto(lot.vgvResidencial, 12_000_000), `lotR=${lot.vgvResidencial}`);
   assert.equal(lot.vgvNaoResidencial, 0);
+});
+
+// #735 — a forma de VÁRIOS fatores de sensibilidade (`FatoresSensibilidade`)
+// continua no motor depois que o cenário composto saiu da tela. Estes casos
+// moravam no teste do cenário composto, apagado junto com ele; sem eles,
+// `fatoresDe` e o seu filtro fail-closed ficariam sem cobertura.
+const ENTRADA_FATORES: ProformaInput = { ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE, permuta_financeira_residencial_pct: 5 };
+
+test('#735: a forma de uma variável e a de conjunto normalizam no mesmo mapa', () => {
+  assert.deepEqual(fatoresDe({ variavel: 'preco', fator: 0.9 }), { preco: 0.9 });
+  assert.deepEqual(fatoresDe({ fatores: { preco: 0.9, custo_obras: 1.1 } }), { preco: 0.9, custo_obras: 1.1 });
+  assert.deepEqual(fatoresDe(undefined), {});
+  assert.deepEqual(fatoresDe(null), {});
+  // Fronteira fail-closed: NaN, null e string não entram no mapa (ausente = 1).
+  assert.deepEqual(fatoresDe({ fatores: { preco: NaN, custo_obras: null as any, custo_infra: '0.9' as any, custo_terreno: 1.2 } }), { custo_terreno: 1.2 });
+  assert.equal(calcularProforma({ ...ENTRADA_FATORES, sensibilidade: { fatores: { preco: NaN } } }).resultado, calcularProforma(ENTRADA_FATORES).resultado);
+  // Uma variável só, nas duas formas, dá a MESMA Proforma.
+  const a = calcularProforma({ ...ENTRADA_FATORES, sensibilidade: { variavel: 'preco', fator: 0.9 } });
+  const b = calcularProforma({ ...ENTRADA_FATORES, sensibilidade: { fatores: { preco: 0.9 } } });
+  assert.equal(a.resultado, b.resultado);
+  assert.equal(a.vgv, b.vgv);
+});
+
+test('#735: três fatores simultâneos movem as três grandezas, cada uma pelo seu fator, com piso por fator', () => {
+  const base = calcularProforma(ENTRADA_FATORES);
+  const p = calcularProforma({ ...ENTRADA_FATORES, sensibilidade: { fatores: { preco: 0.9, custo_obras: 1.2, permuta_financeira: 1.5 } } });
+  assert.ok(perto(p.vgv, base.vgv * 0.9), `vgv ${p.vgv} ≠ ${base.vgv * 0.9}`);
+  assert.ok(perto(p.construcao, base.construcao * 1.2), `construcao ${p.construcao} ≠ ${base.construcao * 1.2}`);
+  // A permuta financeira em % do VGV escala pelo fator dela E pelo VGV já
+  // estressado pelo preço.
+  assert.ok(perto(p.permutaFinResidencial, base.permutaFinResidencial * 1.5 * 0.9), `permFin ${p.permutaFinResidencial}`);
+  // O piso continua POR fator: um fator negativo numa variável não zera as outras.
+  const piso = calcularProforma({ ...ENTRADA_FATORES, sensibilidade: { fatores: { preco: -1, custo_obras: 1.2 } } });
+  assert.equal(piso.vgv, 0);
+  assert.ok(perto(piso.construcao, base.construcao * 1.2));
 });
