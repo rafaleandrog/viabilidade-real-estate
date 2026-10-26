@@ -33,9 +33,6 @@ export const caso = {
     'urbi-badge.cor',
     'urbi-select.label',
     'urbi-select.opcoes',
-    // #734: o alerta de cenário inviável (o preço deste fixture suporta cair
-    // ~9% e o Bear aplica −10%) — a variante do banner não é reproduzida.
-    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).urbiVerso.api = async (rota: string) => {
@@ -52,7 +49,7 @@ export const caso = {
     await (el as any).updateComplete;
     await new Promise((r) => setTimeout(r, 0));
     await (el as any).updateComplete;
-    (el as any)._varSensManual = 'preco';
+    (el as any).varSens = 'preco';
     await (el as any).updateComplete;
   },
   async medir(raiz: HTMLElement): Promise<{

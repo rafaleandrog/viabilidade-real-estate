@@ -59,7 +59,7 @@ identificador.
 Quatro abas. Em **Premissas** você preenche, em sub-abas, **Terreno & Áreas**, **Custos**,
 **Permutas** e **Produtos** (o catálogo de tipologias com preço), e vê os KPIs e o preço sugerido
 por m² recalculados a cada edição. Em **Resultado** ficam a **Proforma** completa e a aba
-**Cenários** — o tornado de alavancas, a margem de segurança e a sensibilidade Bear, Base e Bull —
+**Cenários** — a sensibilidade Bear, Base e Bull da variável escolhida, em tabela e em faixas —
 com exportação para PDF e Excel. **Gráficos** traz a faixa de KPIs, a cascata do resultado, a
 cadeia de áreas e os indicadores contra benchmark. **Análise de Mercado** é a avaliação qualitativa
 do imóvel por IA, a partir de documentos anexados. Ver [Estudo Preliminar](preliminar).

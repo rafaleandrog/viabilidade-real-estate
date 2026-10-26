@@ -26,15 +26,9 @@ export const caso = {
   // `exigir` é OBRIGATÓRIO em todo caso, e o harness lança sem ele.
   exigir: [
     // As duas tabelas da sensibilidade (monetária e indicadores) e o seletor
-    // de PASSO (±5/±10/±15) — o único `urbi-select` que sobra depois do #729:
-    // o dropdown de variável estressada morreu, substituído pelo tornado.
+    // de variável estressada — o único `urbi-select` da aba.
     { seletor: 'table.pf.sens', minimo: 2 },
-    { seletor: 'urbi-select', minimo: 1 },
-    // Rodada 13 (#729): a prova de que o TORNADO é quem seleciona a variável
-    // agora, não mais o dropdown — o componente monta com 5 alavancas.
-    { seletor: 'viab-grafico-tornado', minimo: 1 },
-    // Rodada 13 (#733): o bloco "Margem de segurança", 4 cartões.
-    { seletor: 'div.margem-cartao', minimo: 4 },
+    { seletor: 'div.sens-var urbi-select', minimo: 1 },
     // 8 linhas monetárias × 3 cenários (2026-09-14: "Deduções sobre VGV" — a
     // MESMA linha da Proforma — entrou entre "Receita bruta" e "Receita
     // líquida", eram 7): as células com a cor do cenário. Se o `style` inline
@@ -44,16 +38,9 @@ export const caso = {
     { seletor: 'table.pf.sens td.num.cen-bear', minimo: 8 },
     { seletor: 'table.pf.sens td.num.cen-bull', minimo: 8 },
     // A PROVA DE FIAÇÃO: o Resultado negativo que só o Bear produz, e só se o
-    // fator de stress tiver alcançado o catálogo de Produtos. O caso força
-    // `_varSensManual: 'preco'` (abaixo) para este teste continuar
-    // determinístico — sem isso, a seleção seguiria "a maior amplitude do
-    // ranking", que É medida (o fixture tem outras alavancas com efeito real:
-    // `custo_obras` via `custo_construcao_m2` e `custo_indireto` via
-    // `gestao_indiretos_pct` — achado da lente L2, PR
-    // #757) e portanto sujeita a mudar de variável a cada edição do motor ou
-    // do fixture, sem que ninguém precise tocar este arquivo. Fixar a
-    // variável é o que faz a prova (o fator alcança o catálogo) resistir a
-    // essas edições futuras.
+    // fator de stress tiver alcançado o catálogo de Produtos. A variável é o
+    // preço — o default do seletor —, e o caso a fixa explicitamente (abaixo)
+    // para a prova não depender desse default.
     { seletor: 'table.pf.sens td.num.cen-bear.neg', minimo: 1 },
     // ...e as 5 linhas de receita do Base continuam positivas (as 3 de despesa
     // — Custo direto total, Custo indireto total e, desde 2026-09-14,
@@ -84,13 +71,10 @@ export const caso = {
     'urbi-badge.cor',
     // Binding de PROPRIEDADE (o Lit nem escreve atributo); o stub não desenha
     // opção nenhuma — mesma natureza documentada em modal-pagamento.ts,
-    // kpis-resumo.ts e grupo-badge-legado.ts. Hoje é só o seletor de PASSO
-    // (±5/±10/±15) — o de variável estressada morreu com o #729.
+    // kpis-resumo.ts e grupo-badge-legado.ts. É o seletor de variável
+    // estressada.
     'urbi-select.label',
     'urbi-select.opcoes',
-    // #734: o alerta de cenário inviável (o preço deste fixture suporta cair
-    // ~9% e o Bear aplica −10%) — a variante do banner não é reproduzida.
-    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `_init()` roda no `connectedCallback`, é assíncrono e ESCREVE POR CIMA do
@@ -104,21 +88,18 @@ export const caso = {
     const el = document.createElement('viab-tela-proforma');
     // `benchmarks: []` de propósito: sem indicador de sensibilidade o
     // componente cai no fallback de ±10%, que é o que o fixture documenta.
-    // `_varSensManual: 'preco'` fixa a seleção — ver o comentário acima do
-    // seletor `cen-bear.neg`.
     forcarEstado(el, {
       estudo: ESTUDO_SENSIBILIDADE, secao: 'cenarios', benchmarks: [],
       produtos: PRODUTOS_SENSIBILIDADE, aliquotaRet: 4,
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
-    // #730: `_init()` (connectedCallback) zera `_varSensManual` depois de dois
-    // `await`, então forçá-la ANTES de montar não sobrevivia — o caso só
-    // passava porque o preço também é a alavanca de maior amplitude no
-    // ranking. Espera o assentamento e seleciona, como o clique no tornado.
+    // `_init()` (connectedCallback) reseta `varSens` depois de dois `await`,
+    // então forçá-la ANTES de montar não sobrevive. Espera o assentamento e
+    // seleciona, como a escolha no seletor faria.
     await new Promise((r) => setTimeout(r, 0));
     await (el as any).updateComplete;
-    (el as any)._varSensManual = 'preco';
+    (el as any).varSens = 'preco';
     await (el as any).updateComplete;
   },
 };

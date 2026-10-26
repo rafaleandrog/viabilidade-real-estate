@@ -106,16 +106,17 @@ export type VariavelSensibilidade = 'preco' | 'permuta_fisica' | 'permuta_financ
 export interface FatorSensibilidadeUnico { variavel: VariavelSensibilidade; fator: number; }
 /**
  * #735 — um CONJUNTO de fatores, um por variável, aplicados JUNTOS numa
- * execução do motor: é o cenário composto (as três maiores alavancas erram
- * ao mesmo tempo). Variável ausente do mapa fica em 1. O piso `Math.max(0, …)`
- * continua POR FATOR, não pelo conjunto.
+ * execução do motor. Variável ausente do mapa fica em 1. O piso
+ * `Math.max(0, …)` continua POR FATOR, não pelo conjunto. Nasceu para o
+ * cenário composto da aba Cenários, que saiu da tela por decisão do autor
+ * (2026-10-26); o motor mantém a forma, coberta pelos testes.
  */
 export interface FatoresSensibilidade { fatores: Partial<Record<VariavelSensibilidade, number>>; }
 /**
  * As duas formas são aceitas na entrada e NORMALIZADAS por `fatoresDe` num
  * mapa só, uma vez, no topo de `calcularProforma` — nenhum dos oito pontos
  * que consultam `fatorSens` sabe qual forma chegou. A forma única continua
- * existindo porque é a que os outros motores (tornado, margem de segurança)
+ * existindo porque é a que a aba Cenários
  * e os testes usam, e um formato só para "uma variável" seria `{ fatores: { x } }`
  * em todo call site sem ganho de leitura.
  */
