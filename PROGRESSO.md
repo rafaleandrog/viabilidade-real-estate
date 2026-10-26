@@ -4,6 +4,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-10-26 — Cenários do Preliminar voltam ao seletor de variável (tornado e margem de segurança saem)
+
+Pedido direto do autor, com captura da aba Cenários do estudo Calliandra II: *"essa parte de
+alavancas de resultado está muito confusa. não quero isso no app. retorne ao cenário anterior de
+mover a variação de preço por variáveis (preço de venda, custo de obra, etc) e gerar a visualização
+em tabelas e barras abaixo somente"*.
+
+- **Saem da tela** o card **Alavancas do resultado** (tornado, seletor de passo ±5/±10/±15, cenário
+  composto, ponto de equilíbrio e consumo do colchão) e o card **Margem de segurança** — o pedido diz
+  "tabelas e barras abaixo **somente**". Com eles saem os módulos que só a tela consumia:
+  `grafico-tornado.ts`, `margem-seguranca.ts`, `consumo-colchao.ts`, `cenario-composto.ts`, seus
+  testes e os casos de render que os montavam.
+- **Volta** o seletor **Variável estressada (−X% / +Y%)** no topo do card de sensibilidade, como antes
+  do PR 757, agora com as seis variáveis que o motor sabe estressar: preço de venda, custo de obra (de
+  infraestrutura no Loteamento), custo indireto, custo do terreno, permuta física e permuta
+  financeira. A variação continua vindo do indicador de sensibilidade do benchmark (10% sem ele).
+- **Ficam como estavam** a tabela Bear/Base/Bull com Δ%, amplitude ordenável e linhas invariantes
+  recolhidas (#730), e as faixas dos indicadores contra o benchmark (#731).
+- `tornado-alavancas.ts` virou `variaveis-sensibilidade.ts`, só com o rótulo, o sentido
+  (`ehCustoLike`) e a lista de opções do seletor. O motor não mudou: a forma de vários fatores
+  (`FatoresSensibilidade`, #735) continua em `proforma.ts`, coberta pelos testes, sem consumidor de tela.
+- Prova de fiação: o caso `cenarios-invariantes` escolhe a variável **disparando o
+  `urbi:select-change` do seletor**; apagar o handler deixa o caso vermelho (medido).
+- Guias atualizados: `docs/preliminar.md`, `docs/README.md`, `docs/formulas.md`, `docs/exportacao.md`.
+- Sem migração, sem `schema.json`, `versao` mantida.
+
+---
+
 ## 2026-10-17 — Formulários do Avançado com carteira própria e antecipação de recebíveis
 
 Pedido do autor: os campos novos das duas entregas anteriores (saldo de chaves com carteira própria e

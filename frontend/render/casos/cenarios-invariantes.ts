@@ -46,13 +46,18 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
-    // `_init()` (connectedCallback) zera `_varSensManual` DEPOIS de dois
-    // `await` — forçá-la antes de montar não sobrevive. Espera o assentamento
+    // `_init()` (no `connectedCallback` e na troca de estudo) reseta
+    // `varSens` para o preço — forçá-la antes de montar não sobrevive. Espera o assentamento
     // (mesma técnica de `terreno-nucleo-filtro-regularizacao.ts`) e então
-    // seleciona a variável, como o clique no tornado faria.
+    // seleciona a variável PELO SELETOR: o evento sai do `urbi-select`, e é
+    // isso que prova a fiação do dropdown — atribuir `varSens` direto deixaria
+    // o caso verde com o handler apagado.
     await new Promise((r) => setTimeout(r, 0));
     await (el as any).updateComplete;
-    (el as any)._varSensManual = 'permuta_financeira';
+    const seletor = (el as any).shadowRoot.querySelector('div.sens-var urbi-select');
+    seletor.dispatchEvent(new CustomEvent('urbi:select-change', {
+      detail: { valor: 'permuta_financeira' }, bubbles: true, composed: true,
+    }));
     await (el as any).updateComplete;
   },
   async medir(raiz: HTMLElement): Promise<{

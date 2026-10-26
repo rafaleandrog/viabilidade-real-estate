@@ -39,7 +39,7 @@ português importa parêntese como número negativo. Não há risco de parsing (
 nenhum valor contém `;`, aspas ou quebra de linha); o que muda é o sinal que uma fórmula sua
 enxerga.
 
-Os Cenários (tornado, margem de segurança e sensibilidade) são visualizados na tela e não têm
+Os Cenários (a análise de sensibilidade) são visualizados na tela e não têm
 exportação própria.
 
 ### Fluxo de Caixa do Avançado

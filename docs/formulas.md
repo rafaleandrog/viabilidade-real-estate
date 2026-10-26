@@ -128,12 +128,6 @@ a tela pede que ele seja definido. Ver [Benchmarks](benchmarks).
 
 ## Cenários do Preliminar
 
-- **Alavancas do resultado** varia cada alavanca (preço, permuta física, permuta financeira, custo
-  de obra ou de infraestrutura, custo indireto) em ±5, ±10 ou ±15 % e ranqueia pela amplitude do
-  impacto no resultado. O custo do terreno fica de fora do tornado.
-- **Margem de segurança** resolve numericamente, para cada uma de quatro premissas, quanto ela pode
-  errar até o resultado zerar (queda de preço, estouro de obra ou de infraestrutura, permuta
-  física) — e, para o terreno, o valor residual até a margem-alvo sobre a receita líquida.
 - **Análise de sensibilidade** recalcula a Proforma inteira com a variável escolhida em Bear e
   Bull, usando as variações do indicador de sensibilidade do benchmark daquela variável (10 % sem
   benchmark). Para o preço, Bull é preço maior; para custos e permutas, Bull é valor menor.

@@ -91,32 +91,15 @@ Outras diferenças vêm da natureza estática do nível, e não são defeito: o 
 juros de tabela (não há tempo) e o resultado não deduz despesas financeiras (não há funding). As
 áreas abertas ficam fora da base do catálogo, como descrito em Produtos.
 
-**Cenários.** Três blocos que respondem "o que derruba este resultado?":
+**Cenários.** A aba responde "o que acontece com o resultado se esta premissa errar?". No topo,
+o seletor **Variável estressada** escolhe a premissa — **Preço de venda** (**Preço/m² de venda** no
+Loteamento), **Custo de obra** (**Custo de infraestrutura** no Loteamento), **Custo indireto**,
+**Custo do terreno**, **Permuta física** ou **Permuta financeira** — e o próprio rótulo diz a variação
+aplicada. Na Incorporação, **Custo de obra** estressa construção e decoração, e a gestão da
+construção acompanha por incidir sobre as duas: o custo de obras do estudo (construção, decoração e
+gestão) varia exatamente o percentual aplicado. Abaixo do seletor:
 
-- **Alavancas do resultado** — o tornado: cada alavanca (**Preço de venda** — **Preço/m² de venda** no Loteamento —, **Permuta física**,
-  **Permuta financeira**, **Custo de obra** ou **Custo de infraestrutura**, **Custo indireto**) é
-  variada em ±5, ±10 ou ±15 % (o passo é escolhido no card) e ranqueada pela amplitude do impacto
-  no resultado. A barra mais longa é a premissa que mais merece atenção. Na Incorporação, **Custo de obra** estressa construção e decoração, e a gestão da
-  construção acompanha por incidir sobre as duas: o custo de obras do estudo (construção, decoração e gestão) varia exatamente o percentual escolhido. O custo do terreno não
-  entra no tornado: ele tem o próprio cartão ao lado. No topo da lista fica o **Cenário composto**:
-  as três alavancas de maior amplitude (as de base circular ficam fora; com só duas elegíveis, as
-  duas) estressadas juntas — todas no sentido desfavorável no Bear, todas no favorável no Bull —,
-  porque na prática as premissas erram ao mesmo tempo e o estresse de uma variável isolada
-  subestima o risco. O rótulo e o
-  cabeçalho da tabela declaram as três premissas; o resultado composto sai de uma execução do
-  motor com as três, não da soma dos efeitos isolados. Abaixo do tornado, para a alavanca
-  selecionada, a leitura decisória: o **ponto de equilíbrio** (quanto ela pode errar até o
-  resultado zerar, e até a margem-alvo), o **consumo do colchão** — o estresse do Bear dividido
-  pela folga; se passa de 100 %, ou se o resultado já é negativo na base e a premissa precisaria
-  melhorar para zerar, a tela diz em palavras que o cenário Bear já é inviável —, a nota de
-  **baixa alavanca** quando a amplitude do resultado entre Bull e Bear fica abaixo de 2 % do
-  resultado base (o resultado é insensível à premissa neste projeto) e o motivo de uma premissa de base
-  circular ficar fora do ranking.
-- **Margem de segurança** — quatro cartões. **Queda máxima de preço**, **Estouro máximo de obra**
-  (**de infraestrutura**, no Loteamento) e **Permuta física máxima** dizem, em percentual sobre o
-  valor atual, quanto a premissa pode errar até o resultado zerar; **Terreno máximo** sai em R$ e é
-  o valor residual do terreno até a margem-alvo sobre a receita líquida.
-- **Análise de sensibilidade** — a variável escolhida em **Bear**, **Base** e **Bull**. O cabeçalho
+- **Tabela de sensibilidade** — a variável escolhida em **Bear**, **Base** e **Bull**. O cabeçalho
   diz o estresse aplicado (por exemplo **Bear −10% Preço de venda**); cada linha traz o **Δ%** do Bear
   e do Bull contra a Base — variação relativa, também nas duas linhas em % (uma margem de 20 % que
   cai a 15 % mostra −25,0 %) —, colorido por melhora ou piora conforme a linha seja receita ou

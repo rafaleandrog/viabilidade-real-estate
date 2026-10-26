@@ -74,20 +74,12 @@ const semComentarios = (texto: string) => texto
 const ocorrencias = (texto: string, alvo: string) => semComentarios(texto).split(alvo).length - 1;
 
 /**
- * Os consumidores da exceção, e quantas vezes cada um a chama.
- *
- * #733 (Rodada 13): o cartão "Terreno máximo" do bloco "Margem de segurança"
- * (aba Cenários do Preliminar) virou o SEGUNDO consumidor declarado — a
- * imagem que o autor anexou à Rodada 13 mostra "R$ 39,0 M", e `fmtR$Kpi`
- * (a exceção de card de KPI, #581) imprimiria "R$ 39.000.000" num cartão
- * pequeno. É exatamente o que uma lista de exceção por CONTAGEM EXATA existe
- * para permitir: entrada nova, com motivo ao lado, sem afrouxar a trava — os
- * dois sentidos (chamada a menos ou a mais, em QUALQUER dos consumidores)
- * continuam reprovando.
+ * Os consumidores da exceção, e quantas vezes cada um a chama. O cartão
+ * "Terreno máximo" da margem de segurança (aba Cenários) já foi o segundo
+ * consumidor; saiu com o bloco inteiro, por decisão do autor (2026-10-26).
  */
 const CONSUMIDORES = [
   { arquivo: 'frontend/grafico-cascata.ts', chamadas: 1 },
-  { arquivo: 'frontend/tela-proforma.ts', chamadas: 1 },
 ];
 
 // ⚠️ Enumerar por `git ls-files` e não varrendo o disco: o passo `Build` do
