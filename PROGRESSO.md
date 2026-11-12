@@ -13,8 +13,8 @@ aprovador e aprovava. Decisão do autor: **aprovador exige nível `admin` no app
 
 - Regra única em `frontend/membros-regras.ts` (funções puras, usadas pelo backend como portão e pela
   janela Membros): ninguém altera a própria função (pode sair); editor gere leitores e editores, e só
-  aprovador ou admin concede, altera ou remove aprovador; o estudo nunca fica sem editor nem
-  aprovador (`422 ULTIMO_RESPONSAVEL`); a função não passa do nível do alvo no app
+  aprovador ou admin concede, altera ou remove aprovador; a mudança que tiraria o último editor ou
+  aprovador é recusada (`422 ULTIMO_RESPONSAVEL` — um estudo antigo já sem nenhum não trava); a função não passa do nível do alvo no app
   (`422 NIVEL_INSUFICIENTE`, usuário inexistente incluído — antes era 500).
 - `backend/permissoes-estudo.ts`: sai o atalho `semMembros`; a função que vale é o mínimo entre a
   linha gravada e o que o nível do app comporta (`aprovador` com `escrita` age como editor; com
@@ -25,8 +25,9 @@ aprovador e aprovava. Decisão do autor: **aprovador exige nível `admin` no app
 - Prova de fiação: `backend/rotas/membros-estudo-rota.test.ts` repete por HTTP a sequência da QA,
   e cada regra tem uma mutação medida que deixa o arquivo vermelho — inclusive as três que a revisão
   achou VERDES na primeira versão (PATCH sem o último responsável, PATCH sem o teto pelo nível, e a
-  listagem sem a função efetiva). A janela Membros recria as linhas a cada recarga, para o seletor
-  não ficar mostrando uma função recusada.
+  listagem sem a função efetiva). A janela Membros recria as linhas quando o servidor recusa uma
+  troca, para o seletor não ficar mostrando a função recusada — esta parte NÃO tem caso de render
+  (lacuna declarada no PR).
 - Guias: `docs/permissoes.md` (§ Quem concede cada função) e `docs/avancado.md`.
 - Sem migração, sem `schema.json`, `versao` mantida. Pendente do autor: conferir na Laputa, antes
   de publicar, que nenhum estudo está sem editor/aprovador.

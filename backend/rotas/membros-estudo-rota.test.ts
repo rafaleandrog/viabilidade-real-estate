@@ -209,6 +209,11 @@ test('#861 GET /estudos: linha `aprovador` de usuário com escrita é publicada 
     const d = await chamar(29, 'GET', `/estudos/${e}`);
     assert.equal(d.j._permissao.funcao, 'editor');
     assert.equal(d.j._permissao.podeAprovar, false);
+    // função efetiva nula (sem nível no app): o detalhe nega e a listagem não
+    // publica o estudo — nunca cai na linha crua (achado da rodada 2)
+    dados.semear('estudo_membros', { estudo_id: e, usuario_id: 31, funcao: 'aprovador' });
+    assert.equal((await chamar(31, 'GET', `/estudos/${e}`)).status, 403);
+    assert.equal((await chamar(31, 'GET', '/estudos')).j.dados.some((x: any) => x.id === e), false);
   });
 });
 

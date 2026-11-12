@@ -613,7 +613,10 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
       // desenhar botão que o servidor recusaria.
       const funcaoPorEstudo = new Map<number, string>();
       for (const m of mem.dados) {
-        funcaoPorEstudo.set(Number(m.estudo_id), funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp) ?? String(m.funcao));
+        // Função efetiva nula (nível sem acesso, ou linha inválida) = o detalhe
+        // nega o acesso; a listagem não publica o estudo, em vez de cair na linha crua.
+        const efetiva = funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp);
+        if (efetiva) funcaoPorEstudo.set(Number(m.estudo_id), efetiva);
       }
 
       estudos = [];

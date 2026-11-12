@@ -360,19 +360,22 @@ export class ViabTelaEstudo extends LitElement {
   }
 
   private async _alterarFuncao(usuarioId: number, funcao: string) {
+    let recusada = false;
     try {
       const res = await alterarFuncaoMembro(this.estudoId, usuarioId, funcao);
-      if (res?.erro) urbiVerso.notificar(res.mensagem || 'Erro', 'erro');
+      if (res?.erro) { recusada = true; urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); }
     } catch (e: any) {
+      recusada = true;
       urbiVerso.notificar(e?.message || 'Erro', 'erro');
     }
-    // Recarrega SEMPRE e recria as linhas (`versaoMembros`, usado no `keyed` do
-    // render): numa recusa (#861) o valor recarregado é IGUAL ao anterior, e um
-    // binding comum do Lit não reescreve a propriedade — o seletor ficaria
-    // mostrando a função que o servidor não gravou. Recriar o elemento não depende
-    // de como o `urbi-select` guarda o valor escolhido.
+    // Recarrega SEMPRE; numa RECUSA (#861) também recria as linhas
+    // (`versaoMembros`, usado no `keyed` do render): o valor recarregado é IGUAL
+    // ao anterior, e um binding comum do Lit não reescreve a propriedade — o
+    // seletor ficaria mostrando a função que o servidor não gravou. Recriar o
+    // elemento não depende de como o `urbi-select` guarda o valor escolhido. Na
+    // troca aceita não recria, para não tirar o foco do seletor.
     this.membros = (await listarMembros(this.estudoId).catch(() => null))?.dados || [...this.membros];
-    this.versaoMembros++;
+    if (recusada) this.versaoMembros++;
   }
 
   private async _removerMembro(usuarioId: number) {

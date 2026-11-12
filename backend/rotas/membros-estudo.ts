@@ -111,10 +111,11 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
       return;
     }
 
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem adicionar membros'); return; }
-
     await emSerie(estudoId, async () => {
+      // A permissão é avaliada DENTRO da fila: uma requisição que esperou a vez
+      // pode ter perdido a função enquanto esperava (achado da revisão).
+      const perm = await exigirEditor(req, estudoId);
+      if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem adicionar membros'); return; }
       const membros = await membrosDoEstudo(req, estudoId);
       const atual = membros.find((m) => Number(m.usuario_id) === usuarioId);
       if (atual) { res.json({ ok: true, adicionado: false }); return; }
@@ -146,10 +147,11 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId', async (req: Request,
       return;
     }
 
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem alterar funções'); return; }
-
     await emSerie(estudoId, async () => {
+      // A permissão é avaliada DENTRO da fila: uma requisição que esperou a vez
+      // pode ter perdido a função enquanto esperava (achado da revisão).
+      const perm = await exigirEditor(req, estudoId);
+      if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem alterar funções'); return; }
       const membros = await membrosDoEstudo(req, estudoId);
       const membro = membros.find((m) => Number(m.usuario_id) === usuarioId);
       if (!membro) {
@@ -183,10 +185,11 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId/remover', async (req: 
     const usuarioId = parseInt(req.params.usuarioId);
     if (isNaN(estudoId) || isNaN(usuarioId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
 
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem remover membros'); return; }
-
     await emSerie(estudoId, async () => {
+      // A permissão é avaliada DENTRO da fila: uma requisição que esperou a vez
+      // pode ter perdido a função enquanto esperava (achado da revisão).
+      const perm = await exigirEditor(req, estudoId);
+      if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem remover membros'); return; }
       const membros = await membrosDoEstudo(req, estudoId);
       const membro = membros.find((m) => Number(m.usuario_id) === usuarioId);
       if (membro) {
