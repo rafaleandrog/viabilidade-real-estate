@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
 import {
   SCHEMA_ANALISE, instrucoesSistemaAnalise, montarContextoAnalise,
   normalizarAnalise, CAMPOS_INDICADOR,
@@ -26,13 +26,14 @@ rotasAnaliseMercado.get('/estudos/:id/analise-mercado', async (req: Request, res
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirMembro(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo'); return; }
+    const acesso = await acessoLeituraEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const r = await req.dados!.listar('analise_mercado', {
       filtros: { estudo_id: estudoId }, por_pagina: 1,
     });
-    const estudo = await req.dados!.buscar('estudos', estudoId);
-    const regiaoId = estudo?.regiao_mercado_id ?? null;
+    const estudo = acesso.estudo;
+    const regiaoId = estudo.regiao_mercado_id ?? null;
     const regiao = regiaoId ? await req.dados!.buscar('mercado_regioes', Number(regiaoId)) : null;
     // Coletas recentes da região do estudo — o material que a análise usa e que
     // o usuário precisa ver para julgar a procedência do que a IA respondeu.
@@ -58,7 +59,8 @@ rotasAnaliseMercado.patch('/estudos/:id/analise-mercado/regiao', async (req: Req
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem alterar a região'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const bruto = req.body?.regiao_mercado_id;
     let regiaoId: number | null = null;
@@ -85,11 +87,11 @@ rotasAnaliseMercado.post('/estudos/:id/analise-mercado', async (req: Request, re
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem rodar a análise'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
     if (!req.ia) { erro(res, 422, 'IA_INDISPONIVEL', 'Framework de IA não disponível para esta app/instância'); return; }
 
-    const estudo = await req.dados!.buscar('estudos', estudoId);
-    if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+    const estudo = acesso.estudo;
 
     // Região monitorada do estudo — dá a localidade e o material coletado.
     const regiaoId = estudo.regiao_mercado_id ?? null;

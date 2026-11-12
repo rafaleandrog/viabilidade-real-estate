@@ -5,6 +5,7 @@ import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
+import { STATUS_TRAVADO } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo PRELIMINAR — reestruturação de navegação (2026-08-03), a
@@ -62,6 +63,7 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
 export class ViabTelaPreliminar extends LitElement {
   @property({ type: Object }) estudo: any = null;
   @property({ type: Boolean }) podeEditar = false;
+  @property({ type: Boolean }) podeAprovar = false;
   @property({ type: String }) status = '';
 
   // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das
@@ -122,8 +124,20 @@ export class ViabTelaPreliminar extends LitElement {
     }
   `];
 
+  /**
+   * Escrita pela régua do servidor (`acessoEscritaEstudo`): editor em status
+   * aberto; só aprovador em Aprovado/Reprovado/Arquivado. É o que as abas de IA
+   * (Apelo, Análise de Mercado) usam — sem isto elas ofereciam anexar e analisar
+   * num estudo travado, e o clique terminava em 403 (com o upload já feito).
+   */
+  private get _podeEscrever(): boolean {
+    return this.podeEditar && (!STATUS_TRAVADO.includes(this.status) || this.podeAprovar);
+  }
+
+  // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o
+  // aprovador — o servidor recusa o editor, e a tela deixava digitar e anexar.
   private get _editavelPremissas(): boolean {
-    return this.podeEditar && this.status !== 'aprovado' && this.status !== 'reprovado';
+    return this._podeEscrever && this.status !== 'aprovado' && this.status !== 'reprovado';
   }
 
   render(): TemplateResult {
@@ -155,7 +169,7 @@ export class ViabTelaPreliminar extends LitElement {
         // BUG7-13: só o rótulo do Preliminar virou "Análise de Mercado" (D2) — o
         // Avançado já tem uma aba homônima (mercado_regioes) e ficaria ambíguo.
         // Slug 'apelo', elemento, evento e tabelas apelo_comercial* ficam intactos.
-        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar} titulo="Análise de Mercado do Imóvel (IA)"></viab-tela-apelo>`;
+        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this._podeEscrever} titulo="Análise de Mercado do Imóvel (IA)"></viab-tela-apelo>`;
       default:
         return html`${nothing}`;
     }

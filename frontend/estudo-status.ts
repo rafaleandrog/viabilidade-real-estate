@@ -59,13 +59,10 @@ export function gateTransicao(de: string, para: string): GateTransicao | null {
  * Espelha `exigirEditor`/`exigirAprovador` de `backend/permissoes-estudo.ts`:
  * aprovador inclui tudo do editor, e leitor não atende gate nenhum.
  *
- * ⚠️ **É um subconjunto CONSERVADOR do backend, de propósito.** O backend ainda
- * concede editor a quem tem `nivelApp` escrita+ num estudo SEM membros
- * (`exigirEditor` → `semMembros`). A listagem não traz esse caso: ela só devolve
- * estudo onde o usuário é membro (ou tudo, com `_funcao: 'aprovador'`, quando é
- * admin de app). Então a tela nunca esconde botão que o servidor aceitaria a
- * partir do que a listagem mandou — e, se um dia esconder, o erro é para MENOS,
- * que é o lado seguro.
+ * A função vem da listagem, que só devolve estudo onde o usuário é membro (ou
+ * tudo, com `_funcao: 'aprovador'`, quando é admin de app) — os mesmos dois
+ * casos que `exigirEditor`/`exigirAprovador` aceitam, já que o backend não tem
+ * mais o atalho de "estudo sem membros".
  */
 export function funcaoAtendeGate(funcao: string | null | undefined, gate: GateTransicao): boolean {
   if (funcao === 'aprovador') return true;

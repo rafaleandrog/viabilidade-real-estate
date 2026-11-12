@@ -5,6 +5,9 @@ import {
   exigirEditor,
   exigirAprovador,
   garantirMembro,
+  leituraBloqueadaPorStatus,
+  acessoEscritaEstudo,
+  acessoNegado,
 } from '../permissoes-estudo.js';
 import {
   publicarEvento,
@@ -572,8 +575,17 @@ rotasEstudos.post('/estudos', async (req: Request, res: Response) => {
 
     const estudo = await req.dados!.criar('estudos', dados);
 
-    // Criador vira editor do estudo.
-    const funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');
+    // Criador vira editor do estudo. Sem membro o estudo é inalcançável para
+    // quem não é admin do app (não há atalho de "estudo sem membros"), então uma
+    // falha aqui desfaz a criação, como o `POST /duplicar` já faz com o clone.
+    let funcao: Awaited<ReturnType<typeof garantirMembro>>;
+    try {
+      funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');
+    } catch (e) {
+      try { await req.dados!.remover('estudos', estudo.id, req.contexto!.usuario.id); }
+      catch (e2) { console.error('Falha ao desfazer o estudo sem membro', estudo.id, e2); }
+      throw e;
+    }
     if (funcao) await inscreverMembroEstudo(req, estudo.id, req.contexto!.usuario.id, funcao);
 
     await publicarEvento(req, 'estudo_criado', payloadEstudoCriado(estudo, req.contexto!.usuario.nome));
@@ -645,8 +657,8 @@ rotasEstudos.get('/estudos/:id', async (req: Request, res: Response) => {
 
     const perm = await exigirMembro(req, estudoId);
     if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo'); return; }
-    // Leitor não acessa Rascunho/Arquivado.
-    if (perm.ehLeitor && (estudo.status === 'rascunho' || estudo.status === 'arquivado')) {
+    // Leitor não acessa Rascunho/Arquivado (admin de app, sim — a listagem já os mostra a ele).
+    if (leituraBloqueadaPorStatus(estudo.status, perm)) {
       erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo neste status');
       return;
     }
@@ -665,6 +677,10 @@ rotasEstudos.get('/estudos/:id', async (req: Request, res: Response) => {
       _permissao: {
         funcao: perm.funcao,
         ehMembro: perm.ehMembro,
+        // A tela de membros precisa dos dois para não oferecer o que o servidor
+        // recusa (`recusaAlteracaoMembro`): a própria linha e o admin de app.
+        usuarioId: req.contexto?.usuario?.id ?? null,
+        ehAdminApp: perm.ehAdminApp,
         podeEditar,
         podeAprovar,
         podeSubmeter: podeEditar && estudo.status === 'rascunho',
@@ -772,8 +788,12 @@ rotasEstudos.delete('/estudos/:id', async (req: Request, res: Response) => {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo'); return; }
+    // O gate de método do shell só deixa `DELETE` chegar aqui com nível `admin`
+    // (SDK, `docs/permissoes.md`), e o admin passa em qualquer régua de estudo —
+    // o que o helper acrescenta, de fato, é o 404 para estudo já removido. A régua
+    // de travado fica pela coerência com a edição, caso o gate mude.
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const removido = await req.dados!.remover('estudos', estudoId, req.contexto!.usuario.id);
     if (!removido) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }

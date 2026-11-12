@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
 
 // Rotas da aba "Empreendimento → Informações" (nível Avançado · Lote 4 · #16):
 // anexos do estudo (imagem principal, renders, plantas). Espelha o padrão dos
@@ -23,7 +23,8 @@ rotasEmpreendimento.get('/estudos/:id/empreendimento/documentos', async (req: Re
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirMembro(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso'); return; }
+    const acesso = await acessoLeituraEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const r = await req.dados!.listar('estudo_documentos', {
       filtros: { estudo_id: estudoId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
@@ -51,7 +52,8 @@ rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: R
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem anexar documentos'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const { upload_id, categoria, nome_arquivo } = req.body;
     if (!upload_id) { erro(res, 400, 'NADA_A_ANEXAR', 'Informe um arquivo (upload_id)'); return; }
@@ -78,7 +80,8 @@ rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', asyn
     const estudoId = parseInt(req.params.id);
     const docId = parseInt(req.params.docId);
     if (isNaN(estudoId) || isNaN(docId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const doc = await req.dados!.buscar('estudo_documentos', docId);
     if (!doc || Number(doc.estudo_id) !== estudoId) {

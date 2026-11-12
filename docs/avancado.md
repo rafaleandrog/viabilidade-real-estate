@@ -200,8 +200,7 @@ IA, a partir dos documentos anexados (ver [Apelo Comercial (IA)](apelo-comercial
 
 ## Instruções para não humanos
 
-As rotas com `/estudos/:id/` exigem membro do estudo — ou `admin` do app; num estudo que ainda
-não tem membros, qualquer usuário com nível `escrita` ou superior é aceito — e as de escrita seguem
+As rotas com `/estudos/:id/` exigem membro do estudo — ou `admin` do app —, e as de escrita seguem
 a alçada do estudo (ver [Permissões e ciclo de vida](permissoes)). O catálogo de curvas é global: `GET` para qualquer
 usuário do app, escrita e `semear` só para o `admin` do app.
 

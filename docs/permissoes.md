@@ -22,11 +22,20 @@ disparar.
 | Função | Pode |
 |---|---|
 | `leitor` | ver e exportar. Não vê estudos em Rascunho nem Arquivado. |
-| `editor` | criar, editar, duplicar; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
+| `editor` | criar, editar, duplicar; vincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. Exclusões (`DELETE`) são só do `admin` do app — ver abaixo. |
 | `aprovador` | aprovar, reprovar, devolver ao Rascunho e reabrir um Arquivado; editar em qualquer status (exceto trocar imóvel fora de Rascunho). Inclui o editor. |
 
-Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo. Num
-estudo ainda sem membros, qualquer usuário com nível `escrita` ou superior é aceito como editor.
+Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo, e é
+o único que entra num estudo sem membros — para re-adicionar quem precisar.
+
+### Gerenciar membros
+
+O `editor` adiciona, troca e remove `leitor`es e `editor`es. Conceder a função `aprovador`, ou
+mexer em quem já é aprovador, é só do `aprovador` (ou do `admin` do app). Só o `admin` do app muda
+a própria função, e o estudo nunca fica sem responsável: o último `editor` ou `aprovador` não pode
+ser removido nem passar a `leitor`. Na lista de membros, a tela só oferece as funções e as linhas que a sua função permite alterar.
+Como toda escrita, gerenciar membros de um estudo Aprovado, Reprovado ou Arquivado é só do
+`aprovador`.
 
 ### Ciclo de vida
 
@@ -50,8 +59,8 @@ não oferecer o que o servidor recusaria.
 ### Editar Premissas por status
 
 No Preliminar, as sub-abas de Premissas são editáveis em Rascunho e Em análise por `editor` e
-`aprovador`; em Aprovado e Reprovado ficam em modo de leitura para todos. Em Arquivado a tela deixa
-digitar, mas só o `aprovador` consegue salvar: o servidor recusa o `editor` ao gravar.
+`aprovador`; em Aprovado e Reprovado ficam em modo de leitura para todos. Em Arquivado só o
+`aprovador` edita; para o `editor` elas aparecem em modo de leitura.
 
 ### Renomear um estudo
 
@@ -72,8 +81,20 @@ legível não muda ao renomear: é a identidade estável do estudo.
   aceita escrita do cliente, e `id_legivel` nunca muda. Como `nome_exibicao` é o nome mais sigla,
   UF e sequência, e tem o mesmo limite de 200 caracteres, o servidor encolhe a parte do nome quando
   o rótulo estouraria; o `nome` gravado nunca é truncado.
-- As rotas com `/estudos/:id/` exigem membro do estudo, `admin` do app, ou nível `escrita`+ num
-  estudo ainda sem membros.
+- As rotas com `/estudos/:id/` exigem membro do estudo ou `admin` do app. Todas — inclusive produtos, documentos, apelo, análise de mercado e
+  membros — aplicam as mesmas três regras: estudo excluído responde `404 ESTUDO_NAO_ENCONTRADO`;
+  `leitor` recebe `403` em Rascunho e Arquivado; e escrita em estudo Aprovado, Reprovado ou
+  Arquivado exige `aprovador` (`403` para o `editor`). A exceção são os imóveis: vincular e
+  desvincular só acontecem em Rascunho, para qualquer função (`422 IMOVEL_TRAVADO`).
+- Todo `DELETE` exige nível `admin` do app: o shell recusa os demais com `403
+  AUTH_NIVEL_INSUFICIENTE` antes de a rota rodar. Hoje toda exclusão do app é `DELETE` — estudo,
+  produto, documento, desvínculo de imóvel e as linhas do Avançado e do Funding —, então só o
+  `admin` do app exclui; a única remoção por `PATCH` é a de membro.
+- Sub-recurso com id próprio (`:pid`, `:docId`, `:vinculoId`…) que não pertence ao estudo da URL
+  responde `404`.
+- Membros: `403 PROPRIA_FUNCAO` ao mudar a própria função (salvo `admin` do app);
+  `403 SO_APROVADOR` quando um editor concede, altera ou remove um aprovador;
+  `422 ULTIMO_RESPONSAVEL` ao remover ou rebaixar a `leitor` o último editor ou aprovador.
 
 ## Eventos
 
