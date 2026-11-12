@@ -136,7 +136,7 @@ async function removerProdutoPreliminar(req: Request, res: Response): Promise<vo
     await req.dados!.deletar('preliminar_produtos', p.id);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /preliminar/produtos/:pid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /preliminar/produtos/:pid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }

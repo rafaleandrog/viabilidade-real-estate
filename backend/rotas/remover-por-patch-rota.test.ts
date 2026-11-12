@@ -168,3 +168,27 @@ test('#860: documento do apelo de OUTRO estudo não é apagado (404)', async () 
     assert.equal(dados.existe('apelo_comercial_documentos', docOutro), true);
   });
 });
+
+test('#860: o gate de status vale nos TRÊS status travados (aprovado, reprovado, arquivado)', async () => {
+  // A rodada 1 da revisão mediu: tirar 'reprovado' ou 'arquivado' da lista ficava verde.
+  for (const status of ['reprovado', 'arquivado']) {
+    const dados = new DadosFake();
+    const e = estudo(dados, status);
+    const prod = dados.semear('preliminar_produtos', { estudo_id: e, nome: 'x' });
+    await comServidor(dados, async (patch) => {
+      assert.equal((await patch(26, `/estudos/${e}/preliminar/produtos/${prod}/remover`)).status, 403, status);
+      assert.equal(dados.existe('preliminar_produtos', prod), true, status);
+    });
+  }
+});
+
+test('#860: fora de Rascunho o admin do app exclui o estudo; para quem não tem acesso, inexistente e alheio respondem igual', async () => {
+  const dados = new DadosFake();
+  const e = estudo(dados, 'em_analise');
+  await comServidor(dados, async (patch) => {
+    assert.equal((await patch(28, `/estudos/${e}/remover`)).status, 200);
+    assert.equal(dados.existe('estudos', e), false);
+    assert.equal((await patch(26, '/estudos/999999/remover')).status, 403, 'não revela que o id não existe');
+    assert.equal((await patch(28, '/estudos/999999/remover')).status, 404, 'para o admin, 404');
+  });
+});

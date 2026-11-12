@@ -22,7 +22,7 @@ disparar.
 | Função | Pode |
 |---|---|
 | `leitor` | ver e exportar. Não vê estudos em Rascunho nem Arquivado. |
-| `editor` | criar, editar, duplicar e remover itens do estudo (custos, tipologias, grupos, alocações, cenários, operações de funding, produtos e documentos); excluir o próprio estudo só em Rascunho; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
+| `editor` | criar, editar, duplicar e remover itens do estudo (custos, tipologias, grupos, alocações, cenários, operações de funding, produtos e documentos); excluir o próprio estudo só em Rascunho — em Aprovado, Reprovado e Arquivado, remover e anexar documentos fica com o aprovador; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
 | `aprovador` | aprovar, reprovar, devolver ao Rascunho e reabrir um Arquivado; editar em qualquer status (exceto trocar imóvel fora de Rascunho). Inclui o editor. |
 
 Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo. Num

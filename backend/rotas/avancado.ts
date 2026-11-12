@@ -1058,7 +1058,7 @@ async function removerTipologia(req: Request, res: Response): Promise<void> {
     await req.dados!.deletar('avancado_tipologias', tip.id);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/tipologias/:tid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/tipologias/:tid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }
@@ -1247,7 +1247,7 @@ async function removerFase(req: Request, res: Response): Promise<void> {
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/fases/:fid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/fases/:fid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }
@@ -1500,7 +1500,7 @@ async function removerAlocacao(req: Request, res: Response): Promise<void> {
     await req.dados!.deletar('avancado_alocacoes', aloc.id);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/alocacoes/:aid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/alocacoes/:aid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }
@@ -2196,7 +2196,7 @@ async function removerCusto(req: Request, res: Response): Promise<void> {
     await req.dados!.deletar('avancado_linhas_custo', cid);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/custos/:cid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/custos/:cid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }
@@ -2303,7 +2303,7 @@ async function removerCenario(req: Request, res: Response): Promise<void> {
     await req.dados!.deletar('avancado_cenarios', cid);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/cenarios/:cid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/cenarios/:cid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }

@@ -765,7 +765,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------
-// DELETE /estudos/:id — remover (soft delete)
+// PATCH /estudos/:id/remover (e DELETE) — remover (soft delete)
 // ---------------------------------------------------------------
 async function removerEstudo(req: Request, res: Response): Promise<void> {
   try {
@@ -775,7 +775,13 @@ async function removerEstudo(req: Request, res: Response): Promise<void> {
     // #860 (decisão do autor): o editor exclui o estudo só em Rascunho; nos
     // demais status, só aprovador (ou admin do app).
     const estudo = await req.dados!.buscar('estudos', estudoId);
-    if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+    if (!estudo) {
+      // 404 só para o admin do app; para os demais, inexistente e sem acesso
+      // respondem igual (403), como em `exigirEscritaNoStatus` — o id é sequencial.
+      if (req.contexto?.nivelApp === 'admin') { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+      erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo');
+      return;
+    }
     const perm = estudo.status === 'rascunho'
       ? await exigirEditor(req, estudoId)
       : await exigirAprovador(req, estudoId);
@@ -790,7 +796,7 @@ async function removerEstudo(req: Request, res: Response): Promise<void> {
     if (!removido) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /estudos/:id:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /estudos/:id:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }

@@ -81,7 +81,7 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
   }
 });
 
-// DELETE /estudos/:id/imoveis/:vinculoId — desvincular (editor+, apenas Rascunho)
+// PATCH …/remover (e DELETE) /estudos/:id/imoveis/:vinculoId — desvincular (editor+, apenas Rascunho)
 async function desvincularImovel(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
@@ -106,7 +106,7 @@ async function desvincularImovel(req: Request, res: Response): Promise<void> {
     await req.dados!.deletar('estudo_imoveis', vinculoId);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /estudos/:id/imoveis/:vinculoId:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /estudos/:id/imoveis/:vinculoId:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }

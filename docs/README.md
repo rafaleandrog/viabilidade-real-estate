@@ -25,7 +25,7 @@ empresa, cenários de sensibilidade e uma leitura do mercado local.
 | **Terreno** | Vem do **Núcleo** da instância (uma gleba para Loteamento; um ou mais lotes para Incorporação, com a área somada) ou é **inserido manualmente** (nome e área digitados). A origem se escolhe na criação e o vínculo só muda em Rascunho. |
 | **Proforma** | A tabela de resultado do estudo: VGV, deduções da receita, custos diretos e indiretos, resultado e indicadores (margem, ROI, custo de obras sobre VGV). Ver [Fórmulas da Proforma](formulas). |
 | **Benchmark** | Valores de referência por tipo de empreendimento, mantidos pelo administrador: validam os indicadores (verde ou vermelho) e dão as faixas padrão dos cenários. Ver [Benchmarks](benchmarks). |
-| **Membro e função** | Cada estudo tem os próprios membros. `leitor` vê e exporta; `editor` cria e edita; `aprovador` aprova, reprova e devolve. Ver [Permissões e ciclo de vida](permissoes). |
+| **Membro e função** | Cada estudo tem os próprios membros. `leitor` vê e exporta; `editor` cria, edita e remove; `aprovador` aprova, reprova e devolve. Ver [Permissões e ciclo de vida](permissoes). |
 
 ## Para usuários
 

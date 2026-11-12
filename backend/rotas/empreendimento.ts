@@ -51,7 +51,10 @@ rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: R
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem anexar documentos'); return; }
+    // #860: o mesmo gate de status da remoção. Sem ele, em estudo travado o editor
+    // anexava (a troca da imagem principal anexa a nova e remove a anterior) mas não
+    // removia — e a capa anterior ficava órfã.
+    if (!(await exigirEscritaNoStatus(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem anexar documentos (em estudo aprovado, reprovado ou arquivado, só aprovadores)'); return; }
 
     const { upload_id, categoria, nome_arquivo } = req.body;
     if (!upload_id) { erro(res, 400, 'NADA_A_ANEXAR', 'Informe um arquivo (upload_id)'); return; }
@@ -72,7 +75,7 @@ rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: R
   }
 });
 
-// DELETE /estudos/:id/empreendimento/documentos/:docId
+// PATCH …/remover (e DELETE) /estudos/:id/empreendimento/documentos/:docId
 async function removerDocumentoEmpreendimento(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
@@ -88,7 +91,7 @@ async function removerDocumentoEmpreendimento(req: Request, res: Response): Prom
     await req.dados!.deletar('estudo_documentos', docId);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE empreendimento/documento:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) empreendimento/documento:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }

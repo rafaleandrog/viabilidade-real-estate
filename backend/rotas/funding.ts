@@ -402,7 +402,7 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
   }
 });
 
-// DELETE /estudos/:id/avancado/funding/:oid
+// PATCH …/remover (e DELETE) /estudos/:id/avancado/funding/:oid
 async function removerOperacaoFunding(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
@@ -428,7 +428,7 @@ async function removerOperacaoFunding(req: Request, res: Response): Promise<void
     await req.dados!.deletar('avancado_funding_operacoes', oid);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/funding/:oid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/funding/:oid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 }

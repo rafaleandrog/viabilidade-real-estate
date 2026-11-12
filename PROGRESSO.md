@@ -22,12 +22,16 @@ exclui só em Rascunho.
   `backend/permissoes-estudo.ts`, a mesma regra de `exigirEscrita` do Avançado): em Aprovado,
   Reprovado e Arquivado, só aprovador ou admin. Sem ele, abrir a remoção ao editor deixaria apagar
   dado de estudo aprovado.
+- O **anexo** de documento (empreendimento e apelo) ganha o mesmo gate de status da remoção: sem ele,
+  em estudo travado a troca da imagem principal anexava a nova e não removia a anterior.
 - **De carona, por necessidade:** a remoção de documento do apelo passa a conferir que o documento é
   do estudo (item B2 do diagnóstico #858). Antes só o admin alcançava a rota; com o `PATCH` ela vale
   para editores, e o defeito ficaria mais exposto.
 - Prova de fiação: `frontend/remover-por-patch.test.ts` (método e URL que chegam ao `urbiVerso.api`)
-  e `backend/rotas/remover-por-patch-rota.test.ts` (HTTP); cinco mutações medidas ficam vermelhas
-  (rota PATCH ausente, gate de status, pertença do documento, regra do Rascunho, front em DELETE).
+  e `backend/rotas/remover-por-patch-rota.test.ts` (HTTP); a revisão mediu 19 mutações (o registro
+  `…/remover` de cada handler, o gate de status, a pertença do documento, a regra do Rascunho, o front
+  em DELETE), e as duas que passavam verdes — tirar `reprovado` ou `arquivado` da lista travada —
+  ganharam teste. **Ordem de merge: depois do PR 863**, que remove o atalho do estudo sem membros.
 - Manifesto: a descrição do papel `editor` diz que ele remove (e deixa de dizer "edita benchmarks",
   que as rotas sempre reservaram ao admin). Sem migração, `versao` mantida.
 - Guias: `docs/permissoes.md`, `docs/README.md`, `docs/avancado.md`, `docs/funding.md`,
