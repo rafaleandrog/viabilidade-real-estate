@@ -29,15 +29,17 @@ vivo na homologação, por uma sessão de QA:
   duas remoções ou rebaixamentos simultâneos. Saiu o atalho "estudo sem membros: qualquer usuário
   com escrita age como editor" de `exigirMembro`/`exigirEditor` — era a porta por onde um
   não-membro se incluía como aprovador; agora estudo sem membros é só do admin do app. Medido na
-  homologação: os 11 estudos vivos têm um responsável cada (a produção não foi conferida — o token
-  de leitura de lá não enxerga estudo nenhum).
+  homologação, os 11 estudos vivos têm um responsável cada; na produção, a listagem com nível
+  `admin` do app (que devolve todos os estudos) volta vazia — não há estudo lá para ficar trancado.
+  `POST /estudos` agora desfaz a criação se a inclusão do criador falhar, para não nascer órfão.
 - **Telas alinhadas ao servidor:** o modal de membros (`tela-estudo.ts`) só oferece o que a função
   permite; as abas de IA (Apelo, Análise de Mercado) e as Premissas/anexos ficam em leitura quando o
   servidor recusaria a escrita (Arquivado passa a ser só do aprovador também na tela).
 - Teste de rota com Express real e o gate de método do shell reproduzido
   (`backend/rotas/permissoes-subrotas.test.ts`). Controle de mutação medido: tirar a conferência do
   apelo, trocar a escrita por leitura nos produtos, tirar a guarda de leitura do Avançado, tirar a
-  recontagem do último responsável ou devolver o atalho de estudo sem membros deixa o teste vermelho.
+  recontagem do último responsável (na remoção ou no rebaixamento) ou devolver o atalho de estudo
+  sem membros deixa o teste vermelho.
 - Guias `docs/permissoes.md` e `docs/avancado.md` atualizados. Sem migração, sem `schema.json`,
   `versao` mantida.
 

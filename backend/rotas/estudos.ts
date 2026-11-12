@@ -575,8 +575,17 @@ rotasEstudos.post('/estudos', async (req: Request, res: Response) => {
 
     const estudo = await req.dados!.criar('estudos', dados);
 
-    // Criador vira editor do estudo.
-    const funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');
+    // Criador vira editor do estudo. Sem membro o estudo é inalcançável para
+    // quem não é admin do app (não há atalho de "estudo sem membros"), então uma
+    // falha aqui desfaz a criação, como o `POST /duplicar` já faz com o clone.
+    let funcao: Awaited<ReturnType<typeof garantirMembro>>;
+    try {
+      funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');
+    } catch (e) {
+      try { await req.dados!.remover('estudos', estudo.id, req.contexto!.usuario.id); }
+      catch (e2) { console.error('Falha ao desfazer o estudo sem membro', estudo.id, e2); }
+      throw e;
+    }
     if (funcao) await inscreverMembroEstudo(req, estudo.id, req.contexto!.usuario.id, funcao);
 
     await publicarEvento(req, 'estudo_criado', payloadEstudoCriado(estudo, req.contexto!.usuario.nome));

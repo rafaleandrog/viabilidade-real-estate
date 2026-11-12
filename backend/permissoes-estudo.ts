@@ -51,9 +51,10 @@ export async function resolverPermissaoEstudo(
 
 // ⚠️ Não há mais o atalho "estudo sem membros: qualquer usuário com escrita+
 // age como membro/editor". Ele era a ponte para estudos anteriores à tabela de
-// membros; hoje todo estudo nasce com o criador como editor (`POST /estudos` e
-// `POST /duplicar` chamam `garantirMembro`), e o atalho só era alcançado quando
-// alguém ESVAZIAVA o estudo — e aí virava porta de entrada: qualquer usuário com
+// membros — esses, se ainda existirem numa instância, passam a ser só do admin
+// do app. Hoje todo estudo nasce com o criador como editor (`POST /estudos` e
+// `POST /duplicar` chamam `garantirMembro`, e desfazem a criação se falhar), e
+// o atalho era alcançado quando alguém ESVAZIAVA o estudo — e aí virava porta: qualquer usuário com
 // escrita se incluía como aprovador e aprovava. Estudo sem membros agora é só do
 // admin do app, que re-adiciona quem precisar.
 

@@ -25,6 +25,10 @@ import { leituraBloqueadaPorStatus, escritaExigeAprovador } from '../permissoes-
 // `DELETE` com nível `escrita` mediria um caminho que não existe em produção.
 
 interface Linha { id: number; [k: string]: any }
+interface Ganchos {
+  antesDeDeletar?: (t: string) => Promise<void>;
+  antesDeAtualizar?: (t: string) => Promise<void>;
+}
 
 function montarBanco() {
   const db: Record<string, Linha[]> = {
@@ -60,7 +64,7 @@ function montarBanco() {
   const vivo = (t: string, r: Linha) => !(t === 'estudos' && r.removido_em);
   const casa = (r: Linha, f: Record<string, any> = {}) => Object.entries(f).every(([k, v]) => r[k] === v);
   let seq = 5000;
-  const ganchos: { antesDeDeletar?: (t: string) => Promise<void> } = {};
+  const ganchos: Ganchos = {};
   const dados = {
     async listar(t: string, o: any = {}) {
       // Cede o event loop antes de ler, como um banco real: é o que deixa duas
@@ -74,6 +78,7 @@ function montarBanco() {
     async buscar(t: string, id: number) { return (db[t] ?? []).find((r) => r.id === Number(id) && vivo(t, r)) ?? null; },
     async criar(t: string, v: any) { const r = { id: seq++, ...v }; (db[t] ??= []).push(r); return r; },
     async atualizar(t: string, id: number, v: any) {
+      await ganchos.antesDeAtualizar?.(t);
       const r = (db[t] ?? []).find((x) => x.id === Number(id)); if (!r) return null; Object.assign(r, v); return r;
     },
     async deletar(t: string, id: number) {
@@ -88,7 +93,7 @@ function montarBanco() {
   return { db, dados, ganchos };
 }
 
-async function comServidor(fn: (chamar: (m: string, p: string, corpo?: unknown, quem?: { id: number; nivel: string }) => Promise<{ status: number; corpo: any }>, db: Record<string, Linha[]>, ganchos: { antesDeDeletar?: (t: string) => Promise<void> }) => Promise<void>) {
+async function comServidor(fn: (chamar: (m: string, p: string, corpo?: unknown, quem?: { id: number; nivel: string }) => Promise<{ status: number; corpo: any }>, db: Record<string, Linha[]>, ganchos: Ganchos) => Promise<void>) {
   const { db, dados, ganchos } = montarBanco();
   const app = express();
   app.use(express.json());
@@ -240,6 +245,29 @@ test('membros: duas remoções simultâneas não deixam o estudo sem responsáve
     const restantes = db.estudo_membros.filter((m) => m.estudo_id === 6).length;
     assert.ok(restantes >= 1, `sobrou ${restantes} membro(s) — respostas ${a.status}/${b.status}`);
     assert.ok([a.status, b.status].includes(422), 'ao menos uma remoção é desfeita');
+  }));
+
+test('membros: dois rebaixamentos simultâneos a leitor não deixam o estudo sem responsável', () =>
+  comServidor(async (chamar, db, ganchos) => {
+    // Mesma barreira da remoção, agora no `atualizar`: nenhum rebaixamento grava
+    // antes de os dois terem contado os responsáveis (e visto 2).
+    let chegaram = 0;
+    let liberar!: () => void;
+    const barreira = new Promise<void>((r) => { liberar = r; });
+    ganchos.antesDeAtualizar = async (t) => {
+      if (t !== 'estudo_membros') return;
+      chegaram++;
+      if (chegaram >= 2) liberar();
+      await Promise.race([barreira, new Promise((r) => setTimeout(r, 2000))]);
+    };
+    const [a, b] = await Promise.all([
+      chamar('PATCH', '/estudos/6/membros/9', { funcao: 'leitor' }, { id: 7, nivel: 'escrita' }),
+      chamar('PATCH', '/estudos/6/membros/7', { funcao: 'leitor' }, { id: 9, nivel: 'escrita' }),
+    ]);
+    ganchos.antesDeAtualizar = undefined;
+    const resp = db.estudo_membros.filter((m) => m.estudo_id === 6 && m.funcao !== 'leitor').length;
+    assert.ok(resp >= 1, `sobrou ${resp} responsável(is) — respostas ${a.status}/${b.status}`);
+    assert.ok([a.status, b.status].includes(422), 'ao menos um rebaixamento é desfeito');
   }));
 
 test('regras puras: status e alteração de membro', () => {
