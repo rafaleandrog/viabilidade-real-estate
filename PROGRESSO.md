@@ -11,8 +11,10 @@ Infraestrutura pelo badge grava só o valor canônico e o modo — a coluna da u
 de propósito, e a tela exibe o valor convertido do canônico. `validarObrigatorios`
 (`frontend/premissas-validacao.ts`) exigia a coluna, então o Salvar respondia "Preencha os campos
 obrigatórios" com o campo preenchido na tela. Reproduzido com os estudos 42 e 39 da homologação.
-Agora a obra conta como preenchida pela coluna da unidade ativa **ou** pelo canônico (> 0); o
-canônico é limpo quando o campo é apagado, então não sustenta valor removido. Teste novo em
+Agora a obra é validada pela mesma fonte que a Proforma usa: o canônico quando existe, a coluna da
+unidade ativa só no estudo legado. Isso também fecha o inverso (coluna preenchida com canônico 0,
+que a Proforma aplica como 0). O canônico é limpo quando o campo é apagado, então não sustenta
+valor removido. Teste novo em
 `frontend/premissas-validacao.test.ts`; voltar a regra antiga o deixa vermelho. Sem migração,
 `versao` mantida.
 

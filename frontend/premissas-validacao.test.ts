@@ -93,4 +93,16 @@ test('obras: valor só no canônico (depois de trocar a unidade) não bloqueia o
     infra_modo: 'pct_vgv', infra_pct: null, infra_valor_canonico: 0,
   }, 'loteamento');
   assert.ok('infra_pct' in zero.erros);
+  // O inverso: coluna preenchida com canônico 0 — a Proforma aplica 0, então é vazio.
+  const colunaComCanonicoZero = validarObrigatorios({
+    origem_terreno: 'manual', terreno_manual_area: 1000,
+    infra_modo: 'valor_fixo', infra_valor_fixo: 500_000, infra_valor_canonico: 0,
+  }, 'loteamento');
+  assert.ok('infra_valor_fixo' in colunaComCanonicoZero.erros);
+  // Estudo legado (sem canônico) segue pela coluna.
+  const legado = validarObrigatorios({
+    origem_terreno: 'manual', terreno_manual_area: 1000,
+    construcao_modo: 'valor_m2', custo_construcao_m2: 5500, construcao_valor_canonico: null,
+  }, 'incorporacao');
+  assert.deepEqual(legado.faltando, []);
 });

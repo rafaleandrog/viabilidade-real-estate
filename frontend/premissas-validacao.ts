@@ -55,17 +55,19 @@ export function validarObrigatorios(form: any, tipo: string): ResultadoValidacao
     exigir('terreno_manual_area', n0(form.terreno_manual_area) > 0, 'Área do terreno');
   }
 
-  // Obras (Infraestrutura / Construção), no campo da unidade ativa — OU no
-  // valor canônico. Trocar a unidade pelo badge grava só o canônico e o modo
-  // (`trocaBadgePremissas`), e a coluna da unidade nova fica nula de propósito
-  // (a tela exibe o valor convertido do canônico, que é o que a Proforma usa).
-  // Exigir só a coluna travava o Salvar com o campo preenchido na tela.
+  // Obras (Infraestrutura / Construção), pela MESMA fonte que a Proforma usa:
+  // o valor canônico quando ele existe, e a coluna da unidade ativa só no estudo
+  // legado, sem canônico (`canonico(v, legado)` em `proforma.ts`). Trocar a
+  // unidade pelo badge grava só o canônico e o modo (`trocaBadgePremissas`), e a
+  // coluna da unidade nova fica nula de propósito — exigir a coluna travava o
+  // Salvar com o valor na tela. E o inverso: coluna preenchida com canônico 0
+  // passava aqui enquanto a Proforma aplicava 0.
   // O canônico é limpo quando o campo é esvaziado (`_editarCustoUnidade`), então
   // ele não sustenta um valor que o usuário apagou.
   const obras = campoObrasAtivo(form, tipo);
-  const canonico = tipo === 'loteamento' ? 'infra_valor_canonico' : 'construcao_valor_canonico';
-  exigir(obras, n0(form[obras]) > 0 || n0(form[canonico]) > 0,
-    tipo === 'loteamento' ? 'Infraestrutura' : 'Custo de construção');
+  const canonico = form[tipo === 'loteamento' ? 'infra_valor_canonico' : 'construcao_valor_canonico'];
+  const fonte = canonico === null || canonico === undefined || canonico === '' ? form[obras] : canonico;
+  exigir(obras, n0(fonte) > 0, tipo === 'loteamento' ? 'Infraestrutura' : 'Custo de construção');
 
   return { erros, faltando };
 }
