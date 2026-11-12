@@ -181,7 +181,7 @@ test('leitor não lê sub-rotas de rascunho; admin de app lê mesmo sendo membro
     assert.equal((await chamar('GET', '/estudos/1', undefined, ADMIN)).status, 200);
   }));
 
-test('membros: editor não se promove nem concede/retira aprovador; não remove o último membro', () =>
+test('membros: editor não se promove nem concede/retira aprovador; não deixa o estudo sem responsável', () =>
   comServidor(async (chamar, db) => {
     const r1 = await chamar('PATCH', '/estudos/1/membros/7', { funcao: 'aprovador' });
     assert.equal(r1.status, 403);
@@ -197,21 +197,29 @@ test('membros: editor não se promove nem concede/retira aprovador; não remove 
     assert.equal((await chamar('PATCH', '/estudos/1/membros/8', { funcao: 'editor' })).status, 200);
     // O aprovador concede aprovador.
     assert.equal((await chamar('PATCH', '/estudos/1/membros/8', { funcao: 'aprovador' }, APROVADOR)).status, 200);
-    // Último membro: estudo 3 só tem o usuário 99.
+    // Último responsável: estudo 3 só tem o editor 99 — nem o admin o remove nem o rebaixa.
     const r2 = await chamar('PATCH', '/estudos/3/membros/99/remover', undefined, ADMIN);
     assert.equal(r2.status, 422);
-    assert.equal(r2.corpo.codigo, 'ULTIMO_MEMBRO');
+    assert.equal(r2.corpo.codigo, 'ULTIMO_RESPONSAVEL');
+    const r3 = await chamar('PATCH', '/estudos/3/membros/99', { funcao: 'leitor' }, ADMIN);
+    assert.equal(r3.status, 422);
+    assert.equal(r3.corpo.codigo, 'ULTIMO_RESPONSAVEL');
+    assert.equal(db.estudo_membros.find((m) => m.id === 12)!.funcao, 'editor');
   }));
 
-test('membros: num estudo sem membros, quem tem escrita se inclui (não é "mudar a própria função")', () =>
+test('estudo sem membros: só o admin do app entra (não há mais atalho para quem tem escrita)', () =>
   comServidor(async (chamar, db) => {
     db.estudo_membros = db.estudo_membros.filter((m) => m.estudo_id !== 3);
-    const r = await chamar('POST', '/estudos/3/membros', { usuario_id: 7, funcao: 'editor' });
-    assert.equal(r.status, 200);
-    assert.ok(db.estudo_membros.some((m) => m.estudo_id === 3 && m.usuario_id === 7));
+    assert.equal((await chamar('GET', '/estudos/3')).status, 403);
+    assert.equal((await chamar('GET', '/estudos/3/preliminar/produtos')).status, 403);
+    assert.equal((await chamar('POST', '/estudos/3/membros', { usuario_id: 7, funcao: 'aprovador' })).status, 403);
+    assert.equal((await chamar('POST', '/estudos/3/status', { status: 'em_analise' })).status, 403);
+    assert.ok(!db.estudo_membros.some((m) => m.estudo_id === 3), 'ninguém se incluiu');
+    const r = await chamar('POST', '/estudos/3/membros', { usuario_id: 7, funcao: 'editor' }, ADMIN);
+    assert.equal(r.status, 200, 'o admin re-adiciona quem precisar');
   }));
 
-test('membros: duas remoções simultâneas não deixam o estudo sem membros', () =>
+test('membros: duas remoções simultâneas não deixam o estudo sem responsável', () =>
   comServidor(async (chamar, db, ganchos) => {
     // Estudo 6: dois editores, sem aprovador. Cada um remove o outro ao mesmo tempo.
     // A barreira força a pior intercalação: nenhum `deletar` de membro acontece
@@ -231,6 +239,7 @@ test('membros: duas remoções simultâneas não deixam o estudo sem membros', (
     ]);
     const restantes = db.estudo_membros.filter((m) => m.estudo_id === 6).length;
     assert.ok(restantes >= 1, `sobrou ${restantes} membro(s) — respostas ${a.status}/${b.status}`);
+    assert.ok([a.status, b.status].includes(422), 'ao menos uma remoção é desfeita');
   }));
 
 test('regras puras: status e alteração de membro', () => {
@@ -242,7 +251,9 @@ test('regras puras: status e alteração de membro', () => {
   for (const s of ['aprovado', 'reprovado', 'arquivado']) assert.equal(escritaExigeAprovador(s), true, s);
   for (const s of ['rascunho', 'em_analise']) assert.equal(escritaExigeAprovador(s), false, s);
   const editor = { ehAprovador: false, ehAdminApp: false };
-  assert.equal(recusaAlteracaoMembro({ perm: editor, usuarioAtual: 1, alvo: 2, funcaoAtualAlvo: 'leitor', funcaoNova: 'editor', totalMembros: 3 }), null);
-  assert.equal(recusaAlteracaoMembro({ perm: editor, usuarioAtual: 1, alvo: 2, funcaoAtualAlvo: 'leitor', funcaoNova: null, totalMembros: 3 }), null);
-  assert.equal(recusaAlteracaoMembro({ perm: { ehAprovador: false, ehAdminApp: true }, usuarioAtual: 1, alvo: 1, funcaoAtualAlvo: 'leitor', funcaoNova: 'aprovador', totalMembros: 3 }), null);
+  assert.equal(recusaAlteracaoMembro({ perm: editor, usuarioAtual: 1, alvo: 2, funcaoAtualAlvo: 'leitor', funcaoNova: 'editor', outrosResponsaveis: 1 }), null);
+  assert.equal(recusaAlteracaoMembro({ perm: editor, usuarioAtual: 1, alvo: 2, funcaoAtualAlvo: 'leitor', funcaoNova: null, outrosResponsaveis: 0 }), null, 'remover leitor nunca é o último responsável');
+  assert.equal(recusaAlteracaoMembro({ perm: editor, usuarioAtual: 1, alvo: 2, funcaoAtualAlvo: 'editor', funcaoNova: 'leitor', outrosResponsaveis: 0 })?.codigo, 'ULTIMO_RESPONSAVEL');
+  assert.equal(recusaAlteracaoMembro({ perm: editor, usuarioAtual: 1, alvo: 2, funcaoAtualAlvo: 'editor', funcaoNova: null, outrosResponsaveis: 1 }), null);
+  assert.equal(recusaAlteracaoMembro({ perm: { ehAprovador: false, ehAdminApp: true }, usuarioAtual: 1, alvo: 1, funcaoAtualAlvo: 'leitor', funcaoNova: 'aprovador', outrosResponsaveis: 1 }), null);
 });

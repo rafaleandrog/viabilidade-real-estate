@@ -134,8 +134,10 @@ export class ViabTelaPreliminar extends LitElement {
     return this.podeEditar && (!STATUS_TRAVADO.includes(this.status) || this.podeAprovar);
   }
 
+  // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o
+  // aprovador — o servidor recusa o editor, e a tela deixava digitar e anexar.
   private get _editavelPremissas(): boolean {
-    return this.podeEditar && this.status !== 'aprovado' && this.status !== 'reprovado';
+    return this._podeEscrever && this.status !== 'aprovado' && this.status !== 'reprovado';
   }
 
   render(): TemplateResult {

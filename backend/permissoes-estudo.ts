@@ -49,44 +49,31 @@ export async function resolverPermissaoEstudo(
   return { funcao, ehLeitor, ehEditor, ehAprovador, ehMembro, podeEditar, ehAdminApp };
 }
 
-/** Verdadeiro se o estudo ainda não tem nenhum membro. */
-async function semMembros(req: Request, estudoId: number): Promise<boolean> {
-  const total = await req.dados!.listar('estudo_membros', {
-    filtros: { estudo_id: estudoId },
-    por_pagina: 1,
-  });
-  return total.total === 0;
-}
+// ⚠️ Não há mais o atalho "estudo sem membros: qualquer usuário com escrita+
+// age como membro/editor". Ele era a ponte para estudos anteriores à tabela de
+// membros; hoje todo estudo nasce com o criador como editor (`POST /estudos` e
+// `POST /duplicar` chamam `garantirMembro`), e o atalho só era alcançado quando
+// alguém ESVAZIAVA o estudo — e aí virava porta de entrada: qualquer usuário com
+// escrita se incluía como aprovador e aprovava. Estudo sem membros agora é só do
+// admin do app, que re-adiciona quem precisar.
 
-/**
- * Garante que o usuário é membro do estudo (qualquer função).
- * Estudo sem membros: qualquer usuário com escrita+ age como membro.
- */
+/** Garante que o usuário é membro do estudo (qualquer função), ou admin do app. */
 export async function exigirMembro(
   req: Request,
   estudoId: number,
 ): Promise<PermissaoEstudo | null> {
   const perm = await resolverPermissaoEstudo(req, estudoId);
   if (perm.ehMembro || perm.ehAdminApp) return perm;
-  if (perm.podeEditar && (await semMembros(req, estudoId))) {
-    return { ...perm, ehMembro: true };
-  }
   return null;
 }
 
-/**
- * Garante função de editor (ou aprovador, que inclui tudo do editor).
- * Estudo sem membros: qualquer usuário com escrita+ assume editor.
- */
+/** Garante função de editor (ou aprovador, que inclui tudo do editor), ou admin do app. */
 export async function exigirEditor(
   req: Request,
   estudoId: number,
 ): Promise<PermissaoEstudo | null> {
   const perm = await resolverPermissaoEstudo(req, estudoId);
   if (perm.ehEditor || perm.ehAprovador || perm.ehAdminApp) return perm;
-  if (perm.podeEditar && (await semMembros(req, estudoId))) {
-    return { ...perm, ehEditor: true };
-  }
   return null;
 }
 
@@ -134,9 +121,7 @@ export async function garantirMembro(
 //   sub-rotas seguiam lendo e gravando filhos de um estudo removido, porque o
 //   vínculo de membro sobrevive à remoção;
 // - estudo TRAVADO (aprovado/reprovado/arquivado): só aprovador escreve — a
-//   mesma regra de status de `podeEditarEstudo` (o `PATCH /estudos/:id`), com
-//   uma diferença herdada de `exigirEditor`: num estudo sem membros, o nível
-//   `escrita` do app conta como editor. Sem isto um editor mudava
+//   mesma regra de status de `podeEditarEstudo` (o `PATCH /estudos/:id`). Sem isto um editor mudava
 //   o catálogo (e portanto o VGV) de um estudo já aprovado;
 // - LEITOR não vê rascunho nem arquivado — a mesma regra do `GET /estudos/:id`
 //   e da listagem. Sem isto o leitor lia custos, catálogo e funding do

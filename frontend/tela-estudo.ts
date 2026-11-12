@@ -197,6 +197,12 @@ export class ViabTelaEstudo extends LitElement {
     const linhaEditavel = (m: any) =>
       (p.ehAdminApp || Number(m.usuario_id) !== Number(p.usuarioId))
       && (p.podeAprovar || m.funcao !== 'aprovador');
+    // O estudo nunca fica sem editor ou aprovador: o último deles não sai nem
+    // vira leitor (`ULTIMO_RESPONSAVEL` no servidor).
+    const ehResp = (f: unknown) => f === 'editor' || f === 'aprovador';
+    const totalResp = this.membros.filter((m) => ehResp(m.funcao)).length;
+    const ultimoResp = (m: any) => ehResp(m.funcao) && totalResp <= 1;
+    const funcoesDaLinha = (m: any) => (ultimoResp(m) ? funcoes.filter((f) => f.valor !== 'leitor') : funcoes);
     return html`
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
@@ -208,10 +214,10 @@ export class ViabTelaEstudo extends LitElement {
                 ${podeGerir && linhaEditavel(m) ? html`
                   ${keyed(`${m.usuario_id}:${this._versaoMembros}`, html`<urbi-select
                     .valor=${m.funcao}
-                    .opcoes=${funcoes}
+                    .opcoes=${funcoesDaLinha(m)}
                     @urbi:select-change=${(e: CustomEvent) => this._alterarFuncao(m.usuario_id, e.detail.valor)}
                   ></urbi-select>`)}
-                  ${this.membros.length > 1 ? html`
+                  ${!ultimoResp(m) ? html`
                     <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
                       .ariaLabel=${'Remover membro'}
                       @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>` : nothing}
