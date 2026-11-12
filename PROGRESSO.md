@@ -4,6 +4,38 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-12 — O editor remove itens do estudo: exclusões por `PATCH …/remover` (#860)
+
+Achado da QA ao vivo na Pinguim (2026-11-12), com usuário de serviço de nível `escrita`: o editor
+criava custos, tipologias, produtos e documentos, mas **não removia nada** — todo `DELETE` voltava
+`403 AUTH_NIVEL_INSUFICIENTE`, do shell, antes do handler. É contrato da plataforma (SDK,
+`permissoes.md` § Contrato uniforme método→nível: DELETE só para `admin`; remoção por não-admin se
+modela como `PATCH`). Decisão do autor: quem cria e edita estudos remove; o estudo inteiro, o editor
+exclui só em Rascunho.
+
+- As 11 remoções de dentro do estudo ganham `PATCH <rota>/remover`, com o MESMO handler do `DELETE`
+  (que fica como alias para o admin): estudo, imóvel vinculado, produto do Preliminar, tipologia,
+  grupo/fase, alocação, linha de custo, cenário, operação de funding, documento do apelo e anexo do
+  empreendimento. `frontend/viabilidade-api.ts` passa a chamar a rota nova; benchmarks, curvas e
+  regiões seguem em `DELETE`, só do admin.
+- Gate de status: as remoções (e os anexos) de produto e documento usam `acessoEscritaEstudo`, que
+  chegou à `main` pelo PR 859 — em Aprovado, Reprovado e Arquivado só aprovador ou admin. Sem ele,
+  abrir a remoção ao editor deixaria apagar dado de estudo aprovado. (Este PR tinha um helper
+  próprio, `exigirEscritaNoStatus`, que saiu na sincronização com a `main` em favor do dela.)
+- A conferência de que o documento do apelo é do estudo (item B2 do diagnóstico #858) já veio da
+  `main` (PR 859); aqui ela importa mais, porque com o `PATCH` a rota passa a valer para editores.
+- Prova de fiação: `frontend/remover-por-patch.test.ts` (método e URL que chegam ao `urbiVerso.api`)
+  e `backend/rotas/remover-por-patch-rota.test.ts` (HTTP); a revisão mediu 19 mutações (o registro
+  `…/remover` de cada handler, o gate de status, a pertença do documento, a regra do Rascunho, o front
+  em DELETE), e as duas que passavam verdes — tirar `reprovado` ou `arquivado` da lista travada —
+  ganharam teste. O atalho do estudo sem membros já saiu da `main` (PR 859).
+- Manifesto: a descrição do papel `editor` diz que ele remove (e deixa de dizer "edita benchmarks",
+  que as rotas sempre reservaram ao admin). Sem migração, `versao` mantida.
+- Guias: `docs/permissoes.md`, `docs/README.md`, `docs/avancado.md`, `docs/funding.md`,
+  `docs/apelo-comercial.md`.
+
+---
+
 ## 2026-11-12 — Trocar a unidade de Obras não trava mais o Salvar das Premissas
 
 Item P1 do diagnóstico de 2026-11-11. Trocar a unidade de Construção (R$/m² ↔ R$ total) ou de

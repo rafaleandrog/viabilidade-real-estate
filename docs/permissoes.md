@@ -22,7 +22,7 @@ disparar.
 | Função | Pode |
 |---|---|
 | `leitor` | ver e exportar. Não vê estudos em Rascunho nem Arquivado. |
-| `editor` | criar, editar, duplicar; vincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. Exclusões (`DELETE`) são só do `admin` do app — ver abaixo. |
+| `editor` | criar, editar, duplicar e remover itens do estudo (custos, tipologias, grupos, alocações, cenários, operações de funding, produtos e documentos); vincular e desvincular imóveis (só em Rascunho); excluir o próprio estudo só em Rascunho; enviar Rascunho para Em análise. Em Aprovado, Reprovado e Arquivado, toda escrita — remover inclusive — fica com o aprovador. Inclui o leitor. |
 | `aprovador` | aprovar, reprovar, devolver ao Rascunho e reabrir um Arquivado; editar em qualquer status (exceto trocar imóvel fora de Rascunho). Inclui o editor. |
 
 Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo, e é
@@ -71,6 +71,13 @@ legível não muda ao renomear: é a identidade estável do estudo.
 
 ## Instruções para não humanos
 
+- Toda remoção de dentro de um estudo é `PATCH <rota do item>/remover` (por exemplo
+  `PATCH /estudos/:id/avancado/custos/:cid/remover` e `PATCH /estudos/:id/remover`). O shell só deixa
+  o `admin` do app usar `DELETE`, então quem tem nível `escrita` remove por esse caminho; o `DELETE`
+  das mesmas rotas continua valendo para o `admin`. Em estudo Aprovado, Reprovado ou Arquivado, só
+  aprovador ou `admin` remove itens; o estudo inteiro, o `editor` só exclui em Rascunho. Os cadastros
+  globais (benchmarks, curvas, regiões) seguem em `DELETE`, só para o `admin`.
+
 - `POST /estudos/:id/status` é o portão: reavalia a transição e a alçada a cada chamada e recusa
   com `422 TRANSICAO_INVALIDA` ou `403 SEM_PERMISSAO`, venha o pedido da tela ou de um cliente
   qualquer. A tabela de transições é uma só, compartilhada com o Painel, que a usa para decidir
@@ -87,9 +94,8 @@ legível não muda ao renomear: é a identidade estável do estudo.
   Arquivado exige `aprovador` (`403` para o `editor`). A exceção são os imóveis: vincular e
   desvincular só acontecem em Rascunho, para qualquer função (`422 IMOVEL_TRAVADO`).
 - Todo `DELETE` exige nível `admin` do app: o shell recusa os demais com `403
-  AUTH_NIVEL_INSUFICIENTE` antes de a rota rodar. Hoje toda exclusão do app é `DELETE` — estudo,
-  produto, documento, desvínculo de imóvel e as linhas do Avançado e do Funding —, então só o
-  `admin` do app exclui; a única remoção por `PATCH` é a de membro.
+  AUTH_NIVEL_INSUFICIENTE` antes de a rota rodar. Por isso cada exclusão de dentro do estudo tem
+  também a rota `PATCH …/remover` (ver o primeiro item desta lista), pela qual o `editor` remove.
 - Sub-recurso com id próprio (`:pid`, `:docId`, `:vinculoId`…) que não pertence ao estudo da URL
   responde `404`.
 - Membros: `403 PROPRIA_FUNCAO` ao mudar a própria função (salvo `admin` do app);

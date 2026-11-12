@@ -74,8 +74,8 @@ rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: R
   }
 });
 
-// DELETE /estudos/:id/empreendimento/documentos/:docId
-rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', async (req: Request, res: Response) => {
+// PATCH …/remover (e DELETE) /estudos/:id/empreendimento/documentos/:docId
+async function removerDocumentoEmpreendimento(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     const docId = parseInt(req.params.docId);
@@ -91,7 +91,12 @@ rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', asyn
     await req.dados!.deletar('estudo_documentos', docId);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE empreendimento/documento:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) empreendimento/documento:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasEmpreendimento.patch('/estudos/:id/empreendimento/documentos/:docId/remover', removerDocumentoEmpreendimento);
+rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', removerDocumentoEmpreendimento);

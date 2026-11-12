@@ -155,7 +155,7 @@ Rotas do estudo (membro com alçada de edição para escrever):
 | `GET /estudos/:id/avancado/funding` | lista as operações do estudo |
 | `POST /estudos/:id/avancado/funding` | cria uma operação (`tipo`: `divida`, `equity`, `financiamento_producao` ou `antecipacao_recebiveis`) |
 | `PATCH /estudos/:id/avancado/funding/:oid` | altera uma operação |
-| `DELETE /estudos/:id/avancado/funding/:oid` | remove uma operação |
+| `PATCH /estudos/:id/avancado/funding/:oid/remover` | remove uma operação |
 
 Campos por tipo: todos têm `tipo`, `nome`, `ordem`, `valor` e `inicio_mes` (mês relativo, começando
 em zero, já resolvido a partir da âncora); `ativo: false` só é aceito no financiamento à produção.

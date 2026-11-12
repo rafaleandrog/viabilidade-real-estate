@@ -781,28 +781,46 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------
-// DELETE /estudos/:id — remover (soft delete)
+// PATCH /estudos/:id/remover (e DELETE) — remover (soft delete)
 // ---------------------------------------------------------------
-rotasEstudos.delete('/estudos/:id', async (req: Request, res: Response) => {
+async function removerEstudo(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
-    // O gate de método do shell só deixa `DELETE` chegar aqui com nível `admin`
-    // (SDK, `docs/permissoes.md`), e o admin passa em qualquer régua de estudo —
-    // o que o helper acrescenta, de fato, é o 404 para estudo já removido. A régua
-    // de travado fica pela coerência com a edição, caso o gate mude.
-    const acesso = await acessoEscritaEstudo(req, estudoId);
-    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
+    // #860 (decisão do autor): o editor exclui o estudo só em Rascunho; nos
+    // demais status, só aprovador (ou admin do app).
+    const estudo = await req.dados!.buscar('estudos', estudoId);
+    if (!estudo) {
+      // 404 só para o admin do app; para os demais, inexistente e sem acesso
+      // respondem igual (403), como nas demais sub-rotas para quem não é membro — o id é sequencial.
+      if (req.contexto?.nivelApp === 'admin') { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+      erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo');
+      return;
+    }
+    const perm = estudo.status === 'rascunho'
+      ? await exigirEditor(req, estudoId)
+      : await exigirAprovador(req, estudoId);
+    if (!perm) {
+      erro(res, 403, 'SEM_PERMISSAO', estudo.status === 'rascunho'
+        ? 'Sem permissão para remover este estudo'
+        : 'Fora de Rascunho, só aprovadores removem o estudo');
+      return;
+    }
 
     const removido = await req.dados!.remover('estudos', estudoId, req.contexto!.usuario.id);
     if (!removido) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /estudos/:id:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /estudos/:id:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasEstudos.patch('/estudos/:id/remover', removerEstudo);
+rotasEstudos.delete('/estudos/:id', removerEstudo);
 
 // ---------------------------------------------------------------
 // POST /estudos/:id/duplicar

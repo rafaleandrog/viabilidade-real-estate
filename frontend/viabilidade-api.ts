@@ -65,6 +65,11 @@ declare global {
 
 export const urbiVerso = globalThis.urbiVerso as UrbiVersoApi;
 
+// #860: toda remoção de DENTRO de um estudo é `PATCH …/remover`, nunca DELETE. O shell
+// só deixa `admin` usar DELETE em rota de app (SDK, permissoes.md § Contrato uniforme
+// método→nível), e o editor precisa remover o que cria. DELETE fica só nos cadastros
+// globais (benchmarks, curvas, regiões), que são do admin de qualquer jeito. A trava é
+// `frontend/remover-por-patch.test.ts`.
 // ── Estudos ──
 export function listarEstudos(filtros: { tipo_empreendimento?: string; status?: string } = {}): Promise<any> {
   const qs = new URLSearchParams();
@@ -91,7 +96,7 @@ export function atualizarEstudo(id: number, dados: Record<string, any>, signal?:
 }
 
 export function removerEstudo(id: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${id}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${id}/remover`, { method: 'PATCH' });
 }
 
 export function duplicarEstudo(id: number): Promise<any> {
@@ -130,7 +135,7 @@ export function vincularImovel(estudoId: number, imovelNucleoId: number, tipoImo
   });
 }
 export function desvincularImovel(estudoId: number, vinculoId: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/imoveis/${vinculoId}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/imoveis/${vinculoId}/remover`, { method: 'PATCH' });
 }
 
 // ── Benchmarks ──
@@ -218,7 +223,7 @@ export function atualizarProdutoPreliminar(estudoId: number, pid: number, dados:
   });
 }
 export function removerProdutoPreliminar(estudoId: number, pid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/preliminar/produtos/${pid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/preliminar/produtos/${pid}/remover`, { method: 'PATCH' });
 }
 
 // ── Avançado: catálogo de Tipologias (nível estudo — Lote 6 · #19) ──
@@ -236,7 +241,7 @@ export function atualizarTipologia(estudoId: number, tid: number, dados: Record<
   });
 }
 export function removerTipologia(estudoId: number, tid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/avancado/tipologias/${tid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/tipologias/${tid}/remover`, { method: 'PATCH' });
 }
 
 // ── Avançado: Fases (Absorção/Fluxo por fase — Lote 6 · #21) ──
@@ -258,7 +263,7 @@ export function atualizarFaseAvancado(estudoId: number, fid: number, dados: Reco
   });
 }
 export function removerFaseAvancado(estudoId: number, fid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}/remover`, { method: 'PATCH' });
 }
 
 // ── Avançado: Alocações de venda (tipologia → fase — Lote 6 · #19) ──
@@ -273,7 +278,7 @@ export function atualizarAlocacao(estudoId: number, fid: number, aid: number, da
   });
 }
 export function removerAlocacao(estudoId: number, fid: number, aid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}/remover`, { method: 'PATCH' });
 }
 
 // ── Avançado: linhas de custo ──
@@ -291,7 +296,7 @@ export function atualizarCustoAvancado(estudoId: number, cid: number, dados: Rec
   });
 }
 export function removerCustoAvancado(estudoId: number, cid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/custos/${cid}/remover`, { method: 'PATCH' });
 }
 
 // ── Avançado: Funding — operações (#355, substitui o Capital Stack) ──
@@ -309,7 +314,7 @@ export function atualizarFundingOperacao(estudoId: number, oid: number, dados: R
   });
 }
 export function removerFundingOperacao(estudoId: number, oid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/avancado/funding/${oid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/funding/${oid}/remover`, { method: 'PATCH' });
 }
 
 // ── Avançado: Cenários salvos (Etapa 8 · #56) ──
@@ -329,7 +334,7 @@ export function atualizarCenario(estudoId: number, cid: number, dados: Record<st
   });
 }
 export function removerCenario(estudoId: number, cid: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios/${cid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios/${cid}/remover`, { method: 'PATCH' });
 }
 
 // ── Módulo imobiliário (glebas/lotes/imóveis/parcelamentos) ──
@@ -434,7 +439,7 @@ export function anexarDocumentoApelo(estudoId: number, dados: { upload_id?: numb
   return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial/documentos`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function removerDocumentoApelo(estudoId: number, docId: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial/documentos/${docId}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial/documentos/${docId}/remover`, { method: 'PATCH' });
 }
 export function analisarApelo(estudoId: number): Promise<any> {
   return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial`, { method: 'POST' });
@@ -456,7 +461,7 @@ export function anexarDocumentoEmpreendimento(estudoId: number, dados: { upload_
   return urbiVerso.api(`/estudos/${estudoId}/empreendimento/documentos`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function removerDocumentoEmpreendimento(estudoId: number, docId: number): Promise<any> {
-  return urbiVerso.api(`/estudos/${estudoId}/empreendimento/documentos/${docId}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/empreendimento/documentos/${docId}/remover`, { method: 'PATCH' });
 }
 
 // ── Usuários (para gestão de membros) ──

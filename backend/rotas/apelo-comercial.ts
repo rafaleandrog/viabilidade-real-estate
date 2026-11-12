@@ -70,8 +70,8 @@ rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, 
   }
 });
 
-// DELETE /estudos/:id/apelo-comercial/documentos/:docId
-rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', async (req: Request, res: Response) => {
+// PATCH …/remover (e DELETE) /estudos/:id/apelo-comercial/documentos/:docId
+async function removerDocumentoApelo(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     const docId = parseInt(req.params.docId);
@@ -81,10 +81,10 @@ rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', async (req: 
 
     // O documento pertence ao `apelo_comercial` do estudo, não ao estudo direto:
     // sem esta conferência, o `:docId` de OUTRO estudo era apagado por uma URL que
-    // nomeia este (os ids são sequenciais). Quem chega aqui é sempre admin do app
-    // — o gate de método do shell só deixa `DELETE` passar com nível `admin` —,
-    // então o risco é apagar o documento errado, não escalada. Mesma resposta 404
-    // do gêmeo `DELETE /empreendimento/documentos/:docId`.
+    // nomeia este (os ids são sequenciais). Desde que a remoção também é
+    // `PATCH …/remover` (#860), quem chega aqui pode ser um EDITOR, não só o admin —
+    // e sem esta conferência ele apagaria documento de outro estudo. Mesma resposta
+    // 404 do gêmeo `empreendimento/documentos/:docId`.
     const doc = await req.dados!.buscar('apelo_comercial_documentos', docId);
     const apelo = doc ? await req.dados!.buscar('apelo_comercial', Number(doc.apelo_id)) : null;
     if (!doc || !apelo || Number(apelo.estudo_id) !== estudoId) {
@@ -94,10 +94,15 @@ rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', async (req: 
     await req.dados!.deletar('apelo_comercial_documentos', docId);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE apelo documento:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) apelo documento:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasApelo.patch('/estudos/:id/apelo-comercial/documentos/:docId/remover', removerDocumentoApelo);
+rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', removerDocumentoApelo);
 
 // POST /estudos/:id/apelo-comercial — dispara a análise de IA
 rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Response) => {

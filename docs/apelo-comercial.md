@@ -53,10 +53,10 @@ precisa estar habilitado para o app na instância; caso contrário a análise re
 | Rota | O que faz |
 |---|---|
 | `GET /estudos/:id/apelo-comercial` | o resultado, os documentos anexados e a lista de fatores |
-| `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` | anexa e remove fontes |
+| `POST /estudos/:id/apelo-comercial/documentos` · `PATCH …/documentos/:docId/remover` | anexa e remove fontes |
 | `POST /estudos/:id/apelo-comercial` | dispara a IA; `422 IA_INDISPONIVEL` sem o framework |
 
-Escrever exige a função de `editor` no estudo. O resultado fica em `apelo_comercial` (`resultado`
+Escrever exige a função de `editor` no estudo; em estudo Aprovado, Reprovado ou Arquivado, anexar e remover fontes exige a de `aprovador`. O resultado fica em `apelo_comercial` (`resultado`
 JSON, `score_localizacao`, `score_infraestrutura`, `score_vetor_crescimento`, `score_concorrencia`,
 `score_demanda`, `score_seguranca_juridica`, `score_geral`); as fontes, em
 `apelo_comercial_documentos`.

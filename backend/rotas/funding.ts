@@ -406,8 +406,8 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
   }
 });
 
-// DELETE /estudos/:id/avancado/funding/:oid
-rotasFunding.delete('/estudos/:id/avancado/funding/:oid', async (req: Request, res: Response) => {
+// PATCH …/remover (e DELETE) /estudos/:id/avancado/funding/:oid
+async function removerOperacaoFunding(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
@@ -432,7 +432,12 @@ rotasFunding.delete('/estudos/:id/avancado/funding/:oid', async (req: Request, r
     await req.dados!.deletar('avancado_funding_operacoes', oid);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/funding/:oid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/funding/:oid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasFunding.patch('/estudos/:id/avancado/funding/:oid/remover', removerOperacaoFunding);
+rotasFunding.delete('/estudos/:id/avancado/funding/:oid', removerOperacaoFunding);

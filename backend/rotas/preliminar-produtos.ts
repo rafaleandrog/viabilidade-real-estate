@@ -125,7 +125,7 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
   }
 });
 
-rotasPreliminarProdutos.delete('/estudos/:id/preliminar/produtos/:pid', async (req: Request, res: Response) => {
+async function removerProdutoPreliminar(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
@@ -137,7 +137,12 @@ rotasPreliminarProdutos.delete('/estudos/:id/preliminar/produtos/:pid', async (r
     await req.dados!.deletar('preliminar_produtos', p.id);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /preliminar/produtos/:pid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /preliminar/produtos/:pid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid/remover', removerProdutoPreliminar);
+rotasPreliminarProdutos.delete('/estudos/:id/preliminar/produtos/:pid', removerProdutoPreliminar);

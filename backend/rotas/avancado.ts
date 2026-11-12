@@ -1046,7 +1046,7 @@ rotasAvancado.patch('/estudos/:id/avancado/tipologias/:tid', async (req: Request
   }
 });
 
-rotasAvancado.delete('/estudos/:id/avancado/tipologias/:tid', async (req: Request, res: Response) => {
+async function removerTipologia(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
@@ -1062,10 +1062,15 @@ rotasAvancado.delete('/estudos/:id/avancado/tipologias/:tid', async (req: Reques
     await req.dados!.deletar('avancado_tipologias', tip.id);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/tipologias/:tid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/tipologias/:tid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasAvancado.patch('/estudos/:id/avancado/tipologias/:tid/remover', removerTipologia);
+rotasAvancado.delete('/estudos/:id/avancado/tipologias/:tid', removerTipologia);
 
 // ── Fases (dona da Absorção e do Fluxo de Pagamento) ──
 
@@ -1231,7 +1236,7 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
   }
 });
 
-rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, res: Response) => {
+async function removerFase(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
@@ -1246,10 +1251,15 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/fases/:fid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/fases/:fid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/remover', removerFase);
+rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', removerFase);
 
 // ── Alocações de venda (tipologia → fase) ──
 
@@ -1480,7 +1490,7 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (re
   }
 });
 
-rotasAvancado.delete('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (req: Request, res: Response) => {
+async function removerAlocacao(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
@@ -1494,10 +1504,15 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (r
     await req.dados!.deletar('avancado_alocacoes', aloc.id);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/alocacoes/:aid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/alocacoes/:aid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/alocacoes/:aid/remover', removerAlocacao);
+rotasAvancado.delete('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', removerAlocacao);
 
 // ── GET /receitas: fases no formato do motor do fluxo (compat) ──
 //
@@ -2170,7 +2185,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   }
 }
 
-rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', async (req: Request, res: Response) => {
+async function removerCusto(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
@@ -2185,10 +2200,15 @@ rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', async (req: Request, r
     await req.dados!.deletar('avancado_linhas_custo', cid);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/custos/:cid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/custos/:cid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasAvancado.patch('/estudos/:id/avancado/custos/:cid/remover', removerCusto);
+rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', removerCusto);
 
 // ─────────────────────────────────────────────────────────────────
 // Cenários (Etapa 8 · #56)
@@ -2272,7 +2292,7 @@ rotasAvancado.patch('/estudos/:id/avancado/cenarios/:cid', async (req: Request, 
   }
 });
 
-rotasAvancado.delete('/estudos/:id/avancado/cenarios/:cid', async (req: Request, res: Response) => {
+async function removerCenario(req: Request, res: Response): Promise<void> {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
@@ -2287,10 +2307,15 @@ rotasAvancado.delete('/estudos/:id/avancado/cenarios/:cid', async (req: Request,
     await req.dados!.deletar('avancado_cenarios', cid);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /avancado/cenarios/:cid:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/cenarios/:cid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasAvancado.patch('/estudos/:id/avancado/cenarios/:cid/remover', removerCenario);
+rotasAvancado.delete('/estudos/:id/avancado/cenarios/:cid', removerCenario);
 
 /**
  * Coerção numérica da FRONTEIRA de escrita de uma rota `/avancado/*` — o mesmo

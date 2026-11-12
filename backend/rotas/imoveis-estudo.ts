@@ -81,8 +81,8 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
   }
 });
 
-// DELETE /estudos/:id/imoveis/:vinculoId — desvincular (editor+, apenas Rascunho)
-rotasImoveisEstudo.delete('/estudos/:id/imoveis/:vinculoId', async (req: Request, res: Response) => {
+// PATCH …/remover (e DELETE) /estudos/:id/imoveis/:vinculoId — desvincular (editor+, apenas Rascunho)
+async function desvincularImovel(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     const vinculoId = parseInt(req.params.vinculoId);
@@ -106,7 +106,12 @@ rotasImoveisEstudo.delete('/estudos/:id/imoveis/:vinculoId', async (req: Request
     await req.dados!.deletar('estudo_imoveis', vinculoId);
     res.json({ ok: true });
   } catch (e: any) {
-    console.error('Erro em DELETE /estudos/:id/imoveis/:vinculoId:', e);
+    console.error('Erro ao remover (PATCH …/remover ou DELETE) /estudos/:id/imoveis/:vinculoId:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasImoveisEstudo.patch('/estudos/:id/imoveis/:vinculoId/remover', desvincularImovel);
+rotasImoveisEstudo.delete('/estudos/:id/imoveis/:vinculoId', desvincularImovel);
