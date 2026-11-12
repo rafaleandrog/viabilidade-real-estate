@@ -620,7 +620,14 @@ jobs:
 
   render:
     name: Render em Chromium (overflow, sobreposição, cor)
-    runs-on: ubuntu-latest
+    # ⚠️ Imagem FIXADA, e não `ubuntu-latest`. O pin da toolchain
+    # (`.github/render-deps/`, playwright 1.56.1) só instala o Chromium nas
+    # imagens que essa versão conhece: quando `ubuntu-latest` passou a ser a
+    # 26.04, o passo de instalação morreu com "Playwright does not support
+    # chromium on ubuntu26.04-x64" e o job ficou vermelho em todo PR que toca
+    # frontend, sem nenhuma mudança no repositório. Subir a imagem é subir o
+    # playwright junto (e remedir os números da suíte), num PR próprio.
+    runs-on: ubuntu-24.04
     # ⚠️ 20 min, e não 5 como os demais: este job instala pacotes e baixa o
     # Chromium. O baseline dos passos de medição é ~15s (6 testes, 4 telas,
     # 3 larguras, 4 variantes de tema); o resto é preparo. Sem `timeout-minutes`
