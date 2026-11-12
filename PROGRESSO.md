@@ -4,6 +4,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-12 — Trocar a unidade de Obras não trava mais o Salvar das Premissas
+
+Item P1 do diagnóstico de 2026-11-11. Trocar a unidade de Construção (R$/m² ↔ R$ total) ou de
+Infraestrutura pelo badge grava só o valor canônico e o modo — a coluna da unidade nova fica nula
+de propósito, e a tela exibe o valor convertido do canônico. `validarObrigatorios`
+(`frontend/premissas-validacao.ts`) exigia a coluna, então o Salvar respondia "Preencha os campos
+obrigatórios" com o campo preenchido na tela. Reproduzido com os estudos 42 e 39 da homologação.
+Agora a obra é validada pela mesma fonte que a Proforma usa: o canônico quando existe, a coluna da
+unidade ativa só no estudo legado. Isso também fecha o inverso (coluna preenchida com canônico 0,
+que a Proforma aplica como 0). O canônico é limpo quando o campo é apagado, então não sustenta
+valor removido. Teste novo em
+`frontend/premissas-validacao.test.ts`; voltar a regra antiga o deixa vermelho. Sem migração,
+`versao` mantida.
+
+---
+
 ## 2026-11-12 — Autorização por estudo nas sub-rotas e na gestão de membros
 
 Primeiro conserto do diagnóstico de 2026-11-11 (pedido do autor: explorar o app e trazer os erros).
