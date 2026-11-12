@@ -64,3 +64,33 @@ test('camposObrigatorios (asterisco): terreno e obras, sem depender do catálogo
   assert.ok(s.has('custo_construcao_m2')); // obras
   assert.ok(s.has('terreno_manual_area'));
 });
+
+// Trocar a unidade de Obras pelo badge grava só o canônico e o modo — a coluna da
+// unidade nova fica nula. Reproduzido com os estudos 42 (Incorporação, R$/m² →
+// R$ total) e 39 (Loteamento, R$/m² → R$): o Salvar acusava o campo como vazio,
+// com o valor na tela e na Proforma.
+test('obras: valor só no canônico (depois de trocar a unidade) não bloqueia o salvamento', () => {
+  const inc = validarObrigatorios({
+    origem_terreno: 'manual', terreno_manual_area: 1000,
+    construcao_modo: 'valor_total', construcao_valor_total: null, custo_construcao_m2: 5500,
+    construcao_valor_canonico: 109_159_765,
+  }, 'incorporacao');
+  assert.deepEqual(inc.faltando, [], JSON.stringify(inc));
+  const lot = validarObrigatorios({
+    origem_terreno: 'manual', terreno_manual_area: 1000,
+    infra_modo: 'valor_fixo', infra_valor_fixo: null, infra_valor_canonico: 57_000_000,
+  }, 'loteamento');
+  assert.deepEqual(lot.faltando, [], JSON.stringify(lot));
+  // Sem coluna e sem canônico continua obrigatório (campo apagado limpa o canônico).
+  const vazio = validarObrigatorios({
+    origem_terreno: 'manual', terreno_manual_area: 1000,
+    construcao_modo: 'valor_total', construcao_valor_total: null, construcao_valor_canonico: null,
+  }, 'incorporacao');
+  assert.ok('construcao_valor_total' in vazio.erros);
+  // Canônico zero não conta como preenchido.
+  const zero = validarObrigatorios({
+    origem_terreno: 'manual', terreno_manual_area: 1000,
+    infra_modo: 'pct_vgv', infra_pct: null, infra_valor_canonico: 0,
+  }, 'loteamento');
+  assert.ok('infra_pct' in zero.erros);
+});
