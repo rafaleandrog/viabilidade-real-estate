@@ -25,8 +25,27 @@ disparar.
 | `editor` | criar, editar, duplicar; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
 | `aprovador` | aprovar, reprovar, devolver ao Rascunho e reabrir um Arquivado; editar em qualquer status (exceto trocar imóvel fora de Rascunho). Inclui o editor. |
 
-Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo. Num
-estudo ainda sem membros, qualquer usuário com nível `escrita` ou superior é aceito como editor.
+Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo.
+
+### Quem concede cada função
+
+A função no estudo nunca passa do nível que a pessoa tem no app:
+
+| Função | Nível mínimo no app |
+|---|---|
+| `leitor` | `leitura` |
+| `editor` | `escrita` |
+| `aprovador` | `admin` |
+
+- O `editor` adiciona e altera **leitores e editores**. Só o `aprovador` ou o `admin` do app concede a
+  função de aprovador, ou altera e remove quem já é aprovador.
+- Ninguém altera a **própria** função. Para sair de um estudo, remova-se da lista de membros.
+- O estudo nunca fica sem **editor nem aprovador**: a remoção ou o rebaixamento do último é recusado.
+  Adicione outro antes.
+- Um estudo sem membros só é acessível ao `admin` do app, que adiciona quem precisar.
+
+Na tela, a janela **Membros** só oferece as funções que você pode conceder, e não mostra o seletor
+de função na sua própria linha.
 
 ### Ciclo de vida
 
@@ -72,8 +91,14 @@ legível não muda ao renomear: é a identidade estável do estudo.
   aceita escrita do cliente, e `id_legivel` nunca muda. Como `nome_exibicao` é o nome mais sigla,
   UF e sequência, e tem o mesmo limite de 200 caracteres, o servidor encolhe a parte do nome quando
   o rótulo estouraria; o `nome` gravado nunca é truncado.
-- As rotas com `/estudos/:id/` exigem membro do estudo, `admin` do app, ou nível `escrita`+ num
-  estudo ainda sem membros.
+- As rotas com `/estudos/:id/` exigem membro do estudo ou `admin` do app.
+- `POST /estudos/:id/membros` e `PATCH /estudos/:id/membros/:usuarioId` (e o `…/remover`) recusam
+  com `403 AUTOPROMOCAO` (alterar a própria função), `403 FUNCAO_ACIMA_DO_ATOR` (editor concedendo,
+  alterando ou removendo aprovador), `422 ULTIMO_RESPONSAVEL` (o estudo ficaria sem editor nem
+  aprovador) e `422 NIVEL_INSUFICIENTE` (o nível do usuário no app não comporta a função — usuário
+  inexistente conta como nível `nenhuma`). `usuario_id` que não é inteiro positivo dá
+  `400 USUARIO_INVALIDO`.
+- Um membro com a função `aprovador` gravada e nível abaixo de `admin` age como `editor`.
 
 ## Eventos
 

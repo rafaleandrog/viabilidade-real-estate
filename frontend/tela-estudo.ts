@@ -9,12 +9,7 @@ import {
   urbiVerso, buscarEstudo, transicaoStatus, atualizarEstudo,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
-
-const FUNCOES = [
-  { valor: 'leitor', rotulo: 'Leitor' },
-  { valor: 'editor', rotulo: 'Editor' },
-  { valor: 'aprovador', rotulo: 'Aprovador' },
-];
+import { acoesDoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
 export class ViabTelaEstudo extends LitElement {
@@ -184,26 +179,32 @@ export class ViabTelaEstudo extends LitElement {
 
   private _renderMembros(p: any): TemplateResult {
     const podeGerir = p.podeEditar;
+    const meuId = urbiVerso.usuario()?.id ?? null;
     return html`
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
           ${this.membros.length === 0 ? html`<span class="sec">Nenhum membro.</span>` : nothing}
-          ${this.membros.map((m) => html`
+          ${this.membros.map((m) => {
+            const a = acoesDoMembro(p, meuId, m);
+            return html`
             <div class="membro">
               <span>${m.usuario_nome || `Usuário ${m.usuario_id}`}</span>
               <div class="membro-acoes">
-                ${podeGerir ? html`
+                ${a.podeTrocarFuncao ? html`
                   <urbi-select
                     .valor=${m.funcao}
-                    .opcoes=${FUNCOES}
+                    .opcoes=${a.opcoes}
                     @urbi:select-change=${(e: CustomEvent) => this._alterarFuncao(m.usuario_id, e.detail.valor)}
                   ></urbi-select>
+                ` : html`<urbi-badge cor="padrao">${m.funcao}</urbi-badge>`}
+                ${a.podeRemover ? html`
                   <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
                     @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>
-                ` : html`<urbi-badge cor="padrao">${m.funcao}</urbi-badge>`}
+                ` : nothing}
               </div>
             </div>
-          `)}
+          `;
+          })}
         </div>
         ${podeGerir ? html`
           <div class="add-membro">
@@ -218,7 +219,7 @@ export class ViabTelaEstudo extends LitElement {
             <urbi-select
               label="Função"
               .valor=${this.novoMembroFuncao}
-              .opcoes=${FUNCOES}
+              .opcoes=${acoesDoMembro(p, meuId, { usuario_id: -1, funcao: 'leitor' }).opcoes}
               @urbi:select-change=${(e: CustomEvent) => this.novoMembroFuncao = e.detail.valor}
             ></urbi-select>
             <urbi-botao variante="primario" icone="fa-solid fa-plus" @click=${this._adicionarMembro}>Adicionar</urbi-botao>
@@ -358,11 +359,13 @@ export class ViabTelaEstudo extends LitElement {
   private async _alterarFuncao(usuarioId: number, funcao: string) {
     try {
       const res = await alterarFuncaoMembro(this.estudoId, usuarioId, funcao);
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
-      this.membros = (await listarMembros(this.estudoId))?.dados || this.membros;
+      if (res?.erro) urbiVerso.notificar(res.mensagem || 'Erro', 'erro');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro', 'erro');
     }
+    // Recarrega SEMPRE: numa recusa (#861) o seletor ficaria mostrando a função
+    // que o servidor não gravou.
+    this.membros = (await listarMembros(this.estudoId).catch(() => null))?.dados || [...this.membros];
   }
 
   private async _removerMembro(usuarioId: number) {

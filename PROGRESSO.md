@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-12 — Permissão por estudo: sem autopromoção e sem estudo vazio aberto (#861)
+
+Achado da QA ao vivo na Pinguim (diagnóstico #858, itens B1 e parte do Q6), com usuários de serviço
+reais: (1) o editor mudava a **própria** função para aprovador e aprovava o próprio estudo; (2) o
+último membro saía, e qualquer usuário com nível `escrita` — mesmo sem ser membro — se adicionava como
+aprovador e aprovava. Decisão do autor: **aprovador exige nível `admin` no app**.
+
+- Regra única em `frontend/membros-regras.ts` (funções puras, usadas pelo backend como portão e pela
+  janela Membros): ninguém altera a própria função (pode sair); editor gere leitores e editores, e só
+  aprovador ou admin concede, altera ou remove aprovador; o estudo nunca fica sem editor nem
+  aprovador (`422 ULTIMO_RESPONSAVEL`); a função não passa do nível do alvo no app
+  (`422 NIVEL_INSUFICIENTE`, usuário inexistente incluído — antes era 500).
+- `backend/permissoes-estudo.ts`: sai o atalho `semMembros`; a linha `aprovador` com nível abaixo de
+  `admin` age como editor (defesa para dado antigo). Medido na Pinguim antes da mudança: nenhum
+  estudo com 0 membros e nenhuma linha `aprovador` — ninguém perde acesso nem poder.
+- Prova de fiação: `backend/rotas/membros-estudo-rota.test.ts` repete por HTTP a sequência da QA;
+  apagar a chamada da regra no handler e repor o atalho `semMembros` deixam o arquivo vermelho
+  (medido).
+- Guias: `docs/permissoes.md` (§ Quem concede cada função) e `docs/avancado.md`.
+- Sem migração, sem `schema.json`, `versao` mantida. Pendente do autor: conferir na Laputa, antes
+  de publicar, que nenhum estudo está sem editor/aprovador.
+
+---
+
 ## 2026-10-26 — Cenários do Preliminar voltam ao seletor de variável (tornado e margem de segurança saem)
 
 Pedido direto do autor, com captura da aba Cenários do estudo Calliandra II: *"essa parte de

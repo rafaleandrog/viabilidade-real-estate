@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import { funcaoEfetivaDoMembro } from '../frontend/membros-regras.js';
 
 // Permissão por estudo (4ª camada) — espelha o padrão de `ciclo_membros` do OKR.
 // Cada estudo tem seus próprios membros com função leitor/editor/aprovador.
@@ -40,26 +41,28 @@ export async function resolverPermissaoEstudo(
     }
   }
 
-  const ehLeitor = funcao === 'leitor';
-  const ehEditor = funcao === 'editor';
-  const ehAprovador = funcao === 'aprovador';
+  // #861: a linha `aprovador` só vale com nível `admin` no app (decisão do
+  // autor, 2026-11-12); abaixo dele o membro age como editor. Defesa para
+  // linhas gravadas antes da regra de concessão em `frontend/membros-regras.ts`.
+  const efetiva = funcaoEfetivaDoMembro(funcao, nivel);
+  const ehLeitor = efetiva === 'leitor';
+  const ehEditor = efetiva === 'editor';
+  const ehAprovador = efetiva === 'aprovador';
   const ehMembro = ehLeitor || ehEditor || ehAprovador;
 
-  return { funcao, ehLeitor, ehEditor, ehAprovador, ehMembro, podeEditar, ehAdminApp };
-}
-
-/** Verdadeiro se o estudo ainda não tem nenhum membro. */
-async function semMembros(req: Request, estudoId: number): Promise<boolean> {
-  const total = await req.dados!.listar('estudo_membros', {
-    filtros: { estudo_id: estudoId },
-    por_pagina: 1,
-  });
-  return total.total === 0;
+  return { funcao: efetiva, ehLeitor, ehEditor, ehAprovador, ehMembro, podeEditar, ehAdminApp };
 }
 
 /**
- * Garante que o usuário é membro do estudo (qualquer função).
- * Estudo sem membros: qualquer usuário com escrita+ age como membro.
+ * Garante que o usuário é membro do estudo (qualquer função) ou admin do app.
+ *
+ * #861: não existe mais o atalho "estudo sem membros: qualquer usuário com
+ * escrita+ age como membro". Ele era a ponte para estudos anteriores à tabela de
+ * membros, mas todo estudo nasce hoje com o criador como editor, então o único
+ * jeito de atingi-lo era ESVAZIAR o estudo — e aí qualquer usuário com escrita
+ * se adicionava como aprovador e aprovava. Estudo sem membros é só do admin do
+ * app, que re-adiciona quem precisar; e a regra do último responsável
+ * (`decidirResponsavelRestante`) impede que ele fique vazio.
  */
 export async function exigirMembro(
   req: Request,
@@ -67,25 +70,16 @@ export async function exigirMembro(
 ): Promise<PermissaoEstudo | null> {
   const perm = await resolverPermissaoEstudo(req, estudoId);
   if (perm.ehMembro || perm.ehAdminApp) return perm;
-  if (perm.podeEditar && (await semMembros(req, estudoId))) {
-    return { ...perm, ehMembro: true };
-  }
   return null;
 }
 
-/**
- * Garante função de editor (ou aprovador, que inclui tudo do editor).
- * Estudo sem membros: qualquer usuário com escrita+ assume editor.
- */
+/** Garante função de editor (ou aprovador, que inclui tudo do editor), ou admin do app. */
 export async function exigirEditor(
   req: Request,
   estudoId: number,
 ): Promise<PermissaoEstudo | null> {
   const perm = await resolverPermissaoEstudo(req, estudoId);
   if (perm.ehEditor || perm.ehAprovador || perm.ehAdminApp) return perm;
-  if (perm.podeEditar && (await semMembros(req, estudoId))) {
-    return { ...perm, ehEditor: true };
-  }
   return null;
 }
 

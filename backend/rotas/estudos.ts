@@ -24,6 +24,7 @@ import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
 import { validarSomaPctAlv, areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
+import { funcaoEfetivaDoMembro } from '../../frontend/membros-regras.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
@@ -607,8 +608,13 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
       const mem = await req.dados!.listar('estudo_membros', {
         filtros: { usuario_id: userId }, por_pagina: 500,
       });
+      // #861: a função publicada é a EFETIVA — a linha `aprovador` só vale com
+      // nível `admin` no app (que nem passa por este ramo), então aqui ela age
+      // como `editor`, e a tela não desenha botão que o servidor recusaria.
       const funcaoPorEstudo = new Map<number, string>();
-      for (const m of mem.dados) funcaoPorEstudo.set(Number(m.estudo_id), String(m.funcao));
+      for (const m of mem.dados) {
+        funcaoPorEstudo.set(Number(m.estudo_id), funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp) ?? String(m.funcao));
+      }
 
       estudos = [];
       for (const [estudoId, funcao] of funcaoPorEstudo) {
