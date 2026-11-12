@@ -236,7 +236,9 @@ test('membros: duas remoções simultâneas não deixam o estudo sem responsáve
       if (t !== 'estudo_membros') return;
       chegaram++;
       if (chegaram >= 2) liberar();
-      await Promise.race([barreira, new Promise((r) => setTimeout(r, 2000))]);
+      let teto: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([barreira, new Promise((r) => { teto = setTimeout(r, 2000); })]);
+      clearTimeout(teto); // sem isto o timer perdedor segura o processo ~2 s no fim
     };
     const [a, b] = await Promise.all([
       chamar('PATCH', '/estudos/6/membros/9/remover', undefined, { id: 7, nivel: 'escrita' }),
@@ -258,7 +260,9 @@ test('membros: dois rebaixamentos simultâneos a leitor não deixam o estudo sem
       if (t !== 'estudo_membros') return;
       chegaram++;
       if (chegaram >= 2) liberar();
-      await Promise.race([barreira, new Promise((r) => setTimeout(r, 2000))]);
+      let teto: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([barreira, new Promise((r) => { teto = setTimeout(r, 2000); })]);
+      clearTimeout(teto); // sem isto o timer perdedor segura o processo ~2 s no fim
     };
     const [a, b] = await Promise.all([
       chamar('PATCH', '/estudos/6/membros/9', { funcao: 'leitor' }, { id: 7, nivel: 'escrita' }),

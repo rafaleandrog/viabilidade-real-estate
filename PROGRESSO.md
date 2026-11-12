@@ -29,8 +29,9 @@ vivo na homologação, por uma sessão de QA:
   duas remoções ou rebaixamentos simultâneos. Saiu o atalho "estudo sem membros: qualquer usuário
   com escrita age como editor" de `exigirMembro`/`exigirEditor` — era a porta por onde um
   não-membro se incluía como aprovador; agora estudo sem membros é só do admin do app. Medido na
-  homologação, os 11 estudos vivos têm um responsável cada; na produção, a listagem com nível
-  `admin` do app (que devolve todos os estudos) volta vazia — não há estudo lá para ficar trancado.
+  homologação, os 11 estudos vivos têm um responsável cada; na produção, medido em 2026-11-12
+  com um token de nível `admin` no app (cuja listagem devolve todos os estudos), a listagem volta
+  vazia — não há estudo lá para ficar trancado.
   `POST /estudos` agora desfaz a criação se a inclusão do criador falhar, para não nascer órfão.
 - **Telas alinhadas ao servidor:** o modal de membros (`tela-estudo.ts`) só oferece o que a função
   permite; as abas de IA (Apelo, Análise de Mercado) e as Premissas/anexos ficam em leitura quando o
