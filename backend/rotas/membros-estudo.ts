@@ -59,6 +59,29 @@ async function contarResponsaveis(req: Request, estudoId: number, excluirUsuario
   return (todos as any[]).filter((m) => ehResponsavel(m.funcao) && Number(m.usuario_id) !== excluirUsuario).length;
 }
 
+/**
+ * Desfaz a remoção do último responsável. Se, na janela entre o `deletar` e
+ * aqui, outra requisição já re-incluiu o MESMO usuário (como leitor, digamos),
+ * criar de novo bateria na unicidade `[estudo_id, usuario_id]` e responderia
+ * 500, deixando o estudo só com esse leitor. Então: se a linha voltou a existir,
+ * ela recebe de volta a função de responsável; se não, é recriada.
+ */
+async function restaurarResponsavel(req: Request, estudoId: number, usuarioId: number, funcao: string): Promise<void> {
+  const linha = async () => (await req.dados!.listar('estudo_membros', {
+    filtros: { estudo_id: estudoId, usuario_id: usuarioId }, por_pagina: 1,
+  })).dados[0];
+  const existente = await linha();
+  if (existente) { await req.dados!.atualizar('estudo_membros', existente.id, { funcao }); return; }
+  try {
+    await req.dados!.criar('estudo_membros', { estudo_id: estudoId, usuario_id: usuarioId, funcao });
+  } catch (e) {
+    // Perdeu a corrida para a re-inclusão concorrente: a linha agora existe.
+    const outra = await linha();
+    if (!outra) throw e;
+    await req.dados!.atualizar('estudo_membros', outra.id, { funcao });
+  }
+}
+
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
@@ -190,9 +213,7 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId/remover', async (req: 
       // atalho "estudo sem membros", o instante entre o `deletar` e a recriação
       // não abre o estudo a ninguém além do admin do app.)
       if (ehResponsavel(removido.funcao) && (await contarResponsaveis(req, estudoId)) === 0) {
-        await req.dados!.criar('estudo_membros', {
-          estudo_id: estudoId, usuario_id: Number(removido.usuario_id), funcao: removido.funcao,
-        });
+        await restaurarResponsavel(req, estudoId, Number(removido.usuario_id), String(removido.funcao));
         erro(res, 422, 'ULTIMO_RESPONSAVEL', 'O estudo precisa de ao menos um editor ou aprovador — adicione outro antes');
         return;
       }

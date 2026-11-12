@@ -76,7 +76,12 @@ function montarBanco() {
     async varrerTudo(t: string, o: any = {}) { return (db[t] ?? []).filter((r) => vivo(t, r) && casa(r, o.filtros)); },
     // Como o shell: `buscar` não devolve registro removido por soft delete.
     async buscar(t: string, id: number) { return (db[t] ?? []).find((r) => r.id === Number(id) && vivo(t, r)) ?? null; },
-    async criar(t: string, v: any) { const r = { id: seq++, ...v }; (db[t] ??= []).push(r); return r; },
+    async criar(t: string, v: any) {
+      if (t === 'estudo_membros' && (db[t] ?? []).some((m) => m.estudo_id === v.estudo_id && m.usuario_id === v.usuario_id)) {
+        throw new Error('duplicate key value violates unique constraint (estudo_id, usuario_id)');
+      }
+      const r = { id: seq++, ...v }; (db[t] ??= []).push(r); return r;
+    },
     async atualizar(t: string, id: number, v: any) {
       await ganchos.antesDeAtualizar?.(t);
       const r = (db[t] ?? []).find((x) => x.id === Number(id)); if (!r) return null; Object.assign(r, v); return r;
@@ -272,6 +277,28 @@ test('membros: dois rebaixamentos simultâneos a leitor não deixam o estudo sem
     const resp = db.estudo_membros.filter((m) => m.estudo_id === 6 && m.funcao !== 'leitor').length;
     assert.ok(resp >= 1, `sobrou ${resp} responsável(is) — respostas ${a.status}/${b.status}`);
     assert.ok([a.status, b.status].includes(422), 'ao menos um rebaixamento é desfeito');
+  }));
+
+test('membros: re-inclusão concorrente do removido não vira 500 nem deixa o estudo só com leitor', () =>
+  comServidor(async (chamar, db, ganchos) => {
+    // Estudo 3: só o editor 99. O admin tenta removê-lo (vai ser recusado pela
+    // regra antes de apagar) — então forçamos o caminho da recontagem: um
+    // segundo editor existe na contagem e sai ANTES da recontagem, enquanto o
+    // próprio 99 é re-incluído como leitor na janela.
+    db.estudo_membros.push({ id: 300, estudo_id: 3, usuario_id: 98, funcao: 'editor' });
+    ganchos.antesDeDeletar = async (t) => {
+      if (t !== 'estudo_membros') return;
+      ganchos.antesDeDeletar = undefined;
+      // Na janela: o outro editor sai, e o 99 volta como leitor.
+      db.estudo_membros = db.estudo_membros.filter((m) => m.id !== 300);
+      db.estudo_membros.push({ id: 301, estudo_id: 3, usuario_id: 99, funcao: 'leitor', __pendente: true });
+    };
+    // O fake só aplica a unicidade no `criar`, como o banco.
+    const r = await chamar('PATCH', '/estudos/3/membros/99/remover', undefined, ADMIN);
+    assert.equal(r.status, 422, JSON.stringify(r.corpo));
+    const do99 = db.estudo_membros.filter((m) => m.estudo_id === 3 && m.usuario_id === 99);
+    assert.equal(do99.length, 1, 'sem linha duplicada');
+    assert.equal(do99[0].funcao, 'editor', 'o 99 volta a ser responsável');
   }));
 
 test('regras puras: status e alteração de membro', () => {
