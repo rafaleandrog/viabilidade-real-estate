@@ -92,6 +92,12 @@ test('#860: o editor remove por PATCH …/remover em Rascunho, rota a rota', asy
   const imovel = dados.semear('estudo_imoveis', { estudo_id: p, imovel_nucleo_id: 9, tipo_imovel: 'lote' });
   const cen = dados.semear('avancado_cenarios', { estudo_id: a, nome: 'c' });
   const op = dados.semear('avancado_funding_operacoes', { estudo_id: a, tipo: 'divida', nome: 'd' });
+  const custo = dados.semear('avancado_linhas_custo', { estudo_id: a, grupo: 'obra', categoria: 'X', orcamento_valor: 10 });
+  const tip = dados.semear('avancado_tipologias', { estudo_id: a, nome: 't', quantidade: 5 });
+  const grupo = dados.semear('avancado_fases', { estudo_id: a, tipo: 'receita', nome: '1º Grupo' });
+  const aloc = dados.semear('avancado_alocacoes', { estudo_id: a, fase_id: grupo, tipologia_id: tip, unidades: 2 });
+  const grupo2 = dados.semear('avancado_fases', { estudo_id: a, tipo: 'receita', nome: '2º Grupo' });
+  const tip2 = dados.semear('avancado_tipologias', { estudo_id: a, nome: 't2', quantidade: 1 });
   const casos: [string, string, number][] = [
     [`/estudos/${p}/preliminar/produtos/${prod}/remover`, 'preliminar_produtos', prod],
     [`/estudos/${p}/empreendimento/documentos/${doc}/remover`, 'estudo_documentos', doc],
@@ -99,6 +105,10 @@ test('#860: o editor remove por PATCH …/remover em Rascunho, rota a rota', asy
     [`/estudos/${p}/imoveis/${imovel}/remover`, 'estudo_imoveis', imovel],
     [`/estudos/${a}/avancado/cenarios/${cen}/remover`, 'avancado_cenarios', cen],
     [`/estudos/${a}/avancado/funding/${op}/remover`, 'avancado_funding_operacoes', op],
+    [`/estudos/${a}/avancado/custos/${custo}/remover`, 'avancado_linhas_custo', custo],
+    [`/estudos/${a}/avancado/fases/${grupo}/alocacoes/${aloc}/remover`, 'avancado_alocacoes', aloc],
+    [`/estudos/${a}/avancado/fases/${grupo2}/remover`, 'avancado_fases', grupo2],
+    [`/estudos/${a}/avancado/tipologias/${tip2}/remover`, 'avancado_tipologias', tip2],
   ];
   await comServidor(dados, async (patch) => {
     for (const [caminho, tabela, id] of casos) {
