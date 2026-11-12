@@ -109,11 +109,15 @@ export function decidirResponsavelRestante(
   usuarioId: number,
   funcaoNova: FuncaoEstudo | null,
 ): RecusaMembros | null {
+  const ehResponsavel = (f: string | null) => f === 'editor' || f === 'aprovador';
+  const antes = membros.filter((m) => ehResponsavel(m.funcao)).length;
   const depois = membros
     .map((m) => (Number(m.usuario_id) === usuarioId ? { ...m, funcao: funcaoNova } : m))
-    .filter((m) => m.funcao !== null);
-  const responsaveis = depois.filter((m) => m.funcao === 'editor' || m.funcao === 'aprovador').length;
-  if (responsaveis > 0) return null;
+    .filter((m) => ehResponsavel(m.funcao)).length;
+  // Recusa só a mudança que TIRA o último responsável. Um estudo que já está sem
+  // editor/aprovador (dado legado) não fica travado: remover ou mudar um leitor
+  // ali não piora nada — e é o admin quem o conserta, re-adicionando um editor.
+  if (depois > 0 || antes === 0) return null;
   return {
     http: 422, codigo: 'ULTIMO_RESPONSAVEL',
     mensagem: 'O estudo ficaria sem editor nem aprovador — adicione outro antes de sair ou de rebaixar este membro',
@@ -129,15 +133,25 @@ export function decidirNivelDoAlvo(nivel: string | null | undefined, funcao: Fun
   };
 }
 
+/** Maior função que cada nível do app comporta (o inverso de `NIVEL_MINIMO_DA_FUNCAO`). */
+const MAIOR_FUNCAO_DO_NIVEL: Record<NivelApp, FuncaoEstudo | null> = {
+  nenhuma: null, leitura: 'leitor', escrita: 'editor', admin: 'aprovador',
+};
+const ORDEM_FUNCAO: Record<FuncaoEstudo, number> = { leitor: 1, editor: 2, aprovador: 3 };
+
 /**
- * Função EFETIVA de quem tem a linha `funcao` no estudo e o `nivel` no app: a
- * linha `aprovador` só vale com nível `admin` (a regra acima); abaixo dele, o
- * membro age como `editor`. É a defesa para linhas gravadas antes desta regra.
+ * Função EFETIVA de quem tem a linha `funcao` no estudo e o `nivel` no app: o
+ * MÍNIMO entre a linha gravada e a maior função que o nível comporta. Uma linha
+ * `aprovador` de quem tem `escrita` age como `editor`; de quem caiu para
+ * `leitura`, como `leitor`; e sem nível nenhum, não vale nada. Função de estudo
+ * nunca eleva o nível do app — é a defesa para linhas gravadas antes da regra
+ * de concessão, ou cujo dono perdeu nível depois.
  */
 export function funcaoEfetivaDoMembro(funcao: string | null | undefined, nivel: string | null | undefined): FuncaoEstudo | null {
   if (!ehFuncaoEstudo(funcao)) return null;
-  if (funcao === 'aprovador' && !nivelComportaFuncao(nivel, 'aprovador')) return 'editor';
-  return funcao;
+  const teto = MAIOR_FUNCAO_DO_NIVEL[(nivel ?? 'nenhuma') as NivelApp] ?? null;
+  if (teto === null) return null;
+  return ORDEM_FUNCAO[funcao] <= ORDEM_FUNCAO[teto] ? funcao : teto;
 }
 
 /** Rótulos das funções, na ordem do seletor. */
@@ -148,9 +162,15 @@ export const FUNCOES = [
 ];
 
 /**
- * #861: o que a linha de um membro oferece, pela MESMA regra que o servidor
- * aplica (`frontend/membros-regras.ts`). `p` é o `_permissao` do GET do estudo:
- * `podeAprovar` já inclui o admin do app. É a regra de TELA, testada sem DOM.
+ * #861: o que a linha de um membro oferece, derivado das mesmas regras que o
+ * servidor aplica. `p` é o `_permissao` do GET do estudo: `podeAprovar` já
+ * inclui o admin do app. É a regra de TELA, testada sem DOM.
+ *
+ * Um subconjunto CONSERVADOR do servidor, de propósito: o `_permissao` não diz se
+ * quem vê é admin do app, então a tela trata o admin como aprovador e esconde o
+ * seletor da própria linha, que o servidor aceitaria do admin. O erro é para
+ * MENOS — a tela nunca oferece o que o servidor recusa por estas regras. A regra
+ * do último responsável não é antecipada aqui: o servidor a recusa com 422.
  */
 export function acoesDoMembro(
   p: { podeEditar?: boolean; podeAprovar?: boolean },

@@ -35,6 +35,30 @@ function atorDe(req: Request, perm: PermissaoEstudo): AtorMembros {
   };
 }
 
+/**
+ * As mutações de membros de um MESMO estudo correm em série. Sem isso, duas
+ * remoções (ou rebaixamentos) simultâneas dos dois últimos responsáveis leem a
+ * mesma lista, as duas passam por `decidirResponsavelRestante` e o estudo fica
+ * sem editor nem aprovador — achado P2 do App do Codex na revisão da #861.
+ * Mesmo desenho da `filaSemeadura` de `./avancado.ts`, com a mesma ressalva: a
+ * fila é deste processo; com mais de uma réplica do backend a janela volta a
+ * existir entre réplicas (e o estado resultante é só um estudo do admin, não
+ * uma escalação — sem o atalho `semMembros`, ninguém mais entra nele).
+ */
+const filaMembros = new Map<number, Promise<unknown>>();
+
+async function emSerie<T>(estudoId: number, fn: () => Promise<T>): Promise<T> {
+  const anterior = filaMembros.get(estudoId) ?? Promise.resolve();
+  const atual = anterior.then(fn, fn);
+  const cauda = atual.then(() => undefined, () => undefined);
+  filaMembros.set(estudoId, cauda);
+  try {
+    return await atual;
+  } finally {
+    if (filaMembros.get(estudoId) === cauda) filaMembros.delete(estudoId);
+  }
+}
+
 async function membrosDoEstudo(req: Request, estudoId: number): Promise<any[]> {
   return req.dados!.varrerTudo('estudo_membros', { filtros: { estudo_id: estudoId } });
 }
@@ -46,7 +70,11 @@ async function membrosDoEstudo(req: Request, estudoId: number): Promise<any[]> {
 async function nivelDoAlvo(req: Request, usuarioId: number): Promise<string> {
   try {
     return (await req.shell!.nivelEfetivoUsuario(usuarioId)) ?? 'nenhuma';
-  } catch {
+  } catch (e) {
+    // Falha FECHADA: sem confirmar o nível, a concessão é recusada. O SDK não diz
+    // quando o helper lança (usuário inexistente? falha transitória?), então o
+    // erro vai para o log — a recusa em si não distingue os dois casos.
+    console.warn(`nivelEfetivoUsuario(${usuarioId}) falhou; tratado como "nenhuma":`, e);
     return 'nenhuma';
   }
 }
@@ -86,17 +114,19 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
     const perm = await exigirEditor(req, estudoId);
     if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem adicionar membros'); return; }
 
-    const membros = await membrosDoEstudo(req, estudoId);
-    const atual = membros.find((m) => Number(m.usuario_id) === usuarioId);
-    if (atual) { res.json({ ok: true, adicionado: false }); return; }
+    await emSerie(estudoId, async () => {
+      const membros = await membrosDoEstudo(req, estudoId);
+      const atual = membros.find((m) => Number(m.usuario_id) === usuarioId);
+      if (atual) { res.json({ ok: true, adicionado: false }); return; }
 
-    const recusa = decidirAlteracaoMembro(atorDe(req, perm), { usuarioId, funcaoAtual: null }, funcao)
-      ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
-    if (recusa) { recusar(res, recusa); return; }
+      const recusa = decidirAlteracaoMembro(atorDe(req, perm), { usuarioId, funcaoAtual: null }, funcao)
+        ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
+      if (recusa) { recusar(res, recusa); return; }
 
-    const nova = await garantirMembro(req, estudoId, usuarioId, funcao);
-    if (nova) await inscreverMembroEstudo(req, estudoId, usuarioId, nova);
-    res.json({ ok: true, adicionado: nova !== null });
+      const nova = await garantirMembro(req, estudoId, usuarioId, funcao);
+      if (nova) await inscreverMembroEstudo(req, estudoId, usuarioId, nova);
+      res.json({ ok: true, adicionado: nova !== null });
+    });
   } catch (e: any) {
     console.error('Erro em POST /estudos/:id/membros:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
@@ -119,25 +149,27 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId', async (req: Request,
     const perm = await exigirEditor(req, estudoId);
     if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem alterar funções'); return; }
 
-    const membros = await membrosDoEstudo(req, estudoId);
-    const membro = membros.find((m) => Number(m.usuario_id) === usuarioId);
-    if (!membro) {
-      erro(res, 404, 'MEMBRO_NAO_ENCONTRADO', 'Usuário não é membro deste estudo');
-      return;
-    }
-    if (membro.funcao === funcao) { res.json({ ok: true }); return; }
+    await emSerie(estudoId, async () => {
+      const membros = await membrosDoEstudo(req, estudoId);
+      const membro = membros.find((m) => Number(m.usuario_id) === usuarioId);
+      if (!membro) {
+        erro(res, 404, 'MEMBRO_NAO_ENCONTRADO', 'Usuário não é membro deste estudo');
+        return;
+      }
+      if (membro.funcao === funcao) { res.json({ ok: true }); return; }
 
-    const recusa = decidirAlteracaoMembro(
-      atorDe(req, perm), { usuarioId, funcaoAtual: membro.funcao as FuncaoEstudo }, funcao,
-    )
-      ?? decidirResponsavelRestante(membros, usuarioId, funcao)
-      ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
-    if (recusa) { recusar(res, recusa); return; }
+      const recusa = decidirAlteracaoMembro(
+        atorDe(req, perm), { usuarioId, funcaoAtual: membro.funcao as FuncaoEstudo }, funcao,
+      )
+        ?? decidirResponsavelRestante(membros, usuarioId, funcao)
+        ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
+      if (recusa) { recusar(res, recusa); return; }
 
-    await req.dados!.atualizar('estudo_membros', membro.id, { funcao });
-    // Reconcilia inscrições conforme a nova função.
-    await inscreverMembroEstudo(req, estudoId, usuarioId, funcao);
-    res.json({ ok: true });
+      await req.dados!.atualizar('estudo_membros', membro.id, { funcao });
+      // Reconcilia inscrições conforme a nova função.
+      await inscreverMembroEstudo(req, estudoId, usuarioId, funcao);
+      res.json({ ok: true });
+    });
   } catch (e: any) {
     console.error('Erro em PATCH /estudos/:id/membros/:usuarioId:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
@@ -154,17 +186,19 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId/remover', async (req: 
     const perm = await exigirEditor(req, estudoId);
     if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem remover membros'); return; }
 
-    const membros = await membrosDoEstudo(req, estudoId);
-    const membro = membros.find((m) => Number(m.usuario_id) === usuarioId);
-    if (membro) {
-      const recusa = decidirAlteracaoMembro(
-        atorDe(req, perm), { usuarioId, funcaoAtual: membro.funcao as FuncaoEstudo }, null,
-      ) ?? decidirResponsavelRestante(membros, usuarioId, null);
-      if (recusa) { recusar(res, recusa); return; }
-      await req.dados!.deletar('estudo_membros', membro.id);
-      await desinscreverMembroEstudo(req, estudoId, usuarioId);
-    }
-    res.json({ ok: true });
+    await emSerie(estudoId, async () => {
+      const membros = await membrosDoEstudo(req, estudoId);
+      const membro = membros.find((m) => Number(m.usuario_id) === usuarioId);
+      if (membro) {
+        const recusa = decidirAlteracaoMembro(
+          atorDe(req, perm), { usuarioId, funcaoAtual: membro.funcao as FuncaoEstudo }, null,
+        ) ?? decidirResponsavelRestante(membros, usuarioId, null);
+        if (recusa) { recusar(res, recusa); return; }
+        await req.dados!.deletar('estudo_membros', membro.id);
+        await desinscreverMembroEstudo(req, estudoId, usuarioId);
+      }
+      res.json({ ok: true });
+    });
   } catch (e: any) {
     console.error('Erro em PATCH /estudos/:id/membros/:usuarioId/remover:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);

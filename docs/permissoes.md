@@ -39,13 +39,15 @@ A função no estudo nunca passa do nível que a pessoa tem no app:
 
 - O `editor` adiciona e altera **leitores e editores**. Só o `aprovador` ou o `admin` do app concede a
   função de aprovador, ou altera e remove quem já é aprovador.
-- Ninguém altera a **própria** função. Para sair de um estudo, remova-se da lista de membros.
+- Ninguém altera a **própria** função, exceto o `admin` do app. Para sair de um estudo, remova-se da
+  lista de membros.
 - O estudo nunca fica sem **editor nem aprovador**: a remoção ou o rebaixamento do último é recusado.
-  Adicione outro antes.
+  Adicione outro antes. (Um estudo antigo que já esteja sem nenhum não trava: o `admin` do app
+  adiciona um editor.)
 - Um estudo sem membros só é acessível ao `admin` do app, que adiciona quem precisar.
 
 Na tela, a janela **Membros** só oferece as funções que você pode conceder, e não mostra o seletor
-de função na sua própria linha.
+de função na sua própria linha (nem para o `admin` do app, que pode alterá-la pela API).
 
 ### Ciclo de vida
 
@@ -98,7 +100,8 @@ legível não muda ao renomear: é a identidade estável do estudo.
   aprovador) e `422 NIVEL_INSUFICIENTE` (o nível do usuário no app não comporta a função — usuário
   inexistente conta como nível `nenhuma`). `usuario_id` que não é inteiro positivo dá
   `400 USUARIO_INVALIDO`.
-- Um membro com a função `aprovador` gravada e nível abaixo de `admin` age como `editor`.
+- A função que vale é a menor entre a gravada no estudo e a que o nível do app comporta: um
+  `aprovador` com nível `escrita` age como `editor`; com `leitura`, como `leitor`.
 
 ## Eventos
 

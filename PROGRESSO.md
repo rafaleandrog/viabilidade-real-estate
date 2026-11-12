@@ -16,12 +16,17 @@ aprovador e aprovava. Decisão do autor: **aprovador exige nível `admin` no app
   aprovador ou admin concede, altera ou remove aprovador; o estudo nunca fica sem editor nem
   aprovador (`422 ULTIMO_RESPONSAVEL`); a função não passa do nível do alvo no app
   (`422 NIVEL_INSUFICIENTE`, usuário inexistente incluído — antes era 500).
-- `backend/permissoes-estudo.ts`: sai o atalho `semMembros`; a linha `aprovador` com nível abaixo de
-  `admin` age como editor (defesa para dado antigo). Medido na Pinguim antes da mudança: nenhum
-  estudo com 0 membros e nenhuma linha `aprovador` — ninguém perde acesso nem poder.
-- Prova de fiação: `backend/rotas/membros-estudo-rota.test.ts` repete por HTTP a sequência da QA;
-  apagar a chamada da regra no handler e repor o atalho `semMembros` deixam o arquivo vermelho
-  (medido).
+- `backend/permissoes-estudo.ts`: sai o atalho `semMembros`; a função que vale é o mínimo entre a
+  linha gravada e o que o nível do app comporta (`aprovador` com `escrita` age como editor; com
+  `leitura`, como leitor — achado P1 do App do Codex na revisão). As mutações de membros de um estudo
+  correm em série no processo, para duas remoções simultâneas não esvaziarem o estudo (P2 do App).
+  Medido na Pinguim antes da mudança: nenhum estudo com 0 membros e nenhuma linha `aprovador` — os
+  11 vínculos são `editor` com nível `admin`, então ninguém perde acesso nem poder.
+- Prova de fiação: `backend/rotas/membros-estudo-rota.test.ts` repete por HTTP a sequência da QA,
+  e cada regra tem uma mutação medida que deixa o arquivo vermelho — inclusive as três que a revisão
+  achou VERDES na primeira versão (PATCH sem o último responsável, PATCH sem o teto pelo nível, e a
+  listagem sem a função efetiva). A janela Membros recria as linhas a cada recarga, para o seletor
+  não ficar mostrando uma função recusada.
 - Guias: `docs/permissoes.md` (§ Quem concede cada função) e `docs/avancado.md`.
 - Sem migração, sem `schema.json`, `versao` mantida. Pendente do autor: conferir na Laputa, antes
   de publicar, que nenhum estudo está sem editor/aprovador.

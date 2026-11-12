@@ -35,7 +35,13 @@ class DadosFake {
     const t = this.tabelas.get(tabela)!; const a = { ...t.get(Number(id)), ...patch }; t.set(Number(id), a); return a;
   }
   async criar(tabela: string, dados: Record<string, any>) { return this.buscar(tabela, this.semear(tabela, dados)); }
-  async deletar(tabela: string, id: number) { this.tabelas.get(tabela)?.delete(Number(id)); }
+  // Atraso artificial no `deletar`: abre a janela entre ler a lista e apagar,
+  // para o teste de corrida ser determinístico (o banco real tem essa janela).
+  atrasoDeletarMs = 0;
+  async deletar(tabela: string, id: number) {
+    if (this.atrasoDeletarMs) await new Promise((r) => setTimeout(r, this.atrasoDeletarMs));
+    this.tabelas.get(tabela)?.delete(Number(id));
+  }
   membros(estudoId: number) {
     return [...(this.tabelas.get('estudo_membros')?.values() ?? [])].filter((m) => m.estudo_id === estudoId);
   }
@@ -161,5 +167,72 @@ test('#861: editor não concede aprovador; aprovador (admin) concede; nível do 
     assert.equal((await chamar(26, 'PATCH', `/estudos/${e}/membros/28`, { funcao: 'leitor' })).j.codigo, 'FUNCAO_ACIMA_DO_ATOR');
     // com o aprovador presente, o editor pode sair
     assert.equal((await chamar(26, 'PATCH', `/estudos/${e}/membros/26/remover`, {})).status, 200);
+  });
+});
+
+// Rodada 1 da revisão (lente T4): três caminhos que o PR declara proteger
+// passavam VERDES por mutação — o PATCH sem a regra do último responsável, o
+// PATCH sem o teto pelo nível do alvo, e a listagem sem a função efetiva.
+
+test('#861 PATCH: rebaixar o último responsável é recusado (não só o /remover)', async () => {
+  const dados = new DadosFake();
+  const e = estudoComMembros(dados, [[28, 'editor'], [27, 'leitor']]);
+  await comServidor(dados, async (chamar) => {
+    // o admin rebaixando o único editor (ele mesmo pode; a regra é a do responsável)
+    const r = await chamar(28, 'PATCH', `/estudos/${e}/membros/28`, { funcao: 'leitor' });
+    assert.equal(r.status, 422);
+    assert.equal(r.j.codigo, 'ULTIMO_RESPONSAVEL');
+    assert.equal(dados.membros(e).find((m) => m.usuario_id === 28).funcao, 'editor');
+  });
+});
+
+test('#861 PATCH: a função não passa do nível do alvo no app', async () => {
+  const dados = new DadosFake();
+  // 28 é admin do app; 29 tem só escrita e já é editor
+  const e = estudoComMembros(dados, [[28, 'editor'], [29, 'editor']]);
+  await comServidor(dados, async (chamar) => {
+    const r = await chamar(28, 'PATCH', `/estudos/${e}/membros/29`, { funcao: 'aprovador' });
+    assert.equal(r.status, 422);
+    assert.equal(r.j.codigo, 'NIVEL_INSUFICIENTE');
+    assert.equal(dados.membros(e).find((m) => m.usuario_id === 29).funcao, 'editor');
+  });
+});
+
+test('#861 GET /estudos: linha `aprovador` de usuário com escrita é publicada como `editor`', async () => {
+  const dados = new DadosFake();
+  const e = estudoComMembros(dados, [[29, 'aprovador']]);
+  await comServidor(dados, async (chamar) => {
+    const r = await chamar(29, 'GET', '/estudos');
+    assert.equal(r.status, 200);
+    const linha = r.j.dados.find((x: any) => x.id === e);
+    assert.equal(linha?._funcao, 'editor');
+    const d = await chamar(29, 'GET', `/estudos/${e}`);
+    assert.equal(d.j._permissao.funcao, 'editor');
+    assert.equal(d.j._permissao.podeAprovar, false);
+  });
+});
+
+test('#861 POST de quem já é membro não muda a função (não é porta para promover)', async () => {
+  const dados = new DadosFake();
+  const e = estudoComMembros(dados, [[26, 'editor'], [29, 'leitor']]);
+  await comServidor(dados, async (chamar) => {
+    const r = await chamar(26, 'POST', `/estudos/${e}/membros`, { usuario_id: 29, funcao: 'editor' });
+    assert.equal(r.status, 200);
+    assert.equal(r.j.adicionado, false);
+    assert.equal(dados.membros(e).find((m) => m.usuario_id === 29).funcao, 'leitor');
+  });
+});
+
+test('#861 corrida: dois responsáveis saindo ao mesmo tempo não esvaziam o estudo (achado P2 do App do Codex)', async () => {
+  const dados = new DadosFake();
+  dados.atrasoDeletarMs = 30;
+  const e = estudoComMembros(dados, [[26, 'editor'], [28, 'editor']]);
+  await comServidor(dados, async (chamar) => {
+    const [a, b] = await Promise.all([
+      chamar(26, 'PATCH', `/estudos/${e}/membros/26/remover`, {}),
+      chamar(28, 'PATCH', `/estudos/${e}/membros/28/remover`, {}),
+    ]);
+    assert.deepEqual([a.status, b.status].sort(), [200, 422]);
+    assert.equal(dados.membros(e).length, 1, 'sobra exatamente um responsável');
   });
 });

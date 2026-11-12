@@ -41,9 +41,9 @@ export async function resolverPermissaoEstudo(
     }
   }
 
-  // #861: a linha `aprovador` só vale com nível `admin` no app (decisão do
-  // autor, 2026-11-12); abaixo dele o membro age como editor. Defesa para
-  // linhas gravadas antes da regra de concessão em `frontend/membros-regras.ts`.
+  // #861: a função que vale é o mínimo entre a linha gravada e o que o nível do
+  // app comporta (aprovador exige `admin`, decisão do autor, 2026-11-12). Defesa
+  // para linhas gravadas antes da regra de concessão, ou de quem perdeu nível.
   const efetiva = funcaoEfetivaDoMembro(funcao, nivel);
   const ehLeitor = efetiva === 'leitor';
   const ehEditor = efetiva === 'editor';

@@ -53,6 +53,10 @@ test('#861 porta 2: o estudo nunca fica sem editor nem aprovador', () => {
   assert.equal(decidirResponsavelRestante(um, 11, null), null, 'remover o leitor não toca no responsável');
   const dois = [...um, { usuario_id: 12, funcao: 'aprovador' }];
   assert.equal(decidirResponsavelRestante(dois, 10, null), null);
+  // estudo legado JÁ sem responsável: mexer num leitor não piora nada e não trava
+  const legado = [{ usuario_id: 11, funcao: 'leitor' }, { usuario_id: 13, funcao: 'leitor' }];
+  assert.equal(decidirResponsavelRestante(legado, 11, null), null);
+  assert.equal(decidirResponsavelRestante(legado, 11, 'leitor'), null);
   // id chega como string do banco em alguns caminhos
   assert.equal(decidirResponsavelRestante([{ usuario_id: '10', funcao: 'editor' }], 10, null)?.codigo, 'ULTIMO_RESPONSAVEL');
 });
@@ -70,10 +74,16 @@ test('#861: teto pelo nível do app (decisão do autor: aprovador exige admin)',
   assert.equal(decidirNivelDoAlvo('admin', 'aprovador'), null);
 });
 
-test('#861: linha `aprovador` abaixo de admin age como editor', () => {
+test('#861: a função efetiva é o mínimo entre a linha e o que o nível comporta', () => {
   assert.equal(funcaoEfetivaDoMembro('aprovador', 'escrita'), 'editor');
   assert.equal(funcaoEfetivaDoMembro('aprovador', 'admin'), 'aprovador');
   assert.equal(funcaoEfetivaDoMembro('editor', 'escrita'), 'editor');
+  // achado P1 do App do Codex: quem caiu para `leitura` não age como editor
+  assert.equal(funcaoEfetivaDoMembro('aprovador', 'leitura'), 'leitor');
+  assert.equal(funcaoEfetivaDoMembro('editor', 'leitura'), 'leitor');
+  assert.equal(funcaoEfetivaDoMembro('leitor', 'admin'), 'leitor', 'nunca eleva a linha');
+  assert.equal(funcaoEfetivaDoMembro('editor', 'nenhuma'), null);
+  assert.equal(funcaoEfetivaDoMembro('editor', undefined), null);
   assert.equal(funcaoEfetivaDoMembro('xpto', 'admin'), null);
   assert.equal(funcaoEfetivaDoMembro(null, 'admin'), null);
 });

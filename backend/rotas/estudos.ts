@@ -608,9 +608,9 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
       const mem = await req.dados!.listar('estudo_membros', {
         filtros: { usuario_id: userId }, por_pagina: 500,
       });
-      // #861: a função publicada é a EFETIVA — a linha `aprovador` só vale com
-      // nível `admin` no app (que nem passa por este ramo), então aqui ela age
-      // como `editor`, e a tela não desenha botão que o servidor recusaria.
+      // #861: a função publicada é a EFETIVA — o mínimo entre a linha e o que o
+      // nível do app comporta (ver `funcaoEfetivaDoMembro`), para a tela não
+      // desenhar botão que o servidor recusaria.
       const funcaoPorEstudo = new Map<number, string>();
       for (const m of mem.dados) {
         funcaoPorEstudo.set(Number(m.estudo_id), funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp) ?? String(m.funcao));

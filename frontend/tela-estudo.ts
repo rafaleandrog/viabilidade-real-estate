@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { keyed } from 'lit/directives/keyed.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, COR_NIVEL } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { nomeEstudoLimpo, LIMITE_NOME_ESTUDO, podeEditarEstudo } from './estudo-status.js';
@@ -38,6 +39,8 @@ export class ViabTelaEstudo extends LitElement {
   @state() private mostrarMembros = false;
   @state() private novoMembroUsuario = '';
   @state() private novoMembroFuncao = 'leitor';
+  /** Sobe a cada recarga da lista de membros; recria as linhas (ver `_alterarFuncao`). */
+  @state() private versaoMembros = 0;
   @state() private confirmarStatus: { novo: string; label: string } | null = null;
   // #678: renomear virou ação do cabeçalho do estudo (saiu do Painel).
   @state() private editarAlvo = false;
@@ -184,7 +187,7 @@ export class ViabTelaEstudo extends LitElement {
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
           ${this.membros.length === 0 ? html`<span class="sec">Nenhum membro.</span>` : nothing}
-          ${this.membros.map((m) => {
+          ${keyed(this.versaoMembros, this.membros.map((m) => {
             const a = acoesDoMembro(p, meuId, m);
             return html`
             <div class="membro">
@@ -204,7 +207,7 @@ export class ViabTelaEstudo extends LitElement {
               </div>
             </div>
           `;
-          })}
+          }))}
         </div>
         ${podeGerir ? html`
           <div class="add-membro">
@@ -363,9 +366,13 @@ export class ViabTelaEstudo extends LitElement {
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro', 'erro');
     }
-    // Recarrega SEMPRE: numa recusa (#861) o seletor ficaria mostrando a função
-    // que o servidor não gravou.
+    // Recarrega SEMPRE e recria as linhas (`versaoMembros`, usado no `keyed` do
+    // render): numa recusa (#861) o valor recarregado é IGUAL ao anterior, e um
+    // binding comum do Lit não reescreve a propriedade — o seletor ficaria
+    // mostrando a função que o servidor não gravou. Recriar o elemento não depende
+    // de como o `urbi-select` guarda o valor escolhido.
     this.membros = (await listarMembros(this.estudoId).catch(() => null))?.dados || [...this.membros];
+    this.versaoMembros++;
   }
 
   private async _removerMembro(usuarioId: number) {
