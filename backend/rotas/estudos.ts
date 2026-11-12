@@ -767,13 +767,24 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
 // ---------------------------------------------------------------
 // DELETE /estudos/:id — remover (soft delete)
 // ---------------------------------------------------------------
-rotasEstudos.delete('/estudos/:id', async (req: Request, res: Response) => {
+async function removerEstudo(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo'); return; }
+    // #860 (decisão do autor): o editor exclui o estudo só em Rascunho; nos
+    // demais status, só aprovador (ou admin do app).
+    const estudo = await req.dados!.buscar('estudos', estudoId);
+    if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+    const perm = estudo.status === 'rascunho'
+      ? await exigirEditor(req, estudoId)
+      : await exigirAprovador(req, estudoId);
+    if (!perm) {
+      erro(res, 403, 'SEM_PERMISSAO', estudo.status === 'rascunho'
+        ? 'Sem permissão para remover este estudo'
+        : 'Fora de Rascunho, só aprovadores removem o estudo');
+      return;
+    }
 
     const removido = await req.dados!.remover('estudos', estudoId, req.contexto!.usuario.id);
     if (!removido) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
@@ -782,7 +793,12 @@ rotasEstudos.delete('/estudos/:id', async (req: Request, res: Response) => {
     console.error('Erro em DELETE /estudos/:id:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasEstudos.patch('/estudos/:id/remover', removerEstudo);
+rotasEstudos.delete('/estudos/:id', removerEstudo);
 
 // ---------------------------------------------------------------
 // POST /estudos/:id/duplicar

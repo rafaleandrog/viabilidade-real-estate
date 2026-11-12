@@ -119,3 +119,21 @@ export async function garantirMembro(
   await req.dados!.criar('estudo_membros', { estudo_id: estudoId, usuario_id: usuarioId, funcao });
   return funcao;
 }
+
+/**
+ * #860: gate das REMOÇÕES de dentro do estudo cuja rota antes só exigia editor
+ * (produtos do Preliminar e documentos). Em Aprovado, Reprovado e Arquivado só
+ * aprovador (ou admin do app); nos demais status, editor. É a mesma regra que
+ * `exigirEscrita` já aplica no Avançado e no Funding — sem ela, abrir a remoção
+ * ao editor (PATCH …/remover) deixaria o editor apagar dado de estudo aprovado.
+ * Estudo inexistente responde `null`, como um sem permissão.
+ */
+export async function exigirEscritaNoStatus(
+  req: Request,
+  estudoId: number,
+): Promise<PermissaoEstudo | null> {
+  const estudo = await req.dados!.buscar('estudos', estudoId);
+  if (!estudo) return null;
+  const travado = estudo.status === 'aprovado' || estudo.status === 'reprovado' || estudo.status === 'arquivado';
+  return travado ? exigirAprovador(req, estudoId) : exigirEditor(req, estudoId);
+}

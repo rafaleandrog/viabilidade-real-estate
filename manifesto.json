@@ -23,7 +23,7 @@
     },
     "escrita": {
       "editor": {
-        "descricao": "Cria, edita e duplica estudos; edita benchmarks; avança Rascunho → Em análise",
+        "descricao": "Cria, edita, duplica e remove itens dos estudos (exclui o estudo só em Rascunho); avança Rascunho → Em análise",
         "sticker": {
           "icone": "fa-solid fa-pen-ruler",
           "cor": "#2F6BDB"

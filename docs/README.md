@@ -117,19 +117,19 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão do
 
 | Recurso | Rotas |
 |---|---|
-| Estudos | `GET /estudos` · `POST /estudos` · `GET /estudos/:id` · `PATCH /estudos/:id` · `DELETE /estudos/:id` · `POST /estudos/:id/duplicar` · `POST /estudos/:id/status` |
-| Produtos do Preliminar | `GET`/`POST /estudos/:id/preliminar/produtos` · `PATCH`/`DELETE /estudos/:id/preliminar/produtos/:pid` |
+| Estudos | `GET /estudos` · `POST /estudos` · `GET /estudos/:id` · `PATCH /estudos/:id` · `PATCH /estudos/:id/remover` · `POST /estudos/:id/duplicar` · `POST /estudos/:id/status` |
+| Produtos do Preliminar | `GET`/`POST /estudos/:id/preliminar/produtos` · `PATCH /estudos/:id/preliminar/produtos/:pid` · `PATCH …/:pid/remover` |
 | Membros | `GET /estudos/:id/membros` · `POST /estudos/:id/membros` · `PATCH /estudos/:id/membros/:usuarioId` · `PATCH /estudos/:id/membros/:usuarioId/remover` |
-| Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `DELETE /estudos/:id/imoveis/:vinculoId` |
-| Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` |
+| Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `PATCH /estudos/:id/imoveis/:vinculoId/remover` |
+| Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `PATCH …/documentos/:docId/remover` |
 | Análise de mercado | `GET`/`POST /estudos/:id/analise-mercado` · `PATCH /estudos/:id/analise-mercado/regiao` · `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` |
 | Parâmetros dos lotes | `GET /lote-parametros` · `PUT /lote-parametros/:imovelId` (id do lote no módulo; cadastro exige número e área do lote; a atualização do modal leva `base`, o registro que a pessoa viu, e é recusada com `400` se outra pessoa o alterou antes (o cadastro, se alguém já cadastrou o lote); `403` sem nível de escrita) · `POST /lote-parametros/importar` (até 300 lotes, resultado por lote) |
 | Benchmarks | `GET /benchmarks` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` |
 | Configuração e manutenção | `GET /config` · `POST /manutencao/arquivar-inativos` |
-| Avançado — cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH`/`DELETE /estudos/:id/avancado/fases/:fid` · `POST /estudos/:id/avancado/fases/:fid/alocacoes` · `PATCH`/`DELETE …/alocacoes/:aid` |
-| Avançado — tipologias, receitas, custos | `GET`/`POST /estudos/:id/avancado/tipologias` · `PATCH`/`DELETE …/tipologias/:tid` · `GET /estudos/:id/avancado/receitas` · `GET`/`POST /estudos/:id/avancado/custos` · `PATCH`/`DELETE …/custos/:cid` |
-| Avançado — parâmetros, funding, cenários | `GET`/`PATCH /estudos/:id/avancado/parametros` · `GET`/`POST /estudos/:id/avancado/funding` · `PATCH`/`DELETE …/funding/:oid` · `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH`/`DELETE …/cenarios/:cid` |
-| Avançado — curvas e anexos | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` · `GET`/`POST /estudos/:id/empreendimento/documentos` · `DELETE …/documentos/:docId` |
+| Avançado — cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH /estudos/:id/avancado/fases/:fid` · `PATCH …/fases/:fid/remover` · `POST /estudos/:id/avancado/fases/:fid/alocacoes` · `PATCH …/alocacoes/:aid` · `PATCH …/alocacoes/:aid/remover` |
+| Avançado — tipologias, receitas, custos | `GET`/`POST /estudos/:id/avancado/tipologias` · `PATCH …/tipologias/:tid` · `PATCH …/tipologias/:tid/remover` · `GET /estudos/:id/avancado/receitas` · `GET`/`POST /estudos/:id/avancado/custos` · `PATCH …/custos/:cid` · `PATCH …/custos/:cid/remover` |
+| Avançado — parâmetros, funding, cenários | `GET`/`PATCH /estudos/:id/avancado/parametros` · `GET`/`POST /estudos/:id/avancado/funding` · `PATCH …/funding/:oid` · `PATCH …/funding/:oid/remover` · `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH …/cenarios/:cid` · `PATCH …/cenarios/:cid/remover` |
+| Avançado — curvas e anexos | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` · `GET`/`POST /estudos/:id/empreendimento/documentos` · `PATCH …/documentos/:docId/remover` |
 
 As rotas do Avançado estão descritas por página em [Estudo Avançado](avancado); as regras de
 cálculo por trás delas, em [Funding](funding) e em [Fórmulas da Proforma](formulas). As transições de status são validadas no servidor: uma transição inválida

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { exigirMembro, exigirEditor, exigirEscritaNoStatus } from '../permissoes-estudo.js';
 
 // Rotas da aba "Empreendimento → Informações" (nível Avançado · Lote 4 · #16):
 // anexos do estudo (imagem principal, renders, plantas). Espelha o padrão dos
@@ -73,12 +73,12 @@ rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: R
 });
 
 // DELETE /estudos/:id/empreendimento/documentos/:docId
-rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', async (req: Request, res: Response) => {
+async function removerDocumentoEmpreendimento(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     const docId = parseInt(req.params.docId);
     if (isNaN(estudoId) || isNaN(docId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão'); return; }
+    if (!(await exigirEscritaNoStatus(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão'); return; }
 
     const doc = await req.dados!.buscar('estudo_documentos', docId);
     if (!doc || Number(doc.estudo_id) !== estudoId) {
@@ -91,4 +91,9 @@ rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', asyn
     console.error('Erro em DELETE empreendimento/documento:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasEmpreendimento.patch('/estudos/:id/empreendimento/documentos/:docId/remover', removerDocumentoEmpreendimento);
+rotasEmpreendimento.delete('/estudos/:id/empreendimento/documentos/:docId', removerDocumentoEmpreendimento);

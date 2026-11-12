@@ -22,7 +22,7 @@ disparar.
 | Função | Pode |
 |---|---|
 | `leitor` | ver e exportar. Não vê estudos em Rascunho nem Arquivado. |
-| `editor` | criar, editar, duplicar; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
+| `editor` | criar, editar, duplicar e remover itens do estudo (custos, tipologias, grupos, alocações, cenários, operações de funding, produtos e documentos); excluir o próprio estudo só em Rascunho; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
 | `aprovador` | aprovar, reprovar, devolver ao Rascunho e reabrir um Arquivado; editar em qualquer status (exceto trocar imóvel fora de Rascunho). Inclui o editor. |
 
 Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo. Num
@@ -61,6 +61,13 @@ Reprovado e Arquivado). O nome tem até 200 caracteres e não pode ficar vazio. 
 legível não muda ao renomear: é a identidade estável do estudo.
 
 ## Instruções para não humanos
+
+- Toda remoção de dentro de um estudo é `PATCH <rota do item>/remover` (por exemplo
+  `PATCH /estudos/:id/avancado/custos/:cid/remover` e `PATCH /estudos/:id/remover`). O shell só deixa
+  o `admin` do app usar `DELETE`, então quem tem nível `escrita` remove por esse caminho; o `DELETE`
+  das mesmas rotas continua valendo para o `admin`. Em estudo Aprovado, Reprovado ou Arquivado, só
+  aprovador ou `admin` remove itens; o estudo inteiro, o `editor` só exclui em Rascunho. Os cadastros
+  globais (benchmarks, curvas, regiões) seguem em `DELETE`, só para o `admin`.
 
 - `POST /estudos/:id/status` é o portão: reavalia a transição e a alçada a cada chamada e recusa
   com `422 TRANSICAO_INVALIDA` ou `403 SEM_PERMISSAO`, venha o pedido da tela ou de um cliente

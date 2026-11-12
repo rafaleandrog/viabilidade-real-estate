@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { exigirMembro, exigirEditor, exigirEscritaNoStatus } from '../permissoes-estudo.js';
 import { numeroEstrito } from './coercao-numerica.js';
 
 // Catálogo de Produtos do Preliminar (#315 — item 3 da Rodada 7): tabela
@@ -122,11 +122,14 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
   }
 });
 
-rotasPreliminarProdutos.delete('/estudos/:id/preliminar/produtos/:pid', async (req: Request, res: Response) => {
+async function removerProdutoPreliminar(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem remover produtos'); return; }
+    if (!(await exigirEscritaNoStatus(req, estudoId))) {
+      erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem remover produtos (em estudo aprovado, reprovado ou arquivado, só aprovadores)');
+      return;
+    }
     const p = await produtoDoEstudo(req, res, estudoId);
     if (!p) return;
 
@@ -136,4 +139,9 @@ rotasPreliminarProdutos.delete('/estudos/:id/preliminar/produtos/:pid', async (r
     console.error('Erro em DELETE /preliminar/produtos/:pid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid/remover', removerProdutoPreliminar);
+rotasPreliminarProdutos.delete('/estudos/:id/preliminar/produtos/:pid', removerProdutoPreliminar);

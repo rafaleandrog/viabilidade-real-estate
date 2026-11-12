@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { exigirMembro, exigirEditor, exigirEscritaNoStatus } from '../permissoes-estudo.js';
 import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js';
 import { produtosDoEstudo, type ProformaInput } from '../../frontend/proforma.js';
 import {
@@ -69,19 +69,33 @@ rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, 
 });
 
 // DELETE /estudos/:id/apelo-comercial/documentos/:docId
-rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', async (req: Request, res: Response) => {
+async function removerDocumentoApelo(req: Request, res: Response): Promise<void> {
   try {
     const estudoId = parseInt(req.params.id);
     const docId = parseInt(req.params.docId);
     if (isNaN(estudoId) || isNaN(docId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão'); return; }
+    if (!(await exigirEscritaNoStatus(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão'); return; }
+    // O documento tem de ser DESTE estudo (via o apelo dele). Sem isso, quem edita
+    // um estudo apagava documento de qualquer outro pelo id, que é sequencial —
+    // reproduzido ao vivo na QA; o gêmeo `empreendimento/documentos` já conferia.
+    const doc = await req.dados!.buscar('apelo_comercial_documentos', docId);
+    const apelo = doc ? await req.dados!.buscar('apelo_comercial', Number(doc.apelo_id)) : null;
+    if (!doc || !apelo || Number(apelo.estudo_id) !== estudoId) {
+      erro(res, 404, 'DOCUMENTO_NAO_ENCONTRADO', 'Documento não encontrado neste estudo');
+      return;
+    }
     await req.dados!.deletar('apelo_comercial_documentos', docId);
     res.json({ ok: true });
   } catch (e: any) {
     console.error('Erro em DELETE apelo documento:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
-});
+}
+// #860: remover é PATCH …/remover, porque o shell só deixa `admin` usar DELETE
+// (SDK, permissoes.md § Contrato uniforme método→nível) e o editor precisa remover.
+// O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
+rotasApelo.patch('/estudos/:id/apelo-comercial/documentos/:docId/remover', removerDocumentoApelo);
+rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', removerDocumentoApelo);
 
 // POST /estudos/:id/apelo-comercial — dispara a análise de IA
 rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Response) => {

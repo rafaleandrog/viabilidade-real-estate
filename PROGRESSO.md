@@ -4,6 +4,37 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-12 — O editor remove itens do estudo: exclusões por `PATCH …/remover` (#860)
+
+Achado da QA ao vivo na Pinguim (2026-11-12), com usuário de serviço de nível `escrita`: o editor
+criava custos, tipologias, produtos e documentos, mas **não removia nada** — todo `DELETE` voltava
+`403 AUTH_NIVEL_INSUFICIENTE`, do shell, antes do handler. É contrato da plataforma (SDK,
+`permissoes.md` § Contrato uniforme método→nível: DELETE só para `admin`; remoção por não-admin se
+modela como `PATCH`). Decisão do autor: quem cria e edita estudos remove; o estudo inteiro, o editor
+exclui só em Rascunho.
+
+- As 11 remoções de dentro do estudo ganham `PATCH <rota>/remover`, com o MESMO handler do `DELETE`
+  (que fica como alias para o admin): estudo, imóvel vinculado, produto do Preliminar, tipologia,
+  grupo/fase, alocação, linha de custo, cenário, operação de funding, documento do apelo e anexo do
+  empreendimento. `frontend/viabilidade-api.ts` passa a chamar a rota nova; benchmarks, curvas e
+  regiões seguem em `DELETE`, só do admin.
+- Gate de status nas remoções que só exigiam editor (`exigirEscritaNoStatus` em
+  `backend/permissoes-estudo.ts`, a mesma regra de `exigirEscrita` do Avançado): em Aprovado,
+  Reprovado e Arquivado, só aprovador ou admin. Sem ele, abrir a remoção ao editor deixaria apagar
+  dado de estudo aprovado.
+- **De carona, por necessidade:** a remoção de documento do apelo passa a conferir que o documento é
+  do estudo (item B2 do diagnóstico #858). Antes só o admin alcançava a rota; com o `PATCH` ela vale
+  para editores, e o defeito ficaria mais exposto.
+- Prova de fiação: `frontend/remover-por-patch.test.ts` (método e URL que chegam ao `urbiVerso.api`)
+  e `backend/rotas/remover-por-patch-rota.test.ts` (HTTP); cinco mutações medidas ficam vermelhas
+  (rota PATCH ausente, gate de status, pertença do documento, regra do Rascunho, front em DELETE).
+- Manifesto: a descrição do papel `editor` diz que ele remove (e deixa de dizer "edita benchmarks",
+  que as rotas sempre reservaram ao admin). Sem migração, `versao` mantida.
+- Guias: `docs/permissoes.md`, `docs/README.md`, `docs/avancado.md`, `docs/funding.md`,
+  `docs/apelo-comercial.md`.
+
+---
+
 ## 2026-10-26 — Cenários do Preliminar voltam ao seletor de variável (tornado e margem de segurança saem)
 
 Pedido direto do autor, com captura da aba Cenários do estudo Calliandra II: *"essa parte de

@@ -207,15 +207,15 @@ usuário do app, escrita e `semear` só para o `admin` do app.
 
 | Recurso | Rotas |
 |---|---|
-| Cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH`/`DELETE /estudos/:id/avancado/fases/:fid` · alocações: `POST /estudos/:id/avancado/fases/:fid/alocacoes`, `PATCH`/`DELETE …/alocacoes/:aid` |
-| Tipologias | `GET`/`POST /estudos/:id/avancado/tipologias` · `PATCH`/`DELETE /estudos/:id/avancado/tipologias/:tid` |
+| Cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH /estudos/:id/avancado/fases/:fid` · `PATCH …/fases/:fid/remover` · alocações: `POST /estudos/:id/avancado/fases/:fid/alocacoes`, `PATCH …/alocacoes/:aid`, `PATCH …/alocacoes/:aid/remover` |
+| Tipologias | `GET`/`POST /estudos/:id/avancado/tipologias` · `PATCH /estudos/:id/avancado/tipologias/:tid` · `PATCH …/:tid/remover` |
 | Receitas | `GET /estudos/:id/avancado/receitas` |
-| Custos | `GET`/`POST /estudos/:id/avancado/custos` · `PATCH`/`DELETE /estudos/:id/avancado/custos/:cid` |
+| Custos | `GET`/`POST /estudos/:id/avancado/custos` · `PATCH /estudos/:id/avancado/custos/:cid` · `PATCH …/:cid/remover` |
 | Parâmetros financeiros | `GET`/`PATCH /estudos/:id/avancado/parametros` |
-| Funding | `GET`/`POST /estudos/:id/avancado/funding` · `PATCH`/`DELETE /estudos/:id/avancado/funding/:oid` |
-| Cenários | `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH`/`DELETE /estudos/:id/avancado/cenarios/:cid` |
+| Funding | `GET`/`POST /estudos/:id/avancado/funding` · `PATCH /estudos/:id/avancado/funding/:oid` · `PATCH …/:oid/remover` |
+| Cenários | `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH /estudos/:id/avancado/cenarios/:cid` · `PATCH …/:cid/remover` |
 | Curvas (catálogo do app) | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` |
-| Anexos do empreendimento | `GET`/`POST /estudos/:id/empreendimento/documentos` · `DELETE …/documentos/:docId` |
+| Anexos do empreendimento | `GET`/`POST /estudos/:id/empreendimento/documentos` · `PATCH …/documentos/:docId/remover` |
 
 O `POST /estudos/:id/avancado/custos` com `"semeadura": true` no corpo é idempotente para as três
 linhas semeadas: com `categoria` `Preço` em `terreno`, `Construção` em `obra` ou `Corretagem de

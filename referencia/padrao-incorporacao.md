@@ -3256,7 +3256,7 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 **A9 — Início e Duração não são campos simétricos em Custos.** A UI trava o Início em três casos
 (Construção, fase-âncora, evento fixo) e a Duração **só** em Construção
 (`frontend/tela-fluxo-custos.ts:724-757` vs `:758-780`). O backend faz o mesmo: devolve 422 para
-`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1900-1912`); a duração, que antes passava, hoje também
+`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1915-1927`); a duração, que antes passava, hoje também
 trava (`resolverTravamentoCusto`, `:166-170`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
 Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescreve as duas grandezas.
 → **#249**, validada por **#255**.
