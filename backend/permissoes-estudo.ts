@@ -122,8 +122,10 @@ export async function garantirMembro(
 }
 
 // ---------------------------------------------------------------
-// Acesso a um estudo pelas SUB-ROTAS (produtos, documentos, apelo, análise de
-// mercado, imóveis, membros, Avançado, funding).
+// Acesso a um estudo pelas SUB-ROTAS (produtos, documentos de Empreendimento,
+// apelo, análise de mercado, leitura de imóveis e membros). O Avançado e o
+// Funding têm helpers próprios (`exigirLeitura`/`exigirEscrita`), que aplicam as
+// mesmas regras de status; a escrita de imóveis aceita só Rascunho.
 //
 // Antes, cada sub-rota chamava só `exigirMembro`/`exigirEditor`, sem carregar o
 // estudo. Três regras que `GET`/`PATCH /estudos/:id` aplicam ficavam de fora:
@@ -132,7 +134,9 @@ export async function garantirMembro(
 //   sub-rotas seguiam lendo e gravando filhos de um estudo removido, porque o
 //   vínculo de membro sobrevive à remoção;
 // - estudo TRAVADO (aprovado/reprovado/arquivado): só aprovador escreve — a
-//   mesma `podeEditarEstudo` do `PATCH /estudos/:id`. Sem isto um editor mudava
+//   mesma regra de status de `podeEditarEstudo` (o `PATCH /estudos/:id`), com
+//   uma diferença herdada de `exigirEditor`: num estudo sem membros, o nível
+//   `escrita` do app conta como editor. Sem isto um editor mudava
 //   o catálogo (e portanto o VGV) de um estudo já aprovado;
 // - LEITOR não vê rascunho nem arquivado — a mesma regra do `GET /estudos/:id`
 //   e da listagem. Sem isto o leitor lia custos, catálogo e funding do

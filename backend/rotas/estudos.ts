@@ -668,6 +668,10 @@ rotasEstudos.get('/estudos/:id', async (req: Request, res: Response) => {
       _permissao: {
         funcao: perm.funcao,
         ehMembro: perm.ehMembro,
+        // A tela de membros precisa dos dois para não oferecer o que o servidor
+        // recusa (`recusaAlteracaoMembro`): a própria linha e o admin de app.
+        usuarioId: req.contexto?.usuario?.id ?? null,
+        ehAdminApp: perm.ehAdminApp,
         podeEditar,
         podeAprovar,
         podeSubmeter: podeEditar && estudo.status === 'rascunho',
@@ -775,8 +779,10 @@ rotasEstudos.delete('/estudos/:id', async (req: Request, res: Response) => {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
-    // Mesma régua da edição: estudo travado (aprovado/reprovado/arquivado) só o
-    // aprovador remove — antes bastava ser editor, inclusive de estudo aprovado.
+    // O gate de método do shell só deixa `DELETE` chegar aqui com nível `admin`
+    // (SDK, `docs/permissoes.md`), e o admin passa em qualquer régua de estudo —
+    // o que o helper acrescenta, de fato, é o 404 para estudo já removido. A régua
+    // de travado fica pela coerência com a edição, caso o gate mude.
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 

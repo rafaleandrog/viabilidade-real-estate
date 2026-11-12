@@ -80,9 +80,11 @@ rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', async (req: 
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     // O documento pertence ao `apelo_comercial` do estudo, não ao estudo direto:
-    // sem esta conferência, ser editor de QUALQUER estudo bastava para apagar
-    // documento de outro (os ids são sequenciais). Mesma resposta 404 do gêmeo
-    // `DELETE /empreendimento/documentos/:docId`.
+    // sem esta conferência, o `:docId` de OUTRO estudo era apagado por uma URL que
+    // nomeia este (os ids são sequenciais). Quem chega aqui é sempre admin do app
+    // — o gate de método do shell só deixa `DELETE` passar com nível `admin` —,
+    // então o risco é apagar o documento errado, não escalada. Mesma resposta 404
+    // do gêmeo `DELETE /empreendimento/documentos/:docId`.
     const doc = await req.dados!.buscar('apelo_comercial_documentos', docId);
     const apelo = doc ? await req.dados!.buscar('apelo_comercial', Number(doc.apelo_id)) : null;
     if (!doc || !apelo || Number(apelo.estudo_id) !== estudoId) {

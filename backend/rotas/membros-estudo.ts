@@ -32,7 +32,10 @@ export function recusaAlteracaoMembro(args: {
   totalMembros: number;
 }): { http: number; codigo: string; mensagem: string } | null {
   const podeAprovar = args.perm.ehAprovador || args.perm.ehAdminApp;
-  if (args.funcaoNova !== null && args.usuarioAtual === args.alvo && !args.perm.ehAdminApp) {
+  // Só vale para quem JÁ é membro: num estudo sem membros, a pessoa precisa
+  // conseguir se incluir (é assim que um estudo órfão volta a ter dono).
+  if (args.funcaoNova !== null && args.funcaoAtualAlvo !== null
+    && args.usuarioAtual === args.alvo && !args.perm.ehAdminApp) {
     return { http: 403, codigo: 'PROPRIA_FUNCAO', mensagem: 'Você não pode alterar a sua própria função no estudo' };
   }
   if (!podeAprovar && (args.funcaoNova === 'aprovador' || args.funcaoAtualAlvo === 'aprovador')) {
@@ -78,9 +81,15 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
 
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
+    // Quem já é membro não muda por aqui (`garantirMembro` é idempotente), mas a
+    // função atual entra na regra para a resposta ser a mesma do PATCH.
+    const existente = await req.dados!.listar('estudo_membros', {
+      filtros: { estudo_id: estudoId, usuario_id: Number(usuario_id) }, por_pagina: 1,
+    });
     const recusa = recusaAlteracaoMembro({
       perm: acesso.perm, usuarioAtual: req.contexto?.usuario?.id, alvo: Number(usuario_id),
-      funcaoAtualAlvo: null, funcaoNova: funcao, totalMembros: 0, // só conta na remoção
+      funcaoAtualAlvo: existente.dados[0] ? String(existente.dados[0].funcao) : null,
+      funcaoNova: funcao, totalMembros: 0, // só conta na remoção
     });
     if (recusa) { erro(res, recusa.http, recusa.codigo, recusa.mensagem); return; }
 
@@ -151,7 +160,22 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId/remover', async (req: 
         funcaoAtualAlvo: String(membros.dados[0].funcao), funcaoNova: null, totalMembros: todos.total,
       });
       if (recusa) { erro(res, recusa.http, recusa.codigo, recusa.mensagem); return; }
-      await req.dados!.deletar('estudo_membros', membros.dados[0].id);
+      const removido = membros.dados[0];
+      await req.dados!.deletar('estudo_membros', removido.id);
+      // A contagem acima e o `deletar` não são atômicos: duas remoções simultâneas
+      // num estudo de 2 membros passariam as duas e zerariam o estudo — e aí o
+      // fallback "estudo sem membros" dá editor a todo usuário com escrita no app.
+      // Recontar DEPOIS de apagar fecha a janela: quem achar zero desfaz a própria
+      // remoção. Na corrida, as duas desfazem e o estudo fica com os dois membros
+      // — nunca com nenhum.
+      const depois = await req.dados!.listar('estudo_membros', { filtros: { estudo_id: estudoId }, por_pagina: 1 });
+      if (depois.total === 0) {
+        await req.dados!.criar('estudo_membros', {
+          estudo_id: estudoId, usuario_id: Number(removido.usuario_id), funcao: removido.funcao,
+        });
+        erro(res, 422, 'ULTIMO_MEMBRO', 'O estudo precisa de ao menos um membro');
+        return;
+      }
       await desinscreverMembroEstudo(req, estudoId, usuarioId);
     }
     res.json({ ok: true });

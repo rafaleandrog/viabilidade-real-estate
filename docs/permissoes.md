@@ -32,8 +32,9 @@ estudo ainda sem membros, qualquer usuário com nível `escrita` ou superior é 
 
 O `editor` adiciona, troca e remove `leitor`es e `editor`es. Conceder a função `aprovador`, ou
 mexer em quem já é aprovador, é só do `aprovador` (ou do `admin` do app). Ninguém muda a própria
-função, e o último membro não pode ser removido — um estudo sem membros ficaria aberto a qualquer
-editor do app. Como toda escrita, gerenciar membros de um estudo Aprovado, Reprovado ou Arquivado
+função (num estudo ainda sem membros, porém, quem tem nível `escrita` pode se incluir), e o último
+membro não pode ser removido — um estudo sem membros ficaria aberto a qualquer editor do app. A
+tela de membros só oferece o que a sua função permite. Como toda escrita, gerenciar membros de um estudo Aprovado, Reprovado ou Arquivado
 é só do `aprovador`.
 
 ### Ciclo de vida
@@ -81,11 +82,14 @@ legível não muda ao renomear: é a identidade estável do estudo.
   UF e sequência, e tem o mesmo limite de 200 caracteres, o servidor encolhe a parte do nome quando
   o rótulo estouraria; o `nome` gravado nunca é truncado.
 - As rotas com `/estudos/:id/` exigem membro do estudo, `admin` do app, ou nível `escrita`+ num
-  estudo ainda sem membros. Todas — inclusive produtos, documentos, apelo, análise de mercado,
-  imóveis e membros — aplicam as mesmas três regras: estudo excluído responde `404
-  ESTUDO_NAO_ENCONTRADO`; `leitor` recebe `403` em Rascunho e Arquivado; e escrita em estudo
-  Aprovado, Reprovado ou Arquivado exige `aprovador` (`403` para o `editor`). Remover o estudo
-  (`DELETE /estudos/:id`) segue a mesma régua da edição.
+  estudo ainda sem membros. Todas — inclusive produtos, documentos, apelo, análise de mercado e
+  membros — aplicam as mesmas três regras: estudo excluído responde `404 ESTUDO_NAO_ENCONTRADO`;
+  `leitor` recebe `403` em Rascunho e Arquivado; e escrita em estudo Aprovado, Reprovado ou
+  Arquivado exige `aprovador` (`403` para o `editor`). A exceção são os imóveis: vincular e
+  desvincular só acontecem em Rascunho, para qualquer função (`422 IMOVEL_TRAVADO`).
+- Todo `DELETE` exige nível `admin` do app: o shell recusa os demais com `403
+  AUTH_NIVEL_INSUFICIENTE` antes de a rota rodar. Por isso o `editor` não remove estudo, produto
+  nem documento por `DELETE`.
 - Sub-recurso com id próprio (`:pid`, `:docId`, `:vinculoId`…) que não pertence ao estudo da URL
   responde `404`.
 - Membros: `403 PROPRIA_FUNCAO` ao mudar a própria função, `403 SO_APROVADOR` quando um editor

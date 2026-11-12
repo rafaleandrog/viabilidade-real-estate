@@ -14,6 +14,7 @@ import './tela-financeiro.js';
 import './tela-funding.js';
 import './tela-resumo.js';
 import './tela-analise-mercado.js';
+import { STATUS_TRAVADO } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo AVANÇADO — reestruturação de navegação (Etapa 3 · #39/#40).
@@ -144,6 +145,7 @@ export class ViabTelaAvancado extends LitElement {
   // Guardas de edição vêm de tela-estudo (permissão + status); computados aqui
   // para cada tela conforme o mesmo critério de antes da reestruturação.
   @property({ type: Boolean }) podeEditar = false;
+  @property({ type: Boolean }) podeAprovar = false;
   @property({ type: String }) status = '';
 
   // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 9
@@ -214,6 +216,16 @@ export class ViabTelaAvancado extends LitElement {
     }
   `];
 
+  /**
+   * Escrita pela régua do servidor (`acessoEscritaEstudo`): editor em status
+   * aberto; só aprovador em Aprovado/Reprovado/Arquivado. É o que as abas de IA
+   * (Apelo, Análise de Mercado) usam — sem isto elas ofereciam anexar e analisar
+   * num estudo travado, e o clique terminava em 403 (com o upload já feito).
+   */
+  private get _podeEscrever(): boolean {
+    return this.podeEditar && (!STATUS_TRAVADO.includes(this.status) || this.podeAprovar);
+  }
+
   private get _editavelPremissas(): boolean {
     return this.podeEditar && this.status !== 'aprovado' && this.status !== 'reprovado';
   }
@@ -264,9 +276,9 @@ export class ViabTelaAvancado extends LitElement {
         // #199: projeto × mercado (preço/custo por m², VSO, macros). O lado
         // "projeto" é derivado do estudo; o lado "mercado" vem do snapshot que
         // a rota de IA (#200) preenche — ausente, a tela explica a limitação.
-        return html`<viab-tela-analise-mercado .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-analise-mercado>`;
+        return html`<viab-tela-analise-mercado .estudo=${this.estudo} .editavel=${this._podeEscrever}></viab-tela-analise-mercado>`;
       case 'apelo':
-        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
+        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this._podeEscrever}></viab-tela-apelo>`;
       case 'resumo':
       default:
         // Resumo consolidado do Avançado: KPIs-chave + gráficos que leem os
