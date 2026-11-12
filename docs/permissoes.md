@@ -28,6 +28,14 @@ disparar.
 Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo. Num
 estudo ainda sem membros, qualquer usuário com nível `escrita` ou superior é aceito como editor.
 
+### Gerenciar membros
+
+O `editor` adiciona, troca e remove `leitor`es e `editor`es. Conceder a função `aprovador`, ou
+mexer em quem já é aprovador, é só do `aprovador` (ou do `admin` do app). Ninguém muda a própria
+função, e o último membro não pode ser removido — um estudo sem membros ficaria aberto a qualquer
+editor do app. Como toda escrita, gerenciar membros de um estudo Aprovado, Reprovado ou Arquivado
+é só do `aprovador`.
+
 ### Ciclo de vida
 
 ```text
@@ -73,7 +81,15 @@ legível não muda ao renomear: é a identidade estável do estudo.
   UF e sequência, e tem o mesmo limite de 200 caracteres, o servidor encolhe a parte do nome quando
   o rótulo estouraria; o `nome` gravado nunca é truncado.
 - As rotas com `/estudos/:id/` exigem membro do estudo, `admin` do app, ou nível `escrita`+ num
-  estudo ainda sem membros.
+  estudo ainda sem membros. Todas — inclusive produtos, documentos, apelo, análise de mercado,
+  imóveis e membros — aplicam as mesmas três regras: estudo excluído responde `404
+  ESTUDO_NAO_ENCONTRADO`; `leitor` recebe `403` em Rascunho e Arquivado; e escrita em estudo
+  Aprovado, Reprovado ou Arquivado exige `aprovador` (`403` para o `editor`). Remover o estudo
+  (`DELETE /estudos/:id`) segue a mesma régua da edição.
+- Sub-recurso com id próprio (`:pid`, `:docId`, `:vinculoId`…) que não pertence ao estudo da URL
+  responde `404`.
+- Membros: `403 PROPRIA_FUNCAO` ao mudar a própria função, `403 SO_APROVADOR` quando um editor
+  concede, altera ou remove um aprovador, `422 ULTIMO_MEMBRO` ao remover o último membro.
 
 ## Eventos
 

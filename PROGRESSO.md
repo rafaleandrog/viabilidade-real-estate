@@ -4,6 +4,32 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-12 — Autorização por estudo nas sub-rotas e na gestão de membros
+
+Primeiro conserto do diagnóstico de 2026-11-11 (pedido do autor: explorar o app e trazer os erros).
+Os quatro achados de permissão de maior gravidade, reproduzidos antes do conserto — dois deles ao
+vivo na homologação, por uma sessão de QA:
+
+- **Documento do Apelo de outro estudo:** `DELETE /estudos/:id/apelo-comercial/documentos/:docId`
+  não conferia a pertença; agora responde 404, como o gêmeo de Empreendimento.
+- **Estudo travado editável por sub-rota:** produtos do Preliminar, documentos, apelo, região de
+  mercado e membros usavam só `exigirEditor`. Agora passam por `acessoEscritaEstudo`
+  (`backend/permissoes-estudo.ts`): editor em status aberto, só aprovador em
+  Aprovado/Reprovado/Arquivado — a régua do `PATCH /estudos/:id`. `DELETE /estudos/:id` também.
+- **Estudo excluído acessível:** as sub-rotas não carregavam o estudo; agora o helper o carrega e
+  responde 404 para estudo removido.
+- **Leitor em rascunho:** as sub-rotas (e a leitura do Avançado e do Funding) aplicam a regra do
+  `GET /estudos/:id`. Admin do app não é mais barrado por também ser membro `leitor`.
+- **Escalada editor → aprovador:** `recusaAlteracaoMembro` (`backend/rotas/membros-estudo.ts`) —
+  só aprovador/admin concede ou mexe em aprovador; ninguém muda a própria função (salvo admin);
+  o último membro não sai.
+- Teste de rota com Express real (`backend/rotas/permissoes-subrotas.test.ts`); controle de
+  mutação medido: tirar a conferência do apelo ou trocar a escrita por leitura nos produtos deixa
+  o teste vermelho.
+- Guia `docs/permissoes.md` atualizado. Sem migração, sem `schema.json`, `versao` mantida.
+
+---
+
 ## 2026-10-26 — Cenários do Preliminar voltam ao seletor de variável (tornado e margem de segurança saem)
 
 Pedido direto do autor, com captura da aba Cenários do estudo Calliandra II: *"essa parte de

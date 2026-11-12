@@ -5,6 +5,9 @@ import {
   exigirEditor,
   exigirAprovador,
   garantirMembro,
+  leituraBloqueadaPorStatus,
+  acessoEscritaEstudo,
+  acessoNegado,
 } from '../permissoes-estudo.js';
 import {
   publicarEvento,
@@ -645,8 +648,8 @@ rotasEstudos.get('/estudos/:id', async (req: Request, res: Response) => {
 
     const perm = await exigirMembro(req, estudoId);
     if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo'); return; }
-    // Leitor não acessa Rascunho/Arquivado.
-    if (perm.ehLeitor && (estudo.status === 'rascunho' || estudo.status === 'arquivado')) {
+    // Leitor não acessa Rascunho/Arquivado (admin de app, sim — a listagem já os mostra a ele).
+    if (leituraBloqueadaPorStatus(estudo.status, perm)) {
       erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo neste status');
       return;
     }
@@ -772,8 +775,10 @@ rotasEstudos.delete('/estudos/:id', async (req: Request, res: Response) => {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo'); return; }
+    // Mesma régua da edição: estudo travado (aprovado/reprovado/arquivado) só o
+    // aprovador remove — antes bastava ser editor, inclusive de estudo aprovado.
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const removido = await req.dados!.remover('estudos', estudoId, req.contexto!.usuario.id);
     if (!removido) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }

@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import { STATUS_TRAVADO } from '../frontend/estudo-status.js';
 
 // Permissão por estudo (4ª camada) — espelha o padrão de `ciclo_membros` do OKR.
 // Cada estudo tem seus próprios membros com função leitor/editor/aprovador.
@@ -118,4 +119,78 @@ export async function garantirMembro(
   if (existente.dados.length > 0) return null;
   await req.dados!.criar('estudo_membros', { estudo_id: estudoId, usuario_id: usuarioId, funcao });
   return funcao;
+}
+
+// ---------------------------------------------------------------
+// Acesso a um estudo pelas SUB-ROTAS (produtos, documentos, apelo, análise de
+// mercado, imóveis, membros, Avançado, funding).
+//
+// Antes, cada sub-rota chamava só `exigirMembro`/`exigirEditor`, sem carregar o
+// estudo. Três regras que `GET`/`PATCH /estudos/:id` aplicam ficavam de fora:
+//
+// - estudo EXCLUÍDO (soft delete): `buscar` devolve `null` → 404. Sem isto as
+//   sub-rotas seguiam lendo e gravando filhos de um estudo removido, porque o
+//   vínculo de membro sobrevive à remoção;
+// - estudo TRAVADO (aprovado/reprovado/arquivado): só aprovador escreve — a
+//   mesma `podeEditarEstudo` do `PATCH /estudos/:id`. Sem isto um editor mudava
+//   o catálogo (e portanto o VGV) de um estudo já aprovado;
+// - LEITOR não vê rascunho nem arquivado — a mesma regra do `GET /estudos/:id`
+//   e da listagem. Sem isto o leitor lia custos, catálogo e funding do
+//   rascunho chamando a sub-rota direto.
+//
+// As duas funções devolvem o estudo carregado para o handler não buscá-lo de novo.
+// ---------------------------------------------------------------
+
+/** Status que o leitor não enxerga — os mesmos do `GET /estudos/:id`. */
+export const STATUS_OCULTO_AO_LEITOR: readonly string[] = ['rascunho', 'arquivado'];
+
+export interface NegacaoAcesso { http: number; codigo: string; mensagem: string }
+export type AcessoEstudo = { estudo: Record<string, any>; perm: PermissaoEstudo } | NegacaoAcesso;
+
+export function acessoNegado(a: AcessoEstudo): a is NegacaoAcesso {
+  return 'http' in a;
+}
+
+/**
+ * Regra pura de leitura: o leitor (que não seja admin de app) não vê rascunho
+ * nem arquivado. Admin de app enxerga tudo, inclusive quando também é membro
+ * com função `leitor` — a listagem já mostra todos os estudos a ele.
+ */
+export function leituraBloqueadaPorStatus(status: unknown, perm: Pick<PermissaoEstudo, 'ehLeitor' | 'ehAdminApp'>): boolean {
+  return perm.ehLeitor && !perm.ehAdminApp && STATUS_OCULTO_AO_LEITOR.includes(String(status));
+}
+
+/** Verdadeiro quando escrever no estudo, neste status, exige aprovador. */
+export function escritaExigeAprovador(status: unknown): boolean {
+  return STATUS_TRAVADO.includes(String(status));
+}
+
+/** Carrega o estudo e confere leitura: 404 se não existe/foi excluído, 403 sem acesso. */
+export async function acessoLeituraEstudo(req: Request, estudoId: number): Promise<AcessoEstudo> {
+  const estudo = await req.dados!.buscar('estudos', estudoId);
+  if (!estudo) return { http: 404, codigo: 'ESTUDO_NAO_ENCONTRADO', mensagem: 'Estudo não encontrado' };
+  const perm = await exigirMembro(req, estudoId);
+  if (!perm) return { http: 403, codigo: 'SEM_PERMISSAO', mensagem: 'Sem acesso a este estudo' };
+  if (leituraBloqueadaPorStatus(estudo.status, perm)) {
+    return { http: 403, codigo: 'SEM_PERMISSAO', mensagem: 'Sem acesso a este estudo neste status' };
+  }
+  return { estudo, perm };
+}
+
+/**
+ * Carrega o estudo e confere escrita: 404 se não existe/foi excluído; editor+
+ * em status aberto; só aprovador (ou admin de app) com o estudo travado.
+ */
+export async function acessoEscritaEstudo(req: Request, estudoId: number): Promise<AcessoEstudo> {
+  const estudo = await req.dados!.buscar('estudos', estudoId);
+  if (!estudo) return { http: 404, codigo: 'ESTUDO_NAO_ENCONTRADO', mensagem: 'Estudo não encontrado' };
+  const travado = escritaExigeAprovador(estudo.status);
+  const perm = travado ? await exigirAprovador(req, estudoId) : await exigirEditor(req, estudoId);
+  if (!perm) {
+    return {
+      http: 403, codigo: 'SEM_PERMISSAO',
+      mensagem: travado ? 'Estudo travado neste status — só o aprovador edita' : 'Sem permissão para editar este estudo',
+    };
+  }
+  return { estudo, perm };
 }
