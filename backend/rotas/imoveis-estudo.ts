@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
+import { exigirEditor, acessoLeituraEstudo, acessoNegado } from '../permissoes-estudo.js';
 
 export const rotasImoveisEstudo: ReturnType<typeof Router> = Router();
 
@@ -17,8 +17,8 @@ rotasImoveisEstudo.get('/estudos/:id/imoveis', async (req: Request, res: Respons
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    const perm = await exigirMembro(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo'); return; }
+    const acesso = await acessoLeituraEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
     const imoveis = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
     res.json(imoveis);
   } catch (e: any) {

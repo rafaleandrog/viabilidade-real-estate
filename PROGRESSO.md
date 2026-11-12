@@ -18,24 +18,79 @@ exclui só em Rascunho.
   grupo/fase, alocação, linha de custo, cenário, operação de funding, documento do apelo e anexo do
   empreendimento. `frontend/viabilidade-api.ts` passa a chamar a rota nova; benchmarks, curvas e
   regiões seguem em `DELETE`, só do admin.
-- Gate de status nas remoções que só exigiam editor (`exigirEscritaNoStatus` em
-  `backend/permissoes-estudo.ts`, a mesma regra de `exigirEscrita` do Avançado): em Aprovado,
-  Reprovado e Arquivado, só aprovador ou admin. Sem ele, abrir a remoção ao editor deixaria apagar
-  dado de estudo aprovado.
-- O **anexo** de documento (empreendimento e apelo) ganha o mesmo gate de status da remoção: sem ele,
-  em estudo travado a troca da imagem principal anexava a nova e não removia a anterior.
-- **De carona, por necessidade:** a remoção de documento do apelo passa a conferir que o documento é
-  do estudo (item B2 do diagnóstico #858). Antes só o admin alcançava a rota; com o `PATCH` ela vale
-  para editores, e o defeito ficaria mais exposto.
+- Gate de status: as remoções (e os anexos) de produto e documento usam `acessoEscritaEstudo`, que
+  chegou à `main` pelo PR 859 — em Aprovado, Reprovado e Arquivado só aprovador ou admin. Sem ele,
+  abrir a remoção ao editor deixaria apagar dado de estudo aprovado. (Este PR tinha um helper
+  próprio, `exigirEscritaNoStatus`, que saiu na sincronização com a `main` em favor do dela.)
+- A conferência de que o documento do apelo é do estudo (item B2 do diagnóstico #858) já veio da
+  `main` (PR 859); aqui ela importa mais, porque com o `PATCH` a rota passa a valer para editores.
 - Prova de fiação: `frontend/remover-por-patch.test.ts` (método e URL que chegam ao `urbiVerso.api`)
   e `backend/rotas/remover-por-patch-rota.test.ts` (HTTP); a revisão mediu 19 mutações (o registro
   `…/remover` de cada handler, o gate de status, a pertença do documento, a regra do Rascunho, o front
   em DELETE), e as duas que passavam verdes — tirar `reprovado` ou `arquivado` da lista travada —
-  ganharam teste. **Ordem de merge: depois do PR 863**, que remove o atalho do estudo sem membros.
+  ganharam teste. O atalho do estudo sem membros já saiu da `main` (PR 859).
 - Manifesto: a descrição do papel `editor` diz que ele remove (e deixa de dizer "edita benchmarks",
   que as rotas sempre reservaram ao admin). Sem migração, `versao` mantida.
 - Guias: `docs/permissoes.md`, `docs/README.md`, `docs/avancado.md`, `docs/funding.md`,
   `docs/apelo-comercial.md`.
+
+---
+
+## 2026-11-12 — Trocar a unidade de Obras não trava mais o Salvar das Premissas
+
+Item P1 do diagnóstico de 2026-11-11. Trocar a unidade de Construção (R$/m² ↔ R$ total) ou de
+Infraestrutura pelo badge grava só o valor canônico e o modo — a coluna da unidade nova fica nula
+de propósito, e a tela exibe o valor convertido do canônico. `validarObrigatorios`
+(`frontend/premissas-validacao.ts`) exigia a coluna, então o Salvar respondia "Preencha os campos
+obrigatórios" com o campo preenchido na tela. Reproduzido com os estudos 42 e 39 da homologação.
+Agora a obra é validada pela mesma fonte que a Proforma usa: o canônico quando existe, a coluna da
+unidade ativa só no estudo legado. Isso também fecha o inverso (coluna preenchida com canônico 0,
+que a Proforma aplica como 0). O canônico é limpo quando o campo é apagado, então não sustenta
+valor removido. Teste novo em
+`frontend/premissas-validacao.test.ts`; voltar a regra antiga o deixa vermelho. Sem migração,
+`versao` mantida.
+
+---
+
+## 2026-11-12 — Autorização por estudo nas sub-rotas e na gestão de membros
+
+Primeiro conserto do diagnóstico de 2026-11-11 (pedido do autor: explorar o app e trazer os erros).
+Os cinco achados de permissão de maior gravidade, reproduzidos antes do conserto — dois deles ao
+vivo na homologação, por uma sessão de QA:
+
+- **Documento do Apelo de outro estudo:** `DELETE /estudos/:id/apelo-comercial/documentos/:docId`
+  não conferia a pertença; agora responde 404, como o gêmeo de Empreendimento. Como todo `DELETE`
+  só chega ao app com nível `admin` (gate de método do shell), o risco era o admin apagar o
+  documento errado por uma URL errada — não escalada.
+- **Estudo travado editável por sub-rota:** produtos do Preliminar, documentos, apelo, região de
+  mercado e membros usavam só `exigirEditor`. Agora passam por `acessoEscritaEstudo`
+  (`backend/permissoes-estudo.ts`): editor em status aberto, só aprovador em
+  Aprovado/Reprovado/Arquivado — a regra de status de `podeEditarEstudo`.
+- **Estudo excluído acessível:** as sub-rotas não carregavam o estudo; agora o helper o carrega e
+  responde 404 para estudo removido.
+- **Leitor em rascunho:** as sub-rotas, e a leitura do Avançado e do Funding, aplicam a regra do
+  `GET /estudos/:id`. Admin do app não é mais barrado por também ser membro `leitor`.
+- **Escalada editor → aprovador e estudo sem membros:** `recusaAlteracaoMembro`
+  (`backend/rotas/membros-estudo.ts`) — só aprovador/admin concede ou mexe em aprovador; quem já é
+  membro não muda a própria função (salvo admin); o estudo nunca fica sem responsável (editor ou
+  aprovador): `422 ULTIMO_RESPONSAVEL`, com recontagem depois de gravar para fechar a corrida entre
+  duas remoções ou rebaixamentos simultâneos. Saiu o atalho "estudo sem membros: qualquer usuário
+  com escrita age como editor" de `exigirMembro`/`exigirEditor` — era a porta por onde um
+  não-membro se incluía como aprovador; agora estudo sem membros é só do admin do app. Medido na
+  homologação, os 11 estudos vivos têm um responsável cada; na produção, medido em 2026-11-12
+  com um token de nível `admin` no app (cuja listagem devolve todos os estudos), a listagem volta
+  vazia — não há estudo lá para ficar trancado.
+  `POST /estudos` agora desfaz a criação se a inclusão do criador falhar, para não nascer órfão.
+- **Telas alinhadas ao servidor:** o modal de membros (`tela-estudo.ts`) só oferece o que a função
+  permite; as abas de IA (Apelo, Análise de Mercado) e as Premissas/anexos ficam em leitura quando o
+  servidor recusaria a escrita (Arquivado passa a ser só do aprovador também na tela).
+- Teste de rota com Express real e o gate de método do shell reproduzido
+  (`backend/rotas/permissoes-subrotas.test.ts`). Controle de mutação medido: tirar a conferência do
+  apelo, trocar a escrita por leitura nos produtos, tirar a guarda de leitura do Avançado, tirar a
+  recontagem do último responsável (na remoção ou no rebaixamento) ou devolver o atalho de estudo
+  sem membros deixa o teste vermelho.
+- Guias `docs/permissoes.md` e `docs/avancado.md` atualizados. Sem migração, sem `schema.json`,
+  `versao` mantida.
 
 ---
 

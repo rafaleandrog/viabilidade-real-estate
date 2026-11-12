@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor, exigirEscritaNoStatus } from '../permissoes-estudo.js';
+import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
 import { numeroEstrito } from './coercao-numerica.js';
 
 // Catálogo de Produtos do Preliminar (#315 — item 3 da Rodada 7): tabela
@@ -61,7 +61,8 @@ rotasPreliminarProdutos.get('/estudos/:id/preliminar/produtos', async (req: Requ
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirMembro(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso'); return; }
+    const acesso = await acessoLeituraEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     // #781: o catálogo INTEIRO — a tela confere a soma dos percentuais sobre esta
     // lista, e uma página fixa (antes 200) faria a regra dos 100% valer sobre uma
@@ -80,7 +81,8 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem adicionar produtos'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const msgPct = erroPctAlv(req.body);
     if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
@@ -102,7 +104,8 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem editar produtos'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
     const p = await produtoDoEstudo(req, res, estudoId);
     if (!p) return;
 
@@ -126,10 +129,8 @@ async function removerProdutoPreliminar(req: Request, res: Response): Promise<vo
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEscritaNoStatus(req, estudoId))) {
-      erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem remover produtos (em estudo aprovado, reprovado ou arquivado, só aprovadores)');
-      return;
-    }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
     const p = await produtoDoEstudo(req, res, estudoId);
     if (!p) return;
 

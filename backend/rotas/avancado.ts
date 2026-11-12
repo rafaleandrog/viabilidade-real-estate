@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { varrerTudo } from './varrer-tudo.js';
-import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
+import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
@@ -436,6 +436,10 @@ async function estudoAvancado(req: Request, res: Response): Promise<any | null> 
 async function exigirLeitura(req: Request, res: Response, estudo: any): Promise<boolean> {
   const perm = await exigirMembro(req, estudo.id);
   if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo'); return false; }
+  // Leitor não vê Rascunho/Arquivado — a mesma regra do `GET /estudos/:id`.
+  if (leituraBloqueadaPorStatus(estudo.status, perm)) {
+    erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso a este estudo neste status'); return false;
+  }
   return true;
 }
 

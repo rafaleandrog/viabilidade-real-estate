@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { exigirMembro, exigirEditor, exigirEscritaNoStatus } from '../permissoes-estudo.js';
+import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
 import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js';
 import { produtosDoEstudo, type ProformaInput } from '../../frontend/proforma.js';
 import {
@@ -25,7 +25,8 @@ rotasApelo.get('/estudos/:id/apelo-comercial', async (req: Request, res: Respons
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirMembro(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem acesso'); return; }
+    const acesso = await acessoLeituraEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const apeloRes = await req.dados!.listar('apelo_comercial', { filtros: { estudo_id: estudoId }, por_pagina: 1 });
     const apelo = apeloRes.dados[0] || null;
@@ -46,10 +47,8 @@ rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, 
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    // #860: o mesmo gate de status da remoção. Sem ele, em estudo travado o editor
-    // anexava (a troca da imagem principal anexa a nova e remove a anterior) mas não
-    // removia — e a capa anterior ficava órfã.
-    if (!(await exigirEscritaNoStatus(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem anexar documentos (em estudo aprovado, reprovado ou arquivado, só aprovadores)'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
 
     const { upload_id, tipo_dado, texto_adicional, nome_arquivo } = req.body;
     if (!upload_id && !texto_adicional) {
@@ -77,10 +76,15 @@ async function removerDocumentoApelo(req: Request, res: Response): Promise<void>
     const estudoId = parseInt(req.params.id);
     const docId = parseInt(req.params.docId);
     if (isNaN(estudoId) || isNaN(docId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
-    if (!(await exigirEscritaNoStatus(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão'); return; }
-    // O documento tem de ser DESTE estudo (via o apelo dele). Sem isso, quem edita
-    // um estudo apagava documento de qualquer outro pelo id, que é sequencial —
-    // reproduzido ao vivo na QA; o gêmeo `empreendimento/documentos` já conferia.
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
+
+    // O documento pertence ao `apelo_comercial` do estudo, não ao estudo direto:
+    // sem esta conferência, o `:docId` de OUTRO estudo era apagado por uma URL que
+    // nomeia este (os ids são sequenciais). Desde que a remoção também é
+    // `PATCH …/remover` (#860), quem chega aqui pode ser um EDITOR, não só o admin —
+    // e sem esta conferência ele apagaria documento de outro estudo. Mesma resposta
+    // 404 do gêmeo `empreendimento/documentos/:docId`.
     const doc = await req.dados!.buscar('apelo_comercial_documentos', docId);
     const apelo = doc ? await req.dados!.buscar('apelo_comercial', Number(doc.apelo_id)) : null;
     if (!doc || !apelo || Number(apelo.estudo_id) !== estudoId) {
@@ -105,11 +109,11 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
   try {
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
-    if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem disparar a análise'); return; }
+    const acesso = await acessoEscritaEstudo(req, estudoId);
+    if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
     if (!req.ia) { erro(res, 422, 'IA_INDISPONIVEL', 'Framework de IA não disponível para esta app/instância'); return; }
 
-    const estudo = await req.dados!.buscar('estudos', estudoId);
-    if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+    const estudo = acesso.estudo;
 
     const apelo = await garantirApelo(req, estudoId);
     const docsRes = await req.dados!.listar('apelo_comercial_documentos', { filtros: { apelo_id: apelo.id }, por_pagina: 100 });

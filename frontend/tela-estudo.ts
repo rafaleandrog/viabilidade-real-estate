@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
+import { keyed } from 'lit/directives/keyed.js';
 import { customElement, property, state } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, COR_NIVEL } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
@@ -43,6 +44,7 @@ export class ViabTelaEstudo extends LitElement {
   @state() private mostrarMembros = false;
   @state() private novoMembroUsuario = '';
   @state() private novoMembroFuncao = 'leitor';
+  @state() private _versaoMembros = 0;
   @state() private confirmarStatus: { novo: string; label: string } | null = null;
   // #678: renomear virou ação do cabeçalho do estudo (saiu do Painel).
   @state() private editarAlvo = false;
@@ -137,6 +139,7 @@ export class ViabTelaEstudo extends LitElement {
             <viab-tela-avancado
               .estudo=${this.estudo}
               .podeEditar=${!!p.podeEditar}
+              .podeAprovar=${!!p.podeAprovar}
               .status=${st}
               .aba=${this.aba}
               .subAba=${this.subAba}
@@ -147,6 +150,7 @@ export class ViabTelaEstudo extends LitElement {
             <viab-tela-preliminar
               .estudo=${this.estudo}
               .podeEditar=${!!p.podeEditar}
+              .podeAprovar=${!!p.podeAprovar}
               .status=${st}
               .aba=${this.aba}
               .subAba=${this.subAba}
@@ -183,7 +187,22 @@ export class ViabTelaEstudo extends LitElement {
   }
 
   private _renderMembros(p: any): TemplateResult {
-    const podeGerir = p.podeEditar;
+    // Espelho de `recusaAlteracaoMembro` (backend/rotas/membros-estudo.ts), para a
+    // tela não oferecer o que o servidor recusa: em estudo travado só o aprovador
+    // gere membros; `aprovador` só se concede ou altera por aprovador/admin; a
+    // própria linha não se altera (salvo admin de app).
+    const travado = ['aprovado', 'reprovado', 'arquivado'].includes(String(this.estudo?.status));
+    const podeGerir = p.podeEditar && (!travado || p.podeAprovar);
+    const funcoes = p.podeAprovar ? FUNCOES : FUNCOES.filter((f) => f.valor !== 'aprovador');
+    const linhaEditavel = (m: any) =>
+      (p.ehAdminApp || Number(m.usuario_id) !== Number(p.usuarioId))
+      && (p.podeAprovar || m.funcao !== 'aprovador');
+    // O estudo nunca fica sem editor ou aprovador: o último deles não sai nem
+    // vira leitor (`ULTIMO_RESPONSAVEL` no servidor).
+    const ehResp = (f: unknown) => f === 'editor' || f === 'aprovador';
+    const totalResp = this.membros.filter((m) => ehResp(m.funcao)).length;
+    const ultimoResp = (m: any) => ehResp(m.funcao) && totalResp <= 1;
+    const funcoesDaLinha = (m: any) => (ultimoResp(m) ? funcoes.filter((f) => f.valor !== 'leitor') : funcoes);
     return html`
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
@@ -192,14 +211,16 @@ export class ViabTelaEstudo extends LitElement {
             <div class="membro">
               <span>${m.usuario_nome || `Usuário ${m.usuario_id}`}</span>
               <div class="membro-acoes">
-                ${podeGerir ? html`
-                  <urbi-select
+                ${podeGerir && linhaEditavel(m) ? html`
+                  ${keyed(`${m.usuario_id}:${this._versaoMembros}`, html`<urbi-select
                     .valor=${m.funcao}
-                    .opcoes=${FUNCOES}
+                    .opcoes=${funcoesDaLinha(m)}
                     @urbi:select-change=${(e: CustomEvent) => this._alterarFuncao(m.usuario_id, e.detail.valor)}
-                  ></urbi-select>
-                  <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
-                    @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>
+                  ></urbi-select>`)}
+                  ${!ultimoResp(m) ? html`
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+                      .ariaLabel=${'Remover membro'}
+                      @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>` : nothing}
                 ` : html`<urbi-badge cor="padrao">${m.funcao}</urbi-badge>`}
               </div>
             </div>
@@ -218,7 +239,7 @@ export class ViabTelaEstudo extends LitElement {
             <urbi-select
               label="Função"
               .valor=${this.novoMembroFuncao}
-              .opcoes=${FUNCOES}
+              .opcoes=${funcoes}
               @urbi:select-change=${(e: CustomEvent) => this.novoMembroFuncao = e.detail.valor}
             ></urbi-select>
             <urbi-botao variante="primario" icone="fa-solid fa-plus" @click=${this._adicionarMembro}>Adicionar</urbi-botao>
@@ -358,11 +379,16 @@ export class ViabTelaEstudo extends LitElement {
   private async _alterarFuncao(usuarioId: number, funcao: string) {
     try {
       const res = await alterarFuncaoMembro(this.estudoId, usuarioId, funcao);
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
-      this.membros = (await listarMembros(this.estudoId))?.dados || this.membros;
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); }
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro', 'erro');
     }
+    // Relê sempre — inclusive na recusa — e RECRIA os seletores: sem isto o
+    // seletor segue mostrando a função que o servidor recusou, porque `m.funcao`
+    // não mudou e o lit não reaplica um `.valor` igual ao último que gravou. A
+    // versão entra na chave do `keyed`, que descarta o elemento e monta outro.
+    try { this.membros = (await listarMembros(this.estudoId))?.dados || this.membros; } catch { /* mantém */ }
+    this._versaoMembros++;
   }
 
   private async _removerMembro(usuarioId: number) {
