@@ -15,12 +15,16 @@ a sessão fizesse o trabalho no lugar dele.
   Rascunho dos demais status pela resposta, e o id do estudo é sequencial. A permissão passou para
   antes do status nas duas rotas.
 - `backend/rotas/estudos.ts` (`removerEstudo`): o texto do `403` mudava fora de Rascunho ("só
-  aprovadores removem"), com o mesmo efeito. Quem não é membro recebe agora a mesma resposta em
-  qualquer status; a mensagem específica continua indo ao membro.
+  aprovadores removem"), com o mesmo efeito. Quem não é membro **e o leitor** recebem agora a mesma
+  resposta em qualquer status; a mensagem específica vai só a editor, aprovador e admin do app. O
+  leitor entrou na rodada 1 da revisão: ele não enxerga Rascunho nem Arquivado, e o texto distinguia
+  os dois.
 - Teste HTTP contra Express real (`backend/rotas/imoveis-gate-rota.test.ts`): não-membro recebe
-  respostas idênticas em Rascunho e Em análise nas quatro rotas; o membro editor segue com `422
-  IMOVEL_TRAVADO`. Mutações medidas, cada uma vermelha: ordem antiga no POST, ordem antiga no
-  desvincular, `exigirMembro` retirado do `removerEstudo`, gate de status retirado do desvincular.
+  respostas idênticas em Rascunho e Em análise nas quatro rotas; o leitor, idênticas em Rascunho e
+  Arquivado; o membro editor segue com `422 IMOVEL_TRAVADO`; o admin do app, sem ser membro, segue
+  desvinculando em Rascunho e excluindo em qualquer status. Mutações medidas, cada uma vermelha:
+  ordem antiga no POST, ordem antiga no desvincular, `exigirMembro` retirado do `removerEstudo`,
+  gate de status retirado do desvincular, leitor fora da regra, admin fora da regra.
 - `docs/permissoes.md`: a regra "permissão antes do status" entra nas Instruções para não humanos.
 
 ---

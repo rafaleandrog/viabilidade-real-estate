@@ -41,8 +41,9 @@ class DadosFake {
   existe(tabela: string, id: number) { return this.tabelas.get(tabela)?.has(id) ?? false; }
 }
 
-// 26 = editor (nível escrita, membro editor); 30 = escrita, NÃO membro.
-const NIVEIS: Record<number, string> = { 26: 'escrita', 30: 'escrita' };
+// 26 = editor (nível escrita, membro editor); 30 = escrita, NÃO membro;
+// 27 = leitura, membro leitor; 28 = admin do app, NÃO membro.
+const NIVEIS: Record<number, string> = { 26: 'escrita', 27: 'leitura', 28: 'admin', 30: 'escrita' };
 
 function criarApp(dados: DadosFake) {
   const app = express();
@@ -75,6 +76,7 @@ async function comServidor(dados: DadosFake, fn: (chamar: Chamada) => Promise<vo
 function estudo(dados: DadosFake, status: string) {
   const id = dados.semear('estudos', { status, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao', nome: 'e' });
   dados.semear('estudo_membros', { estudo_id: id, usuario_id: 26, funcao: 'editor' });
+  dados.semear('estudo_membros', { estudo_id: id, usuario_id: 27, funcao: 'leitor' });
   const vinculo = dados.semear('estudo_imoveis', { estudo_id: id, imovel_nucleo_id: 9, tipo_imovel: 'lote' });
   return { id, vinculo };
 }
@@ -120,5 +122,39 @@ test('#871: para o membro editor, o gate de status continua valendo (422 IMOVEL_
     const excluir = await chamar(26, 'PATCH', `/estudos/${emAnalise.id}/remover`);
     assert.equal(excluir.status, 403);
     assert.match(excluir.j.mensagem, /Fora de Rascunho/);
+  });
+});
+
+test('#871: o leitor também recebe a mesma resposta em Rascunho e Arquivado (os dois ocultos a ele)', async () => {
+  const dados = new DadosFake();
+  const rascunho = estudo(dados, 'rascunho');
+  const arquivado = estudo(dados, 'arquivado');
+  await comServidor(dados, async (chamar) => {
+    for (const [m, sufixo, corpo] of [
+      ['POST', 'imoveis', { imovel_nucleo_id: 77 }],
+      ['PATCH', 'remover', {}],
+    ] as [string, string, unknown][]) {
+      const ra = await chamar(27, m, `/estudos/${rascunho.id}/${sufixo}`, corpo);
+      const rb = await chamar(27, m, `/estudos/${arquivado.id}/${sufixo}`, corpo);
+      assert.equal(ra.status, 403, `${m} ${sufixo} → ${JSON.stringify(ra.j)}`);
+      assert.deepEqual(rb, ra, `${m} ${sufixo}: a resposta ao leitor não pode depender do status`);
+    }
+    const da = await chamar(27, 'PATCH', `/estudos/${rascunho.id}/imoveis/${rascunho.vinculo}/remover`);
+    const db = await chamar(27, 'PATCH', `/estudos/${arquivado.id}/imoveis/${arquivado.vinculo}/remover`);
+    assert.equal(da.status, 403); assert.deepEqual(db, da);
+    assert.equal(dados.existe('estudos', rascunho.id), true);
+  });
+});
+
+test('#871: o admin do app, sem ser membro, segue desvinculando em Rascunho e excluindo em qualquer status', async () => {
+  const dados = new DadosFake();
+  const rascunho = estudo(dados, 'rascunho');
+  const emAnalise = estudo(dados, 'em_analise');
+  await comServidor(dados, async (chamar) => {
+    assert.equal((await chamar(28, 'PATCH', `/estudos/${rascunho.id}/imoveis/${rascunho.vinculo}/remover`)).status, 200);
+    const travado = await chamar(28, 'PATCH', `/estudos/${emAnalise.id}/imoveis/${emAnalise.vinculo}/remover`);
+    assert.equal(travado.status, 422); assert.equal(travado.j.codigo, 'IMOVEL_TRAVADO');
+    assert.equal((await chamar(28, 'PATCH', `/estudos/${emAnalise.id}/remover`)).status, 200);
+    assert.equal(dados.existe('estudos', emAnalise.id), false);
   });
 });

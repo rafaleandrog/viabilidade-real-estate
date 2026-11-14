@@ -798,10 +798,13 @@ async function removerEstudo(req: Request, res: Response): Promise<void> {
       erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo');
       return;
     }
-    // #871: quem não é membro recebe a MESMA resposta em qualquer status. A
-    // mensagem específica de "fora de Rascunho" só vai a quem já enxerga o
-    // estudo — senão o texto do 403 revelaria o status de um estudo alheio.
-    if (!(await exigirMembro(req, estudoId))) {
+    // #871: quem não pode excluir em NENHUM status (não-membro e leitor) recebe a
+    // MESMA resposta em qualquer status. A mensagem específica de "fora de
+    // Rascunho" só vai a editor, aprovador e admin do app — senão o texto do 403
+    // revelaria o status de um estudo alheio, ou um Rascunho/Arquivado ao leitor,
+    // que não os enxerga.
+    const membro = await exigirMembro(req, estudoId);
+    if (!membro || !(membro.ehEditor || membro.ehAprovador || membro.ehAdminApp)) {
       erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para remover este estudo');
       return;
     }
