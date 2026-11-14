@@ -4,7 +4,7 @@ import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js
 import { produtosDoEstudo, type ProformaInput } from '../../frontend/proforma.js';
 import {
   FATORES, SCHEMA_RESPOSTA, instrucoesSistema, calcularScores,
-  montarContextoApeloDoEstudo, normalizarRespostaApelo,
+  montarContextoApeloDoEstudo, normalizarRespostaApelo, contarNotasValidas,
 } from '../apelo-comercial.js';
 
 export const rotasApelo: ReturnType<typeof Router> = Router();
@@ -192,16 +192,31 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
     });
     // A normalização é a trava real (mesmo padrão de mercado-ia.ts): reconstrói
     // os 6 fatores × 4 perguntas na ordem canônica e descarta nota fora de 1–5.
-    const dados = normalizarRespostaApelo(resposta.dados);
+    const dados = normalizarRespostaApelo(resposta?.dados);
     const { porFator, geral } = calcularScores(dados.fatores);
 
+    // #862: nenhuma nota utilizável não é análise concluída. Antes, o handler
+    // gravava 24 notas nulas por cima do resultado anterior e publicava o evento
+    // com score 0. Agora responde 422 sem tocar no registro e sem evento; a
+    // resposta bruta vai para o log do servidor, que é onde dá para lê-la sem
+    // sobrescrever o resultado bom.
+    if (contarNotasValidas(dados) === 0 || geral === null) {
+      console.warn('[viabilidade] Apelo: IA sem notas utilizáveis; resposta bruta:',
+        JSON.stringify(resposta?.dados ?? null).slice(0, 4000));
+      erro(res, 422, 'IA_SEM_NOTAS', 'A IA não devolveu notas utilizáveis; tente de novo.');
+      return;
+    }
+
+    // #862: `bruto` guarda a resposta da IA como veio (mesmo padrão de
+    // `analise_mercado.resultado.bruto`), para comparar bruto × normalizado.
     const atualizado = await req.dados!.atualizar('apelo_comercial', apelo.id, {
-      resultado: dados,
+      resultado: { ...dados, bruto: resposta?.dados ?? null },
       ...porFator,
       score_geral: geral,
     });
 
-    await publicarEvento(req, 'apelo_comercial_concluido', payloadApeloConcluido(estudo, geral ?? 0));
+    // Score ausente é ausente, não zero: o 422 acima garante `geral` numérico aqui.
+    await publicarEvento(req, 'apelo_comercial_concluido', payloadApeloConcluido(estudo, geral));
     res.json({ ...atualizado, falhas });
   } catch (e: any) {
     console.error('Erro em POST apelo-comercial (IA):', e);

@@ -7,6 +7,9 @@
 // MESMA fonte que `calcularProforma` usa para o VGV, e é o que garante que o
 // contexto da IA e a Proforma nunca divirjam sobre o que é "catálogo válido".
 import { resumoCatalogoProdutos, type ProdutoPreliminar } from '../frontend/proforma.js';
+// #862: o parser numérico único da app (armadilha 14 do CLAUDE.md) — a nota em
+// string ("4") é aceita pelas mesmas regras de toda a fronteira de escrita.
+import { numeroEstrito } from './rotas/coercao-numerica.js';
 
 export const FATORES: { chave: string; nome: string; perguntas: string[] }[] = [
   {
@@ -83,7 +86,10 @@ export const SCHEMA_RESPOSTA = {
       items: {
         type: 'object',
         properties: {
-          chave: { type: 'string' },
+          // #862: sem `enum`, a chave era a única coisa que a normalização casava
+          // e a única que o modelo não tinha como saber — o schema é serializado
+          // no system prompt (SDK, docs/ia.md) e é o contrato que ele vê.
+          chave: { type: 'string', enum: FATORES.map((f) => f.chave) },
           nome: { type: 'string' },
           perguntas: {
             type: 'array',
@@ -91,13 +97,13 @@ export const SCHEMA_RESPOSTA = {
               type: 'object',
               properties: {
                 pergunta: { type: 'string' },
-                nota: { type: ['number', 'null'] },
+                nota: { type: ['number', 'null'], minimum: 1, maximum: 5 },
                 justificativa: { type: 'string' },
               },
               required: ['pergunta', 'nota', 'justificativa'],
             },
           },
-          nota_consolidada: { type: ['number', 'null'] },
+          nota_consolidada: { type: ['number', 'null'], minimum: 1, maximum: 5 },
           justificativa_geral: { type: 'string' },
         },
         required: ['chave', 'nome', 'perguntas', 'nota_consolidada', 'justificativa_geral'],
@@ -119,14 +125,17 @@ export const SCHEMA_RESPOSTA = {
 
 export function instrucoesSistema(tipoEmpreendimento: string): string {
   const guia = FATORES.map((f, i) =>
-    `${i + 1}. ${f.nome}\n${f.perguntas.map((p) => `   - ${p}`).join('\n')}`).join('\n\n');
+    `${i + 1}. ${f.nome} (chave: "${f.chave}")\n${f.perguntas.map((p) => `   - ${p}`).join('\n')}`).join('\n\n');
   return [
     `Você é um analista de mercado imobiliário avaliando o APELO COMERCIAL de um imóvel para um empreendimento do tipo "${tipoEmpreendimento}".`,
     'Analise todas as evidências disponíveis nos documentos e no texto fornecido e atribua uma nota de 1 a 5 para CADA pergunta-guia (5 = cenário muito favorável ao desenvolvimento imobiliário; 1 = muito desfavorável).',
     'A avaliação é comparativa e contextual (mercado local, tendências, riscos, oportunidades), não segue critérios numéricos rígidos. Se os dados forem insuficientes para uma pergunta, use nota null e explique na justificativa.',
     'Para cada pergunta dê uma justificativa sintética. Para cada fator, dê uma nota consolidada (média das 4 notas válidas) e uma justificativa geral.',
     'Ao final, produza um relatório com vantagens, desvantagens, principais ganhos e principais riscos de prosseguir.',
-    'Responda ESTRITAMENTE no schema JSON solicitado, mantendo a ordem e as chaves dos 6 fatores abaixo.',
+    'Responda ESTRITAMENTE no schema JSON solicitado, mantendo a ordem dos 6 fatores abaixo.',
+    'No campo "chave" de cada fator, use exatamente estas chaves, indicadas entre parênteses: '
+      + FATORES.map((f) => `"${f.chave}"`).join(', ') + '.',
+    'O campo "nota" é um número de 1 a 5 (não texto), ou null quando faltar dado.',
     '',
     'Fatores e perguntas-guia:',
     guia,
@@ -205,12 +214,68 @@ export function montarContextoApeloDoEstudo(entrada: {
 
 // Nota fora de 1–5 (ou não numérica) vira null — mesma trava anti-invenção de
 // `mercado-ia.ts:normalizarIndicador`, adaptada para escala 1–5 em vez de
-// valor/origem/confiança.
-const notaValida = (v: any): number | null => {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
-  const n = Math.round(v * 10) / 10;
+// valor/origem/confiança. #862: string numérica ESTRITA ("4", "3.5") é aceita
+// pelo parser único `numeroEstrito`; "ótimo", "", "0x4" continuam virando null.
+const notaValida = (v: unknown): number | null => {
+  const bruto = numeroEstrito(v);
+  if (bruto === null) return null;
+  const n = Math.round(bruto * 10) / 10;
   return n >= 1 && n <= 5 ? n : null;
 };
+
+/**
+ * #862: forma comparável de uma chave ou nome de fator — minúsculas, sem acento,
+ * sem pontuação, espaços viram `_`. "Infraestrutura no Entorno" →
+ * `infraestrutura_no_entorno`; "Segurança Jurídica" → `seguranca_juridica`.
+ */
+export function normalizarIdentificadorFator(v: unknown): string {
+  return String(v ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, '_');
+}
+
+/**
+ * #862: casa os fatores da resposta com `FATORES`, em cascata, sem inventar nota.
+ * 1. `chave` exata;
+ * 2. `chave` ou `nome` da resposta, normalizados, IGUAIS à chave ou ao nome
+ *    canônico normalizados, ou CONTENDO um deles (`infraestrutura_no_entorno`
+ *    contém `infraestrutura`). Só nesse sentido: o inverso deixaria `"a"` casar
+ *    com `localizacao`;
+ * 3. posição no array — só quando a resposta traz exatamente 6 fatores e NENHUM
+ *    casou pelos critérios anteriores (casamento parcial + posição misturaria
+ *    os dois critérios e poderia trocar fator).
+ * Cada fator da resposta é usado no máximo uma vez. Devolve, por índice de
+ * `FATORES`, o fator bruto casado (ou `undefined`).
+ */
+export function casarFatoresApelo(brutos: unknown): (any | undefined)[] {
+  const lista: any[] = Array.isArray(brutos) ? brutos : [];
+  const casados: (any | undefined)[] = FATORES.map(() => undefined);
+  const usados = new Set<number>();
+  // 1. chave exata
+  FATORES.forEach((def, i) => {
+    const j = lista.findIndex((f, k) => !usados.has(k) && f?.chave === def.chave);
+    if (j >= 0) { casados[i] = lista[j]; usados.add(j); }
+  });
+  // 2. chave/nome normalizados
+  FATORES.forEach((def, i) => {
+    if (casados[i] !== undefined) return;
+    const alvos = [def.chave, normalizarIdentificadorFator(def.nome)];
+    const j = lista.findIndex((f, k) => {
+      if (usados.has(k)) return false;
+      const ids = [normalizarIdentificadorFator(f?.chave), normalizarIdentificadorFator(f?.nome)].filter(Boolean);
+      return ids.some((id) => alvos.some((a) => id === a || id.includes(a)));
+    });
+    if (j >= 0) { casados[i] = lista[j]; usados.add(j); }
+  });
+  // 3. posição
+  if (usados.size === 0 && lista.length === FATORES.length) {
+    return FATORES.map((_, i) => lista[i]);
+  }
+  return casados;
+}
 
 export interface RespostaApeloNormalizada {
   fatores: {
@@ -227,12 +292,15 @@ export interface RespostaApeloNormalizada {
 // manter a ordem, mas nada garante isso — sem isto, `calcularScores` associa
 // nota a fator errado se a IA reordenar ou omitir um). `nota_consolidada`
 // recalcula como média das notas válidas quando a IA não mandar uma válida.
+//
+// #862: o casamento por `chave` exata zerava os 6 fatores quando o modelo
+// devolvia o NOME ("Localização") — o prompt nunca disse qual era a chave.
+// Agora casa em cascata (`casarFatoresApelo`).
 export function normalizarRespostaApelo(bruto: any): RespostaApeloNormalizada {
-  const porChave = new Map(
-    (Array.isArray(bruto?.fatores) ? bruto.fatores : []).map((f: any) => [String(f?.chave ?? ''), f]),
-  );
-  const fatores = FATORES.map((def) => {
-    const f: any = porChave.get(def.chave) ?? {};
+  const casados = casarFatoresApelo(bruto?.fatores);
+  const fatores = FATORES.map((def, iDef) => {
+    const c = casados[iDef];
+    const f: any = c && typeof c === 'object' ? c : {};
     const perguntasBrutas = Array.isArray(f.perguntas) ? f.perguntas : [];
     const perguntas = def.perguntas.map((pergunta, i) => {
       const p = perguntasBrutas[i] ?? {};
@@ -257,6 +325,11 @@ export function normalizarRespostaApelo(bruto: any): RespostaApeloNormalizada {
       ganhos: listaTexto(rel.ganhos), riscos: listaTexto(rel.riscos),
     },
   };
+}
+
+/** #862: quantas notas de pergunta sobreviveram à normalização. Zero → 422 `IA_SEM_NOTAS`. */
+export function contarNotasValidas(norm: RespostaApeloNormalizada): number {
+  return norm.fatores.reduce((s, f) => s + f.perguntas.filter((p) => p.nota !== null).length, 0);
 }
 
 // Calcula scores por fator e score geral a partir da resposta da IA.
