@@ -69,8 +69,8 @@ Cada fator tem uma chave fixa (`localizacao`, `infraestrutura`, `vetor_crescimen
 `concorrencia`, `demanda`, `seguranca_juridica`), informada à IA no prompt e no esquema de
 resposta. A resposta é casada com os seis fatores pela chave exata; se ela não bater, pela chave ou
 pelo nome sem acento, maiúsculas e pontuação ("Infraestrutura no Entorno" casa com
-`infraestrutura`); e, só quando vierem exatamente seis fatores sem nenhum casado, pela posição. A
-nota aceita número ou texto numérico ("4") e é descartada fora de 1 a 5. O evento
+`infraestrutura`); e, só quando vierem exatamente seis fatores sem nenhum casado, pela posição. Nota
+fora de 1 a 5, ou que não seja número, conta como ausente. O evento
 `apelo_comercial_concluido` leva o `score_geral` calculado, nunca um zero no lugar de score
 ausente.
 
