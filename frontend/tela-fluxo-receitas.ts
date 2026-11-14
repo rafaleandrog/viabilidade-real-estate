@@ -536,9 +536,14 @@ export class ViabFluxoReceitas extends LitElement {
     try {
       const res = await atualizarAlocacao(this.estudo.id, f.id, a.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // Trocar a tipologia faz o servidor gravar o preço/m² da tipologia nova:
+      // só esse campo vem da resposta — o resto segue o que foi digitado, para
+      // uma resposta atrasada não desfazer edição mais nova.
+      const doServidor = dados.tipologia_id !== undefined && res?.preco_m2 !== undefined
+        ? { preco_m2: res.preco_m2 } : {};
       this.fases = this.fases.map((x) =>
         x.id === f.id
-          ? { ...x, alocacoes: x.alocacoes.map((y: any) => (y.id === a.id ? { ...y, ...dados } : y)) }
+          ? { ...x, alocacoes: x.alocacoes.map((y: any) => (y.id === a.id ? { ...y, ...dados, ...doServidor } : y)) }
           : x);
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');

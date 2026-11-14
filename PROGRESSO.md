@@ -4,6 +4,26 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-14 — Trocar a tipologia de uma alocação confere o estoque do destino (item Q1 do índice de diagnóstico)
+
+Achado reproduzido ao vivo na Pinguim: o `PATCH …/fases/:fid/alocacoes/:aid` só conferia o saldo
+quando o corpo trazia `unidades`, então trocar só a `tipologia_id` levava as unidades da origem para
+o destino sem olhar o estoque dele, e a alocação seguia com o preço/m² da origem.
+
+- O POST e o PATCH passam a usar as mesmas funções (`tipologiaParaAlocacao`,
+  `unidadesCabemNaTipologia`, `unidadesDoCorpo`, `precoM2DaAlocacao`). Trocar a tipologia é tratado
+  como entrar nela: `400 TIPOLOGIA_OBRIGATORIA` para id não numérico (antes 404), `404` para
+  tipologia de outro estudo, `422 SALDO_ESGOTADO`/`SALDO_EXCEDIDO` contra o destino com as unidades
+  que a alocação terá, e o `preco_m2` do destino, salvo preço informado na mesma edição.
+- Repetir a mesma `tipologia_id` não é troca: não reescreve o preço negociado. Mudar só as unidades
+  na mesma tipologia segue como antes (sem `SALDO_ESGOTADO`). A guarda de permuta física da origem
+  não mudou.
+- Na aba Receitas, a troca de tipologia passa a mostrar o preço/m² que o servidor gravou.
+- Teste HTTP contra Express real: `backend/rotas/alocacao-tipologia-rota.test.ts`. Sem migração,
+  `versao` mantida.
+
+---
+
 ## 2026-11-14 — Função no estudo com teto pelo nível do app (aprovador exige `admin`)
 
 O que faltava da #861 depois do PR 859 (escalada do Sentinela na #869), portado do PR 863 — que
