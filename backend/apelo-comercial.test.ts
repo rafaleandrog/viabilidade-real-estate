@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   FATORES, montarContextoApelo, montarContextoApeloDoEstudo, normalizarRespostaApelo, calcularScores,
+  casarFatoresApelo, contarNotasValidas, normalizarIdentificadorFator, instrucoesSistema, SCHEMA_RESPOSTA,
+  COLUNA_SCORE,
 } from './apelo-comercial.js';
 
 // ── BUG7-15: contexto — localidade é a causa dominante do diagnóstico ──
@@ -195,4 +197,125 @@ test('#781 fiação: o handler do Apelo lê o catálogo por produtosDoEstudo', (
   const fonte = readFileSync(new URL('./rotas/apelo-comercial.ts', import.meta.url), 'utf8');
   assert.ok(fonte.includes('produtos: produtosDoEstudo({ ...estudo, produtos: produtosRes.dados }'),
     'o Apelo voltou a ler o catálogo cru');
+});
+
+// ── #862: a IA não sabia a chave dos fatores — casamento tolerante + prompt × schema ──
+
+/** Os 6 fatores com 4 perguntas de nota `nota` cada, identificados por `id(def, i)`. */
+function respostaCom(id: (def: (typeof FATORES)[number], i: number) => Record<string, unknown>, nota: unknown = 4) {
+  return {
+    fatores: FATORES.map((def, i) => ({
+      ...id(def, i),
+      perguntas: def.perguntas.map((p) => ({ pergunta: p, nota, justificativa: `j-${def.chave}` })),
+      nota_consolidada: null,
+      justificativa_geral: `g-${def.chave}`,
+    })),
+    relatorio: { vantagens: [], desvantagens: [], ganhos: ['g'], riscos: [] },
+  };
+}
+
+test('#862 normalizarRespostaApelo: fatores identificados só pelo NOME (o que o prompt antigo pedia) preservam as notas', () => {
+  // A reprodução da Pinguim: a resposta vem com "Localização", "Infraestrutura no Entorno"…
+  // Invertida de propósito, para provar que não é a posição que casa.
+  const bruto = respostaCom((def) => ({ chave: def.nome, nome: def.nome }));
+  bruto.fatores.reverse();
+  const norm = normalizarRespostaApelo(bruto);
+  for (const f of norm.fatores) {
+    assert.deepEqual(f.perguntas.map((p) => p.nota), [4, 4, 4, 4], f.chave);
+    assert.equal(f.justificativa_geral, `g-${f.chave}`);
+    assert.equal(f.perguntas[0].justificativa, `j-${f.chave}`);
+  }
+  assert.equal(calcularScores(norm.fatores).geral, 4);
+});
+
+test('#862 normalizarRespostaApelo: chave normalizada ou contendo a canônica casa (acento, maiúscula, sufixo)', () => {
+  const variantes: Record<string, string> = {
+    localizacao: 'Localização',
+    infraestrutura: 'infraestrutura_no_entorno',
+    vetor_crescimento: 'Vetor de Crescimento',
+    concorrencia: 'CONCORRÊNCIA',
+    demanda: 'demanda estrutural',
+    seguranca_juridica: 'Segurança Jurídica',
+  };
+  const bruto = respostaCom((def) => ({ chave: variantes[def.chave], nome: '' }), 3);
+  bruto.fatores.reverse();
+  const norm = normalizarRespostaApelo(bruto);
+  for (const f of norm.fatores) {
+    assert.equal(f.perguntas[0].nota, 3, f.chave);
+    assert.equal(f.justificativa_geral, `g-${f.chave}`);
+  }
+});
+
+test('#862 normalizarIdentificadorFator: minúsculas, sem acento, sem pontuação, espaço → _', () => {
+  assert.equal(normalizarIdentificadorFator('Infraestrutura no Entorno'), 'infraestrutura_no_entorno');
+  assert.equal(normalizarIdentificadorFator('Segurança Jurídica e Regulatória.'), 'seguranca_juridica_e_regulatoria');
+  assert.equal(normalizarIdentificadorFator('  1. Localização!  '), '1_localizacao');
+  assert.equal(normalizarIdentificadorFator(null), '');
+});
+
+test('#862 casarFatoresApelo: identificador curto contido na canônica NÃO casa', () => {
+  // Só "a resposta contém a canônica" casa; o inverso deixaria "a" virar Localização.
+  const casados = casarFatoresApelo([{ chave: 'a', nome: 'a', perguntas: [] }]);
+  assert.ok(casados.every((c) => c === undefined));
+});
+
+test('#862 normalizarRespostaApelo: nota em string numérica estrita ("4") vira 4; lixo e fora de 1–5 continuam null', () => {
+  const norm = normalizarRespostaApelo({
+    fatores: [{
+      chave: 'localizacao', nome: 'Localização',
+      perguntas: [
+        { pergunta: 'p1', nota: '4', justificativa: '' },
+        { pergunta: 'p2', nota: ' 3.5 ', justificativa: '' },
+        { pergunta: 'p3', nota: '0x4', justificativa: '' },
+        { pergunta: 'p4', nota: '6', justificativa: '' },
+      ],
+      nota_consolidada: '', justificativa_geral: '',
+    }],
+    relatorio: {},
+  });
+  const f = norm.fatores[0];
+  assert.deepEqual(f.perguntas.map((p) => p.nota), [4, 3.5, null, null]);
+  assert.equal(f.nota_consolidada, 3.8); // média de 4 e 3,5 — '' não é nota
+});
+
+test('#862 normalizarRespostaApelo: 6 fatores sem chave nem nome reconhecíveis casam por posição', () => {
+  const bruto = respostaCom((_def, i) => ({ chave: String(i + 1), nome: '' }), 2);
+  const norm = normalizarRespostaApelo(bruto);
+  for (const f of norm.fatores) {
+    assert.deepEqual(f.perguntas.map((p) => p.nota), [2, 2, 2, 2], f.chave);
+    assert.equal(f.justificativa_geral, `g-${f.chave}`); // a posição i casou o fator i
+  }
+});
+
+test('#862 normalizarRespostaApelo: posição NÃO entra se a resposta não tem 6 fatores, ou se algum já casou', () => {
+  const cinco = respostaCom((_def, i) => ({ chave: String(i + 1), nome: '' }));
+  cinco.fatores.pop();
+  assert.equal(contarNotasValidas(normalizarRespostaApelo(cinco)), 0);
+
+  const misto = respostaCom((_def, i) => ({ chave: i === 0 ? 'localizacao' : `x${i}`, nome: '' }));
+  const norm = normalizarRespostaApelo(misto);
+  assert.equal(norm.fatores[0].perguntas[0].nota, 4);
+  for (const f of norm.fatores.slice(1)) assert.equal(f.perguntas[0].nota, null, f.chave);
+});
+
+test('#862 contarNotasValidas: resposta vazia ou só com nulls dá zero (é o que dispara o 422 IA_SEM_NOTAS)', () => {
+  for (const bruto of [{}, null, { fatores: [] }, respostaCom((def) => ({ chave: def.chave }), null)]) {
+    assert.equal(contarNotasValidas(normalizarRespostaApelo(bruto)), 0);
+  }
+  assert.equal(contarNotasValidas(normalizarRespostaApelo(respostaCom((def) => ({ chave: def.chave })))), 24);
+});
+
+test('#862 prompt × schema × FATORES: a chave de cada fator está no prompt E é o enum do schema', () => {
+  const prompt = instrucoesSistema('incorporacao');
+  for (const f of FATORES) {
+    assert.ok(prompt.includes(`(chave: "${f.chave}")`), `o prompt não informa a chave de ${f.nome}`);
+  }
+  assert.match(prompt, /use exatamente estas chaves/);
+  const itens = (SCHEMA_RESPOSTA as any).properties.fatores.items.properties;
+  assert.deepEqual(itens.chave.enum, FATORES.map((f) => f.chave));
+  const nota = itens.perguntas.items.properties.nota;
+  assert.equal(nota.minimum, 1);
+  assert.equal(nota.maximum, 5);
+  // e as chaves batem com as colunas de score — senão calcularScores perde o fator
+  assert.deepEqual(Object.keys(COLUNA_SCORE).sort(), FATORES.map((f) => f.chave).sort());
 });
