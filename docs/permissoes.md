@@ -93,6 +93,9 @@ legível não muda ao renomear: é a identidade estável do estudo.
   `leitor` recebe `403` em Rascunho e Arquivado; e escrita em estudo Aprovado, Reprovado ou
   Arquivado exige `aprovador` (`403` para o `editor`). A exceção são os imóveis: vincular e
   desvincular só acontecem em Rascunho, para qualquer função (`422 IMOVEL_TRAVADO`).
+- A permissão é conferida antes do status. Quem não é membro (nem `admin` do app) recebe o mesmo
+  `403` com qualquer status do estudo, inclusive ao vincular ou desvincular imóvel e ao excluir o
+  estudo: a resposta nunca revela o status de um estudo de que a pessoa não participa.
 - Todo `DELETE` exige nível `admin` do app: o shell recusa os demais com `403
   AUTH_NIVEL_INSUFICIENTE` antes de a rota rodar. Por isso cada exclusão de dentro do estudo tem
   também a rota `PATCH …/remover` (ver o primeiro item desta lista), pela qual o `editor` remove.
