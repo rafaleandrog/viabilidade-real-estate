@@ -25,6 +25,9 @@ a restringia.
   `backend/rotas/apelo-comercial-rota.test.ts`, com prova de mutação registrada no PR. Sem migração,
   `versao` mantida. Guia: `docs/apelo-comercial.md`.
 - Falta, depois de publicar: rodar a análise na Pinguim com o texto da reprodução (skill `qa`).
+
+---
+
 ## 2026-11-14 — Quem não é membro não lê o status do estudo pela resposta (#871)
 
 Achado da revisão do PR 867, virou o caso 20 do Sentinela e a OS 12 (issue de escalada #871). O
