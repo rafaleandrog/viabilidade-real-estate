@@ -148,6 +148,15 @@ test('fiação: tela-estudo usa acoesDoMembro e opcoesDeFuncao na janela Membros
   assert.match(fonte, /\.opcoes=\$\{a\.opcoes\}/);
   assert.match(fonte, /\.opcoes=\$\{opcoesNovo\}/);
   assert.doesNotMatch(fonte, /const FUNCOES = \[/, 'sem segunda lista de funções na tela');
-  assert.match(fonte, /formNovoMembro\(p, !!this\.novoMembroUsuario, nivelDe\(this\.novoMembroUsuario\), this\.novoMembroFuncao\)/);
+  assert.match(fonte, /formNovoMembro\(p, !!this\.novoMembroUsuario, this\._nivelDe\(this\.novoMembroUsuario\), this\.novoMembroFuncao\)/);
+  // o render e o handler usam o MESMO estado: o botão habilitado por `formNovo`
+  // envia a função de `formNovo`, nunca `this.novoMembroFuncao` cru
+  assert.match(fonte, /const formNovo = this\._formNovo\(p\);/);
+  const handler = fonte.slice(fonte.indexOf('private async _adicionarMembro()'));
+  const corpoHandler = handler.slice(0, handler.indexOf('\n  }\n'));
+  assert.match(corpoHandler, /const form = this\._formNovo\(this\.estudo\?\._permissao \|\| \{\}\);/);
+  assert.match(corpoHandler, /if \(!form\.podeAdicionar \|\| !form\.funcao\) return;/);
+  assert.match(corpoHandler, /adicionarMembro\(this\.estudoId, usuarioId, form\.funcao\)/);
+  assert.doesNotMatch(corpoHandler, /this\.novoMembroFuncao/);
   assert.match(fonte, /\?desabilitado=\$\{!formNovo\.podeAdicionar\}/);
 });

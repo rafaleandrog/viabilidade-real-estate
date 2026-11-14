@@ -190,12 +190,9 @@ export class ViabTelaEstudo extends LitElement {
     // segue sendo o portão).
     const st = this.estudo?.status;
     const podeGerir = podeGerirMembros(p, st);
-    const nivelDe = (id: unknown): string | undefined => {
-      if (this.usuarios.length === 0) return undefined;
-      return this.usuarios.find((u) => Number(u.id) === Number(id))?.nivel ?? 'nenhuma';
-    };
+    const nivelDe = (id: unknown) => this._nivelDe(id);
     const opcoesNovo = opcoesDeFuncao(p, this.novoMembroUsuario ? nivelDe(this.novoMembroUsuario) : undefined);
-    const formNovo = formNovoMembro(p, !!this.novoMembroUsuario, nivelDe(this.novoMembroUsuario), this.novoMembroFuncao);
+    const formNovo = this._formNovo(p);
     return html`
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
@@ -361,11 +358,28 @@ export class ViabTelaEstudo extends LitElement {
     }
   }
 
+  /** Nível no app de uma pessoa, pela lista de usuários; `undefined` enquanto ela não carrega. */
+  private _nivelDe(id: unknown): string | undefined {
+    if (this.usuarios.length === 0) return undefined;
+    return this.usuarios.find((u) => Number(u.id) === Number(id))?.nivel ?? 'nenhuma';
+  }
+
+  /**
+   * Estado do formulário de adicionar membro — o MESMO no render (que habilita o
+   * botão) e no handler (que manda o pedido), para o botão nunca enviar uma função
+   * diferente da que o habilitou.
+   */
+  private _formNovo(p: any) {
+    return formNovoMembro(p, !!this.novoMembroUsuario, this._nivelDe(this.novoMembroUsuario), this.novoMembroFuncao);
+  }
+
   private async _adicionarMembro() {
     const usuarioId = parseInt(this.novoMembroUsuario || '');
     if (!usuarioId) { urbiVerso.notificar('Selecione um usuário.', 'alerta'); return; }
+    const form = this._formNovo(this.estudo?._permissao || {});
+    if (!form.podeAdicionar || !form.funcao) return;
     try {
-      const res = await adicionarMembro(this.estudoId, usuarioId, this.novoMembroFuncao);
+      const res = await adicionarMembro(this.estudoId, usuarioId, form.funcao);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
       this.membros = (await listarMembros(this.estudoId))?.dados || this.membros;
       this.novoMembroUsuario = '';
