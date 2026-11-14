@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-14 — Apelo Comercial grava as notas da IA, e resposta sem nota não finge sucesso (#862)
+
+Achado da QA de 2026-11-12 na Pinguim: a análise de Apelo Comercial terminava em 200 com o relatório
+preenchido e as 24 notas, as justificativas e o `score_geral` todos nulos, e o evento
+`apelo_comercial_concluido` saía com score 0. Causa: `normalizarRespostaApelo` casava cada fator da
+resposta pela `chave` exata, e o prompt nunca dizia qual era a chave (listava só o nome) nem o schema
+a restringia.
+
+- A chave vai ao modelo pelos dois canais: `enum` em `SCHEMA_RESPOSTA` (`FATORES.map(f => f.chave)`,
+  nota com `minimum` 1 e `maximum` 5) e cada fator no prompt com `(chave: "...")` mais "use exatamente
+  estas chaves".
+- Casamento em cascata (`casarFatoresApelo`): chave exata → chave ou nome normalizados, iguais ou
+  contendo os canônicos → posição, só com exatamente 6 fatores e nenhum casado. A nota aceita string
+  numérica estrita pelo parser único `numeroEstrito`.
+- Zero notas válidas → `422 IA_SEM_NOTAS`, sem `atualizar` e sem evento; a resposta bruta vai para o
+  log do servidor. O evento nunca mais publica `geral ?? 0`.
+- `resultado.bruto` grava a resposta da IA como veio (padrão de `analise_mercado`), sem coluna nova.
+- Testes em `backend/apelo-comercial.test.ts` e fiação por HTTP em
+  `backend/rotas/apelo-comercial-rota.test.ts`, com prova de mutação registrada no PR. Sem migração,
+  `versao` mantida. Guia: `docs/apelo-comercial.md`.
+- Falta, depois de publicar: rodar a análise na Pinguim com o texto da reprodução (skill `qa`).
+
+---
+
 ## 2026-11-12 — O editor remove itens do estudo: exclusões por `PATCH …/remover` (#860)
 
 Achado da QA ao vivo na Pinguim (2026-11-12), com usuário de serviço de nível `escrita`: o editor

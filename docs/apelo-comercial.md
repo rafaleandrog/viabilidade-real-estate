@@ -26,6 +26,9 @@ a comparação numérica com o mercado da região (ver [Análise de Mercado](ana
 3. O card **Resultado** mostra o **Score geral**, o score de cada fator e o relatório; o evento
    `apelo_comercial_concluido` é publicado, e os editores e aprovadores do estudo o recebem (os
    leitores são inscritos só nas mudanças de status).
+4. Se a IA não devolver **nenhuma** nota utilizável, a análise não é dada como concluída: aparece a
+   mensagem "A IA não devolveu notas utilizáveis; tente de novo", o resultado anterior continua na
+   tela e nenhum evento é publicado. Basta analisar de novo.
 
 **Contexto do empreendimento.** Antes das fontes, o prompt inclui um bloco com a localidade, o
 tipo de empreendimento, o número de unidades, a área média por unidade e o preço de venda
@@ -54,12 +57,22 @@ precisa estar habilitado para o app na instância; caso contrário a análise re
 |---|---|
 | `GET /estudos/:id/apelo-comercial` | o resultado, os documentos anexados e a lista de fatores |
 | `POST /estudos/:id/apelo-comercial/documentos` · `PATCH …/documentos/:docId/remover` | anexa e remove fontes |
-| `POST /estudos/:id/apelo-comercial` | dispara a IA; `422 IA_INDISPONIVEL` sem o framework |
+| `POST /estudos/:id/apelo-comercial` | dispara a IA; `422 IA_INDISPONIVEL` sem o framework; `422 IA_SEM_NOTAS` quando a resposta não traz nenhuma nota válida (nada é gravado, nenhum evento) |
 
 Escrever exige a função de `editor` no estudo; em estudo Aprovado, Reprovado ou Arquivado, anexar e remover fontes exige a de `aprovador`. O resultado fica em `apelo_comercial` (`resultado`
 JSON, `score_localizacao`, `score_infraestrutura`, `score_vetor_crescimento`, `score_concorrencia`,
 `score_demanda`, `score_seguranca_juridica`, `score_geral`); as fontes, em
-`apelo_comercial_documentos`.
+`apelo_comercial_documentos`. Dentro de `resultado`, `fatores` e `relatorio` são a resposta já
+normalizada, e `bruto` é a resposta da IA como veio, para comparar as duas.
+
+Cada fator tem uma chave fixa (`localizacao`, `infraestrutura`, `vetor_crescimento`,
+`concorrencia`, `demanda`, `seguranca_juridica`), informada à IA no prompt e no esquema de
+resposta. A resposta é casada com os seis fatores pela chave exata; se ela não bater, pela chave ou
+pelo nome sem acento, maiúsculas e pontuação ("Infraestrutura no Entorno" casa com
+`infraestrutura`); e, só quando vierem exatamente seis fatores sem nenhum casado, pela posição. A
+nota aceita número ou texto numérico ("4") e é descartada fora de 1 a 5. O evento
+`apelo_comercial_concluido` leva o `score_geral` calculado, nunca um zero no lugar de score
+ausente.
 
 ## Veja também
 
