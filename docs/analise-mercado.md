@@ -66,7 +66,10 @@ página avisa que a referência é mais ampla; **sem dado do projeto**, o indica
 
 As **Regiões monitoradas** (nome, UF, palavras-chave e o interruptor de coleta) ficam na aba do
 Painel e em *Admin → Apps → viabilidade → Regiões monitoradas*; o botão **Ver coletas** mostra o
-que a rotina guardou para cada uma. Ver [Administração](administracao).
+que a rotina guardou para cada uma. Excluir uma região apaga também as coletas dela, e os estudos
+que estavam vinculados a ela ficam **Não vinculada**; os retratos já gerados permanecem. Para só
+parar a coleta sem perder o histórico, desligue o interruptor em vez de excluir. Ver
+[Administração](administracao).
 
 **A rotina diária.** O manifesto declara a rotina **Coleta diária de mercado**, que o shell dispara
 uma vez por dia; o app não agenda nada por conta própria. Para cada região ativa ela monta os termos
