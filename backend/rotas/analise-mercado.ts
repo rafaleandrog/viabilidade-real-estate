@@ -233,7 +233,11 @@ rotasAnaliseMercado.delete('/mercado/regioes/:rid', async (req: Request, res: Re
     if (!exigirAdmin(req, res)) return;
     const rid = parseInt(req.params.rid);
     if (isNaN(rid)) { erro(res, 400, 'ID_INVALIDO', 'ID inválido'); return; }
-    await req.dados!.remover('mercado_regioes', rid);
+    // `remover` é soft delete e exige `soft_delete` na tabela, que mercado_regioes não declara
+    // (daí o 500 de sempre). `deletar` é o certo: o schema já define o destino dos filhos —
+    // coletas em cascata, `regiao_mercado_id` dos estudos anulado.
+    if (!(await req.dados!.buscar('mercado_regioes', rid))) { erro(res, 404, 'REGIAO_NAO_ENCONTRADA', 'Região não encontrada'); return; }
+    await req.dados!.deletar('mercado_regioes', rid);
     res.json({ ok: true });
   } catch (e: any) {
     console.error('Erro em DELETE mercado/regioes:', e);
