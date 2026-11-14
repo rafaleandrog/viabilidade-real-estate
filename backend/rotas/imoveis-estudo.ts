@@ -35,13 +35,15 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
 
     const estudo = await req.dados!.buscar('estudos', estudoId);
     if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+    // #871: a permissão vem ANTES do status. Na ordem inversa, quem não é membro
+    // recebia 422 IMOVEL_TRAVADO fora de Rascunho e 403 em Rascunho — e lia o
+    // status de um estudo alheio pela diferença (o id é sequencial).
+    const perm = await exigirEditor(req, estudoId);
+    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para vincular imóveis'); return; }
     if (estudo.status !== 'rascunho') {
       erro(res, 422, 'IMOVEL_TRAVADO', 'O imóvel vinculado só pode ser alterado em Rascunho');
       return;
     }
-
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para vincular imóveis'); return; }
 
     const imovelNucleoId = parseInt(req.body.imovel_nucleo_id);
     if (isNaN(imovelNucleoId)) {
@@ -90,13 +92,13 @@ async function desvincularImovel(req: Request, res: Response): Promise<void> {
 
     const estudo = await req.dados!.buscar('estudos', estudoId);
     if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
+    // #871: permissão antes do status, pelo mesmo motivo do POST acima.
+    const perm = await exigirEditor(req, estudoId);
+    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para desvincular imóveis'); return; }
     if (estudo.status !== 'rascunho') {
       erro(res, 422, 'IMOVEL_TRAVADO', 'O imóvel vinculado só pode ser alterado em Rascunho');
       return;
     }
-
-    const perm = await exigirEditor(req, estudoId);
-    if (!perm) { erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para desvincular imóveis'); return; }
 
     const vinculo = await req.dados!.buscar('estudo_imoveis', vinculoId);
     if (!vinculo || Number(vinculo.estudo_id) !== estudoId) {

@@ -31,6 +31,31 @@ ficou em conflito e é substituído por este:
 
 ---
 
+## 2026-11-14 — Quem não é membro não lê o status do estudo pela resposta (#871)
+
+Achado da revisão do PR 867, virou o caso 20 do Sentinela e a OS 12 (issue de escalada #871). O
+executor designado (MaximilIAn) não recebia avisos da Pinguim desde 2026-10-05, e o autor pediu que
+a sessão fizesse o trabalho no lugar dele.
+
+- `backend/rotas/imoveis-estudo.ts`: vincular e desvincular conferiam o status (`422
+  IMOVEL_TRAVADO` fora de Rascunho) **antes** da permissão (`403`). Quem não era membro distinguia
+  Rascunho dos demais status pela resposta, e o id do estudo é sequencial. A permissão passou para
+  antes do status nas duas rotas.
+- `backend/rotas/estudos.ts` (`removerEstudo`): o texto do `403` mudava fora de Rascunho ("só
+  aprovadores removem"), com o mesmo efeito. Quem não é membro **e o leitor** recebem agora a mesma
+  resposta em qualquer status; a mensagem específica vai só a editor, aprovador e admin do app. O
+  leitor entrou na rodada 1 da revisão: ele não enxerga Rascunho nem Arquivado, e o texto distinguia
+  os dois.
+- Teste HTTP contra Express real (`backend/rotas/imoveis-gate-rota.test.ts`): não-membro recebe
+  respostas idênticas em Rascunho e Em análise nas quatro rotas; o leitor, idênticas em Rascunho e
+  Arquivado; o membro editor segue com `422 IMOVEL_TRAVADO`; o admin do app, sem ser membro, segue
+  desvinculando em Rascunho e excluindo em qualquer status. Mutações medidas, cada uma vermelha:
+  ordem antiga no POST, ordem antiga no desvincular, `exigirMembro` retirado do `removerEstudo`,
+  gate de status retirado do desvincular, leitor fora da regra, admin fora da regra.
+- `docs/permissoes.md`: a regra "permissão antes do status" entra nas Instruções para não humanos.
+
+---
+
 ## 2026-11-12 — O editor remove itens do estudo: exclusões por `PATCH …/remover` (#860)
 
 Achado da QA ao vivo na Pinguim (2026-11-12), com usuário de serviço de nível `escrita`: o editor
