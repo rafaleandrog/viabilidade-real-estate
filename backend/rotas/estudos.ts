@@ -28,6 +28,7 @@ import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
 import { validarSomaPctAlv, areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
+import { funcaoEfetivaDoMembro } from '../../frontend/membros-regras.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
 
@@ -619,8 +620,16 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
       const mem = await req.dados!.listar('estudo_membros', {
         filtros: { usuario_id: userId }, por_pagina: 500,
       });
+      // A função publicada é a EFETIVA — o mínimo entre a linha e o que o nível
+      // do app comporta (ver `funcaoEfetivaDoMembro`), a mesma que o detalhe e as
+      // sub-rotas aplicam; senão a tela desenharia botão que o servidor recusa.
+      // Função efetiva nula (nível sem acesso, ou linha inválida) = o detalhe nega
+      // o acesso, e a listagem não publica o estudo em vez de cair na linha crua.
       const funcaoPorEstudo = new Map<number, string>();
-      for (const m of mem.dados) funcaoPorEstudo.set(Number(m.estudo_id), String(m.funcao));
+      for (const m of mem.dados) {
+        const efetiva = funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp);
+        if (efetiva) funcaoPorEstudo.set(Number(m.estudo_id), efetiva);
+      }
 
       estudos = [];
       for (const [estudoId, funcao] of funcaoPorEstudo) {

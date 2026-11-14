@@ -4,6 +4,33 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-14 — Função no estudo com teto pelo nível do app (aprovador exige `admin`)
+
+O que faltava da #861 depois do PR 859 (escalada do Sentinela na #869), portado do PR 863 — que
+ficou em conflito e é substituído por este:
+
+- **Teto pelo nível do alvo** (decisão do autor: `aprovador` exige `admin` no app; `editor`,
+  `escrita`; `leitor`, `leitura`). `POST` e `PATCH` de membros recusam com
+  `422 NIVEL_INSUFICIENTE`, consultando `req.shell.nivelEfetivoUsuario` (SDK, `permissoes.md`);
+  usuário inexistente ou sem acesso conta como `nenhuma` (falha fechada, nunca 500).
+- **Função efetiva** = mínimo entre a linha de membro e o que o nível comporta, aplicada em
+  `resolverPermissaoEstudo` (logo em todas as rotas que passam por ele) e na listagem `GET /estudos`
+  (estudo pulado quando ela é nula). Uma linha `aprovador` de quem tem só `escrita` não aprova.
+- **`usuario_id` inválido** no `POST` de membros → `400 USUARIO_INVALIDO` (parser `numeroEstrito`).
+- **Tela de membros**: as regras saem do `_renderMembros` para `frontend/membros-regras.ts`
+  (`acoesDoMembro`, `opcoesDeFuncao`, `podeGerirMembros`), e o seletor de função corta também pelo
+  nível de cada pessoa, lido da lista de usuários do app.
+- Ficou com o desenho da `main`, e não o do 863: `recusaAlteracaoMembro` (códigos `PROPRIA_FUNCAO`
+  e `SO_APROVADOR`), a recontagem-e-desfaz do último responsável, e o recriar do seletor a cada
+  troca. Sem migração, `versao` mantida.
+- Consequência da decisão, para o autor ver: com `aprovador` exigindo `admin`, todo aprovador
+  efetivo já é admin do app, que aprova em qualquer estudo — a linha `aprovador` deixa de dar
+  poder a mais a alguém.
+- Falta: revalidar ao vivo com a skill `qa` depois de publicar (critério 8 da #861), e o
+  levantamento da Laputa antes do upgrade (critério 6).
+
+---
+
 ## 2026-11-12 — O editor remove itens do estudo: exclusões por `PATCH …/remover` (#860)
 
 Achado da QA ao vivo na Pinguim (2026-11-12), com usuário de serviço de nível `escrita`: o editor

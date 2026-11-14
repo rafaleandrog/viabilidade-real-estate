@@ -25,6 +25,7 @@ import { leituraBloqueadaPorStatus, escritaExigeAprovador } from '../permissoes-
 // `DELETE` com nível `escrita` mediria um caminho que não existe em produção.
 
 interface Linha { id: number; [k: string]: any }
+const NIVEL_ALVO: Record<number, string> = { 8: 'leitura', 9: 'admin', 50: 'admin', 51: 'admin' };
 interface Ganchos {
   antesDeDeletar?: (t: string) => Promise<void>;
   antesDeAtualizar?: (t: string) => Promise<void>;
@@ -114,6 +115,9 @@ async function comServidor(fn: (chamar: (m: string, p: string, corpo?: unknown, 
       usuario: { id: Number(req.headers['x-usuario'] ?? 7), nome: 'u' },
       nivelApp: String(req.headers['x-nivel'] ?? 'escrita'),
     };
+    // Nível do usuário-ALVO no app, como `req.shell.nivelEfetivoUsuario` responde:
+    // é o teto da função que ele recebe no estudo. Quem não está no mapa tem `escrita`.
+    req.shell = { nivelEfetivoUsuario: async (id: number) => NIVEL_ALVO[id] ?? 'escrita' };
     req.eventos = { publicar: async () => {}, inscreverUsuario: async () => {}, desinscreverUsuario: async () => {}, cancelarInscricao: async () => {} };
     next();
   });
@@ -135,7 +139,9 @@ async function comServidor(fn: (chamar: (m: string, p: string, corpo?: unknown, 
 }
 
 const LEITOR = { id: 8, nivel: 'leitura' };
-const APROVADOR = { id: 9, nivel: 'escrita' };
+// `aprovador` exige `admin` no app (decisão do autor): com `escrita`, a linha
+// `aprovador` do 9 valeria só como editor (ver `funcaoEfetivaDoMembro`).
+const APROVADOR = { id: 9, nivel: 'admin' };
 const ADMIN = { id: 50, nivel: 'admin' };
 
 test('apelo: DELETE de documento de OUTRO estudo devolve 404 e não apaga nada', () =>
@@ -204,9 +210,13 @@ test('membros: editor não se promove nem concede/retira aprovador; não deixa o
     assert.equal(db.estudo_membros.find((m) => m.id === 16)!.funcao, 'aprovador');
     // O que continua permitido ao editor.
     assert.equal((await chamar('POST', '/estudos/1/membros', { usuario_id: 30, funcao: 'leitor' })).status, 200);
-    assert.equal((await chamar('PATCH', '/estudos/1/membros/8', { funcao: 'editor' })).status, 200);
-    // O aprovador concede aprovador.
-    assert.equal((await chamar('PATCH', '/estudos/1/membros/8', { funcao: 'aprovador' }, APROVADOR)).status, 200);
+    // ...dentro do nível do alvo: o 8 tem só `leitura` no app e não vira editor.
+    const r4 = await chamar('PATCH', '/estudos/1/membros/8', { funcao: 'editor' });
+    assert.equal(r4.status, 422);
+    assert.equal(r4.corpo.codigo, 'NIVEL_INSUFICIENTE');
+    assert.equal((await chamar('PATCH', '/estudos/1/membros/30', { funcao: 'editor' })).status, 200);
+    // O aprovador concede aprovador — a quem tem `admin` no app.
+    assert.equal((await chamar('POST', '/estudos/1/membros', { usuario_id: 51, funcao: 'aprovador' }, APROVADOR)).status, 200);
     // Último responsável: estudo 3 só tem o editor 99 — nem o admin o remove nem o rebaixa.
     const r2 = await chamar('PATCH', '/estudos/3/membros/99/remover', undefined, ADMIN);
     assert.equal(r2.status, 422);
