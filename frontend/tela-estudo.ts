@@ -11,7 +11,7 @@ import {
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros } from './membros-regras.js';
+import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros, formNovoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
 export class ViabTelaEstudo extends LitElement {
@@ -195,6 +195,7 @@ export class ViabTelaEstudo extends LitElement {
       return this.usuarios.find((u) => Number(u.id) === Number(id))?.nivel ?? 'nenhuma';
     };
     const opcoesNovo = opcoesDeFuncao(p, this.novoMembroUsuario ? nivelDe(this.novoMembroUsuario) : undefined);
+    const formNovo = formNovoMembro(p, !!this.novoMembroUsuario, nivelDe(this.novoMembroUsuario), this.novoMembroFuncao);
     return html`
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
@@ -237,8 +238,11 @@ export class ViabTelaEstudo extends LitElement {
               .opcoes=${opcoesNovo}
               @urbi:select-change=${(e: CustomEvent) => this.novoMembroFuncao = e.detail.valor}
             ></urbi-select>
-            <urbi-botao variante="primario" icone="fa-solid fa-plus" @click=${this._adicionarMembro}>Adicionar</urbi-botao>
-          </div>` : nothing}
+            <urbi-botao variante="primario" icone="fa-solid fa-plus" ?desabilitado=${!formNovo.podeAdicionar}
+              @click=${this._adicionarMembro}>Adicionar</urbi-botao>
+          </div>
+          ${this.novoMembroUsuario && formNovo.semFuncaoPossivel ? html`
+            <span class="sec">Esta pessoa não tem nível no app para nenhuma função que você pode conceder.</span>` : nothing}` : nothing}
       </urbi-modal>
     `;
   }
@@ -375,11 +379,12 @@ export class ViabTelaEstudo extends LitElement {
    * Escolher a pessoa a adicionar recorta as funções pelo nível dela no app; se a
    * função escolhida antes não cabe mais, volta para a primeira que cabe — senão
    * o Adicionar mandaria uma função que o servidor recusa (`NIVEL_INSUFICIENTE`).
+   * Se nenhuma cabe, o Adicionar fica desabilitado (`formNovoMembro`).
    */
   private _escolherNovoMembro(p: any, usuario: string, nivel: string | undefined) {
     this.novoMembroUsuario = usuario;
-    const cabem = opcoesDeFuncao(p, usuario ? nivel : undefined).map((o) => o.valor as string);
-    if (!cabem.includes(this.novoMembroFuncao)) this.novoMembroFuncao = cabem[0] ?? 'leitor';
+    const f = formNovoMembro(p, !!usuario, nivel, this.novoMembroFuncao).funcao;
+    if (f) this.novoMembroFuncao = f;
   }
 
   private async _alterarFuncao(usuarioId: number, funcao: string, atual?: string) {

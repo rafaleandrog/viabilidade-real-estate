@@ -126,6 +126,25 @@ export function opcoesDeFuncao(p: PermissaoTela, nivelAlvo: string | null | unde
 }
 
 /**
+ * Estado do formulário "adicionar membro" para a pessoa escolhida (`nivelAlvo`
+ * dela no app; `undefined` = nível desconhecido, ver `opcoesDeFuncao`): a
+ * função que fica selecionada — a atual, se ainda cabe; senão a primeira que
+ * cabe — e se o Adicionar pode mandar o pedido. Quando NENHUMA função cabe
+ * (pessoa sem acesso ao app, ou o ator não concede nada), `funcao` é `null` e o
+ * Adicionar fica desabilitado: o pedido seria um `422 NIVEL_INSUFICIENTE` certo.
+ */
+export function formNovoMembro(
+  p: PermissaoTela,
+  usuarioEscolhido: boolean,
+  nivelAlvo: string | null | undefined,
+  funcaoAtual: string,
+): { funcao: FuncaoEstudo | null; podeAdicionar: boolean; semFuncaoPossivel: boolean } {
+  const cabem = opcoesDeFuncao(p, usuarioEscolhido ? nivelAlvo : undefined).map((o) => o.valor);
+  const funcao = cabem.find((f) => f === funcaoAtual) ?? cabem[0] ?? null;
+  return { funcao, podeAdicionar: usuarioEscolhido && funcao !== null, semFuncaoPossivel: cabem.length === 0 };
+}
+
+/**
  * O que a linha de um membro oferece na janela Membros — espelho de
  * `recusaAlteracaoMembro` (backend/rotas/membros-estudo.ts) e do teto pelo
  * nível do alvo, para a tela não oferecer o que o servidor recusa:

@@ -52,14 +52,19 @@ class DadosFake {
 // chama) e `req.shell.nivelEfetivoUsuario` (o alvo).
 const NIVEIS: Record<number, string> = { 26: 'escrita', 27: 'leitura', 28: 'admin', 29: 'escrita', 32: 'admin' };
 
-function criarApp(dados: DadosFake) {
+function criarApp(dados: DadosFake, opts: { shellFalha?: boolean } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req: any, _res, next) => {
     const uid = Number(req.header('x-usuario'));
     req.dados = dados;
     req.contexto = { nivelApp: NIVEIS[uid] ?? 'nenhuma', usuario: { id: uid, nome: `U${uid}` } };
-    req.shell = { nivelEfetivoUsuario: async (id: number) => NIVEIS[id] ?? 'nenhuma' };
+    req.shell = {
+      nivelEfetivoUsuario: async (id: number) => {
+        if (opts.shellFalha) throw new Error('shell indisponível');
+        return NIVEIS[id] ?? 'nenhuma';
+      },
+    };
     req.eventos = { publicar: async () => {}, inscreverUsuario: async () => {}, desinscreverUsuario: async () => {}, cancelarInscricao: async () => {} };
     next();
   });
@@ -70,8 +75,8 @@ function criarApp(dados: DadosFake) {
 
 type Chamar = (uid: number, metodo: string, caminho: string, corpo?: any) => Promise<{ status: number; j: any }>;
 
-async function comServidor(dados: DadosFake, fn: (chamar: Chamar) => Promise<void>) {
-  const server = criarApp(dados).listen(0);
+async function comServidor(dados: DadosFake, fn: (chamar: Chamar) => Promise<void>, opts: { shellFalha?: boolean } = {}) {
+  const server = criarApp(dados, opts).listen(0);
   await new Promise<void>((r) => server.once('listening', () => r()));
   const { port } = server.address() as AddressInfo;
   const chamar: Chamar = async (uid, metodo, caminho, corpo) => {
@@ -198,4 +203,28 @@ test('usuario_id inválido no POST de membros é 400, não 500', async () => {
     assert.equal(dados.membros(e).find((m) => m.usuario_id === 27)?.funcao, 'leitor');
     assert.equal(dados.membros(e).length, 2);
   });
+});
+
+test('falha fechada: se a consulta do nível do alvo lança, a concessão é 422, não 500 nem aceita', async () => {
+  const dados = new DadosFake();
+  const e = estudoComMembros(dados, [[28, 'editor'], [29, 'editor'], [27, 'leitor']]);
+  const avisos = console.warn;
+  console.warn = () => {}; // o handler registra a falha no log; aqui é esperado
+  try {
+    await comServidor(dados, async (chamar) => {
+      const r1 = await chamar(28, 'POST', `/estudos/${e}/membros`, { usuario_id: 32, funcao: 'aprovador' });
+      assert.equal(r1.status, 422, JSON.stringify(r1.j));
+      assert.equal(r1.j.codigo, 'NIVEL_INSUFICIENTE');
+      const r2 = await chamar(28, 'POST', `/estudos/${e}/membros`, { usuario_id: 26, funcao: 'editor' });
+      assert.equal(r2.j.codigo, 'NIVEL_INSUFICIENTE');
+      const r3 = await chamar(28, 'PATCH', `/estudos/${e}/membros/27`, { funcao: 'editor' });
+      assert.equal(r3.status, 422);
+      assert.equal(r3.j.codigo, 'NIVEL_INSUFICIENTE');
+      const r4 = await chamar(28, 'PATCH', `/estudos/${e}/membros/29`, { funcao: 'aprovador' });
+      assert.equal(r4.j.codigo, 'NIVEL_INSUFICIENTE');
+      assert.equal(dados.membros(e).length, 3, 'nada gravado');
+      assert.equal(dados.membros(e).find((m) => m.usuario_id === 27).funcao, 'leitor');
+      assert.equal(dados.membros(e).find((m) => m.usuario_id === 29).funcao, 'editor');
+    }, { shellFalha: true });
+  } finally { console.warn = avisos; }
 });

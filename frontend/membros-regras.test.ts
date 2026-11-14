@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   NIVEL_MINIMO_DA_FUNCAO, nivelComportaFuncao, decidirNivelDoAlvo, funcaoEfetivaDoMembro,
-  funcoesQueAtorConcede, opcoesDeFuncao, podeGerirMembros, acoesDoMembro,
+  funcoesQueAtorConcede, opcoesDeFuncao, podeGerirMembros, acoesDoMembro, formNovoMembro,
 } from './membros-regras.js';
 
 // Teto da função no estudo pelo nível do usuário no app (decisão do autor:
@@ -124,6 +124,21 @@ test('tela: o último responsável não sai nem vira leitor', () => {
   assert.equal(a.podeTrocarFuncao, false, 'só a função atual sobrou');
 });
 
+test('tela: adicionar quem não tem nível para nenhuma função não manda pedido fadado ao 422', () => {
+  // sem acesso ao app: nenhuma função cabe, o Adicionar fica desabilitado
+  assert.deepEqual(formNovoMembro(EDITOR, true, 'nenhuma', 'leitor'), { funcao: null, podeAdicionar: false, semFuncaoPossivel: true });
+  // a função escolhida antes não cabe mais: cai na primeira que cabe
+  assert.deepEqual(formNovoMembro(ADMIN, true, 'leitura', 'aprovador'), { funcao: 'leitor', podeAdicionar: true, semFuncaoPossivel: false });
+  // cabe: fica a escolhida
+  assert.equal(formNovoMembro(ADMIN, true, 'admin', 'aprovador').funcao, 'aprovador');
+  // ninguém escolhido: não adiciona, mas o seletor não acusa falta de função
+  assert.deepEqual(formNovoMembro(EDITOR, false, undefined, 'leitor'), { funcao: 'leitor', podeAdicionar: false, semFuncaoPossivel: false });
+  // nível desconhecido (lista não carregou): não corta, o servidor é o portão
+  assert.equal(formNovoMembro(EDITOR, true, undefined, 'editor').podeAdicionar, true);
+  // leitor não concede nada
+  assert.equal(formNovoMembro(LEITOR, true, 'admin', 'leitor').podeAdicionar, false);
+});
+
 // Fiação da TELA: a janela Membros chama as regras deste módulo (e não uma
 // cópia inline). Lido do fonte, como a bateria de `tela-estudo.test.ts`.
 test('fiação: tela-estudo usa acoesDoMembro e opcoesDeFuncao na janela Membros', () => {
@@ -133,4 +148,6 @@ test('fiação: tela-estudo usa acoesDoMembro e opcoesDeFuncao na janela Membros
   assert.match(fonte, /\.opcoes=\$\{a\.opcoes\}/);
   assert.match(fonte, /\.opcoes=\$\{opcoesNovo\}/);
   assert.doesNotMatch(fonte, /const FUNCOES = \[/, 'sem segunda lista de funções na tela');
+  assert.match(fonte, /formNovoMembro\(p, !!this\.novoMembroUsuario, nivelDe\(this\.novoMembroUsuario\), this\.novoMembroFuncao\)/);
+  assert.match(fonte, /\?desabilitado=\$\{!formNovo\.podeAdicionar\}/);
 });
