@@ -33,9 +33,25 @@ o único que entra num estudo sem membros — para re-adicionar quem precisar.
 O `editor` adiciona, troca e remove `leitor`es e `editor`es. Conceder a função `aprovador`, ou
 mexer em quem já é aprovador, é só do `aprovador` (ou do `admin` do app). Só o `admin` do app muda
 a própria função, e o estudo nunca fica sem responsável: o último `editor` ou `aprovador` não pode
-ser removido nem passar a `leitor`. Na lista de membros, a tela só oferece as funções e as linhas que a sua função permite alterar.
-Como toda escrita, gerenciar membros de um estudo Aprovado, Reprovado ou Arquivado é só do
-`aprovador`.
+ser removido nem passar a `leitor`. Como toda escrita, gerenciar membros de um estudo Aprovado,
+Reprovado ou Arquivado é só do `aprovador`.
+
+A função no estudo nunca passa do nível que a pessoa tem no app:
+
+| Função | Nível mínimo no app |
+|---|---|
+| `leitor` | `leitura` |
+| `editor` | `escrita` |
+| `aprovador` | `admin` |
+
+Adicionar alguém, ou mudar a função de alguém, para uma função acima do nível dele no app é
+recusado. E a função que vale é a menor entre a gravada no estudo e a que o nível comporta: um
+membro gravado como `aprovador` que tem só `escrita` no app age como `editor` (não aprova); com
+`leitura`, como `leitor`; sem acesso ao app, não entra no estudo.
+
+Na lista de membros, a tela só oferece as linhas que a sua função permite alterar e, em cada uma,
+só as funções que você pode conceder e que cabem no nível da pessoa. Ao escolher quem adicionar, o
+seletor de função se ajusta ao nível dela.
 
 ### Ciclo de vida
 
@@ -105,7 +121,15 @@ legível não muda ao renomear: é a identidade estável do estudo.
   responde `404`.
 - Membros: `403 PROPRIA_FUNCAO` ao mudar a própria função (salvo `admin` do app);
   `403 SO_APROVADOR` quando um editor concede, altera ou remove um aprovador;
-  `422 ULTIMO_RESPONSAVEL` ao remover ou rebaixar a `leitor` o último editor ou aprovador.
+  `422 ULTIMO_RESPONSAVEL` ao remover ou rebaixar a `leitor` o último editor ou aprovador;
+  `422 NIVEL_INSUFICIENTE` quando o nível do usuário no app não comporta a função pedida
+  (`aprovador` exige `admin`, `editor` exige `escrita`, `leitor` exige `leitura`; usuário inexistente
+  ou sem acesso conta como `nenhuma`). Em `POST /estudos/:id/membros`, `usuario_id` ausente dá
+  `400 USUARIO_OBRIGATORIO` e o que não for inteiro positivo dá `400 USUARIO_INVALIDO`.
+- A função que todas as rotas aplicam — e que `_permissao.funcao` do `GET /estudos/:id` e
+  `_funcao` do `GET /estudos` publicam — é a efetiva: a menor entre a linha de membro e a que o
+  nível do app comporta. Quem fica com função efetiva nula não vê o estudo na listagem e recebe
+  `403` no detalhe.
 
 ## Eventos
 

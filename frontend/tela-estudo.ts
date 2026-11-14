@@ -11,11 +11,7 @@ import {
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-const FUNCOES = [
-  { valor: 'leitor', rotulo: 'Leitor' },
-  { valor: 'editor', rotulo: 'Editor' },
-  { valor: 'aprovador', rotulo: 'Aprovador' },
-];
+import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros, formNovoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
 export class ViabTelaEstudo extends LitElement {
@@ -187,44 +183,41 @@ export class ViabTelaEstudo extends LitElement {
   }
 
   private _renderMembros(p: any): TemplateResult {
-    // Espelho de `recusaAlteracaoMembro` (backend/rotas/membros-estudo.ts), para a
-    // tela não oferecer o que o servidor recusa: em estudo travado só o aprovador
-    // gere membros; `aprovador` só se concede ou altera por aprovador/admin; a
-    // própria linha não se altera (salvo admin de app).
-    const travado = ['aprovado', 'reprovado', 'arquivado'].includes(String(this.estudo?.status));
-    const podeGerir = p.podeEditar && (!travado || p.podeAprovar);
-    const funcoes = p.podeAprovar ? FUNCOES : FUNCOES.filter((f) => f.valor !== 'aprovador');
-    const linhaEditavel = (m: any) =>
-      (p.ehAdminApp || Number(m.usuario_id) !== Number(p.usuarioId))
-      && (p.podeAprovar || m.funcao !== 'aprovador');
-    // O estudo nunca fica sem editor ou aprovador: o último deles não sai nem
-    // vira leitor (`ULTIMO_RESPONSAVEL` no servidor).
-    const ehResp = (f: unknown) => f === 'editor' || f === 'aprovador';
-    const totalResp = this.membros.filter((m) => ehResp(m.funcao)).length;
-    const ultimoResp = (m: any) => ehResp(m.funcao) && totalResp <= 1;
-    const funcoesDaLinha = (m: any) => (ultimoResp(m) ? funcoes.filter((f) => f.valor !== 'leitor') : funcoes);
+    // As regras moram em `membros-regras.ts`, as mesmas que o servidor aplica
+    // (`recusaAlteracaoMembro` e o teto pelo nível do alvo no app), para a tela
+    // não oferecer o que ele recusa. O nível de cada pessoa vem da lista de
+    // usuários do app; enquanto ela não carrega, o teto não corta (o servidor
+    // segue sendo o portão).
+    const st = this.estudo?.status;
+    const podeGerir = podeGerirMembros(p, st);
+    const nivelDe = (id: unknown) => this._nivelDe(id);
+    const opcoesNovo = opcoesDeFuncao(p, this.novoMembroUsuario ? nivelDe(this.novoMembroUsuario) : undefined);
+    const formNovo = this._formNovo(p);
     return html`
       <urbi-modal title="Membros do estudo" @urbi-modal:close=${() => this.mostrarMembros = false}>
         <div class="membros-lista">
           ${this.membros.length === 0 ? html`<span class="sec">Nenhum membro.</span>` : nothing}
-          ${this.membros.map((m) => html`
+          ${this.membros.map((m) => {
+            const a = acoesDoMembro(p, st, this.membros, m, nivelDe(m.usuario_id));
+            return html`
             <div class="membro">
               <span>${m.usuario_nome || `Usuário ${m.usuario_id}`}</span>
               <div class="membro-acoes">
-                ${podeGerir && linhaEditavel(m) ? html`
+                ${a.podeTrocarFuncao ? html`
                   ${keyed(`${m.usuario_id}:${this._versaoMembros}`, html`<urbi-select
                     .valor=${m.funcao}
-                    .opcoes=${funcoesDaLinha(m)}
-                    @urbi:select-change=${(e: CustomEvent) => this._alterarFuncao(m.usuario_id, e.detail.valor)}
+                    .opcoes=${a.opcoes}
+                    @urbi:select-change=${(e: CustomEvent) => this._alterarFuncao(m.usuario_id, e.detail.valor, m.funcao)}
                   ></urbi-select>`)}
-                  ${!ultimoResp(m) ? html`
-                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
-                      .ariaLabel=${'Remover membro'}
-                      @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>` : nothing}
                 ` : html`<urbi-badge cor="padrao">${m.funcao}</urbi-badge>`}
+                ${a.podeRemover ? html`
+                  <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+                    .ariaLabel=${'Remover membro'}
+                    @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>` : nothing}
               </div>
             </div>
-          `)}
+          `;
+          })}
         </div>
         ${podeGerir ? html`
           <div class="add-membro">
@@ -234,16 +227,19 @@ export class ViabTelaEstudo extends LitElement {
               .valor=${this.novoMembroUsuario}
               .opcoes=${this.usuarios.map((u) => ({ valor: String(u.id), rotulo: u.nome }))}
               pesquisavel
-              @urbi:select-change=${(e: CustomEvent) => this.novoMembroUsuario = e.detail.valor}
+              @urbi:select-change=${(e: CustomEvent) => this._escolherNovoMembro(p, e.detail.valor, nivelDe(e.detail.valor))}
             ></urbi-select>
             <urbi-select
               label="Função"
               .valor=${this.novoMembroFuncao}
-              .opcoes=${funcoes}
+              .opcoes=${opcoesNovo}
               @urbi:select-change=${(e: CustomEvent) => this.novoMembroFuncao = e.detail.valor}
             ></urbi-select>
-            <urbi-botao variante="primario" icone="fa-solid fa-plus" @click=${this._adicionarMembro}>Adicionar</urbi-botao>
-          </div>` : nothing}
+            <urbi-botao variante="primario" icone="fa-solid fa-plus" ?desabilitado=${!formNovo.podeAdicionar}
+              @click=${this._adicionarMembro}>Adicionar</urbi-botao>
+          </div>
+          ${this.novoMembroUsuario && formNovo.semFuncaoPossivel ? html`
+            <span class="sec">Esta pessoa não tem nível no app para nenhuma função que você pode conceder.</span>` : nothing}` : nothing}
       </urbi-modal>
     `;
   }
@@ -362,11 +358,28 @@ export class ViabTelaEstudo extends LitElement {
     }
   }
 
+  /** Nível no app de uma pessoa, pela lista de usuários; `undefined` enquanto ela não carrega. */
+  private _nivelDe(id: unknown): string | undefined {
+    if (this.usuarios.length === 0) return undefined;
+    return this.usuarios.find((u) => Number(u.id) === Number(id))?.nivel ?? 'nenhuma';
+  }
+
+  /**
+   * Estado do formulário de adicionar membro — o MESMO no render (que habilita o
+   * botão) e no handler (que manda o pedido), para o botão nunca enviar uma função
+   * diferente da que o habilitou.
+   */
+  private _formNovo(p: any) {
+    return formNovoMembro(p, !!this.novoMembroUsuario, this._nivelDe(this.novoMembroUsuario), this.novoMembroFuncao);
+  }
+
   private async _adicionarMembro() {
     const usuarioId = parseInt(this.novoMembroUsuario || '');
     if (!usuarioId) { urbiVerso.notificar('Selecione um usuário.', 'alerta'); return; }
+    const form = this._formNovo(this.estudo?._permissao || {});
+    if (!form.podeAdicionar || !form.funcao) return;
     try {
-      const res = await adicionarMembro(this.estudoId, usuarioId, this.novoMembroFuncao);
+      const res = await adicionarMembro(this.estudoId, usuarioId, form.funcao);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
       this.membros = (await listarMembros(this.estudoId))?.dados || this.membros;
       this.novoMembroUsuario = '';
@@ -376,7 +389,22 @@ export class ViabTelaEstudo extends LitElement {
     }
   }
 
-  private async _alterarFuncao(usuarioId: number, funcao: string) {
+  /**
+   * Escolher a pessoa a adicionar recorta as funções pelo nível dela no app; se a
+   * função escolhida antes não cabe mais, volta para a primeira que cabe — senão
+   * o Adicionar mandaria uma função que o servidor recusa (`NIVEL_INSUFICIENTE`).
+   * Se nenhuma cabe, o Adicionar fica desabilitado (`formNovoMembro`).
+   */
+  private _escolherNovoMembro(p: any, usuario: string, nivel: string | undefined) {
+    this.novoMembroUsuario = usuario;
+    const f = formNovoMembro(p, !!usuario, nivel, this.novoMembroFuncao).funcao;
+    if (f) this.novoMembroFuncao = f;
+  }
+
+  private async _alterarFuncao(usuarioId: number, funcao: string, atual?: string) {
+    // Escolher de novo a função atual (ela fica no seletor só para ser mostrada)
+    // não é troca: nenhum pedido sai.
+    if (funcao === atual) return;
     try {
       const res = await alterarFuncaoMembro(this.estudoId, usuarioId, funcao);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); }

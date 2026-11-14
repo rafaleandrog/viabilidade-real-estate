@@ -4,10 +4,10 @@ import {
   type PermissaoEstudo,
 } from '../permissoes-estudo.js';
 import { inscreverMembroEstudo, desinscreverMembroEstudo } from '../eventos-viabilidade.js';
+import { ehFuncaoEstudo, decidirNivelDoAlvo } from '../../frontend/membros-regras.js';
+import { numeroEstrito } from './coercao-numerica.js';
 
 export const rotasMembrosEstudo: ReturnType<typeof Router> = Router();
-
-const FUNCOES = ['leitor', 'editor', 'aprovador'];
 
 const RESPONSAVEIS = ['editor', 'aprovador'];
 const ehResponsavel = (f: unknown) => RESPONSAVEIS.includes(String(f));
@@ -82,6 +82,30 @@ async function restaurarResponsavel(req: Request, estudoId: number, usuarioId: n
   }
 }
 
+/** id de usuário: inteiro positivo (int4), pelo parser único da app. */
+function idUsuario(v: unknown): number | null {
+  const n = numeroEstrito(v);
+  return n !== null && Number.isInteger(n) && n > 0 && n <= 2147483647 ? n : null;
+}
+
+/**
+ * Nível efetivo do usuário-alvo no app (SDK, `permissoes.md` § Validar acesso de
+ * um terceiro). É o TETO da função que ele pode receber no estudo (ver
+ * `NIVEL_MINIMO_DA_FUNCAO`): usuário sem acesso ou inexistente responde
+ * `nenhuma` e vira `422 NIVEL_INSUFICIENTE`, nunca 500.
+ */
+async function nivelDoAlvo(req: Request, usuarioId: number): Promise<string> {
+  try {
+    return (await req.shell!.nivelEfetivoUsuario(usuarioId)) ?? 'nenhuma';
+  } catch (e) {
+    // Falha FECHADA: sem confirmar o nível, a concessão é recusada. O SDK não diz
+    // quando o helper lança (usuário inexistente? falha transitória?), então o
+    // erro vai para o log — a recusa em si não distingue os dois casos.
+    console.warn(`nivelEfetivoUsuario(${usuarioId}) falhou; tratado como "nenhuma":`, e);
+    return 'nenhuma';
+  }
+}
+
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
@@ -107,9 +131,15 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
     const estudoId = parseInt(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
-    const { usuario_id, funcao } = req.body;
-    if (!usuario_id) { erro(res, 400, 'USUARIO_OBRIGATORIO', 'Campo "usuario_id" é obrigatório'); return; }
-    if (!FUNCOES.includes(funcao)) {
+    const { funcao } = req.body;
+    if (req.body.usuario_id === undefined || req.body.usuario_id === null || req.body.usuario_id === '') {
+      erro(res, 400, 'USUARIO_OBRIGATORIO', 'Campo "usuario_id" é obrigatório'); return;
+    }
+    // Antes, `Number(usuario_id)` deixava passar `'abc'` (NaN), `-1` ou `1.5`
+    // até o banco, e a resposta era 500.
+    const usuarioId = idUsuario(req.body.usuario_id);
+    if (usuarioId === null) { erro(res, 400, 'USUARIO_INVALIDO', '"usuario_id" deve ser um inteiro positivo'); return; }
+    if (!ehFuncaoEstudo(funcao)) {
       erro(res, 400, 'FUNCAO_INVALIDA', 'funcao deve ser "leitor", "editor" ou "aprovador"');
       return;
     }
@@ -119,17 +149,19 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
     // Quem já é membro não muda por aqui (`garantirMembro` é idempotente), mas a
     // função atual entra na regra para a resposta ser a mesma do PATCH.
     const existente = await req.dados!.listar('estudo_membros', {
-      filtros: { estudo_id: estudoId, usuario_id: Number(usuario_id) }, por_pagina: 1,
+      filtros: { estudo_id: estudoId, usuario_id: usuarioId }, por_pagina: 1,
     });
+    // Teto pelo nível do alvo no app: `aprovador` exige `admin`, `editor`
+    // exige `escrita`, `leitor` exige `leitura` (`NIVEL_MINIMO_DA_FUNCAO`).
     const recusa = recusaAlteracaoMembro({
-      perm: acesso.perm, usuarioAtual: req.contexto?.usuario?.id, alvo: Number(usuario_id),
+      perm: acesso.perm, usuarioAtual: req.contexto?.usuario?.id, alvo: usuarioId,
       funcaoAtualAlvo: existente.dados[0] ? String(existente.dados[0].funcao) : null,
       funcaoNova: funcao, outrosResponsaveis: 1, // não conta: adicionar nunca tira responsável
-    });
+    }) ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
     if (recusa) { erro(res, recusa.http, recusa.codigo, recusa.mensagem); return; }
 
-    const nova = await garantirMembro(req, estudoId, Number(usuario_id), funcao);
-    if (nova) await inscreverMembroEstudo(req, estudoId, Number(usuario_id), nova);
+    const nova = await garantirMembro(req, estudoId, usuarioId, funcao);
+    if (nova) await inscreverMembroEstudo(req, estudoId, usuarioId, nova);
     res.json({ ok: true, adicionado: nova !== null });
   } catch (e: any) {
     console.error('Erro em POST /estudos/:id/membros:', e);
@@ -145,7 +177,7 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId', async (req: Request,
     if (isNaN(estudoId) || isNaN(usuarioId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
 
     const { funcao } = req.body;
-    if (!FUNCOES.includes(funcao)) {
+    if (!ehFuncaoEstudo(funcao)) {
       erro(res, 400, 'FUNCAO_INVALIDA', 'funcao deve ser "leitor", "editor" ou "aprovador"');
       return;
     }
@@ -165,7 +197,7 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId', async (req: Request,
       perm: acesso.perm, usuarioAtual: req.contexto?.usuario?.id, alvo: usuarioId,
       funcaoAtualAlvo: anterior, funcaoNova: funcao,
       outrosResponsaveis: await contarResponsaveis(req, estudoId, usuarioId),
-    });
+    }) ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
     if (recusa) { erro(res, recusa.http, recusa.codigo, recusa.mensagem); return; }
     await req.dados!.atualizar('estudo_membros', membros.dados[0].id, { funcao });
     // Mesma recontagem da remoção (ver lá): dois rebaixamentos simultâneos não

@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import { STATUS_TRAVADO } from '../frontend/estudo-status.js';
+import { funcaoEfetivaDoMembro } from '../frontend/membros-regras.js';
 
 // Permissão por estudo (4ª camada) — espelha o padrão de `ciclo_membros` do OKR.
 // Cada estudo tem seus próprios membros com função leitor/editor/aprovador.
@@ -19,7 +20,7 @@ export interface PermissaoEstudo {
 
 /**
  * Resolve a função do usuário no contexto de um estudo, consultando
- * `estudo_membros` e combinando com o nível de app.
+ * `estudo_membros` e combinando com o nível de app. `funcao` é a EFETIVA.
  */
 export async function resolverPermissaoEstudo(
   req: Request,
@@ -41,12 +42,18 @@ export async function resolverPermissaoEstudo(
     }
   }
 
-  const ehLeitor = funcao === 'leitor';
-  const ehEditor = funcao === 'editor';
-  const ehAprovador = funcao === 'aprovador';
+  // A função que vale é a EFETIVA: o mínimo entre a linha gravada e o que o
+  // nível do app comporta (`aprovador` exige `admin`, decisão do autor). Uma
+  // linha `aprovador` de quem tem só `escrita` age como `editor`, e não aprova;
+  // de quem tem `leitura`, como `leitor`. Defesa para linhas gravadas antes do
+  // teto, ou de quem perdeu nível depois.
+  const efetiva = funcaoEfetivaDoMembro(funcao, nivel);
+  const ehLeitor = efetiva === 'leitor';
+  const ehEditor = efetiva === 'editor';
+  const ehAprovador = efetiva === 'aprovador';
   const ehMembro = ehLeitor || ehEditor || ehAprovador;
 
-  return { funcao, ehLeitor, ehEditor, ehAprovador, ehMembro, podeEditar, ehAdminApp };
+  return { funcao: efetiva, ehLeitor, ehEditor, ehAprovador, ehMembro, podeEditar, ehAdminApp };
 }
 
 // ⚠️ Não há mais o atalho "estudo sem membros: qualquer usuário com escrita+
