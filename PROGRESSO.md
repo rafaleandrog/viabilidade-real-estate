@@ -28,6 +28,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+
+---
+
 ## 2026-11-16 — Carteira com carência que a parcela não paga: sem zeramento forçado, sem juros negativos
 
 Item A1 do diagnóstico de 2026-11-11. Um `prazo_fixo`/`ate_marco` com o 1º vencimento dois ou mais
