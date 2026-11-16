@@ -21,6 +21,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Testes: `frontend/acoes-estudo.test.ts` (puros + fiação por leitura de fonte); os dois testes
   de fiação do Painel em `tela-dashboard.test.ts` acompanharam a forma nova. Guias: `docs/README.md`
   e `docs/avancado.md`.
+
+---
+
 ## 2026-11-16 — Submissão do Preliminar confere base e VGV dos produtos (índice #858, itens Q3 e Q4)
 
 Dois buracos do portão de `POST /estudos/:id/status` → `em_analise`, achados no diagnóstico:
