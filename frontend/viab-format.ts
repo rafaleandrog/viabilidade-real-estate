@@ -276,3 +276,15 @@ export function parseNumeroBR(bruto: string | null | undefined): number | null {
   const n = Number(limpo);
   return Number.isFinite(n) ? n : null;
 }
+
+/**
+ * Escapa texto vindo de dado (nome do estudo, tipologia, linha de custo, mensagem, rótulo de mês…)
+ * antes de entrar no HTML do PDF, que é escrito por `document.write` numa janela da mesma origem.
+ * Única função de escape do documento: todo ponto de interpolação de dado passa por ela.
+ */
+export function escaparHtml(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
