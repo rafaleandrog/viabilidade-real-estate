@@ -18,7 +18,10 @@ o destino sem olhar o estoque dele, e a alocação seguia com o preço/m² da or
 - Repetir a mesma `tipologia_id` não é troca: não reescreve o preço negociado. Mudar só as unidades
   na mesma tipologia segue como antes (sem `SALDO_ESGOTADO`). A guarda de permuta física da origem
   não mudou.
-- Na aba Receitas, a troca de tipologia passa a mostrar o preço/m² que o servidor gravou.
+- Na aba Receitas, o seletor de tipologia da alocação só oferece destinos cujo saldo comporte as
+  unidades dela (`tipologiasDestinoAlocacao`, a regra do servidor), volta ao valor gravado quando o
+  servidor recusa a troca, e a troca passa a mostrar o preço/m² que o servidor gravou, salvo preço
+  editado depois do pedido (`camposDoServidorNaAlocacao`). Teste: `frontend/alocacao-destino.test.ts`.
 - Teste HTTP contra Express real: `backend/rotas/alocacao-tipologia-rota.test.ts`. Sem migração,
   `versao` mantida.
 

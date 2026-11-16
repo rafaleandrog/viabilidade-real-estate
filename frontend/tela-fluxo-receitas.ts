@@ -1,10 +1,12 @@
 import { LitElement, html, css, nothing, svg, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { keyed } from 'lit/directives/keyed.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtM2, fmtPctEntrada } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado, APOS_CHAVES_MESES, POS_CHAVES_MESES_MIN,
   erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis, vgvTipologia,
+  tipologiasDestinoAlocacao, camposDoServidorNaAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
 import {
@@ -66,6 +68,13 @@ export class ViabFluxoReceitas extends LitElement {
   @state() private crono: EventoCrono[] = [];
   @state() private dataInicio: string | null = null;
   @state() private confirmRemover: { tipo: 'fase' | 'alocacao'; fase: any; aloc?: any } | null = null;
+  // Sobe quando um PATCH de alocação é recusado: o `keyed` do seletor de
+  // tipologia recria o elemento, que volta a mostrar o valor gravado em vez
+  // da escolha recusada (o estado não muda, então o lit não reescreveria).
+  @state() private _versaoAloc = 0;
+  // Edições de preço por alocação: a resposta de uma troca de tipologia só
+  // aplica o preço do servidor se nenhuma edição de preço saiu depois dela.
+  private _edicoesPreco = new Map<number, number>();
 
   // Modais
   @state() private modalAbs: any = null;      // fase em edição
@@ -417,16 +426,16 @@ export class ViabFluxoReceitas extends LitElement {
     // "Saldo" é esse total menos as unidades vendidas na própria linha.
     const total = totalAntesAlocacao(this.fases, this.tipologias, a.id, a.tipologia_id);
     const saldo = total - n(a.unidades);
-    // Opções: tipologias com saldo global > 0 + a atual (sempre inclusa).
-    const opcoes = this.tipologias
-      .filter((t) => Number(t.id) === Number(a.tipologia_id) || this._saldo(t.id) > 0)
+    // Opções: a atual, mais os destinos cujo saldo comporta as unidades desta
+    // alocação — a regra com que o servidor aceita a troca.
+    const opcoes = tipologiasDestinoAlocacao(this.fases, this.tipologias, a)
       .map((t) => ({ valor: String(t.id), rotulo: t.nome || 'Sem nome' }));
     return html`
       <tr>
         <td class="tipo">
-          <urbi-select .valor=${String(a.tipologia_id)} .opcoes=${opcoes} ?desabilitado=${dis}
+          ${keyed(`${a.id}:${this._versaoAloc}`, html`<urbi-select .valor=${String(a.tipologia_id)} .opcoes=${opcoes} ?desabilitado=${dis}
             @urbi:select-change=${(e: CustomEvent) => this._salvarAlocacao(f, a, { tipologia_id: Number(e.detail.valor) })}
-          ></urbi-select>
+          ></urbi-select>`)}
         </td>
         <td class="num">${area ? fmtM2(area) : '—'}</td>
         <td class="num">${tip ? total : '—'}</td>
@@ -533,19 +542,22 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   private async _salvarAlocacao(f: any, a: any, dados: Record<string, any>) {
+    const id = Number(a.id);
+    if (dados.preco_m2 !== undefined) this._edicoesPreco.set(id, (this._edicoesPreco.get(id) ?? 0) + 1);
+    const edicoesAntes = this._edicoesPreco.get(id) ?? 0;
     try {
       const res = await atualizarAlocacao(this.estudo.id, f.id, a.id, dados);
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      // Trocar a tipologia faz o servidor gravar o preço/m² da tipologia nova:
-      // só esse campo vem da resposta — o resto segue o que foi digitado, para
-      // uma resposta atrasada não desfazer edição mais nova.
-      const doServidor = dados.tipologia_id !== undefined && res?.preco_m2 !== undefined
-        ? { preco_m2: res.preco_m2 } : {};
+      if (res?.erro) { this._versaoAloc++; urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // Da resposta só vem o preço/m² que o servidor grava na troca de
+      // tipologia, e só se o preço não foi editado depois deste pedido; o
+      // resto segue o que foi digitado.
+      const doServidor = camposDoServidorNaAlocacao(dados, res, (this._edicoesPreco.get(id) ?? 0) !== edicoesAntes);
       this.fases = this.fases.map((x) =>
         x.id === f.id
           ? { ...x, alocacoes: x.alocacoes.map((y: any) => (y.id === a.id ? { ...y, ...dados, ...doServidor } : y)) }
           : x);
     } catch (e: any) {
+      this._versaoAloc++;
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
     }
   }
