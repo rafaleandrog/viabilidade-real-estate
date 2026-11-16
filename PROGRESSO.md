@@ -4,6 +4,18 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-16 — PDF exportado escapa todo texto vindo de dado (item U1 do índice de segurança)
+
+- `htmlProforma` e `htmlFluxo` (`frontend/exportar.ts`), cujo HTML é escrito por `document.write`
+  numa janela da mesma origem, interpolavam cru o nome do estudo, o tipo, o status, a linha, a
+  tipologia da permuta, os campos e a mensagem de divergência e os rótulos de mês. Todos passam agora
+  por `escaparHtml` (`frontend/viab-format.ts`), a única função de escape do documento, enumerada pela
+  função que monta cada documento, inclusive o SVG do fluxo. Visual e paridade tela×arquivo intactos.
+- Teste `frontend/exportar-escape.test.ts` com `<img src=x onerror=alert(1)>` e `</style><script>`.
+- Fora deste PR: U3 (injeção de fórmula e separador no CSV), outro assunto.
+
+---
+
 ## 2026-11-14 — Função no estudo com teto pelo nível do app (aprovador exige `admin`)
 
 O que faltava da #861 depois do PR 859 (escalada do Sentinela na #869), portado do PR 863 — que
