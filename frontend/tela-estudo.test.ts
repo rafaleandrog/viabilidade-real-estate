@@ -96,7 +96,9 @@ test('#678: o modal de renomear edita `nome` cru e valida com o MESMO parser do 
 
 test('#678: salvar faz merge em `this.estudo`, não em uma lista — o cabeçalho é UM estudo só', () => {
   assert.ok(
-    FONTE_ESTUDO.includes('this.estudo = { ...this.estudo, ...res }'),
+    // O merge passa por `reaplicarRascunho` para não apagar uma edição de
+    // Premissas ainda não salva (premissas-rascunho.ts).
+    FONTE_ESTUDO.includes('this.estudo = reaplicarRascunho({ ...this.estudo, ...res }, this.estudo, this._estudoSalvo)'),
     'o merge tem que atualizar this.estudo (o cabeçalho já lê nome_exibicao dele), não this.estudos',
   );
 });
@@ -106,4 +108,15 @@ test('#678: o modal está ligado ao render — estado sem montagem não desenha 
     FONTE_ESTUDO.includes('${this.editarAlvo ? this._renderEditarNome() : nothing}'),
     'o modal existe mas nunca é montado',
   );
+});
+
+test('rascunho das Premissas: o retrato do servidor só muda com o servidor, e o beforeunload sai com a tela', () => {
+  assert.ok(FONTE_ESTUDO.includes(".estudoSalvo=${this._estudoSalvo}"),
+    'a tela do Preliminar não recebe o retrato do servidor — Premissas remontada volta a se dar por salva');
+  assert.ok(FONTE_ESTUDO.includes('@viab:premissas-salvas=${(e: CustomEvent) => { this._estudoSalvo = { ...this._estudoSalvo, ...e.detail.dados }; }}'),
+    'o save das Premissas não atualiza o retrato do servidor — o salvo volta a parecer rascunho');
+  assert.ok(FONTE_ESTUDO.includes("window.addEventListener('beforeunload', this._antesDeSair)"),
+    'sem beforeunload, recarregar com rascunho perde a edição sem aviso');
+  assert.ok(FONTE_ESTUDO.includes("window.removeEventListener('beforeunload', this._antesDeSair)"),
+    'o listener de beforeunload não sai com a tela — vaza para o próximo estudo');
 });

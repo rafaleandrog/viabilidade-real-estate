@@ -4,6 +4,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-16 — Rascunho das Premissas sobrevive à troca de página (item U2 do índice #858)
+
+- Trocar de página do estudo desmonta a tela de Premissas, que remontava a partir do `estudo` já
+  com o rascunho (cada tecla é espelhada nele para a Proforma e os Gráficos) e o usava também como
+  retrato do servidor: a edição voltava com cara de salva e se perdia no recarregar. Agora a tela do
+  estudo guarda o retrato do servidor à parte (`_estudoSalvo`, atualizado na carga, no save das
+  Premissas por `viab:premissas-salvas` e no renomear) e o repassa; a tela remontada compara contra
+  ele e mantém a faixa de não salvo. Lógica pura em `frontend/premissas-rascunho.ts`.
+- `beforeunload` na tela do estudo enquanto houver rascunho, registrado no `connectedCallback` e
+  removido no `disconnectedCallback`. Recarregar mostra o que está no servidor.
+- Decisão não fixada pelo item: preservar o rascunho (não pedir confirmação na troca de aba), porque
+  é o desenho existente — a edição já alimenta Resultado e Gráficos ao vivo — e nenhuma outra aba
+  do app pede confirmação ao trocar. Renomear o estudo com rascunho pendente também o preserva.
+- Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`) e
+  as recargas do estudo por mudança de status ou de terreno do Núcleo continuam descartando o
+  rascunho.
+- Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
+  `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+
+---
+
 ## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
 
 - `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na

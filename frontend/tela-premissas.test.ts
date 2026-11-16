@@ -160,8 +160,11 @@ test('fiação: `_salvar` pula o campo que não mudou, e usa o MESMO predicado d
     '`_salvar` deixou de filtrar pelo diff — o registro inteiro voltou a viajar');
   assert.match(fonte, /_campoMudou\(k: string\): boolean \{\s*return campoMudou\(this\.form, this\._snapshot, k\);/,
     '`_campoMudou` deixou de delegar à função pura testada acima');
-  assert.match(fonte, /_formDifereSnapshot\(\): boolean \{\s*return Object\.keys\(this\.form\)\s*\.filter\(\(k\) => !CHAVES_NAO_ENVIADAS\.has\(k\)\)\s*\.some\(\(k\) => this\._campoMudou\(k\)\);/,
-    'a faixa de "alterações não salvas" deixou de varrer o MESMO conjunto de chaves do Salvar');
+  // A faixa delega a `premissasNaoSalvas` (premissas-rascunho.ts), que varre
+  // `Object.keys(form)` menos `CHAVES_NAO_ENVIADAS` com `campoMudou` — o mesmo
+  // conjunto e o mesmo predicado do Salvar, provados em premissas-rascunho.test.ts.
+  assert.match(fonte, /_formDifereSnapshot\(\): boolean \{\s*return premissasNaoSalvas\(this\.form, this\._snapshot\);/,
+    'a faixa de "alterações não salvas" deixou de usar o predicado compartilhado com o Salvar');
   assert.match(fonte, /if \(CHAVES_NAO_ENVIADAS\.has\(k\)\) continue;/,
     '`_salvar` deixou de usar a lista compartilhada — duas listas iguais divergem');
 });

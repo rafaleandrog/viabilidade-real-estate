@@ -19,6 +19,7 @@ import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
+import { CHAVES_NAO_ENVIADAS, campoMudou, premissasNaoSalvas, retratoSalvo } from './premissas-rascunho.js';
 
 type T = 'num' | 'txt';
 type Largura = 'p1' | 'p2' | 'p3';
@@ -314,45 +315,10 @@ const CAMPO_POR_LINHA_INC: Record<string, string> = {
 // Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
 const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
 
-/**
- * Chaves que o Salvar NUNCA manda: identidade e estado gerados pelo servidor,
- * colunas de soft-delete geridas pelo framework, e as estruturas de junção que
- * o GET anexa ao registro (`membros`, `imoveis`, `_permissao`, …).
- *
- * ⚠️ **A faixa de "alterações não salvas" usa a MESMA lista.** Se ela varresse
- * chaves que o Salvar descarta, `_dirty` poderia ficar `true` com payload
- * vazio — a faixa acusando alteração que o PATCH nunca mandaria. Achado da
- * revisão deste PR; a defesa é a lista ser uma só, não duas iguais.
- */
-const CHAVES_NAO_ENVIADAS = new Set([
-  'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id', 'criado_em', 'atualizado_em',
-  'removido_em', 'removido_por_id',
-  'membros', 'imoveis', '_permissao', '_funcao', 'autor_nome', 'autor_avatar_url',
-]);
-
-/**
- * Um campo mudou em relação ao retrato que a tela carregou? Normaliza
- * `''`/`null` para o mesmo valor antes de comparar, porque um input limpo
- * devolve `''` onde o registro trazia `null`, e isso não é edição.
- *
- * ⚠️ **É o predicado que decide DUAS coisas**: a faixa de "alterações não
- * salvas" (`_formDifereSnapshot`) e **o que o Salvar manda** (`_salvar`). Os
- * dois varrem o MESMO conjunto de chaves — `Object.keys(form)` menos
- * `CHAVES_NAO_ENVIADAS` — porque divergir ali faria a faixa falar de um
- * conjunto e o PATCH de outro. Predicado e lista são únicos, e esta função é
- * exportada para ser testada direto.
- */
-export function campoMudou(
-  form: Record<string, any>,
-  snapshot: Record<string, any>,
-  k: string,
-): boolean {
-  const a = form[k];
-  const b = snapshot[k];
-  const an = (a === '' || a == null) ? null : a;
-  const bn = (b === '' || b == null) ? null : b;
-  return String(an) !== String(bn);
-}
+// `CHAVES_NAO_ENVIADAS` e `campoMudou` moram em `premissas-rascunho.ts`, junto
+// do retrato do servidor que a tela do estudo guarda — o predicado de "o que
+// mudou" é um só para a faixa, o Salvar e o aviso de saída da página.
+export { campoMudou };
 
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
@@ -376,6 +342,12 @@ export class ViabTelaPremissas extends LitElement {
   // qualquer sub-aba salva as premissas inteiras, como já era antes da
   // divisão visual.
   @property({ type: String }) secao: 'terreno' | 'custos' | 'produtos' | 'permutas' = 'terreno';
+  // Retrato do SERVIDOR do estudo, guardado pela tela do estudo. `estudo` é o
+  // registro com o rascunho já aplicado (cada tecla volta por
+  // `viab:premissas-change`), e trocar de página desmonta esta tela: sem o
+  // retrato à parte, ela remontaria comparando o rascunho consigo mesmo e a
+  // edição não salva voltaria com cara de salva (`premissas-rascunho.ts`).
+  @property({ attribute: false }) estudoSalvo: Record<string, any> | null = null;
 
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
@@ -590,8 +562,10 @@ export class ViabTelaPremissas extends LitElement {
     const id = this.estudo.id;
     this._idCarregado = id ?? null;
     this.form = { ...this.estudo };
-    this._snapshot = { ...this.estudo };
-    this._dirty = false;
+    // O retrato é o do servidor, não o `estudo` corrente: remontada depois de
+    // uma troca de página, a tela reencontra o rascunho como rascunho.
+    this._snapshot = retratoSalvo(this.estudo, this.estudoSalvo);
+    this._dirty = this._formDifereSnapshot();
     this.erros = {};
     this.erroGeral = '';
     this.produtos = [];
@@ -643,9 +617,7 @@ export class ViabTelaPremissas extends LitElement {
   }
 
   private _formDifereSnapshot(): boolean {
-    return Object.keys(this.form)
-      .filter((k) => !CHAVES_NAO_ENVIADAS.has(k))
-      .some((k) => this._campoMudou(k));
+    return premissasNaoSalvas(this.form, this._snapshot);
   }
 
   private _num(k: string): number | null {
@@ -1637,9 +1609,14 @@ export class ViabTelaPremissas extends LitElement {
       // E `_campoMudou` é o mesmo predicado da faixa de "alterações não salvas",
       // de propósito.
       const dados: Record<string, any> = {};
+      // Os mesmos campos, com o valor do FORMULÁRIO (não o convertido): é o
+      // que a tela do estudo funde no retrato do servidor depois do save, e o
+      // retrato tem de bater com `form` campo a campo — ver o ⚠️ logo abaixo.
+      const salvos: Record<string, any> = {};
       for (const [k, v] of Object.entries(this.form)) {
         if (CHAVES_NAO_ENVIADAS.has(k)) continue;
         if (!this._campoMudou(k)) continue;
+        salvos[k] = v;
         if (TODOS_NUM.has(k)) dados[k] = v === '' || v == null ? null : Number(v);
         else dados[k] = v;
       }
@@ -1661,6 +1638,9 @@ export class ViabTelaPremissas extends LitElement {
       // que este PR acabou de matar, voltaria por essa porta.
       this._snapshot = { ...this.form };
       this._dirty = false;
+      this.dispatchEvent(new CustomEvent('viab:premissas-salvas', {
+        detail: { dados: salvos }, bubbles: true, composed: true,
+      }));
       urbiVerso.notificar('Premissas salvas.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
