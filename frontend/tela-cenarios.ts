@@ -50,6 +50,14 @@ interface Faixa { min: number; max: number; }
 @customElement('viab-tela-cenarios')
 export class ViabTelaCenarios extends LitElement {
   @property({ type: Object }) estudo: any = null;
+  /**
+   * Salvar e Remover cenário gravam (`POST`/`PATCH …/remover` de
+   * `/avancado/cenarios`, guardados por `exigirEscrita`): editor em status
+   * aberto, só aprovador com o estudo travado; leitor nunca. A tela-mãe passa
+   * `_podeEscrever`, a mesma régua. Sem permissão, a simulação continua — só
+   * não há o que salvar nem remover.
+   */
+  @property({ type: Boolean }) editavel = false;
 
   @state() private carregando = true;
   @state() private precoPct = 0;
@@ -492,15 +500,16 @@ export class ViabTelaCenarios extends LitElement {
             Voltar à base
           </urbi-botao>
         </div>
-        <div class="salvar">
-          <urbi-input
-            label="Nome do cenário"
-            .valor=${this.nomeNovo}
-            @urbi:input-change=${(e: CustomEvent) => this.nomeNovo = e.detail.valor}
-          ></urbi-input>
-          <urbi-botao variante="primario" icone="fa-solid fa-floppy-disk"
-            ?desabilitado=${this.salvando} @click=${this._salvar}>Salvar cenário</urbi-botao>
-        </div>
+        ${this.editavel ? html`
+          <div class="salvar">
+            <urbi-input
+              label="Nome do cenário"
+              .valor=${this.nomeNovo}
+              @urbi:input-change=${(e: CustomEvent) => this.nomeNovo = e.detail.valor}
+            ></urbi-input>
+            <urbi-botao variante="primario" icone="fa-solid fa-floppy-disk"
+              ?desabilitado=${this.salvando} @click=${this._salvar}>Salvar cenário</urbi-botao>
+          </div>` : nothing}
       </urbi-card>
     `;
   }
@@ -525,7 +534,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _salvar = async () => {
-    if (this.salvando || !this.estudo?.id) return;
+    if (!this.editavel || this.salvando || !this.estudo?.id) return;
     this.salvando = true;
     try {
       const nome = this.nomeNovo.trim() || `Preço ${this.precoPct >= 0 ? '+' : ''}${this.precoPct}% · Obra ${this.custoPct >= 0 ? '+' : ''}${this.custoPct}%`;
@@ -547,7 +556,7 @@ export class ViabTelaCenarios extends LitElement {
   private _confirmarRemover = async () => {
     const id = this.removerId;
     this.removerId = null;
-    if (id == null || !this.estudo?.id) return;
+    if (!this.editavel || id == null || !this.estudo?.id) return;
     try {
       const res = await removerCenario(this.estudo.id, id);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao remover', 'erro'); return; }
@@ -589,7 +598,9 @@ export class ViabTelaCenarios extends LitElement {
         </div>
         ${this.cenarios.length === 0
           ? html`<urbi-estado-vazio icone="fa-solid fa-layer-group"
-              mensagem="Nenhum cenário salvo. Ajuste os parâmetros acima e clique em “Salvar cenário”."></urbi-estado-vazio>`
+              mensagem=${this.editavel
+                ? 'Nenhum cenário salvo. Ajuste os parâmetros acima e clique em “Salvar cenário”.'
+                : 'Nenhum cenário salvo.'}></urbi-estado-vazio>`
           : nothing}
       </section>
       ${this.removerId != null ? this._renderConfirmRemover() : nothing}
@@ -659,8 +670,9 @@ export class ViabTelaCenarios extends LitElement {
         <td class="neg">${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
         <td class="cen-var">${this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
         <td>
-          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
-            @click=${() => this.removerId = Number(c.id)}></urbi-botao>
+          ${this.editavel ? html`
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              @click=${() => this.removerId = Number(c.id)}></urbi-botao>` : nothing}
         </td>
       </tr>
     `;

@@ -159,3 +159,64 @@ export function nomeEstudoLimpo(v: unknown): string | null {
   if (limpo.length > LIMITE_NOME_ESTUDO) return null;
   return limpo;
 }
+
+/**
+ * Função efetiva a partir do `_permissao` do `GET /estudos/:id`. `podeAprovar`
+ * já inclui o admin do app (`perm.ehAprovador || perm.ehAdminApp`) e
+ * `podeEditar` já inclui o aprovador — é a mesma elevação que o backend aplica
+ * antes de chamar `podeEditarEstudo`.
+ */
+export function funcaoDaPermissao(p: { podeEditar?: boolean; podeAprovar?: boolean } | null | undefined): FuncaoEstudo {
+  if (p?.podeAprovar) return 'aprovador';
+  if (p?.podeEditar) return 'editor';
+  return 'leitor';
+}
+
+/**
+ * Criar estudo: a mesma régua do `POST /estudos` — nível `escrita` ou `admin`
+ * no app. O nível vem de `urbiVerso.contexto().nivel`.
+ */
+export function podeCriarEstudo(nivelApp: string | null | undefined): boolean {
+  return nivelApp === 'escrita' || nivelApp === 'admin';
+}
+
+/** Motivo mostrado no botão Remover desabilitado do editor fora de Rascunho — o texto do 403 do servidor. */
+export const MOTIVO_REMOVER_FORA_DE_RASCUNHO = 'Fora de Rascunho, só aprovadores removem o estudo';
+
+/** O que a linha do Painel oferece para um estudo, dado o status e a função efetiva (`_funcao` da listagem). */
+export interface AcoesDoEstudo {
+  /** Transições de status válidas para a função (`acoesTransicao`). */
+  transicoes: AcaoTransicao[];
+  /** `POST /estudos/:id/duplicar` exige editor (ou aprovador/admin), em qualquer status. */
+  duplicar: boolean;
+  /**
+   * Remover: `'sim'` mostra o botão; `'desabilitado'` mostra desabilitado, com
+   * `motivoRemover`; `'nao'` não mostra (leitor e não-membro nunca removem).
+   */
+  remover: 'sim' | 'desabilitado' | 'nao';
+  motivoRemover: string | null;
+}
+
+/**
+ * As ações da linha do estudo no Painel, pela MESMA régua do servidor:
+ *
+ * - transições: `acoesTransicao` (a tabela que o `POST /estudos/:id/status` usa);
+ * - duplicar: `exigirEditor` do `POST /estudos/:id/duplicar` — editor ou
+ *   aprovador, qualquer status; o leitor não duplica;
+ * - remover: `removerEstudo` — editor só em Rascunho, aprovador (e o admin do
+ *   app, que a listagem já entrega como `aprovador`) em qualquer status; leitor
+ *   e não-membro nunca. Ao editor fora de Rascunho o botão aparece desabilitado,
+ *   com o motivo, para ele saber por que não pode e a quem pedir.
+ */
+export function acoesDoEstudo(status: string, funcao: string | null | undefined): AcoesDoEstudo {
+  const transicoes = acoesTransicao(status, funcao);
+  if (funcao === 'aprovador') {
+    return { transicoes, duplicar: true, remover: 'sim', motivoRemover: null };
+  }
+  if (funcao === 'editor') {
+    return status === 'rascunho'
+      ? { transicoes, duplicar: true, remover: 'sim', motivoRemover: null }
+      : { transicoes, duplicar: true, remover: 'desabilitado', motivoRemover: MOTIVO_REMOVER_FORA_DE_RASCUNHO };
+  }
+  return { transicoes, duplicar: false, remover: 'nao', motivoRemover: null };
+}

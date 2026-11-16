@@ -8,7 +8,8 @@ import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { areaPrivativaTotalLinhas, areaVendavelTotalLinhas } from './fluxo-shared.js';
 import { proformaAvancado } from './proforma-avancado.js';
 import {
-  acoesTransicao,
+  acoesDoEstudo,
+  podeCriarEstudo,
   type AcaoTransicao,
 } from './estudo-status.js';
 import {
@@ -538,13 +539,14 @@ export class ViabTelaDashboard extends LitElement {
                 title=${this.mostrarArquivados ? 'Ocultar arquivados' : 'Mostrar arquivados'}
                 @click=${() => { this.mostrarArquivados = !this.mostrarArquivados; }}
               ></urbi-botao>
-              <urbi-botao
-                slot="actions"
-                variante="primario"
-                pequeno
-                icone="fa-solid fa-plus"
-                @click=${this._abrirForm}
-              >Criar estudo</urbi-botao>`
+              ${this._podeCriar ? html`
+                <urbi-botao
+                  slot="actions"
+                  variante="primario"
+                  pequeno
+                  icone="fa-solid fa-plus"
+                  @click=${this._abrirForm}
+                >Criar estudo</urbi-botao>` : nothing}`
           : nothing}
 
         <urbi-abas
@@ -771,20 +773,32 @@ export class ViabTelaDashboard extends LitElement {
         // (2026-08-22) ainda não conhecia a prop e o guard de props recusava
         // `.ariaLabel=` como atributo inexistente.
         id: 'acoes', label: '', alinhamento: 'direita',
-        render: (l: any) => html`
+        // As ações da linha seguem a régua do servidor por `acoesDoEstudo`
+        // (transição, duplicar e remover), com a função efetiva que a
+        // listagem devolve em `_funcao`: o leitor não vê Duplicar nem
+        // Remover, e o editor fora de Rascunho vê Remover desabilitado, com o
+        // motivo no `title` — o servidor recusaria com 403.
+        render: (l: any) => {
+          const acoes = acoesDoEstudo(String(l.status), l._funcao);
+          const rotuloRemover = acoes.motivoRemover ?? 'Remover';
+          return html`
           <div class="acoes-linha" style="display:inline-flex;flex-wrap:nowrap;justify-content:flex-end;gap:6px;">
-            ${acoesTransicao(String(l.status), l._funcao).map((a: AcaoTransicao) => html`
+            ${acoes.transicoes.map((a: AcaoTransicao) => html`
               <urbi-botao variante=${a.variante} pequeno icone=${a.icone}
                 ?desabilitado=${this.statusEmCurso === l.id}
                 @click=${(ev: Event) => { ev.stopPropagation(); this._mudarStatus(l, a.para); }}
                 title=${a.rotulo} .ariaLabel=${a.rotulo}></urbi-botao>`)}
-            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-copy"
-              @click=${(ev: Event) => { ev.stopPropagation(); this._duplicar(l.id); }}
-              title="Duplicar" .ariaLabel=${'Duplicar'}></urbi-botao>
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-              @click=${(ev: Event) => { ev.stopPropagation(); this.removerAlvo = l; }}
-              title="Remover" .ariaLabel=${'Remover'}></urbi-botao>
-          </div>`,
+            ${acoes.duplicar ? html`
+              <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-copy"
+                @click=${(ev: Event) => { ev.stopPropagation(); this._duplicar(l.id); }}
+                title="Duplicar" .ariaLabel=${'Duplicar'}></urbi-botao>` : nothing}
+            ${acoes.remover !== 'nao' ? html`
+              <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+                ?desabilitado=${acoes.remover === 'desabilitado'}
+                @click=${(ev: Event) => { ev.stopPropagation(); if (acoes.remover === 'sim') this.removerAlvo = l; }}
+                title=${rotuloRemover} .ariaLabel=${rotuloRemover}></urbi-botao>` : nothing}
+          </div>`;
+        },
       },
     ];
   }
@@ -864,7 +878,7 @@ export class ViabTelaDashboard extends LitElement {
         .colunas=${this._colunas()}
         .linhas=${this._linhasFiltradas()}
         ?carregando=${this.carregando}
-        mensagem-vazio="Nenhum estudo ainda. Clique em “Criar estudo”."
+        mensagem-vazio=${this._podeCriar ? 'Nenhum estudo ainda. Clique em “Criar estudo”.' : 'Nenhum estudo disponível para você.'}
         @urbi:tabela-click=${(e: CustomEvent) => {
           const l = e.detail?.linha; if (l?.id) urbiVerso.navegarSub(`/detalhe/${l.id}`);
         }}
@@ -989,7 +1003,13 @@ export class ViabTelaDashboard extends LitElement {
     `;
   }
 
+  /** `POST /estudos` exige nível `escrita` ou `admin` no app — `podeCriarEstudo`. */
+  private get _podeCriar(): boolean {
+    return podeCriarEstudo(urbiVerso.contexto()?.nivel);
+  }
+
   private _abrirForm = () => {
+    if (!this._podeCriar) return;
     this.form = {
       nome: '', tipo_empreendimento: 'loteamento', nivel_analise: 'preliminar',
       origem_terreno: 'manual', uf: '',
