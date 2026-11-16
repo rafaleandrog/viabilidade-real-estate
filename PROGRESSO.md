@@ -29,11 +29,16 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   (`premissasSoLeitura`, em `estudo-status.ts`), usada pelo `_editavelPremissas` do Preliminar e
   do Avançado e pelo rascunho.
   Campo de texto compara como texto: a comparação numérica vale só quando um dos lados é `number`.
-- Com a tela de Premissas montada, um retrato novo do servidor (Núcleo gravou a área do terreno,
-  troca de status) faz o rebase do formulário (`rebasearRascunho`): campo não editado adota o
-  servidor, campo editado mantém a edição, e status só de leitura descarta as edições. Sem isso o
-  Salvar devolvia a área velha do terreno, desfazendo o Núcleo — caso de render
-  `premissas-rascunho-nucleo`.
+- Com a tela de Premissas montada, um retrato novo do servidor no mesmo estudo faz o rebase do
+  formulário (`rebasearRascunho`): campo não editado adota o servidor, campo editado mantém a
+  edição, e status só de leitura descarta as edições. Em produção isso dispara no próprio Salvar e
+  no renomear; o Núcleo e a troca de status passam por `_carregar`, cujo spinner desmonta e
+  remonta as Premissas (`_init`/`estudoDepoisDaRecarga`). O caso de render
+  `premissas-rascunho-nucleo` prova a fiação forçando o retrato novo com a tela montada: sem o
+  rebase, o Salvar devolvia a área velha do terreno.
+- O retrato depois do Salvar é o do que foi ENVIADO (`retratoAposSalvar`), não o formulário depois
+  do `await`: tecla digitada com o PATCH em voo continua rascunho, e o rebase disparado pelo
+  próprio save não a reverte.
 - Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`)
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render

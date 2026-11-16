@@ -169,6 +169,19 @@ export function estudoDepoisDaRecarga(
 }
 
 /**
+ * O retrato da tela depois de um Salvar bem-sucedido: o retrato de ANTES do
+ * envio com os campos que viajaram por cima (`salvos`, no valor do
+ * formulário). Nunca o formulário depois do `await` — o que se digitou com o
+ * PATCH em voo não foi salvo e continua rascunho.
+ */
+export function retratoAposSalvar(
+  snapshotEnviado: Record<string, any>,
+  salvos: Record<string, any>,
+): Record<string, any> {
+  return { ...snapshotEnviado, ...salvos };
+}
+
+/**
  * Rebase do formulário MONTADO quando o retrato do servidor muda sem trocar de
  * estudo (o Núcleo gravou a área do terreno, o status mudou). Campo que o
  * usuário NÃO editou — igual ao retrato anterior — adota o valor novo do

@@ -1,9 +1,20 @@
-// Caso de render: o Núcleo grava a área do terreno com a tela de Premissas
-// MONTADA e um rascunho em outro campo. A tela do estudo recebe o retrato novo
-// do servidor sem desmontar as Premissas (é o que ela faz quando a recarga não
-// passa pelo spinner — aqui forçado direto no estado, como `_carregar` o
-// deixaria). Depois o usuário digita outro campo, troca de página, volta e
-// salva: o PATCH não pode levar a área VELHA do terreno de volta.
+// Caso de render: o retrato do servidor muda no MESMO estudo com a tela de
+// Premissas MONTADA e um rascunho pendente — a fiação do rebase
+// (`willUpdate` → `rebasearRascunho`).
+//
+// ⚠️ Em produção, `viab:terreno-alterado` (o Núcleo) chama `_carregar` com
+// `carregando = true`: o spinner DESMONTA as Premissas e a tela volta pelo
+// `_init`/`estudoDepoisDaRecarga`, não por aqui. Com a tela montada, o
+// `willUpdate` dispara de verdade no próprio Salvar (`viab:premissas-salvas`)
+// e no renomear. O caso força o retrato novo direto no estado da tela do
+// estudo, sem spinner, para provar a fiação do rebase com o cenário que mais
+// custa se ela falhar: a área do terreno gravada por outra tela. Depois o
+// usuário digita outro campo, troca de página, volta e salva — o PATCH não
+// pode levar a área VELHA de volta.
+//
+// O stub do PATCH também digita um campo com o envio em voo: o retrato do que
+// foi salvo é o do ENVIO (`retratoAposSalvar`), e o rebase que o próprio save
+// dispara não pode reverter essa tecla.
 //
 // `medir()` espiona `urbiVerso.api` e devolve o corpo do PATCH do Salvar.
 
@@ -75,6 +86,7 @@ export const caso = {
     'urbi-abas.abas',
     'urbi-abas.ativa',
     'urbi-badge.cor',
+    'urbi-banner.variante',
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
@@ -92,6 +104,9 @@ export const caso = {
       if (opcoes?.method === 'PATCH' && rota === `/estudos/${ESTUDO.id}`) {
         const corpo = JSON.parse(opcoes.body ?? '{}');
         patches.push(corpo);
+        // Tecla digitada com o PATCH em voo: não foi enviada, continua rascunho.
+        const p = achar(estudoEl.shadowRoot, 'viab-tela-premissas') as any;
+        p?._set('custo_terreno_m2', 1700);
         return { ...DO_NUCLEO, ...corpo };
       }
       return apiOriginal(rota, opcoes);
@@ -130,6 +145,14 @@ export const caso = {
     const erroGeral = premissas?.erroGeral ?? null;
     await assentar(estudoEl);
     repintarAbas(estudoEl.shadowRoot);
-    return { formArea, dirty, erroGeral, patches };
+    // Depois do save, o retrato do servidor voltou à tela (`premissas-salvas` →
+    // rebase): a tecla digitada no meio tem de continuar na tela e pendente.
+    const depois = achar(estudoEl.shadowRoot, 'viab-tela-premissas') as any;
+    return {
+      formArea, dirty, erroGeral, patches,
+      digitadoNoMeio: depois?.form?.custo_terreno_m2 ?? null,
+      pendenteDepois: depois?._dirty ?? null,
+      estudoNoMeio: estudoEl.estudo?.custo_terreno_m2 ?? null,
+    };
   },
 };

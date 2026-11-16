@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   premissasNaoSalvas, camposAlterados, retratoSalvo, reaplicarRascunho, avisarSaidaSeNaoSalvo,
-  dadosPropagaveis, estudoDepoisDaRecarga, transicaoDescartaRascunho, rebasearRascunho,
+  dadosPropagaveis, estudoDepoisDaRecarga, transicaoDescartaRascunho, rebasearRascunho, retratoAposSalvar,
 } from './premissas-rascunho.js';
 
 // O estado "não salvo" das Premissas, sem DOM. A prova de que a tela usa estas
@@ -145,4 +145,18 @@ test('rebasearRascunho: status novo só de leitura descarta as edições', () =>
     assert.equal(r.form.custo_terreno_m2, '1000.00', status);
     assert.equal(premissasNaoSalvas(r.form, r.snapshot), false, status);
   }
+});
+
+test('retratoAposSalvar: tecla digitada com o PATCH em voo continua rascunho e não é revertida pelo rebase', () => {
+  const salvo = { id: 2, status: 'rascunho', custo_terreno_m2: '1000.00', custo_decoracao_m2: '100.00' };
+  // O usuário edita `a` e clica Salvar; `salvos` sai do form antes do await.
+  const salvos = { custo_terreno_m2: 1500 };
+  // Durante o await digita `b`.
+  const formDepois = { ...salvo, custo_terreno_m2: 1500, custo_decoracao_m2: 150 };
+  const retrato = retratoAposSalvar(salvo, salvos);
+  assert.deepEqual(camposAlterados(formDepois, retrato), ['custo_decoracao_m2'], 'b segue como edição pendente');
+  // A tela do estudo funde `salvos` no retrato do servidor e o devolve: rebase.
+  const r = rebasearRascunho(formDepois, retrato, { ...salvo, ...salvos });
+  assert.equal(r.form.custo_decoracao_m2, 150, 'o rebase reverteu a tecla digitada durante o save');
+  assert.equal(premissasNaoSalvas(r.form, r.snapshot), true);
 });

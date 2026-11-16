@@ -20,7 +20,7 @@ import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
-import { CHAVES_NAO_ENVIADAS, campoMudou, dadosPropagaveis, premissasNaoSalvas, rebasearRascunho, retratoSalvo } from './premissas-rascunho.js';
+import { CHAVES_NAO_ENVIADAS, campoMudou, dadosPropagaveis, premissasNaoSalvas, rebasearRascunho, retratoAposSalvar, retratoSalvo } from './premissas-rascunho.js';
 
 type T = 'num' | 'txt';
 type Largura = 'p1' | 'p2' | 'p3';
@@ -1666,14 +1666,20 @@ export class ViabTelaPremissas extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      // ⚠️ O retrato novo é `form`, **não** a resposta do servidor, e a
+      // ⚠️ O retrato novo sai do `form` (os `salvos`), **não** da resposta do servidor, e a
       // distinção é armadilha: `atualizado` traz as colunas `decimal` como
       // STRING (`"4.00"`), enquanto `form` guarda o número que o usuário
       // digitou. Ressincronizar pela resposta faria todo campo numérico
       // aparecer como "mudou" no save seguinte — e o eco do registro inteiro,
       // que este PR acabou de matar, voltaria por essa porta.
-      this._snapshot = { ...this.form };
-      this._dirty = false;
+      //
+      // E é o formulário DO ENVIO, não o de agora: tecla digitada durante o
+      // `await` entraria no retrato como salva, e o rebase do retrato novo do
+      // servidor (`willUpdate`) a reverteria na tela. `retratoAposSalvar` parte
+      // do retrato corrente — `_set` não o toca, então é o de antes do envio,
+      // ou o do rebase se o servidor mudou no meio — e aplica só o que viajou.
+      this._snapshot = retratoAposSalvar(this._snapshot, salvos);
+      this._dirty = this._formDifereSnapshot();
       this.dispatchEvent(new CustomEvent('viab:premissas-salvas', {
         detail: { dados: salvos }, bubbles: true, composed: true,
       }));

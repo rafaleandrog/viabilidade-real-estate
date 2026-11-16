@@ -1,6 +1,8 @@
-// Render: o Núcleo grava a área do terreno com as Premissas montadas e um
-// rascunho em outro campo; depois de trocar de página e salvar, o PATCH leva
-// só a edição — nunca a área velha. Ver `casos/premissas-rascunho-nucleo.ts`.
+// Render: o retrato do servidor muda (área do terreno nova) com as Premissas
+// montadas e um rascunho em outro campo; depois de trocar de página e salvar,
+// o PATCH leva só a edição — nunca a área velha —, e a tecla digitada com o
+// PATCH em voo continua pendente. Ver `casos/premissas-rascunho-nucleo.ts`,
+// inclusive por que o Núcleo em produção passa pelo spinner e não por aqui.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,6 +24,13 @@ test('Premissas: área gravada pelo Núcleo com a tela montada não é desfeita 
   assert.ok(!('area_terreno_nucleo' in m!.patches[0]),
     `o Salvar mandou a área VELHA do terreno, desfazendo o Núcleo: ${JSON.stringify(m!.patches[0])}` + relato(a));
   assert.equal(String(m!.formArea), '1000.00', 'o formulário montado ficou com a área velha do terreno' + relato(a));
+
+  // Tecla digitada DURANTE o await do Salvar: não foi enviada, então segue na
+  // tela, pendente, e igual no estudo da tela do estudo.
+  const mm = m as unknown as { digitadoNoMeio: unknown; pendenteDepois: unknown; estudoNoMeio: unknown };
+  assert.equal(mm.digitadoNoMeio, 1700, 'a tecla digitada durante o Salvar foi revertida na tela' + relato(a));
+  assert.equal(mm.pendenteDepois, true, 'a tecla digitada durante o Salvar ficou com cara de salva' + relato(a));
+  assert.equal(mm.estudoNoMeio, 1700, 'a tela do estudo ficou com outro valor que o formulário' + relato(a));
 
   assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
