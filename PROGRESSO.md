@@ -22,6 +22,9 @@ excesso como juro negativo na última parcela.
 - **Fica para o autor:** se a parcela deve capitalizar a carência (como a carteira própria faz) ou
   se a periodicidade legada deveria ser "parcelas a cada N meses" — é a decisão pendente da #808,
   que também cobre o `CARTEIRA_RESSURGE` que continua disparando durante a carência.
+
+---
+
 ## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
 
 - `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na
