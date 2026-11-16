@@ -71,6 +71,10 @@ Não há rota de exportação: os arquivos são montados no cliente a partir dos
 tela lê (`GET /estudos/:id` e as rotas do Avançado). Um cliente que queira reproduzir um arquivo
 precisa reproduzir o motor de cálculo, descrito em [Fórmulas da Proforma](formulas).
 
+No PDF, todo texto vindo de dado (nome do estudo, tipologia, linha de custo, mensagem de
+reconciliação, rótulo de mês) sai como texto literal: caracteres como `<` e `&` aparecem na página
+como estão, nunca interpretados como marcação.
+
 ## Veja também
 
 - [Fórmulas da Proforma](formulas) · [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado)
