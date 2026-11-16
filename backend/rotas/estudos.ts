@@ -25,7 +25,7 @@ import {
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
-import { validarSomaPctAlv, areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
+import { validarProdutosParaSubmissao, areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { funcaoEfetivaDoMembro } from '../../frontend/membros-regras.js';
@@ -985,8 +985,16 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
       // `varrerTudo`, e não `listar` com página fixa: a soma precisa do catálogo
       // INTEIRO, e uma página de 500 truncaria um estudo maior em silêncio.
       const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
-      const soma = validarSomaPctAlv(produtos, baseProdutosM2(estudo as unknown as ProformaInput), rotuloBaseProdutos(estudo.tipo_empreendimento as string));
-      if (!soma.ok) { erro(res, 422, 'SOMA_ALV_INVALIDA', soma.mensagem ?? 'Os produtos devem somar 100% da base'); return; }
+      //
+      // A regra é `validarProdutosParaSubmissao`, mais estrita que a do salvamento:
+      // base 0 com produto cadastrado RECUSA (`BASE_PRODUTOS_ZERADA` — no
+      // salvamento ela libera, senão o Terreno & Áreas não salvaria a própria
+      // base), e produto que não forma VGV (0 unidades, sem preço, 0% da base)
+      // recusa nomeando o produto (`PRODUTO_SEM_VGV`). O POST/PATCH do produto
+      // NÃO barra isso: a linha nasce vazia ("Adicionar Produto") e é preenchida
+      // campo a campo, então o lugar de exigir o produto completo é aqui.
+      const cat = validarProdutosParaSubmissao(produtos, baseProdutosM2(estudo as unknown as ProformaInput), rotuloBaseProdutos(estudo.tipo_empreendimento as string));
+      if (!cat.ok) { erro(res, 422, cat.codigo ?? 'SOMA_ALV_INVALIDA', cat.mensagem ?? 'Os produtos devem somar 100% da base'); return; }
     }
 
     const atualizado = await req.dados!.atualizar('estudos', estudoId, { status: novoStatus });

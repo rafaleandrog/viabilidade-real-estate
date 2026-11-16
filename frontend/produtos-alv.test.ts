@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   areasParaTrocarDeTipo, pctAlvEfetivo, areaTotalDaLinha, areaMediaDaLinha, produtosComAreaDerivada,
   somaPctAlv, alocacaoAlv, validarSomaPctAlv, rotuloBaseProdutos,
+  validarProdutosParaSubmissao, produtosSemVgv,
 } from './produtos-alv.js';
 import { calcularProforma, produtosDoEstudo, alvDoLoteamento, baseProdutosM2, areaPrivativaFechadaIncorporacao, type ProformaInput } from './proforma.js';
 
@@ -312,4 +313,51 @@ test('#784 revisão: o Avançado não deriva por pct_alv — a área guardada se
   for (const nivel of ['preliminar', null, undefined]) {
     assert.ok(perto(Number(produtosDoEstudo({ ...base, nivel_analise: nivel })[0].area_media_m2), 400));
   }
+});
+
+// O portão da SUBMISSÃO é mais estrito que o do salvamento: base 0 com produto
+// recusa (o salvamento libera) e produto que não forma VGV recusa, nomeado.
+test('validarProdutosParaSubmissao — base 0, soma, produto sem VGV e o caso normal', () => {
+  const R = 'área privativa fechada';
+  assert.deepEqual(validarProdutosParaSubmissao([], 0, R), { ok: true, codigo: null, mensagem: null });
+  const cem = [
+    { nome: 'A', pct_alv: 60, preco_venda_m2: 10_000, unidades: 50 },
+    { nome: 'B', pct_alv: 40, preco_venda_m2: 10_000, unidades: 30 },
+  ];
+  assert.equal(validarProdutosParaSubmissao(cem, 1000, R).ok, true);
+  // Base 0: o salvamento deixa passar 101%; a submissão não.
+  const cento1 = [{ ...cem[0] }, { ...cem[1], pct_alv: 41 }];
+  assert.equal(validarSomaPctAlv(cento1, 0, R).ok, true);
+  const b0 = validarProdutosParaSubmissao(cento1, 0, R);
+  assert.equal(b0.codigo, 'BASE_PRODUTOS_ZERADA');
+  assert.match(b0.mensagem!, /área privativa fechada está zerada/);
+  // Base 0 recusa também o catálogo que somaria 100%: sem base o % não tem referência.
+  assert.equal(validarProdutosParaSubmissao(cem, 0, R).codigo, 'BASE_PRODUTOS_ZERADA');
+  assert.equal(validarProdutosParaSubmissao(cento1, 1000, R).codigo, 'SOMA_ALV_INVALIDA');
+  // Soma tem precedência sobre o VGV: a primeira correção é a da soma.
+  const semUn = [{ ...cem[0] }, { ...cem[1], unidades: 0 }];
+  const r = validarProdutosParaSubmissao(semUn, 1000, R);
+  assert.equal(r.codigo, 'PRODUTO_SEM_VGV');
+  assert.match(r.mensagem!, /O produto "B" \(0 unidades\) não forma VGV/);
+  assert.doesNotMatch(r.mensagem!, /"A"/);
+  // Unidades como string vinda do banco contam.
+  assert.equal(validarProdutosParaSubmissao([{ ...cem[0], unidades: '50' }, { ...cem[1], unidades: '30' }], 1000, R).ok, true);
+});
+
+test('produtosSemVgv — motivos por linha, nome padrão pela posição', () => {
+  const R = 'ALV';
+  const l = produtosSemVgv([
+    { nome: 'Ok', pct_alv: 50, preco_venda_m2: 100, unidades: 10 },
+    { nome: '', pct_alv: 0, preco_venda_m2: 0, unidades: 0 },
+    { nome: 'Legado', area_media_m2: 0, preco_venda_m2: 100, unidades: 10 },
+  ], 1000, R);
+  assert.deepEqual(l, [
+    { nome: 'Produto 2', motivos: ['0 unidades', 'sem preço de venda', '0% da ALV'] },
+    { nome: 'Legado', motivos: ['sem área'] },
+  ]);
+  const m = validarProdutosParaSubmissao([
+    { nome: 'X', pct_alv: 50, preco_venda_m2: 0, unidades: 1 },
+    { nome: 'Y', pct_alv: 50, preco_venda_m2: 1, unidades: 0 },
+  ], 1000, R).mensagem!;
+  assert.match(m, /^Os produtos "X" \(sem preço de venda\) e "Y" \(0 unidades\) não formam VGV\./);
 });
