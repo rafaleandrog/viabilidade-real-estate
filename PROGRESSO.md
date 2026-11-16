@@ -21,6 +21,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Testes: `frontend/acoes-estudo.test.ts` (puros + fiação por leitura de fonte); os dois testes
   de fiação do Painel em `tela-dashboard.test.ts` acompanharam a forma nova. Guias: `docs/README.md`
   e `docs/avancado.md`.
+
+---
+
 ## 2026-11-16 — Carteira com carência que a parcela não paga: sem zeramento forçado, sem juros negativos
 
 Item A1 do diagnóstico de 2026-11-11. Um `prazo_fixo`/`ate_marco` com o 1º vencimento dois ou mais
