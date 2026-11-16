@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   premissasNaoSalvas, camposAlterados, retratoSalvo, reaplicarRascunho, avisarSaidaSeNaoSalvo,
-  dadosPropagaveis, estudoDepoisDaRecarga,
+  dadosPropagaveis, estudoDepoisDaRecarga, transicaoDescartaRascunho,
 } from './premissas-rascunho.js';
 
 // O estado "não salvo" das Premissas, sem DOM. A prova de que a tela usa estas
@@ -68,14 +68,19 @@ test('camposAlterados: varre as chaves do formulário menos CHAVES_NAO_ENVIADAS,
   assert.deepEqual(camposAlterados(form, SALVO).sort(), ['custo_terreno_m2', 'obs']);
 });
 
-test('campoMudou (via premissasNaoSalvas): decimal compara como número — 4, "4" e "4.00" são o mesmo valor', () => {
+test('campoMudou (via premissasNaoSalvas): campo numérico compara como número — 4 e "4.00" são o mesmo valor', () => {
   const salvo = { id: 1, juros_tabela_aa_padrao: '4.00' };
   assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: 4 }, salvo), false);
-  assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: '4' }, salvo), false);
   assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: 4.5 }, salvo), true);
-  // Zero à esquerda é forma de código em campo de texto: não normaliza.
-  assert.equal(premissasNaoSalvas({ id: 1, matricula: '123' }, { id: 1, matricula: '0123' }), true);
+  assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: 0 }, { id: 1, juros_tabela_aa_padrao: null }), true);
   assert.equal(premissasNaoSalvas({ id: 1, obs: 'abc' }, { id: 1, obs: 'abc' }), false);
+});
+
+test('campoMudou (via premissasNaoSalvas): campo de TEXTO compara como texto, mesmo com cara de número', () => {
+  // `terreno_manual_nome` é campo de texto: "10" → "10.0" é edição.
+  assert.equal(premissasNaoSalvas({ id: 1, terreno_manual_nome: '10.0' }, { id: 1, terreno_manual_nome: '10' }), true);
+  assert.deepEqual(camposAlterados({ id: 1, terreno_manual_nome: '10.0' }, { id: 1, terreno_manual_nome: '10' }), ['terreno_manual_nome']);
+  assert.equal(premissasNaoSalvas({ id: 1, matricula: '123' }, { id: 1, matricula: '0123' }), true);
 });
 
 test('Avançado: depois de salvar o Financeiro (Number(v) espalhado no estudo), não há rascunho', () => {
@@ -108,4 +113,14 @@ test('estudoDepoisDaRecarga: recarga do mesmo estudo preserva o rascunho; status
   }
   assert.equal(estudoDepoisDaRecarga({ ...novo, id: 6 }, atual, salvo).custo_terreno_m2, '1000.00');
   assert.equal(estudoDepoisDaRecarga(novo, null, null), novo);
+});
+
+test('transicaoDescartaRascunho: só com rascunho pendente E status novo só de leitura', () => {
+  const salvo = { id: 9, status: 'em_analise', custo_terreno_m2: '1000.00' };
+  const comRascunho = { ...salvo, custo_terreno_m2: 1500 };
+  assert.equal(transicaoDescartaRascunho('aprovado', comRascunho, salvo), true);
+  assert.equal(transicaoDescartaRascunho('reprovado', comRascunho, salvo), true);
+  assert.equal(transicaoDescartaRascunho('rascunho', comRascunho, salvo), false);
+  assert.equal(transicaoDescartaRascunho('arquivado', comRascunho, salvo), false);
+  assert.equal(transicaoDescartaRascunho('aprovado', { ...salvo }, salvo), false);
 });

@@ -11,7 +11,7 @@ import {
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-import { premissasNaoSalvas, reaplicarRascunho, estudoDepoisDaRecarga, avisarSaidaSeNaoSalvo } from './premissas-rascunho.js';
+import { premissasNaoSalvas, reaplicarRascunho, estudoDepoisDaRecarga, avisarSaidaSeNaoSalvo, transicaoDescartaRascunho } from './premissas-rascunho.js';
 import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros, formNovoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
@@ -278,6 +278,11 @@ export class ViabTelaEstudo extends LitElement {
     return html`
       <urbi-modal title="Confirmar" maxWidth="420px" @urbi-modal:close=${() => this.confirmarStatus = null}>
         <p>Confirma <strong>${c.label}</strong> este estudo?</p>
+        ${transicaoDescartaRascunho(c.novo, this.estudo, this._estudoSalvo) ? html`
+          <urbi-banner variante="alerta">
+            Há alterações não salvas nas Premissas. Com este status elas ficam só de leitura, e as
+            alterações serão descartadas — cancele e clique em “Salvar premissas” para mantê-las.
+          </urbi-banner>` : nothing}
         <div class="form-acoes">
           <urbi-botao variante="fantasma" @click=${() => this.confirmarStatus = null}>Cancelar</urbi-botao>
           <urbi-botao variante=${c.novo === 'reprovado' ? 'perigo' : 'sucesso'}

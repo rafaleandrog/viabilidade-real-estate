@@ -5,7 +5,7 @@ import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
-import { STATUS_TRAVADO } from './estudo-status.js';
+import { STATUS_TRAVADO, premissasSoLeitura } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo PRELIMINAR — reestruturação de navegação (2026-08-03), a
@@ -139,7 +139,7 @@ export class ViabTelaPreliminar extends LitElement {
   // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o
   // aprovador — o servidor recusa o editor, e a tela deixava digitar e anexar.
   private get _editavelPremissas(): boolean {
-    return this._podeEscrever && this.status !== 'aprovado' && this.status !== 'reprovado';
+    return this._podeEscrever && !premissasSoLeitura(this.status);
   }
 
   render(): TemplateResult {

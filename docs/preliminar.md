@@ -42,7 +42,8 @@ não salva, uma faixa de aviso aparece acima do botão. A edição já se reflet
 Gráficos, e trocar de sub-aba ou de página do estudo não a descarta: de volta às Premissas, os
 valores digitados e a faixa de aviso continuam lá até salvar. O mesmo vale quando o estudo é
 relido do servidor — ao vincular o terreno do Núcleo ou ao mudar o status —, exceto quando ele
-passa a Aprovado ou Reprovado: com as Premissas só de leitura, a alteração não salva é descartada. Recarregar ou fechar a página com
+passa a Aprovado ou Reprovado: com as Premissas só de leitura, a alteração não salva é descartada,
+e a confirmação de Aprovar ou Reprovar avisa disso antes. Recarregar ou fechar a página com
 alteração não salva pede confirmação do navegador; recarregando, as Premissas voltam ao que está
 salvo. Sair do estudo pelo botão de voltar descarta a alteração não salva.
 

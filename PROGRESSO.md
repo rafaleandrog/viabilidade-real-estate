@@ -24,6 +24,10 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - O Financeiro do Avançado também emite `viab:premissas-salvas` ao salvar, e a comparação do estado
   não salvo trata decimal como número (`4` × `"4"` × `"4.00"`): sem isso o `beforeunload` pedia
   confirmação a cada recarga depois de salvar o Financeiro.
+- O modal de Aprovar/Reprovar avisa quando há rascunho que a transição vai descartar
+  (`transicaoDescartaRascunho`); a regra de Premissas só de leitura é uma só
+  (`premissasSoLeitura`, em `estudo-status.ts`), usada pela tela do Preliminar e pelo rascunho.
+  Campo de texto compara como texto: a comparação numérica vale só quando um dos lados é `number`.
 - Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`)
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render

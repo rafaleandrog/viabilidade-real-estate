@@ -13,6 +13,8 @@
 // abaixo são o único predicado de "o que mudou" — da faixa, do Salvar e do
 // aviso de saída da página.
 
+import { premissasSoLeitura } from './estudo-status.js';
+
 /**
  * Chaves que o Salvar NUNCA manda: identidade e estado gerados pelo servidor,
  * colunas de soft-delete geridas pelo framework, e as estruturas de junção que
@@ -31,31 +33,33 @@ export const CHAVES_NAO_ENVIADAS: ReadonlySet<string> = new Set([
 
 /**
  * Número decimal escrito na forma canônica (`4`, `4.00`, `-0.5`). Zero à
- * esquerda (`0123`) fica de fora de propósito: é a forma de um código em
- * campo de texto, e ali `0123` e `123` são valores diferentes.
+ * esquerda (`0123`) fica de fora: não é a forma em que o Postgres devolve um
+ * `decimal`.
  */
 const DECIMAL = /^-?(0|[1-9]\d*)(\.\d+)?$/;
 
-/**
- * Valor normalizado para comparar: `''`/`null`/`undefined` viram `null`, e
- * número ou decimal em string viram NÚMERO. O Postgres devolve `decimal` como
- * string (`"4.00"`), a tela guarda o número digitado (`4`) e o Financeiro grava
- * `Number(v)` — os três são o mesmo valor, e compará-los como texto acusaria
- * rascunho sem edição nenhuma.
- */
-function normalizar(v: unknown): unknown {
-  if (v === '' || v == null) return null;
-  if (typeof v === 'number') return Number.isFinite(v) ? v : String(v);
+const vazio = (v: unknown): boolean => v === '' || v == null;
+
+/** O lado vale como número: número finito, ou decimal canônico em string. */
+function comoNumero(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v === 'string' && DECIMAL.test(v)) return Number(v);
-  return String(v);
+  return null;
 }
 
 /**
  * Um campo mudou em relação ao retrato salvo? Normaliza `''`/`null` para o
  * mesmo valor antes de comparar, porque um input limpo devolve `''` onde o
- * registro trazia `null`, e isso não é edição; e compara decimal como número
- * (`4` × `"4"` × `"4.00"`), porque a mesma coluna chega do servidor como
- * string e da tela como número.
+ * registro trazia `null`, e isso não é edição.
+ *
+ * **Campo numérico compara como número; texto, como texto.** O que diz que o
+ * campo é numérico é o VALOR do lado da tela ser `number`: o input numérico
+ * entrega `number`, o Financeiro grava `Number(v)`, e o Postgres devolve a
+ * mesma coluna `decimal` como string (`"4.00"`) — então `4` × `"4.00"` é o
+ * mesmo valor. Campo de texto tem string dos dois lados e compara como texto:
+ * `"10"` → `"10.0"` num nome é edição, e conta. Não é uma lista de colunas de
+ * propósito: o aviso de saída compara o estudo inteiro, de qualquer tela, e
+ * uma lista teria de conhecer os campos numéricos de todas elas.
  *
  * ⚠️ **É o predicado que decide a faixa de "alterações não salvas", o que o
  * Salvar manda e o aviso de saída da página.** Os três varrem o MESMO conjunto
@@ -66,10 +70,15 @@ export function campoMudou(
   snapshot: Record<string, any>,
   k: string,
 ): boolean {
-  const an = normalizar(form[k]);
-  const bn = normalizar(snapshot[k]);
-  if (typeof an === 'number' && typeof bn === 'number') return an !== bn;
-  return String(an) !== String(bn);
+  const a = form[k];
+  const b = snapshot[k];
+  if (vazio(a) || vazio(b)) return vazio(a) !== vazio(b);
+  if (typeof a === 'number' || typeof b === 'number') {
+    const an = comoNumero(a);
+    const bn = comoNumero(b);
+    if (an !== null && bn !== null) return an !== bn;
+  }
+  return String(a) !== String(b);
 }
 
 /**
@@ -141,9 +150,6 @@ export function reaplicarRascunho(
   return r;
 }
 
-/** Status em que as Premissas ficam só de leitura para todos. */
-const STATUS_PREMISSAS_LEITURA: ReadonlySet<string> = new Set(['aprovado', 'reprovado']);
-
 /**
  * O `estudo` corrente depois de a tela do estudo RECARREGAR o registro do
  * servidor (terreno do Núcleo alterado, troca de status). Recarga do mesmo
@@ -158,8 +164,21 @@ export function estudoDepoisDaRecarga(
   salvoAntigo: Record<string, any> | null | undefined,
 ): Record<string, any> {
   if (!atual || !salvoAntigo || salvoAntigo.id !== novo.id) return novo;
-  if (STATUS_PREMISSAS_LEITURA.has(String(novo.status))) return novo;
+  if (premissasSoLeitura(String(novo.status))) return novo;
   return reaplicarRascunho(novo, atual, salvoAntigo);
+}
+
+/**
+ * A transição para `novo` vai DESCARTAR o rascunho das Premissas? É o caso em
+ * que o modal de confirmação da transição avisa: há edição não salva e o
+ * status novo deixa as Premissas só de leitura (`estudoDepoisDaRecarga`).
+ */
+export function transicaoDescartaRascunho(
+  novo: string,
+  estudo: Record<string, any> | null | undefined,
+  estudoSalvo: Record<string, any> | null | undefined,
+): boolean {
+  return premissasSoLeitura(novo) && premissasNaoSalvas(estudo, estudoSalvo);
 }
 
 /**
