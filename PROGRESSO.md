@@ -21,6 +21,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Testes: `frontend/acoes-estudo.test.ts` (puros + fiação por leitura de fonte); os dois testes
   de fiação do Painel em `tela-dashboard.test.ts` acompanharam a forma nova. Guias: `docs/README.md`
   e `docs/avancado.md`.
+
+---
+
 ## 2026-11-14 — Trocar a tipologia de uma alocação confere o estoque do destino (item Q1 do índice de diagnóstico)
 
 Achado reproduzido ao vivo na Pinguim: o `PATCH …/fases/:fid/alocacoes/:aid` só conferia o saldo
