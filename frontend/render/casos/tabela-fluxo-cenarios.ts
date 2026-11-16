@@ -65,6 +65,10 @@ export const caso = {
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-tela-cenarios');
     forcarEstado(el, {
+      // A vista de quem pode escrever: com `editavel` o card desenha o campo
+      // "Nome do cenário" e o Salvar, e a geometria medida é a de sempre. Sem
+      // ele (leitor, ou editor em estudo travado) os dois somem.
+      editavel: true,
       carregando: false,
       // ⚠️ `operacoesFunding` no config NÃO é decoração (#446): é ele que
       // estica o horizonte até a quitação. Sem ele a série sai truncada e a

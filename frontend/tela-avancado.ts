@@ -14,7 +14,7 @@ import './tela-financeiro.js';
 import './tela-funding.js';
 import './tela-resumo.js';
 import './tela-analise-mercado.js';
-import { STATUS_TRAVADO } from './estudo-status.js';
+import { podeEditarEstudo, funcaoDaPermissao } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo AVANÇADO — reestruturação de navegação (Etapa 3 · #39/#40).
@@ -221,9 +221,11 @@ export class ViabTelaAvancado extends LitElement {
    * aberto; só aprovador em Aprovado/Reprovado/Arquivado. É o que as abas de IA
    * (Apelo, Análise de Mercado) usam — sem isto elas ofereciam anexar e analisar
    * num estudo travado, e o clique terminava em 403 (com o upload já feito).
+   * É `podeEditarEstudo`, a MESMA função que o `PATCH /estudos/:id` chama, sobre
+   * a função efetiva que `_permissao` descreve (`funcaoDaPermissao`).
    */
   private get _podeEscrever(): boolean {
-    return this.podeEditar && (!STATUS_TRAVADO.includes(this.status) || this.podeAprovar);
+    return podeEditarEstudo(this.status, funcaoDaPermissao({ podeEditar: this.podeEditar, podeAprovar: this.podeAprovar }));
   }
 
   // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o
@@ -267,7 +269,9 @@ export class ViabTelaAvancado extends LitElement {
         // Cenários (Etapa 8 · #56): simulação de deltas (preço/custo) sobre o
         // fluxo. Componente exclusivo do Avançado; o Preliminar mantém sua aba
         // Gráficos estática em viab-tela-graficos (via tela-estudo).
-        return html`<viab-tela-cenarios .estudo=${this.estudo}></viab-tela-cenarios>`;
+        // Salvar e Remover cenário são escrita (`exigirEscrita`): a mesma
+        // régua de `_podeEscrever`. Os sliders seguem livres — simular não grava.
+        return html`<viab-tela-cenarios .estudo=${this.estudo} .editavel=${this._podeEscrever}></viab-tela-cenarios>`;
       case 'funding':
         // #718: página de nível 1 própria. `viab-funding` já tem sua própria
         // navegação interna (Operações · Financiamento à produção · Dívida ·

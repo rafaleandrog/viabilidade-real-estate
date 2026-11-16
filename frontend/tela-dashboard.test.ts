@@ -387,8 +387,10 @@ test('#659: a coluna Status não desenha mais seletor — o `urbi-select` saiu d
 
 test('#659: a linha de ações monta os botões a partir de acoesTransicao — não de uma lista escrita ali', () => {
   assert.ok(
-    FONTE_DASHBOARD.includes('acoesTransicao(String(l.status), l._funcao)'),
-    'sem esta chamada os testes de estudo-status provam uma função que a tela não usa',
+    FONTE_DASHBOARD.includes('const acoes = acoesDoEstudo(String(l.status), l._funcao);')
+      && FONTE_DASHBOARD.includes('${acoes.transicoes.map((a: AcaoTransicao) => html`'),
+    'sem esta chamada os testes de estudo-status provam uma função que a tela não usa '
+      + '(acoesDoEstudo devolve as transições de acoesTransicao — ver acoes-estudo.test.ts)',
   );
   assert.ok(
     FONTE_DASHBOARD.includes('this._mudarStatus(l, a.para)'),
@@ -556,7 +558,7 @@ test('#680: a coluna acoes declara alinhamento direita — sem isso a <td> não 
 
 test('#680: TODOS os urbi-botao da fila de ações declaram .ariaLabel — por CONTAGEM EXATA, para um botão novo sem label quebrar o teste', () => {
   const bloco = FONTE_DASHBOARD.match(
-    /id: 'acoes', label: '', alinhamento: 'direita',[\s\S]*?render: \(l: any\) => html`[\s\S]*?<\/div>`,\n {6}\},/,
+    /id: 'acoes', label: '', alinhamento: 'direita',[\s\S]*?render: \(l: any\) => \{[\s\S]*?<\/div>`;\n {8}\},/,
   )?.[0];
   assert.ok(bloco, 'não encontrei o bloco de render da coluna acoes — mudou de forma?');
   const botoes = bloco!.match(/<urbi-botao/g)?.length ?? 0;
