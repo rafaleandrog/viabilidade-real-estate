@@ -191,7 +191,9 @@ variação de TIR, VPL e exposição máxima contra o cenário real, com o gráf
 cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é fixo: ele cobre o
 fluxo acumulado da base e o de todas as posições dos dois controles, então mover um controle move
 a curva, não a escala, e a ordem de grandeza da variação fica visível. Os cenários ficam salvos no
-estudo.
+estudo. Salvar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
+análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação continua
+disponível, sem os botões **Salvar cenário** e **Remover**.
 
 ### Análise de mercado e Apelo Comercial
 

@@ -5,7 +5,7 @@ import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
-import { STATUS_TRAVADO, premissasSoLeitura } from './estudo-status.js';
+import { podeEditarEstudo, funcaoDaPermissao, premissasSoLeitura } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo PRELIMINAR — reestruturação de navegação (2026-08-03), a
@@ -131,9 +131,11 @@ export class ViabTelaPreliminar extends LitElement {
    * aberto; só aprovador em Aprovado/Reprovado/Arquivado. É o que as abas de IA
    * (Apelo, Análise de Mercado) usam — sem isto elas ofereciam anexar e analisar
    * num estudo travado, e o clique terminava em 403 (com o upload já feito).
+   * É `podeEditarEstudo`, a MESMA função que o `PATCH /estudos/:id` chama, sobre
+   * a função efetiva que `_permissao` descreve (`funcaoDaPermissao`).
    */
   private get _podeEscrever(): boolean {
-    return this.podeEditar && (!STATUS_TRAVADO.includes(this.status) || this.podeAprovar);
+    return podeEditarEstudo(this.status, funcaoDaPermissao({ podeEditar: this.podeEditar, podeAprovar: this.podeAprovar }));
   }
 
   // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o

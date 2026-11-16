@@ -32,6 +32,23 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+## 2026-11-16 — A tela deixa de oferecer o que o servidor recusa (itens U4, U5 e U7 do índice #858)
+
+- **Painel (U7):** as ações da linha saem de `acoesDoEstudo(status, _funcao)`, em
+  `frontend/estudo-status.ts`, com a régua do servidor: Duplicar para editor e aprovador (o
+  `exigirEditor` do `POST /estudos/:id/duplicar`); Remover para o editor só em Rascunho e para o
+  aprovador em qualquer status (`removerEstudo`). O leitor não vê nenhum dos dois; o editor fora de
+  Rascunho vê Remover desabilitado, com o texto do 403 no `title`. **Criar estudo** só aparece com
+  `podeCriarEstudo(nivel)` — escrita ou admin, como o `POST /estudos`.
+- **Cenários do Avançado (U5):** `viab-tela-cenarios` ganhou `editavel`, que a tela-mãe liga em
+  `_podeEscrever`; sem ele, Salvar cenário e Remover somem e os sliders continuam simulando.
+- **Arquivado (U4):** o que restava de U4 na `main` era o Remover do Painel e o Salvar/Remover de
+  Cenários; Premissas, Apelo e Mercado já seguiam a régua. `_podeEscrever` das duas telas de estudo
+  passa a ser `podeEditarEstudo(status, funcaoDaPermissao(...))`, a função do `PATCH /estudos/:id`,
+  em vez de uma reimplementação inline.
+- Testes: `frontend/acoes-estudo.test.ts` (puros + fiação por leitura de fonte); os dois testes
+  de fiação do Painel em `tela-dashboard.test.ts` acompanharam a forma nova. Guias: `docs/README.md`
+  e `docs/avancado.md`.
 
 ---
 
