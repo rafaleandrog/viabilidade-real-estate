@@ -14,7 +14,7 @@ import './tela-financeiro.js';
 import './tela-funding.js';
 import './tela-resumo.js';
 import './tela-analise-mercado.js';
-import { podeEditarEstudo, funcaoDaPermissao } from './estudo-status.js';
+import { podeEditarEstudo, funcaoDaPermissao, premissasSoLeitura } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo AVANÇADO — reestruturação de navegação (Etapa 3 · #39/#40).
@@ -231,7 +231,7 @@ export class ViabTelaAvancado extends LitElement {
   // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o
   // aprovador — o servidor recusa o editor, e a tela deixava digitar e anexar.
   private get _editavelPremissas(): boolean {
-    return this._podeEscrever && this.status !== 'aprovado' && this.status !== 'reprovado';
+    return this._podeEscrever && !premissasSoLeitura(this.status);
   }
   private get _editavelFluxo(): boolean {
     return this.podeEditar && this.status !== 'aprovado' && this.status !== 'reprovado' && this.status !== 'arquivado';

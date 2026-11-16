@@ -11,6 +11,7 @@ import {
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
+import { premissasNaoSalvas, reaplicarRascunho, estudoDepoisDaRecarga, avisarSaidaSeNaoSalvo, transicaoDescartaRascunho } from './premissas-rascunho.js';
 import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros, formNovoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
@@ -34,6 +35,13 @@ export class ViabTelaEstudo extends LitElement {
   @property({ type: String }) subAba = '';
 
   @state() private estudo: any = null;
+  // Retrato do SERVIDOR do estudo. `estudo` recebe o rascunho das Premissas a
+  // cada tecla (`viab:premissas-change`), para a Proforma e os Gráficos
+  // refletirem a edição ao vivo; este aqui só muda quando o servidor confirma
+  // (carga, save das Premissas, renomear). A diferença entre os dois É o
+  // rascunho — o que a tela de Premissas acusa ao ser remontada depois de uma
+  // troca de página, e o que o aviso de saída (`beforeunload`) protege.
+  @state() private _estudoSalvo: any = null;
   @state() private carregando = true;
   @state() private membros: any[] = [];
   @state() private usuarios: any[] = [];
@@ -62,8 +70,23 @@ export class ViabTelaEstudo extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    window.addEventListener('beforeunload', this._antesDeSair);
     this._carregar();
   }
+
+  disconnectedCallback() {
+    window.removeEventListener('beforeunload', this._antesDeSair);
+    super.disconnectedCallback();
+  }
+
+  /**
+   * Recarregar ou fechar a página com edição de Premissas não salva pede a
+   * confirmação nativa do navegador. Arrow de instância: a MESMA referência é
+   * registrada e removida, então desmontar o estudo não deixa listener vivo.
+   */
+  private _antesDeSair = (e: BeforeUnloadEvent) => {
+    avisarSaidaSeNaoSalvo(e, premissasNaoSalvas(this.estudo, this._estudoSalvo));
+  };
 
   updated(changed: Map<string, unknown>) {
     if (changed.has('estudoId')) this._carregar();
@@ -74,9 +97,13 @@ export class ViabTelaEstudo extends LitElement {
     this.carregando = true;
     try {
       const estudo = await buscarEstudo(this.estudoId);
-      if (estudo?.erro) { urbiVerso.notificar(estudo.mensagem || 'Sem acesso', 'erro'); this.estudo = null; }
+      if (estudo?.erro) { urbiVerso.notificar(estudo.mensagem || 'Sem acesso', 'erro'); this.estudo = null; this._estudoSalvo = null; }
       else {
-        this.estudo = estudo;
+        // Recarga do mesmo estudo (terreno do Núcleo alterado, troca de
+        // status) preserva o rascunho das Premissas ainda não salvo — regra e
+        // exceção em `estudoDepoisDaRecarga`.
+        this.estudo = estudoDepoisDaRecarga(estudo, this.estudo, this._estudoSalvo);
+        this._estudoSalvo = estudo;
         this.membros = estudo.membros || [];
       }
     } catch (e) {
@@ -112,7 +139,8 @@ export class ViabTelaEstudo extends LitElement {
     return html`
       <urbi-shell-page dashboard .titulo=${this.estudo.nome_exibicao || this.estudo.nome}
         @viab:terreno-alterado=${() => this._carregar()}
-        @viab:premissas-change=${(e: CustomEvent) => { this.estudo = { ...this.estudo, ...e.detail.dados }; }}>
+        @viab:premissas-change=${(e: CustomEvent) => { this.estudo = { ...this.estudo, ...e.detail.dados }; }}
+        @viab:premissas-salvas=${(e: CustomEvent) => { this._estudoSalvo = { ...this._estudoSalvo, ...e.detail.dados }; }}>
         <urbi-botao-voltar slot="voltar" rotulo="Voltar aos estudos"
           @urbi:voltar=${() => urbiVerso.navegarSub('/')}></urbi-botao-voltar>
         ${this._renderAcoesStatus(p, st)}
@@ -145,6 +173,7 @@ export class ViabTelaEstudo extends LitElement {
           : html`
             <viab-tela-preliminar
               .estudo=${this.estudo}
+              .estudoSalvo=${this._estudoSalvo}
               .podeEditar=${!!p.podeEditar}
               .podeAprovar=${!!p.podeAprovar}
               .status=${st}
@@ -249,6 +278,11 @@ export class ViabTelaEstudo extends LitElement {
     return html`
       <urbi-modal title="Confirmar" maxWidth="420px" @urbi-modal:close=${() => this.confirmarStatus = null}>
         <p>Confirma <strong>${c.label}</strong> este estudo?</p>
+        ${transicaoDescartaRascunho(c.novo, this.estudo, this._estudoSalvo) ? html`
+          <urbi-banner variante="alerta">
+            Há alterações não salvas nas Premissas. Com este status elas ficam só de leitura, e as
+            alterações serão descartadas — cancele e clique em “Salvar premissas” para mantê-las.
+          </urbi-banner>` : nothing}
         <div class="form-acoes">
           <urbi-botao variante="fantasma" @click=${() => this.confirmarStatus = null}>Cancelar</urbi-botao>
           <urbi-botao variante=${c.novo === 'reprovado' ? 'perigo' : 'sucesso'}
@@ -328,7 +362,11 @@ export class ViabTelaEstudo extends LitElement {
       // recomposto pelo servidor, que é o que o cabeçalho mostra. Espalhar
       // sobre `this.estudo` preserva o que já foi carregado e o PATCH não
       // devolve (ex.: `membros`, `_permissao`).
-      this.estudo = { ...this.estudo, ...res };
+      // O retrato do servidor recebe a linha inteira; o `estudo` corrente
+      // recebe a mesma linha com o rascunho das Premissas por cima — renomear
+      // não pode apagar uma edição ainda não salva.
+      this.estudo = reaplicarRascunho({ ...this.estudo, ...res }, this.estudo, this._estudoSalvo);
+      this._estudoSalvo = { ...this._estudoSalvo, ...res };
       this.editarAlvo = false;
       urbiVerso.notificar('Nome do estudo atualizado.', 'sucesso');
     } catch (e: any) {

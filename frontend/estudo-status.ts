@@ -41,6 +41,16 @@ export const STATUS_ESTUDO = [
 export const STATUS_TRAVADO: readonly string[] = ['aprovado', 'reprovado', 'arquivado'];
 
 /**
+ * Status em que as Premissas do Preliminar ficam só de leitura para TODOS,
+ * aprovador inclusive (decisão de tela). Fonte única: a tela do Preliminar
+ * decide por ela se as Premissas são editáveis, e a tela do estudo decide por
+ * ela se uma recarga ou transição descarta o rascunho não salvo.
+ */
+export function premissasSoLeitura(status: string): boolean {
+  return status === 'aprovado' || status === 'reprovado';
+}
+
+/**
  * Alçada exigida pela transição `de → para`, ou `null` quando a transição não
  * existe. É a MESMA função que o handler de `POST /estudos/:id/status` consulta.
  */

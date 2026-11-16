@@ -96,7 +96,9 @@ test('#678: o modal de renomear edita `nome` cru e valida com o MESMO parser do 
 
 test('#678: salvar faz merge em `this.estudo`, não em uma lista — o cabeçalho é UM estudo só', () => {
   assert.ok(
-    FONTE_ESTUDO.includes('this.estudo = { ...this.estudo, ...res }'),
+    // O merge passa por `reaplicarRascunho` para não apagar uma edição de
+    // Premissas ainda não salva (premissas-rascunho.ts).
+    FONTE_ESTUDO.includes('this.estudo = reaplicarRascunho({ ...this.estudo, ...res }, this.estudo, this._estudoSalvo)'),
     'o merge tem que atualizar this.estudo (o cabeçalho já lê nome_exibicao dele), não this.estudos',
   );
 });
@@ -106,4 +108,49 @@ test('#678: o modal está ligado ao render — estado sem montagem não desenha 
     FONTE_ESTUDO.includes('${this.editarAlvo ? this._renderEditarNome() : nothing}'),
     'o modal existe mas nunca é montado',
   );
+});
+
+test('rascunho das Premissas: o retrato do servidor só muda com o servidor, e o beforeunload sai com a tela', () => {
+  assert.ok(FONTE_ESTUDO.includes(".estudoSalvo=${this._estudoSalvo}"),
+    'a tela do Preliminar não recebe o retrato do servidor — Premissas remontada volta a se dar por salva');
+  assert.ok(FONTE_ESTUDO.includes('@viab:premissas-salvas=${(e: CustomEvent) => { this._estudoSalvo = { ...this._estudoSalvo, ...e.detail.dados }; }}'),
+    'o save das Premissas não atualiza o retrato do servidor — o salvo volta a parecer rascunho');
+  assert.ok(FONTE_ESTUDO.includes("window.addEventListener('beforeunload', this._antesDeSair)"),
+    'sem beforeunload, recarregar com rascunho perde a edição sem aviso');
+  assert.ok(FONTE_ESTUDO.includes("window.removeEventListener('beforeunload', this._antesDeSair)"),
+    'o listener de beforeunload não sai com a tela — vaza para o próximo estudo');
+});
+
+test('rascunho das Premissas: recarga do estudo preserva o rascunho; Financeiro e Premissas propagam só o que é deles', () => {
+  assert.ok(FONTE_ESTUDO.includes('this.estudo = estudoDepoisDaRecarga(estudo, this.estudo, this._estudoSalvo)'),
+    '`_carregar` voltou a trocar o estudo pelo servidor e apaga o rascunho');
+  const fin = semComentarios(readFileSync(new URL('./tela-financeiro.ts', import.meta.url), 'utf8'));
+  assert.ok(/new CustomEvent\('viab:premissas-salvas', \{\s*detail: \{ dados \}/.test(fin),
+    'o save do Financeiro não atualiza o retrato do servidor — o aviso de saída dispara à toa no Avançado');
+  const prem = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
+  assert.ok(prem.includes("new CustomEvent('viab:premissas-change', {\n      detail: { dados: dadosPropagaveis(this.form) }"),
+    'a tela de Premissas voltou a espalhar o formulário inteiro (com o nome velho) sobre o estudo');
+});
+
+test('rascunho das Premissas: o modal de transição avisa quando o status novo descarta o rascunho', () => {
+  assert.ok(FONTE_ESTUDO.includes('${transicaoDescartaRascunho(c.novo, this.estudo, this._estudoSalvo) ? html`'),
+    'o modal de Aprovar/Reprovar não avisa que as alterações não salvas das Premissas serão descartadas');
+  assert.ok(/_renderConfirmStatus\(\)[\s\S]{0,600}transicaoDescartaRascunho/.test(FONTE_ESTUDO),
+    'o aviso saiu do modal de confirmação da transição');
+});
+
+test('Premissas só de leitura: uma regra só, usada pela tela do Preliminar e pelo rascunho', () => {
+  const pre = semComentarios(readFileSync(new URL('./tela-preliminar.ts', import.meta.url), 'utf8'));
+  assert.ok(pre.includes('return this._podeEscrever && !premissasSoLeitura(this.status);'),
+    '`_editavelPremissas` deixou de usar `premissasSoLeitura` — a regra duplicada volta a divergir');
+  const ava = semComentarios(readFileSync(new URL('./tela-avancado.ts', import.meta.url), 'utf8'));
+  assert.ok(ava.includes('return this._podeEscrever && !premissasSoLeitura(this.status);'),
+    '`_editavelPremissas` do Avançado deixou de usar `premissasSoLeitura`');
+  const ras = semComentarios(readFileSync(new URL('./premissas-rascunho.ts', import.meta.url), 'utf8'));
+  assert.ok(ras.includes('if (premissasSoLeitura(String(novo.status))) return novo;'),
+    '`estudoDepoisDaRecarga` deixou de usar `premissasSoLeitura`');
+  assert.ok(ras.includes('return premissasSoLeitura(novo) && premissasNaoSalvas(estudo, estudoSalvo);'),
+    '`transicaoDescartaRascunho` deixou de usar `premissasSoLeitura`');
+  assert.ok(!/['"]aprovado['"][\s\S]{0,40}['"]reprovado['"]/.test(ras + pre),
+    'a lista aprovado/reprovado voltou a ser escrita à mão fora de `premissasSoLeitura`');
 });

@@ -5,7 +5,7 @@ import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
-import { podeEditarEstudo, funcaoDaPermissao } from './estudo-status.js';
+import { podeEditarEstudo, funcaoDaPermissao, premissasSoLeitura } from './estudo-status.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo PRELIMINAR — reestruturação de navegação (2026-08-03), a
@@ -62,6 +62,8 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
 @customElement('viab-tela-preliminar')
 export class ViabTelaPreliminar extends LitElement {
   @property({ type: Object }) estudo: any = null;
+  // Retrato do servidor (ver `estudoSalvo` em tela-premissas.ts) — só repassado.
+  @property({ attribute: false }) estudoSalvo: Record<string, any> | null = null;
   @property({ type: Boolean }) podeEditar = false;
   @property({ type: Boolean }) podeAprovar = false;
   @property({ type: String }) status = '';
@@ -139,7 +141,7 @@ export class ViabTelaPreliminar extends LitElement {
   // Aprovado e Reprovado: leitura para todos (decisão de tela). Arquivado: só o
   // aprovador — o servidor recusa o editor, e a tela deixava digitar e anexar.
   private get _editavelPremissas(): boolean {
-    return this._podeEscrever && this.status !== 'aprovado' && this.status !== 'reprovado';
+    return this._podeEscrever && !premissasSoLeitura(this.status);
   }
 
   render(): TemplateResult {
@@ -203,7 +205,7 @@ export class ViabTelaPreliminar extends LitElement {
 
   private _renderSubConteudo(topo: AbaTopo, sub: string): TemplateResult {
     if (topo === 'premissas') {
-      return html`<viab-tela-premissas .estudo=${this.estudo} .editavel=${this._editavelPremissas} .secao=${sub}></viab-tela-premissas>`;
+      return html`<viab-tela-premissas .estudo=${this.estudo} .estudoSalvo=${this.estudoSalvo} .editavel=${this._editavelPremissas} .secao=${sub}></viab-tela-premissas>`;
     }
     if (topo === 'proforma') {
       return html`<viab-tela-proforma .estudo=${this.estudo} .secao=${sub}></viab-tela-proforma>`;

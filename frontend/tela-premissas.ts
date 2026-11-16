@@ -20,6 +20,7 @@ import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
+import { CHAVES_NAO_ENVIADAS, campoMudou, dadosPropagaveis, premissasNaoSalvas, rebasearRascunho, retratoAposSalvar, retratoSalvo } from './premissas-rascunho.js';
 
 type T = 'num' | 'txt';
 type Largura = 'p1' | 'p2' | 'p3';
@@ -315,45 +316,10 @@ const CAMPO_POR_LINHA_INC: Record<string, string> = {
 // Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
 const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
 
-/**
- * Chaves que o Salvar NUNCA manda: identidade e estado gerados pelo servidor,
- * colunas de soft-delete geridas pelo framework, e as estruturas de junção que
- * o GET anexa ao registro (`membros`, `imoveis`, `_permissao`, …).
- *
- * ⚠️ **A faixa de "alterações não salvas" usa a MESMA lista.** Se ela varresse
- * chaves que o Salvar descarta, `_dirty` poderia ficar `true` com payload
- * vazio — a faixa acusando alteração que o PATCH nunca mandaria. Achado da
- * revisão deste PR; a defesa é a lista ser uma só, não duas iguais.
- */
-const CHAVES_NAO_ENVIADAS = new Set([
-  'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id', 'criado_em', 'atualizado_em',
-  'removido_em', 'removido_por_id',
-  'membros', 'imoveis', '_permissao', '_funcao', 'autor_nome', 'autor_avatar_url',
-]);
-
-/**
- * Um campo mudou em relação ao retrato que a tela carregou? Normaliza
- * `''`/`null` para o mesmo valor antes de comparar, porque um input limpo
- * devolve `''` onde o registro trazia `null`, e isso não é edição.
- *
- * ⚠️ **É o predicado que decide DUAS coisas**: a faixa de "alterações não
- * salvas" (`_formDifereSnapshot`) e **o que o Salvar manda** (`_salvar`). Os
- * dois varrem o MESMO conjunto de chaves — `Object.keys(form)` menos
- * `CHAVES_NAO_ENVIADAS` — porque divergir ali faria a faixa falar de um
- * conjunto e o PATCH de outro. Predicado e lista são únicos, e esta função é
- * exportada para ser testada direto.
- */
-export function campoMudou(
-  form: Record<string, any>,
-  snapshot: Record<string, any>,
-  k: string,
-): boolean {
-  const a = form[k];
-  const b = snapshot[k];
-  const an = (a === '' || a == null) ? null : a;
-  const bn = (b === '' || b == null) ? null : b;
-  return String(an) !== String(bn);
-}
+// `CHAVES_NAO_ENVIADAS` e `campoMudou` moram em `premissas-rascunho.ts`, junto
+// do retrato do servidor que a tela do estudo guarda — o predicado de "o que
+// mudou" é um só para a faixa, o Salvar e o aviso de saída da página.
+export { campoMudou };
 
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
@@ -377,6 +343,12 @@ export class ViabTelaPremissas extends LitElement {
   // qualquer sub-aba salva as premissas inteiras, como já era antes da
   // divisão visual.
   @property({ type: String }) secao: 'terreno' | 'custos' | 'produtos' | 'permutas' = 'terreno';
+  // Retrato do SERVIDOR do estudo, guardado pela tela do estudo. `estudo` é o
+  // registro com o rascunho já aplicado (cada tecla volta por
+  // `viab:premissas-change`), e trocar de página desmonta esta tela: sem o
+  // retrato à parte, ela remontaria comparando o rascunho consigo mesmo e a
+  // edição não salva voltaria com cara de salva (`premissas-rascunho.ts`).
+  @property({ attribute: false }) estudoSalvo: Record<string, any> | null = null;
 
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
@@ -567,6 +539,20 @@ export class ViabTelaPremissas extends LitElement {
     // de fato — não a cada tecla propagada de volta via viab:premissas-change (#6).
     if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
+  willUpdate(ch: Map<string, unknown>) {
+    // O retrato do servidor mudou com o MESMO estudo e esta tela montada
+    // (Núcleo gravou a área do terreno, troca de status): rebase do formulário
+    // — ver `rebasearRascunho`. Na primeira atualização o valor anterior é
+    // `undefined`, e o `_init` já usou o retrato.
+    const anterior = ch.get('estudoSalvo') as Record<string, any> | null | undefined;
+    if (ch.has('estudoSalvo') && anterior && this.estudoSalvo && this.estudoSalvo !== anterior
+      && this.estudoSalvo.id === this._idCarregado) {
+      const r = rebasearRascunho(this.form, this._snapshot, this.estudoSalvo);
+      this.form = r.form;
+      this._snapshot = r.snapshot;
+      this._dirty = this._formDifereSnapshot();
+    }
+  }
 
   /**
    * #597 — mesma corrida que `tela-graficos.ts` teve (PR 580): navegar do
@@ -591,8 +577,10 @@ export class ViabTelaPremissas extends LitElement {
     const id = this.estudo.id;
     this._idCarregado = id ?? null;
     this.form = { ...this.estudo };
-    this._snapshot = { ...this.estudo };
-    this._dirty = false;
+    // O retrato é o do servidor, não o `estudo` corrente: remontada depois de
+    // uma troca de página, a tela reencontra o rascunho como rascunho.
+    this._snapshot = retratoSalvo(this.estudo, this.estudoSalvo);
+    this._dirty = this._formDifereSnapshot();
     this.erros = {};
     this.erroGeral = '';
     this.produtos = [];
@@ -634,7 +622,7 @@ export class ViabTelaPremissas extends LitElement {
     // Propaga em tempo real para a tela do estudo, que reflete em Proforma e
     // Gráficos instantaneamente (#6). Não persiste — persistência é no Salvar.
     this.dispatchEvent(new CustomEvent('viab:premissas-change', {
-      detail: { dados: this.form }, bubbles: true, composed: true,
+      detail: { dados: dadosPropagaveis(this.form) }, bubbles: true, composed: true,
     }));
   }
 
@@ -644,9 +632,7 @@ export class ViabTelaPremissas extends LitElement {
   }
 
   private _formDifereSnapshot(): boolean {
-    return Object.keys(this.form)
-      .filter((k) => !CHAVES_NAO_ENVIADAS.has(k))
-      .some((k) => this._campoMudou(k));
+    return premissasNaoSalvas(this.form, this._snapshot);
   }
 
   private _num(k: string): number | null {
@@ -1649,18 +1635,24 @@ export class ViabTelaPremissas extends LitElement {
       // a aba Financeiro inteira, que o filtro de nível do backend não protege
       // (ele só vale em Preliminar).
       //
-      // O retrato **não é refeito** enquanto o id do estudo não muda
-      // (`willUpdate`), então ele envelhece durante a sessão — é por isso que o
-      // conserto não é "recarregar antes de salvar".
+      // O retrato só é refeito quando a tela do estudo recebe do servidor um
+      // registro novo (`willUpdate` → `rebasearRascunho`); o que outra tela
+      // grava por outro endpoint não passa por ali, então ele envelhece durante
+      // a sessão — é por isso que o conserto não é "recarregar antes de salvar".
       //
       // Mandar o diff resolve a classe inteira sem lista nomeada nenhuma: campo
       // que a tela não edita nunca muda em relação ao retrato, logo nunca viaja.
       // E `_campoMudou` é o mesmo predicado da faixa de "alterações não salvas",
       // de propósito.
       const dados: Record<string, any> = {};
+      // Os mesmos campos, com o valor do FORMULÁRIO (não o convertido): é o
+      // que a tela do estudo funde no retrato do servidor depois do save, e o
+      // retrato tem de bater com `form` campo a campo — ver o ⚠️ logo abaixo.
+      const salvos: Record<string, any> = {};
       for (const [k, v] of Object.entries(this.form)) {
         if (CHAVES_NAO_ENVIADAS.has(k)) continue;
         if (!this._campoMudou(k)) continue;
+        salvos[k] = v;
         if (TODOS_NUM.has(k)) dados[k] = v === '' || v == null ? null : Number(v);
         else dados[k] = v;
       }
@@ -1674,14 +1666,23 @@ export class ViabTelaPremissas extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      // ⚠️ O retrato novo é `form`, **não** a resposta do servidor, e a
+      // ⚠️ O retrato novo sai do `form` (os `salvos`), **não** da resposta do servidor, e a
       // distinção é armadilha: `atualizado` traz as colunas `decimal` como
       // STRING (`"4.00"`), enquanto `form` guarda o número que o usuário
       // digitou. Ressincronizar pela resposta faria todo campo numérico
       // aparecer como "mudou" no save seguinte — e o eco do registro inteiro,
       // que este PR acabou de matar, voltaria por essa porta.
-      this._snapshot = { ...this.form };
-      this._dirty = false;
+      //
+      // E é o formulário DO ENVIO, não o de agora: tecla digitada durante o
+      // `await` entraria no retrato como salva, e o rebase do retrato novo do
+      // servidor (`willUpdate`) a reverteria na tela. `retratoAposSalvar` parte
+      // do retrato corrente — `_set` não o toca, então é o de antes do envio,
+      // ou o do rebase se o servidor mudou no meio — e aplica só o que viajou.
+      this._snapshot = retratoAposSalvar(this._snapshot, salvos);
+      this._dirty = this._formDifereSnapshot();
+      this.dispatchEvent(new CustomEvent('viab:premissas-salvas', {
+        detail: { dados: salvos }, bubbles: true, composed: true,
+      }));
       urbiVerso.notificar('Premissas salvas.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');

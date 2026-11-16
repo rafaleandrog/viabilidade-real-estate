@@ -237,3 +237,8 @@ test('#659: STATUS_ESTUDO é exatamente o enum do schema.json', () => {
   const schema = JSON.parse(readFileSync(new URL('../schema.json', import.meta.url), 'utf8'));
   assert.deepEqual([...STATUS_ESTUDO].sort(), [...schema.tabelas.estudos.colunas.status.opcoes].sort());
 });
+
+test('premissasSoLeitura: Aprovado e Reprovado, e só eles, deixam as Premissas só de leitura', async () => {
+  const { premissasSoLeitura, STATUS_ESTUDO } = await import('./estudo-status.js');
+  assert.deepEqual(STATUS_ESTUDO.filter((s) => premissasSoLeitura(s)), ['aprovado', 'reprovado']);
+});

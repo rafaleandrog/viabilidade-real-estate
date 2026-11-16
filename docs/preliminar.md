@@ -36,6 +36,17 @@ Quatro sub-abas, cada uma com os campos que valem para o tipo do estudo (Loteame
 | **Permutas** | **Permuta física** (em m² ou em percentual da área de venda; residencial e não residencial na Incorporação) e **permuta financeira** (percentual do VGV ou valor). A física reduz a área que o incorporador vende; a financeira é dedução sobre a receita. |
 | **Produtos** | O catálogo de tipologias, cadastrado por participação na base de área do tipo de estudo — veja abaixo. O VGV de cada produto aparece na linha, e o total alimenta a Proforma quando o catálogo existe. |
 
+**Salvar premissas.** As quatro sub-abas são um formulário só, salvo inteiro pelo botão
+**Salvar premissas** de qualquer uma delas; nada é salvo automaticamente. Enquanto houver alteração
+não salva, uma faixa de aviso aparece acima do botão. A edição já se reflete em Resultado e
+Gráficos, e trocar de sub-aba ou de página do estudo não a descarta: de volta às Premissas, os
+valores digitados e a faixa de aviso continuam lá até salvar. O mesmo vale quando o estudo é
+relido do servidor — ao vincular o terreno do Núcleo ou ao mudar o status —, exceto quando ele
+passa a Aprovado ou Reprovado: com as Premissas só de leitura, a alteração não salva é descartada,
+e a confirmação de Aprovar ou Reprovar avisa disso antes. Recarregar ou fechar a página com
+alteração não salva pede confirmação do navegador; recarregando, as Premissas voltam ao que está
+salvo. Sair do estudo pelo botão de voltar descarta a alteração não salva.
+
 **Produtos: cadastro por % da base.** Cada linha tem **Nome**, **Tipo**, **%**, **Unidades** e
 **Preço de venda** (R$/m²) — os campos que se preenchem. O **Tipo** é Residencial ou Comercial no
 Loteamento, e Residencial ou Não Residencial na Incorporação. A **base** do percentual é a **ALV**

@@ -4,6 +4,48 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-16 — Rascunho das Premissas sobrevive à troca de página (item U2 do índice #858)
+
+- Trocar de página do estudo desmonta a tela de Premissas, que remontava a partir do `estudo` já
+  com o rascunho (cada tecla é espelhada nele para a Proforma e os Gráficos) e o usava também como
+  retrato do servidor: a edição voltava com cara de salva e se perdia no recarregar. Agora a tela do
+  estudo guarda o retrato do servidor à parte (`_estudoSalvo`, atualizado na carga, no save das
+  Premissas por `viab:premissas-salvas` e no renomear) e o repassa; a tela remontada compara contra
+  ele e mantém a faixa de não salvo. Lógica pura em `frontend/premissas-rascunho.ts`.
+- `beforeunload` na tela do estudo enquanto houver rascunho, registrado no `connectedCallback` e
+  removido no `disconnectedCallback`. Recarregar mostra o que está no servidor.
+- Decisão não fixada pelo item: preservar o rascunho (não pedir confirmação na troca de aba), porque
+  é o desenho existente — a edição já alimenta Resultado e Gráficos ao vivo — e nenhuma outra aba
+  do app pede confirmação ao trocar. Renomear o estudo com rascunho pendente também o preserva.
+- Recarga do estudo pelo servidor (terreno do Núcleo, troca de status) preserva o rascunho
+  (`estudoDepoisDaRecarga`), exceto quando o status novo é Aprovado ou Reprovado (Premissas só de
+  leitura). Renomear também o preserva, e a tela de Premissas deixou de propagar `nome` e as chaves
+  do servidor com o resto do formulário (renomear e depois digitar desfazia o nome no `estudo`).
+- O Financeiro do Avançado também emite `viab:premissas-salvas` ao salvar, e a comparação do estado
+  não salvo trata decimal como número (`4` × `"4"` × `"4.00"`): sem isso o `beforeunload` pedia
+  confirmação a cada recarga depois de salvar o Financeiro.
+- O modal de Aprovar/Reprovar avisa quando há rascunho que a transição vai descartar
+  (`transicaoDescartaRascunho`); a regra de Premissas só de leitura é uma só
+  (`premissasSoLeitura`, em `estudo-status.ts`), usada pelo `_editavelPremissas` do Preliminar e
+  do Avançado e pelo rascunho.
+  Campo de texto compara como texto: a comparação numérica vale só quando um dos lados é `number`.
+- Com a tela de Premissas montada, um retrato novo do servidor no mesmo estudo faz o rebase do
+  formulário (`rebasearRascunho`): campo não editado adota o servidor, campo editado mantém a
+  edição, e status só de leitura descarta as edições. Em produção isso dispara no próprio Salvar e
+  no renomear; o Núcleo e a troca de status passam por `_carregar`, cujo spinner desmonta e
+  remonta as Premissas (`_init`/`estudoDepoisDaRecarga`). O caso de render
+  `premissas-rascunho-nucleo` prova a fiação forçando o retrato novo com a tela montada: sem o
+  rebase, o Salvar devolvia a área velha do terreno.
+- O retrato depois do Salvar é o do que foi ENVIADO (`retratoAposSalvar`), não o formulário depois
+  do `await`: tecla digitada com o PATCH em voo continua rascunho, e o rebase disparado pelo
+  próprio save não a reverte.
+- Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`)
+  continua descartando o rascunho.
+- Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
+  `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+
+---
+
 ## 2026-11-16 — A tela deixa de oferecer o que o servidor recusa (itens U4, U5 e U7 do índice #858)
 
 - **Painel (U7):** as ações da linha saem de `acoesDoEstudo(status, _funcao)`, em
