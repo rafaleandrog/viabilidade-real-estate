@@ -143,6 +143,9 @@ test('Premissas só de leitura: uma regra só, usada pela tela do Preliminar e p
   const pre = semComentarios(readFileSync(new URL('./tela-preliminar.ts', import.meta.url), 'utf8'));
   assert.ok(pre.includes('return this._podeEscrever && !premissasSoLeitura(this.status);'),
     '`_editavelPremissas` deixou de usar `premissasSoLeitura` — a regra duplicada volta a divergir');
+  const ava = semComentarios(readFileSync(new URL('./tela-avancado.ts', import.meta.url), 'utf8'));
+  assert.ok(ava.includes('return this._podeEscrever && !premissasSoLeitura(this.status);'),
+    '`_editavelPremissas` do Avançado deixou de usar `premissasSoLeitura`');
   const ras = semComentarios(readFileSync(new URL('./premissas-rascunho.ts', import.meta.url), 'utf8'));
   assert.ok(ras.includes('if (premissasSoLeitura(String(novo.status))) return novo;'),
     '`estudoDepoisDaRecarga` deixou de usar `premissasSoLeitura`');

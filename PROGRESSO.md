@@ -26,12 +26,16 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   confirmação a cada recarga depois de salvar o Financeiro.
 - O modal de Aprovar/Reprovar avisa quando há rascunho que a transição vai descartar
   (`transicaoDescartaRascunho`); a regra de Premissas só de leitura é uma só
-  (`premissasSoLeitura`, em `estudo-status.ts`), usada pela tela do Preliminar e pelo rascunho.
+  (`premissasSoLeitura`, em `estudo-status.ts`), usada pelo `_editavelPremissas` do Preliminar e
+  do Avançado e pelo rascunho.
   Campo de texto compara como texto: a comparação numérica vale só quando um dos lados é `number`.
 - Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`)
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+
+---
+
 ## 2026-11-16 — A tela deixa de oferecer o que o servidor recusa (itens U4, U5 e U7 do índice #858)
 
 - **Painel (U7):** as ações da linha saem de `acoesDoEstudo(status, _funcao)`, em
