@@ -1,6 +1,6 @@
 // Caso de render: o card "Resumo" de Premissas → Produtos (Incorporação),
 // com "Preço médio/unid." de 9 DÍGITOS (#579 — "o VALOR salta para fora do
-// quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1494-1523`)
+// quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1529-1558`)
 // só aparece na sub-aba `secao: 'produtos'`, e a MESMA `.kpis` que ele usa
 // também rege `.kpis.aproveitamento` (#569) e `.kpis.area-alocada` (#573,
 // que corenderiza aqui — `_renderAlocacaoAlv()` mora na mesma sub-aba): os
