@@ -47,10 +47,17 @@ percentuais. A soma dos percentuais tem que ser **100% da base**: o indicador ab
 mostra quanto está alocado e quanto resta, o produto novo já nasce com o que falta, e com a soma
 diferente de 100% o app recusa **Salvar premissas** e **Submeter para análise**.
 Uma linha só compõe o catálogo, e só entra no VGV, com **área, preço e unidades** maiores que zero:
-com **Unidades** vazio ou zero a linha é ignorada no cálculo, e o estudo pode ficar com VGV zerado. Para reproduzir uma planilha que traz só áreas e preços, lance **1 unidade** por
+com **Unidades** vazio ou zero a linha é ignorada no cálculo, e o estudo pode ficar com VGV zerado.
+Por isso **Submeter para análise** recusa o estudo que tenha um produto com zero unidades, sem preço
+de venda ou com 0% da base, nomeando cada produto e o motivo, e **Aprovar** confere o mesmo catálogo
+(um produto pode ser zerado enquanto o estudo está em análise). A aba Produtos mostra o mesmo aviso,
+calculado sobre as áreas já salvas, sem impedir o salvamento. Para reproduzir uma planilha que traz só áreas e preços, lance **1 unidade** por
 produto — o VGV não muda, porque ele é a base × o percentual × o preço, mas os indicadores por
 unidade (**Nº de unidades**, **Preço médio/unid.**) deixam de ter sentido. Catálogo vazio não
-bloqueia, e sem base (Terreno & Áreas ainda em branco) a regra também não se aplica. O salvamento
+bloqueia. Sem base (Terreno & Áreas ainda em branco) o salvamento das premissas segue liberado —
+é ele que grava a base —, mas **Submeter para análise** é recusado enquanto houver produto
+cadastrado por percentual: sem base, os percentuais não têm como somar 100%. Um catálogo só de linhas
+antigas, com área própria, não depende da base. O salvamento
 espera o catálogo terminar de carregar. Numa linha antiga, a primeira edição de qualquer campo fixa
 a área total dela: mudar as unidades passa então a mudar a área média, não o VGV. Estudos
 anteriores a esta forma de cadastro abrem com a mesma área e o mesmo VGV, mas, se a soma das suas
