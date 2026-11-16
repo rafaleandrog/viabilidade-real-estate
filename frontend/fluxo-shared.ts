@@ -800,6 +800,44 @@ export function totalAntesAlocacao(
   return 0;
 }
 
+/**
+ * Tipologias que o seletor de uma alocação pode oferecer como destino. É a
+ * regra do servidor para TROCAR a tipologia (a mesma de criar a alocação):
+ * o destino precisa ter saldo no estudo inteiro (catálogo − Σ unidades
+ * alocadas da tipologia em todas as fases, sem a própria alocação), saldo
+ * maior que zero, e que comporte as unidades que a alocação já tem. A
+ * tipologia atual sempre aparece. Oferecer destino que o servidor recusa só
+ * produz erro depois da escolha.
+ */
+export function tipologiasDestinoAlocacao(fases: any[], tipologias: any[], aloc: any): any[] {
+  const unidades = n(aloc?.unidades);
+  return (tipologias ?? []).filter((t) => {
+    if (Number(t?.id) === Number(aloc?.tipologia_id)) return true;
+    let vendido = 0;
+    for (const fase of fases ?? []) {
+      for (const a of (fase?.alocacoes ?? [])) {
+        if (Number(a?.id) === Number(aloc?.id)) continue;
+        if (Number(a?.tipologia_id) === Number(t?.id)) vendido += n(a?.unidades);
+      }
+    }
+    const saldo = n(t?.quantidade) - vendido;
+    return saldo > 0 && saldo >= unidades;
+  });
+}
+
+/**
+ * O que a tela aplica da RESPOSTA de um PATCH de alocação. Só a troca de
+ * tipologia traz um campo que o servidor decide — o `preco_m2` do destino —,
+ * e ele é descartado quando o preço foi editado depois de o pedido sair:
+ * a resposta atrasada da troca não desfaz o preço digitado em seguida.
+ */
+export function camposDoServidorNaAlocacao(
+  dados: Record<string, any>, res: any, precoEditadoDepois: boolean,
+): Record<string, any> {
+  if (dados?.tipologia_id === undefined || res?.preco_m2 === undefined || precoEditadoDepois) return {};
+  return { preco_m2: res.preco_m2 };
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Corretagem de vendas (#121) — custo direto pago no mês da venda
 // ─────────────────────────────────────────────────────────────────
