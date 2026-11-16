@@ -136,7 +136,7 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão do
 
 As rotas do Avançado estão descritas por página em [Estudo Avançado](avancado); as regras de
 cálculo por trás delas, em [Funding](funding) e em [Fórmulas da Proforma](formulas). As transições de status são validadas no servidor: uma transição inválida
-responde `422 TRANSICAO_INVALIDA`, e uma sem alçada `403 SEM_PERMISSAO`.
+responde `422 TRANSICAO_INVALIDA`, e uma sem alçada `403 SEM_PERMISSAO`. Submeter um Preliminar confere também o catálogo de Produtos: base de área zerada (`422 BASE_PRODUTOS_ZERADA`), soma diferente de 100% (`422 SOMA_ALV_INVALIDA`) ou produto que não forma VGV (`422 PRODUTO_SEM_VGV`) recusam a submissão, e a aprovação confere o mesmo catálogo — ver [Estudo Preliminar](preliminar).
 
 O app publica três eventos no barramento da instância: `estudo_criado`, `estudo_status_alterado` e
 `apelo_comercial_concluido`. Os membros do estudo são inscritos automaticamente.

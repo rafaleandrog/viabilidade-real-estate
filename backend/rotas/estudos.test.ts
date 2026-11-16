@@ -1019,7 +1019,7 @@ test('campos aposentados pela `041` (marketing global e valor venal) de cliente 
   }
 });
 
-// #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarSomaPctAlv`
+// #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarProdutosParaSubmissao`
 // é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
 // servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
 // "a API não contorna a tela" passaria a valer só na tela.
@@ -1043,23 +1043,23 @@ test('#781/#784 fiação: PATCH que troca o tipo do rascunho leva a área deriva
 
 test('#781/#784 fiação: POST /estudos/:id/status recusa em_analise (Loteamento e Incorporação) com soma ≠ 100% da base', () => {
   for (const parte of [
-    "novoStatus === 'em_analise'",
+    "(novoStatus === 'em_analise' || novoStatus === 'aprovado')",
     "estudo.nivel_analise !== 'avancado'", // o Avançado não tem tela para corrigir o catálogo obsoleto; linha antiga sem nível segue barrada
     "(estudo.tipo_empreendimento === 'loteamento' || estudo.tipo_empreendimento === 'incorporacao')",
     "varrerTudo('preliminar_produtos'",
-    'validarSomaPctAlv(produtos, baseProdutosM2(',
+    'validarProdutosParaSubmissao(produtos, baseProdutosM2(',
     "rotuloBaseProdutos(estudo.tipo_empreendimento as string)",
-    "erro(res, 422, 'SOMA_ALV_INVALIDA'",
+    "erro(res, 422, cat.codigo ?? 'SOMA_ALV_INVALIDA'",
   ]) {
     assert.ok(FONTE_ROTA.includes(parte), `o handler de status deixou de ter: ${parte}`);
   }
   // O predicado é `!soma.ok` E a recusa RETORNA: invertê-lo ou perder o `return;`
   // manteria as quatro strings acima e desligaria o portão.
-  assert.match(FONTE_ROTA, /if \(!soma\.ok\) \{ erro\(res, 422, 'SOMA_ALV_INVALIDA'[^\n]*\); return; \}/,
+  assert.match(FONTE_ROTA, /if \(!cat\.ok\) \{ erro\(res, 422, cat\.codigo \?\? 'SOMA_ALV_INVALIDA'[^\n]*\); return; \}/,
     'o portão deixou de recusar (predicado invertido ou return perdido)');
   // A recusa vem ANTES de gravar o status.
   assert.ok(
-    FONTE_ROTA.indexOf("erro(res, 422, 'SOMA_ALV_INVALIDA'") < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, { status: novoStatus })"),
+    FONTE_ROTA.indexOf("erro(res, 422, cat.codigo ?? 'SOMA_ALV_INVALIDA'") < FONTE_ROTA.indexOf("atualizar('estudos', estudoId, { status: novoStatus })"),
     'a checagem tem que preceder a escrita do status',
   );
 });
