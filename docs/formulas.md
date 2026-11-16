@@ -146,7 +146,12 @@ carteira e o repasse — estão descritas, com os cenários de referência, nos 
 do repositório: `referencia/padrao-incorporacao.md` (seções 11 a 14 e o anexo G, os cenários
 dourados) e `referencia/inteligencia-evi-incorporacao.md` (o significado econômico). A recorrência da carteira é por safra: com o 1º vencimento no mês seguinte à venda ou depois,
 `saldo_s,s = principal_s`, e `saldo_s,t = saldo_s,t−1 + juros_s,t − pagamento_s,t`; o saldo nunca fica negativo e zera no último
-vencimento, e a reconciliação acusa quando o saldo de um componente que amortiza volta a crescer. Quando a 1ª parcela vence no
+vencimento, e a reconciliação acusa quando o saldo de um componente que amortiza volta a crescer. Quando a 1ª
+parcela de uma tabela (prazo fixo ou até marco) vence dois ou mais meses depois da venda — o parcelamento trimestral, semestral
+ou anual, por exemplo — e a taxa é maior que zero, a carteira capitaliza os meses de carência, mas a parcela é a de uma
+tabela com o 1º vencimento um mês depois da venda e não paga esses juros: o saldo que sobra no último vencimento fica na
+carteira, e a reconciliação o acusa como carteira que não zera. Os juros de cada parcela nunca passam do juro total que o
+plano paga, então nenhum mês recebe juros negativos. Quando a 1ª parcela vence no
 próprio mês da venda, ela já abate o saldo desse mês: `saldo_s,s = principal_s × (1 + taxa) −
 parcela_s,s` — a parcela é a de uma tabela com juros entre vencimentos, então leva um período de
 juros, e só a sua amortização sai do saldo (com taxa zero, `principal_s − parcela_s,s`). O repasse

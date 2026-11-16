@@ -24,6 +24,31 @@ Dois buracos do portão de `POST /estudos/:id/status` → `em_analise`, achados 
 
 ---
 
+## 2026-11-16 — Carteira com carência que a parcela não paga: sem zeramento forçado, sem juros negativos
+
+Item A1 do diagnóstico de 2026-11-11. Um `prazo_fixo`/`ate_marco` com o 1º vencimento dois ou mais
+meses depois da venda (parcelamento legado trimestral/semestral/anual, ou plano gravado pela API) e
+taxa > 0 tem a PMT de uma tabela com 1º vencimento em `s + 1`, mas a carteira capitaliza cada mês
+da carência. O saldo que sobrava no último vencimento era zerado pelo grampo de `carteiraSaldoSafra`,
+o `CARTEIRA_NAO_ZERA` não disparava, e a repartição juros × principal de
+`calcularRecebiveisComponentes` (que lê o juro de cada parcela do saldo da carteira) devolvia o
+excesso como juro negativo na última parcela.
+
+- `carteiraSaldoSafra` não grampeia mais esse caso: o saldo fica na série e o `CARTEIRA_NAO_ZERA`
+  acusa. A `carteira_pos_marco`, que capitaliza a carência na própria parcela, segue grampeada.
+- O juro de cada parcela tem teto no juro que o plano ainda tem a pagar; nenhum mês sai negativo e
+  juros + principal continuam fechando o recebido.
+- O recebimento não muda (as parcelas são as mesmas), nem TIR, VPL e exposição; o plano mensal não
+  muda. **Muda a carteira máxima publicada** desses planos, porque o saldo da carência deixa de ser
+  zerado no último vencimento — medido na revisão (30 safras de R$ 1 mi, 10% à vista, 30% parcelado,
+  12% a.a.): trimestral +R$ 6.406,75, semestral +R$ 15.351,58, anual +R$ 33.785,52, mesmo mês da
+  máxima. Sem migração, `versao` mantida.
+- **Fica para o autor:** se a parcela deve capitalizar a carência (como a carteira própria faz) ou
+  se a periodicidade legada deveria ser "parcelas a cada N meses" — é a decisão pendente da #808,
+  que também cobre o `CARTEIRA_RESSURGE` que continua disparando durante a carência.
+
+---
+
 ## 2026-11-16 — PDF exportado escapa todo texto vindo de dado (item U1 do índice de segurança)
 
 - `htmlProforma` e `htmlFluxo` (`frontend/exportar.ts`), cujo HTML é escrito por `document.write`

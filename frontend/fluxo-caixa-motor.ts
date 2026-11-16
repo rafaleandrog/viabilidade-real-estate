@@ -1414,8 +1414,11 @@ export interface SaldoSafra {
  * convenção da #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
  * (1+taxa) − pagamentos_s(t)`, nunca negativo — o último mês da safra é
  * grampeado em zero (liquidação exata; resíduo de ponto flutuante não é
- * saldo real), exceto quando alguma parcela vence ANTES da venda: essa nunca
- * é abatida da série, e o que sobra no fim é saldo, não resíduo. `imediato` não tem saldo (paga e encerra no mesmo mês).
+ * saldo real), exceto quando alguma parcela vence ANTES da venda (essa nunca
+ * é abatida da série) ou quando a parcela não capitaliza a carência (1º
+ * vencimento dois ou mais meses depois da venda, taxa > 0, fora da carteira
+ * própria): nos dois casos o que sobra no fim é saldo, não resíduo, e fica
+ * para o `CARTEIRA_NAO_ZERA` acusar. `imediato` não tem saldo (paga e encerra no mesmo mês).
  *
  * Parcela que vence NO PRÓPRIO mês da contratação (`defasagemMeses = 0`, o
  * plano da EVI de 25/09 e a entrada parcelada do legado): ela abate o saldo
@@ -1466,18 +1469,31 @@ export function carteiraSaldoSafra(
   const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
   let ultimoMes = safra;
+  let primeiroMes = Infinity;
   let pagouAntesDaVenda = false;
   for (const p of pagamentos) {
     if (p.tipo === 'sinal') continue;
     porMes.set(p.mes, (porMes.get(p.mes) ?? 0) + p.valor);
     ultimoMes = Math.max(ultimoMes, p.mes);
+    primeiroMes = Math.min(primeiroMes, p.mes);
     if (p.mes < safra) pagouAntesDaVenda = true;
   }
   // Os grampos abaixo zeram o resíduo de ARREDONDAMENTO do último vencimento.
   // Parcela antes da venda (defasagem negativa persistida) nunca é abatida do
   // saldo — a série começa em `s` —, então o que sobra no fim não é resíduo, e
   // zerar esconderia o `CARTEIRA_NAO_ZERA` que a carteira deve acusar.
-  const grampear = !pagouAntesDaVenda;
+  //
+  // O mesmo vale para a carência que a parcela NÃO capitaliza: `prazo_fixo` e
+  // `ate_marco` com o 1º vencimento dois ou mais meses depois da venda (o
+  // parcelamento legado trimestral/semestral/anual, ou um plano gravado pela
+  // API) e taxa > 0. A PMT deles é a de uma tabela com o 1º vencimento um
+  // período depois da venda, mas a carteira capitaliza cada mês da carência,
+  // e o que sobra no último vencimento são esses juros — saldo, não resíduo.
+  // A `carteira_pos_marco` capitaliza a carência na própria parcela, então o
+  // que sobra nela é só arredondamento.
+  const carenciaNaoCapitalizada = c.tipo !== 'carteira_pos_marco'
+    && c.taxaMensal !== 0 && primeiroMes > safra + 1;
+  const grampear = !pagouAntesDaVenda && !carenciaNaoCapitalizada;
 
   // #789: a parcela que vence no mês da contratação (defasagem 0) abate o
   // saldo já em `s` — ver a convenção no comentário da função.
@@ -1896,7 +1912,14 @@ export function calcularRecebiveisComponentes(
               ? principalFinanciado
               : saldos.get(pagamento.mes - 1) ?? 0;
             const devido = saldoAnterior * componente.taxaMensal + jurosPendentes;
-            jurosPagamento = round2(Math.min(pagamento.valor, devido));
+            // Teto no juro que o plano ainda tem a pagar (`jurosTotal −
+            // jurosAlocados`): o juro de cada parcela sai do saldo da carteira,
+            // e quando a parcela não capitaliza a carência esse saldo carrega
+            // juros que o plano nunca paga. Sem o teto, as primeiras parcelas
+            // levavam mais juro do que existe e a última o devolvia como juro
+            // NEGATIVO (e principal acima do valor recebido). O que a carteira
+            // não recebe fica nela e o `CARTEIRA_NAO_ZERA` acusa.
+            jurosPagamento = round2(Math.max(0, Math.min(pagamento.valor, devido, jurosTotal - jurosAlocados)));
             jurosPendentes = Math.max(0, round2(devido - jurosPagamento));
             jurosAlocados = round2(jurosAlocados + jurosPagamento);
           }
