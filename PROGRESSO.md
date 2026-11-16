@@ -38,6 +38,9 @@ excesso como juro negativo na última parcela.
   função que monta cada documento, inclusive o SVG do fluxo. Visual e paridade tela×arquivo intactos.
 - Teste `frontend/exportar-escape.test.ts` com `<img src=x onerror=alert(1)>` e `</style><script>`.
 - Fora deste PR: U3 (injeção de fórmula e separador no CSV), outro assunto.
+
+---
+
 ## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
 
 - `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na
