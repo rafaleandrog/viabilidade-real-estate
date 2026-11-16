@@ -127,8 +127,8 @@ A **carteira de clientes** é o saldo a receber das vendas já contratadas, soma
 tabela e o saldo a repassar e zera no último vencimento de cada safra; o pico é a **carteira
 máxima**. A exceção é a tabela cuja 1ª parcela vence dois ou mais meses depois da venda (o
 parcelamento trimestral, semestral ou anual) com juros: a parcela não paga os juros desses meses de
-carência, o saldo deles fica na carteira depois do último vencimento e a reconciliação acusa que a
-carteira não zera. Quando o plano paga a 1ª parcela no próprio mês da venda, essa parcela já abate a
+carência, o saldo deles fica na carteira — e entra na carteira máxima — no mês do último vencimento,
+e a reconciliação acusa que a carteira não zera. Quando o plano paga a 1ª parcela no próprio mês da venda, essa parcela já abate a
 carteira daquele mês: os juros dela são reconhecidos nesse mês e só a amortização sai do saldo. O
 que entra em caixa é o mesmo; a carteira e a carteira máxima desses planos já descontam essa
 parcela. Uma venda contratada depois do mês do repasse do Grupo (e antes da entrega) recebe o

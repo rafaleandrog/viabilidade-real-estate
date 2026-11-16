@@ -18,7 +18,11 @@ excesso como juro negativo na última parcela.
   acusa. A `carteira_pos_marco`, que capitaliza a carência na própria parcela, segue grampeada.
 - O juro de cada parcela tem teto no juro que o plano ainda tem a pagar; nenhum mês sai negativo e
   juros + principal continuam fechando o recebido.
-- O recebimento não muda (as parcelas são as mesmas). Sem migração, `versao` mantida.
+- O recebimento não muda (as parcelas são as mesmas), nem TIR, VPL e exposição; o plano mensal não
+  muda. **Muda a carteira máxima publicada** desses planos, porque o saldo da carência deixa de ser
+  zerado no último vencimento — medido na revisão (30 safras de R$ 1 mi, 10% à vista, 30% parcelado,
+  12% a.a.): trimestral +R$ 6.406,75, semestral +R$ 15.351,58, anual +R$ 33.785,52, mesmo mês da
+  máxima. Sem migração, `versao` mantida.
 - **Fica para o autor:** se a parcela deve capitalizar a carência (como a carteira própria faz) ou
   se a periodicidade legada deveria ser "parcelas a cada N meses" — é a decisão pendente da #808,
   que também cobre o `CARTEIRA_RESSURGE` que continua disparando durante a carência.
