@@ -19,7 +19,7 @@ import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
-import { CHAVES_NAO_ENVIADAS, campoMudou, premissasNaoSalvas, retratoSalvo } from './premissas-rascunho.js';
+import { CHAVES_NAO_ENVIADAS, campoMudou, dadosPropagaveis, premissasNaoSalvas, retratoSalvo } from './premissas-rascunho.js';
 
 type T = 'num' | 'txt';
 type Largura = 'p1' | 'p2' | 'p3';
@@ -607,7 +607,7 @@ export class ViabTelaPremissas extends LitElement {
     // Propaga em tempo real para a tela do estudo, que reflete em Proforma e
     // Gráficos instantaneamente (#6). Não persiste — persistência é no Salvar.
     this.dispatchEvent(new CustomEvent('viab:premissas-change', {
-      detail: { dados: this.form }, bubbles: true, composed: true,
+      detail: { dados: dadosPropagaveis(this.form) }, bubbles: true, composed: true,
     }));
   }
 

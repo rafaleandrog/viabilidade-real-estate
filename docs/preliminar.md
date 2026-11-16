@@ -40,7 +40,9 @@ Quatro sub-abas, cada uma com os campos que valem para o tipo do estudo (Loteame
 **Salvar premissas** de qualquer uma delas; nada é salvo automaticamente. Enquanto houver alteração
 não salva, uma faixa de aviso aparece acima do botão. A edição já se reflete em Resultado e
 Gráficos, e trocar de sub-aba ou de página do estudo não a descarta: de volta às Premissas, os
-valores digitados e a faixa de aviso continuam lá até salvar. Recarregar ou fechar a página com
+valores digitados e a faixa de aviso continuam lá até salvar. O mesmo vale quando o estudo é
+relido do servidor — ao vincular o terreno do Núcleo ou ao mudar o status —, exceto quando ele
+passa a Aprovado ou Reprovado: com as Premissas só de leitura, a alteração não salva é descartada. Recarregar ou fechar a página com
 alteração não salva pede confirmação do navegador; recarregando, as Premissas voltam ao que está
 salvo. Sair do estudo pelo botão de voltar descarta a alteração não salva.
 

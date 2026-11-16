@@ -25,6 +25,9 @@ test('Premissas: rascunho sobrevive à troca de página com a faixa de não salv
   assert.equal(String(m!.valorDepois), '1500', 'o rascunho não voltou para o formulário depois da troca de página' + relato(a));
   assert.equal(m!.avisoDepois, true,
     'depois de trocar de página e voltar, a edição não salva aparece como salva (sem a faixa de "não salvo")' + relato(a));
+  assert.equal(String(m!.valorDepoisRecarga), '1500', 'a recarga do estudo pelo servidor apagou o rascunho do formulário' + relato(a));
+  assert.equal(m!.avisoDepoisRecarga, true,
+    'depois de o estudo ser recarregado do servidor (terreno do Núcleo, status), o rascunho aparece como salvo' + relato(a));
   assert.equal(m!.saidaBloqueadaMontado, true, 'com rascunho pendente, o beforeunload não pediu confirmação' + relato(a));
   assert.equal(m!.saidaBloqueadaDesmontado, false, 'o listener de beforeunload sobrou depois de a tela do estudo sair' + relato(a));
 });

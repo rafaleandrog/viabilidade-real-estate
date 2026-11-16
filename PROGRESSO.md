@@ -17,9 +17,15 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Decisão não fixada pelo item: preservar o rascunho (não pedir confirmação na troca de aba), porque
   é o desenho existente — a edição já alimenta Resultado e Gráficos ao vivo — e nenhuma outra aba
   do app pede confirmação ao trocar. Renomear o estudo com rascunho pendente também o preserva.
-- Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`) e
-  as recargas do estudo por mudança de status ou de terreno do Núcleo continuam descartando o
-  rascunho.
+- Recarga do estudo pelo servidor (terreno do Núcleo, troca de status) preserva o rascunho
+  (`estudoDepoisDaRecarga`), exceto quando o status novo é Aprovado ou Reprovado (Premissas só de
+  leitura). Renomear também o preserva, e a tela de Premissas deixou de propagar `nome` e as chaves
+  do servidor com o resto do formulário (renomear e depois digitar desfazia o nome no `estudo`).
+- O Financeiro do Avançado também emite `viab:premissas-salvas` ao salvar, e a comparação do estado
+  não salvo trata decimal como número (`4` × `"4"` × `"4.00"`): sem isso o `beforeunload` pedia
+  confirmação a cada recarga depois de salvar o Financeiro.
+- Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`)
+  continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
 

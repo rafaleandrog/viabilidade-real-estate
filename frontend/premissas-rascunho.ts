@@ -30,9 +30,32 @@ export const CHAVES_NAO_ENVIADAS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Número decimal escrito na forma canônica (`4`, `4.00`, `-0.5`). Zero à
+ * esquerda (`0123`) fica de fora de propósito: é a forma de um código em
+ * campo de texto, e ali `0123` e `123` são valores diferentes.
+ */
+const DECIMAL = /^-?(0|[1-9]\d*)(\.\d+)?$/;
+
+/**
+ * Valor normalizado para comparar: `''`/`null`/`undefined` viram `null`, e
+ * número ou decimal em string viram NÚMERO. O Postgres devolve `decimal` como
+ * string (`"4.00"`), a tela guarda o número digitado (`4`) e o Financeiro grava
+ * `Number(v)` — os três são o mesmo valor, e compará-los como texto acusaria
+ * rascunho sem edição nenhuma.
+ */
+function normalizar(v: unknown): unknown {
+  if (v === '' || v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : String(v);
+  if (typeof v === 'string' && DECIMAL.test(v)) return Number(v);
+  return String(v);
+}
+
+/**
  * Um campo mudou em relação ao retrato salvo? Normaliza `''`/`null` para o
  * mesmo valor antes de comparar, porque um input limpo devolve `''` onde o
- * registro trazia `null`, e isso não é edição.
+ * registro trazia `null`, e isso não é edição; e compara decimal como número
+ * (`4` × `"4"` × `"4.00"`), porque a mesma coluna chega do servidor como
+ * string e da tela como número.
  *
  * ⚠️ **É o predicado que decide a faixa de "alterações não salvas", o que o
  * Salvar manda e o aviso de saída da página.** Os três varrem o MESMO conjunto
@@ -43,11 +66,31 @@ export function campoMudou(
   snapshot: Record<string, any>,
   k: string,
 ): boolean {
-  const a = form[k];
-  const b = snapshot[k];
-  const an = (a === '' || a == null) ? null : a;
-  const bn = (b === '' || b == null) ? null : b;
+  const an = normalizar(form[k]);
+  const bn = normalizar(snapshot[k]);
+  if (typeof an === 'number' && typeof bn === 'number') return an !== bn;
   return String(an) !== String(bn);
+}
+
+/**
+ * Chaves que pertencem a OUTRA tela e que a de Premissas carrega só porque
+ * copia o registro inteiro: `nome` é do cabeçalho do estudo (renomear).
+ */
+const CHAVES_DE_OUTRA_TELA: ReadonlySet<string> = new Set(['nome']);
+
+/**
+ * O que a tela de Premissas propaga, a cada tecla, para a tela do estudo: o
+ * formulário SEM as chaves que ela não edita. Espalhar o formulário inteiro
+ * levaria de volta a cópia velha de `nome`/`nome_exibicao`/`status` que ela
+ * fez ao montar — desfazendo, no `estudo`, um renomear feito depois.
+ */
+export function dadosPropagaveis(form: Record<string, any>): Record<string, any> {
+  const r: Record<string, any> = {};
+  for (const [k, v] of Object.entries(form)) {
+    if (CHAVES_NAO_ENVIADAS.has(k) || CHAVES_DE_OUTRA_TELA.has(k)) continue;
+    r[k] = v;
+  }
+  return r;
 }
 
 /** Chaves editáveis do formulário que diferem do retrato salvo. */
@@ -96,6 +139,27 @@ export function reaplicarRascunho(
   if (!salvoAntigo) return r;
   for (const k of camposAlterados(atual, salvoAntigo)) r[k] = atual[k];
   return r;
+}
+
+/** Status em que as Premissas ficam só de leitura para todos. */
+const STATUS_PREMISSAS_LEITURA: ReadonlySet<string> = new Set(['aprovado', 'reprovado']);
+
+/**
+ * O `estudo` corrente depois de a tela do estudo RECARREGAR o registro do
+ * servidor (terreno do Núcleo alterado, troca de status). Recarga do mesmo
+ * estudo preserva o rascunho das Premissas — ele só some no save —, exceto
+ * quando o status novo deixa as Premissas só de leitura: ali não há como salvar
+ * nem descartar, e a tela mostraria como do estudo números que nunca foram
+ * gravados. Estudo novo (ou primeira carga) não tem rascunho a preservar.
+ */
+export function estudoDepoisDaRecarga(
+  novo: Record<string, any>,
+  atual: Record<string, any> | null | undefined,
+  salvoAntigo: Record<string, any> | null | undefined,
+): Record<string, any> {
+  if (!atual || !salvoAntigo || salvoAntigo.id !== novo.id) return novo;
+  if (STATUS_PREMISSAS_LEITURA.has(String(novo.status))) return novo;
+  return reaplicarRascunho(novo, atual, salvoAntigo);
 }
 
 /**

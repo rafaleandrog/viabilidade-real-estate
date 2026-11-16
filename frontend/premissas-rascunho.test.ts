@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   premissasNaoSalvas, camposAlterados, retratoSalvo, reaplicarRascunho, avisarSaidaSeNaoSalvo,
+  dadosPropagaveis, estudoDepoisDaRecarga,
 } from './premissas-rascunho.js';
 
 // O estado "não salvo" das Premissas, sem DOM. A prova de que a tela usa estas
@@ -65,4 +66,46 @@ test('avisarSaidaSeNaoSalvo: cancela a saída só com rascunho', () => {
 test('camposAlterados: varre as chaves do formulário menos CHAVES_NAO_ENVIADAS, com campoMudou', () => {
   const form = { ...SALVO, custo_terreno_m2: 1500, obs: 'a', id: 99, atualizado_em: 'agora' };
   assert.deepEqual(camposAlterados(form, SALVO).sort(), ['custo_terreno_m2', 'obs']);
+});
+
+test('campoMudou (via premissasNaoSalvas): decimal compara como número — 4, "4" e "4.00" são o mesmo valor', () => {
+  const salvo = { id: 1, juros_tabela_aa_padrao: '4.00' };
+  assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: 4 }, salvo), false);
+  assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: '4' }, salvo), false);
+  assert.equal(premissasNaoSalvas({ id: 1, juros_tabela_aa_padrao: 4.5 }, salvo), true);
+  // Zero à esquerda é forma de código em campo de texto: não normaliza.
+  assert.equal(premissasNaoSalvas({ id: 1, matricula: '123' }, { id: 1, matricula: '0123' }), true);
+  assert.equal(premissasNaoSalvas({ id: 1, obs: 'abc' }, { id: 1, obs: 'abc' }), false);
+});
+
+test('Avançado: depois de salvar o Financeiro (Number(v) espalhado no estudo), não há rascunho', () => {
+  // `tela-financeiro` grava `Number(v)` e o espalha no `estudo` corrente; o
+  // retrato do servidor veio do GET, com o decimal em string.
+  const salvo = { id: 3, nivel_analise: 'avancado', juros_tabela_aa_padrao: '4.00', taxa_desconto_aa: '12.00' };
+  const dados = { juros_tabela_aa_padrao: 4, taxa_desconto_aa: 12 };
+  const estudo = { ...salvo, ...dados };
+  // Mesmo sem o retrato acompanhar o save, o número salvo é o mesmo valor:
+  assert.equal(premissasNaoSalvas(estudo, salvo), false);
+  // E com o retrato acompanhando (`viab:premissas-salvas` do Financeiro):
+  assert.equal(premissasNaoSalvas(estudo, { ...salvo, ...dados }), false);
+});
+
+test('dadosPropagaveis: o formulário propagado não leva nome, nome_exibicao nem chaves do servidor', () => {
+  const r = dadosPropagaveis({ id: 1, nome: 'Velho', nome_exibicao: 'INC - Velho', status: 'rascunho', custo_terreno_m2: 10 });
+  assert.deepEqual(r, { custo_terreno_m2: 10 });
+});
+
+test('estudoDepoisDaRecarga: recarga do mesmo estudo preserva o rascunho; status só leitura e outro estudo não', () => {
+  const salvo = { id: 5, status: 'rascunho', custo_terreno_m2: '1000.00', area_terreno_nucleo: '100.00' };
+  const atual = { ...salvo, custo_terreno_m2: 1500 };
+  const novo = { ...salvo, area_terreno_nucleo: '200.00' };
+  const r = estudoDepoisDaRecarga(novo, atual, salvo);
+  assert.equal(r.custo_terreno_m2, 1500, 'o rascunho sobreviveu à recarga');
+  assert.equal(r.area_terreno_nucleo, '200.00', 'o campo que o servidor mudou entrou');
+  assert.equal(premissasNaoSalvas(r, novo), true);
+  for (const status of ['aprovado', 'reprovado']) {
+    assert.equal(estudoDepoisDaRecarga({ ...novo, status }, atual, salvo).custo_terreno_m2, '1000.00', status);
+  }
+  assert.equal(estudoDepoisDaRecarga({ ...novo, id: 6 }, atual, salvo).custo_terreno_m2, '1000.00');
+  assert.equal(estudoDepoisDaRecarga(novo, null, null), novo);
 });

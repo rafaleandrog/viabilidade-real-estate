@@ -11,7 +11,7 @@ import {
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-import { premissasNaoSalvas, reaplicarRascunho, avisarSaidaSeNaoSalvo } from './premissas-rascunho.js';
+import { premissasNaoSalvas, reaplicarRascunho, estudoDepoisDaRecarga, avisarSaidaSeNaoSalvo } from './premissas-rascunho.js';
 import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros, formNovoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
@@ -99,7 +99,10 @@ export class ViabTelaEstudo extends LitElement {
       const estudo = await buscarEstudo(this.estudoId);
       if (estudo?.erro) { urbiVerso.notificar(estudo.mensagem || 'Sem acesso', 'erro'); this.estudo = null; this._estudoSalvo = null; }
       else {
-        this.estudo = estudo;
+        // Recarga do mesmo estudo (terreno do Núcleo alterado, troca de
+        // status) preserva o rascunho das Premissas ainda não salvo — regra e
+        // exceção em `estudoDepoisDaRecarga`.
+        this.estudo = estudoDepoisDaRecarga(estudo, this.estudo, this._estudoSalvo);
         this._estudoSalvo = estudo;
         this.membros = estudo.membros || [];
       }

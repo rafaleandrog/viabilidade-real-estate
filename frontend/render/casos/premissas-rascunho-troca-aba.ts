@@ -1,3 +1,8 @@
+// Sub-aba Terreno & Áreas (a primeira): o stub de `urbi-abas` não honra
+// `ativa` (declarado abaixo), e depois de uma recarga do estudo só a primeira
+// sub-aba fica projetada. O campo editado é de Custos, mas o formulário e a
+// faixa de "não salvo" são únicos e aparecem em toda sub-aba.
+//
 // Caso de render: edição NÃO SALVA das Premissas do Preliminar sobrevive a uma
 // troca de página do estudo (Premissas → Resultado → Premissas) COMO
 // rascunho — a faixa de "não salvo" tem de estar de volta.
@@ -51,9 +56,9 @@ function temAviso(premissas: Element | null): boolean {
 }
 
 async function assentar(el: any): Promise<void> {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 10; i++) {
     await el.updateComplete;
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   }
 }
 
@@ -89,7 +94,7 @@ export const caso = {
     // Depois do append: `connectedCallback` dispara `_carregar()`, que volta
     // cedo sem `estudoId` — forçar antes seria sobrescrito por ele. O retrato
     // do servidor é forçado junto, como `_carregar` o deixaria.
-    forcarEstado(el, { carregando: false, estudo: ESTUDO, _estudoSalvo: ESTUDO, aba: 'premissas', subAba: 'custos' });
+    forcarEstado(el, { carregando: false, estudo: ESTUDO, _estudoSalvo: ESTUDO, aba: 'premissas', subAba: 'terreno' });
     await assentar(el);
 
     // Edita um campo pela mesma porta do input (`_set`): rascunho, sem salvar.
@@ -111,6 +116,18 @@ export const caso = {
     const avisoDepois = temAviso(premissas);
     const valorDepois = (premissas as any)?.form?.custo_terreno_m2 ?? null;
 
+    // Recarga do MESMO estudo pelo servidor (o que `viab:terreno-alterado` e a
+    // troca de status fazem): o servidor devolve o registro sem a edição, e o
+    // rascunho tem de sobreviver a ela também, com a faixa acesa.
+    const apiOriginal = (globalThis as any).urbiVerso.api;
+    (globalThis as any).urbiVerso.api = async (rota: string, ...resto: unknown[]) =>
+      rota === `/estudos/${ESTUDO.id}` ? { ...ESTUDO } : apiOriginal(rota, ...resto);
+    estudoEl.estudoId = ESTUDO.id; // `updated()` chama `_carregar()`
+    await assentar(estudoEl);
+    const premissasRecarga = achar(estudoEl.shadowRoot, 'viab-tela-premissas');
+    const avisoDepoisRecarga = temAviso(premissasRecarga);
+    const valorDepoisRecarga = (premissasRecarga as any)?.form?.custo_terreno_m2 ?? null;
+
     const ev1 = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(ev1);
     const saidaBloqueadaMontado = ev1.defaultPrevented;
@@ -125,6 +142,9 @@ export const caso = {
     pai.appendChild(estudoEl);
     await assentar(estudoEl);
 
-    return { recriada, avisoDepois, valorDepois, saidaBloqueadaMontado, saidaBloqueadaDesmontado };
+    return {
+      recriada, avisoDepois, valorDepois, avisoDepoisRecarga, valorDepoisRecarga,
+      saidaBloqueadaMontado, saidaBloqueadaDesmontado,
+    };
   },
 };

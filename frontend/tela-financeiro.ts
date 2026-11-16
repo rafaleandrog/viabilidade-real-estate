@@ -335,6 +335,13 @@ export class ViabTelaFinanceiro extends LitElement {
       this.dispatchEvent(new CustomEvent('viab:premissas-change', {
         detail: { dados }, bubbles: true, composed: true,
       }));
+      // E o servidor confirmou: o retrato do servidor que a tela do estudo
+      // guarda (`premissas-rascunho.ts`) acompanha, senão a diferença entre os
+      // dois viraria um "rascunho" que ninguém digitou — e o aviso de saída da
+      // página dispararia a cada recarga depois de salvar.
+      this.dispatchEvent(new CustomEvent('viab:premissas-salvas', {
+        detail: { dados }, bubbles: true, composed: true,
+      }));
       urbiVerso.notificar('Financeiro salvo.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
