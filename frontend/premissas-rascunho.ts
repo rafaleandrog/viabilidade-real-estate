@@ -169,6 +169,30 @@ export function estudoDepoisDaRecarga(
 }
 
 /**
+ * Rebase do formulário MONTADO quando o retrato do servidor muda sem trocar de
+ * estudo (o Núcleo gravou a área do terreno, o status mudou). Campo que o
+ * usuário NÃO editou — igual ao retrato anterior — adota o valor novo do
+ * servidor; campo editado mantém a edição; e o retrato da tela passa a ser o
+ * novo. Com o status novo só de leitura, as edições são descartadas (é o que o
+ * modal da transição avisou).
+ *
+ * Sem isto, a tela montada seguia com a cópia velha de um campo que outra tela
+ * gravou, devolvia-a ao estudo na primeira tecla e, depois de uma troca de
+ * página, o Salvar a mandava de volta, desfazendo a gravação.
+ */
+export function rebasearRascunho(
+  form: Record<string, any>,
+  snapshotAntigo: Record<string, any>,
+  salvoNovo: Record<string, any>,
+): { form: Record<string, any>; snapshot: Record<string, any> } {
+  const novoForm: Record<string, any> = { ...form, ...salvoNovo };
+  if (!premissasSoLeitura(String(salvoNovo.status))) {
+    for (const k of camposAlterados(form, snapshotAntigo)) novoForm[k] = form[k];
+  }
+  return { form: novoForm, snapshot: { ...salvoNovo } };
+}
+
+/**
  * A transição para `novo` vai DESCARTAR o rascunho das Premissas? É o caso em
  * que o modal de confirmação da transição avisa: há edição não salva e o
  * status novo deixa as Premissas só de leitura (`estudoDepoisDaRecarga`).

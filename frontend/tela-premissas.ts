@@ -20,7 +20,7 @@ import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
-import { CHAVES_NAO_ENVIADAS, campoMudou, dadosPropagaveis, premissasNaoSalvas, retratoSalvo } from './premissas-rascunho.js';
+import { CHAVES_NAO_ENVIADAS, campoMudou, dadosPropagaveis, premissasNaoSalvas, rebasearRascunho, retratoSalvo } from './premissas-rascunho.js';
 
 type T = 'num' | 'txt';
 type Largura = 'p1' | 'p2' | 'p3';
@@ -538,6 +538,20 @@ export class ViabTelaPremissas extends LitElement {
     // Só recarrega (e refaz o fetch de benchmarks/config) quando muda o ESTUDO
     // de fato — não a cada tecla propagada de volta via viab:premissas-change (#6).
     if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
+  }
+  willUpdate(ch: Map<string, unknown>) {
+    // O retrato do servidor mudou com o MESMO estudo e esta tela montada
+    // (Núcleo gravou a área do terreno, troca de status): rebase do formulário
+    // — ver `rebasearRascunho`. Na primeira atualização o valor anterior é
+    // `undefined`, e o `_init` já usou o retrato.
+    const anterior = ch.get('estudoSalvo') as Record<string, any> | null | undefined;
+    if (ch.has('estudoSalvo') && anterior && this.estudoSalvo && this.estudoSalvo !== anterior
+      && this.estudoSalvo.id === this._idCarregado) {
+      const r = rebasearRascunho(this.form, this._snapshot, this.estudoSalvo);
+      this.form = r.form;
+      this._snapshot = r.snapshot;
+      this._dirty = this._formDifereSnapshot();
+    }
   }
 
   /**
@@ -1621,9 +1635,10 @@ export class ViabTelaPremissas extends LitElement {
       // a aba Financeiro inteira, que o filtro de nível do backend não protege
       // (ele só vale em Preliminar).
       //
-      // O retrato **não é refeito** enquanto o id do estudo não muda
-      // (`willUpdate`), então ele envelhece durante a sessão — é por isso que o
-      // conserto não é "recarregar antes de salvar".
+      // O retrato só é refeito quando a tela do estudo recebe do servidor um
+      // registro novo (`willUpdate` → `rebasearRascunho`); o que outra tela
+      // grava por outro endpoint não passa por ali, então ele envelhece durante
+      // a sessão — é por isso que o conserto não é "recarregar antes de salvar".
       //
       // Mandar o diff resolve a classe inteira sem lista nomeada nenhuma: campo
       // que a tela não edita nunca muda em relação ao retrato, logo nunca viaja.

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   premissasNaoSalvas, camposAlterados, retratoSalvo, reaplicarRascunho, avisarSaidaSeNaoSalvo,
-  dadosPropagaveis, estudoDepoisDaRecarga, transicaoDescartaRascunho,
+  dadosPropagaveis, estudoDepoisDaRecarga, transicaoDescartaRascunho, rebasearRascunho,
 } from './premissas-rascunho.js';
 
 // O estado "não salvo" das Premissas, sem DOM. A prova de que a tela usa estas
@@ -123,4 +123,26 @@ test('transicaoDescartaRascunho: só com rascunho pendente E status novo só de 
   assert.equal(transicaoDescartaRascunho('rascunho', comRascunho, salvo), false);
   assert.equal(transicaoDescartaRascunho('arquivado', comRascunho, salvo), false);
   assert.equal(transicaoDescartaRascunho('aprovado', { ...salvo }, salvo), false);
+});
+
+test('rebasearRascunho: campo não editado adota o servidor, campo editado mantém a edição', () => {
+  const antigo = { id: 4, status: 'rascunho', area_terreno_nucleo: '500.00', custo_terreno_m2: '1000.00' };
+  const form = { ...antigo, custo_terreno_m2: 1500 };
+  const novo = { ...antigo, area_terreno_nucleo: '1000.00' };
+  const r = rebasearRascunho(form, antigo, novo);
+  assert.equal(r.form.area_terreno_nucleo, '1000.00', 'o valor que o Núcleo gravou entrou no formulário');
+  assert.equal(r.form.custo_terreno_m2, 1500, 'a edição do usuário ficou');
+  assert.deepEqual(r.snapshot, novo);
+  assert.deepEqual(camposAlterados(r.form, r.snapshot), ['custo_terreno_m2'],
+    'o Salvar mandaria só a edição — nunca a área velha do terreno');
+});
+
+test('rebasearRascunho: status novo só de leitura descarta as edições', () => {
+  const antigo = { id: 4, status: 'em_analise', custo_terreno_m2: '1000.00' };
+  const form = { ...antigo, custo_terreno_m2: 1500 };
+  for (const status of ['aprovado', 'reprovado']) {
+    const r = rebasearRascunho(form, antigo, { ...antigo, status });
+    assert.equal(r.form.custo_terreno_m2, '1000.00', status);
+    assert.equal(premissasNaoSalvas(r.form, r.snapshot), false, status);
+  }
 });

@@ -29,6 +29,11 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   (`premissasSoLeitura`, em `estudo-status.ts`), usada pelo `_editavelPremissas` do Preliminar e
   do Avançado e pelo rascunho.
   Campo de texto compara como texto: a comparação numérica vale só quando um dos lados é `number`.
+- Com a tela de Premissas montada, um retrato novo do servidor (Núcleo gravou a área do terreno,
+  troca de status) faz o rebase do formulário (`rebasearRascunho`): campo não editado adota o
+  servidor, campo editado mantém a edição, e status só de leitura descarta as edições. Sem isso o
+  Salvar devolvia a área velha do terreno, desfazendo o Núcleo — caso de render
+  `premissas-rascunho-nucleo`.
 - Fora do escopo, sem mudança: sair pelo botão de voltar (navegação interna, sem `beforeunload`)
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
