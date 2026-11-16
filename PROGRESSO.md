@@ -32,6 +32,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+
+---
+
 ## 2026-11-16 — Submissão do Preliminar confere base e VGV dos produtos (índice #858, itens Q3 e Q4)
 
 Dois buracos do portão de `POST /estudos/:id/status` → `em_analise`, achados no diagnóstico:
