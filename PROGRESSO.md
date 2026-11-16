@@ -32,6 +32,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+## 2026-11-16 — Submissão do Preliminar confere base e VGV dos produtos (índice #858, itens Q3 e Q4)
+
+Dois buracos do portão de `POST /estudos/:id/status` → `em_analise`, achados no diagnóstico:
+
+- **Q4 — base 0 pulava a regra dos 100%.** `validarSomaPctAlv` libera base ≤ 0 de propósito (sem
+  isso o Terreno & Áreas não salvaria a própria base), e a rota da submissão reusava a mesma função:
+  60% + 41% sem área era submetido. A submissão passa a usar `validarProdutosParaSubmissao`
+  (`frontend/produtos-alv.ts`), mais estrita: com produto cadastrado e base ≤ 0, recusa
+  `422 BASE_PRODUTOS_ZERADA`. O salvamento das premissas segue liberado com base 0.
+- **Q3 — produto com 0 unidades zerava o VGV sem aviso.** O motor descarta a linha que não forma
+  VGV (`produtoCompoeCatalogo`) em silêncio. A submissão recusa `422 PRODUTO_SEM_VGV`, nomeando cada
+  produto e o motivo (0 unidades, sem preço de venda, 0% da base ou sem área). Decisão: barra só na
+  submissão, não no `POST`/`PATCH` do produto — a linha nasce vazia e é preenchida campo a campo.
+- A aba Produtos mostra o mesmo texto num `urbi-banner` de alerta (`_renderAvisoSubmissaoProdutos`),
+  pela mesma função; não trava o salvamento. Ordem do portão: base → soma → VGV.
+- A **aprovação** (`em_analise → aprovado`) confere o mesmo catálogo: em análise o estudo não está
+  travado, e um produto pode ser zerado depois de submetido. Base 0 só recusa catálogo com produto
+  por `pct_alv` (só de legados segue pela checagem de VGV). O predicado "não forma VGV" é o do motor
+  (`produtoCompoeCatalogo` sobre `produtosComAreaDerivada`), em `frontend/produtos-submissao.ts`
+  (arquivo próprio para não criar ciclo com `proforma.ts`); o aviso usa a base salva.
+- Testes: HTTP da submissão e da aprovação (`backend/rotas/submissao-produtos-rota.test.ts`), lógica
+  pura e equivalência com o motor em `produtos-submissao.test.ts` e o caso de render
+  `produto-sem-vgv-aviso`. Sem migração, `versao` mantida.
 
 ---
 
