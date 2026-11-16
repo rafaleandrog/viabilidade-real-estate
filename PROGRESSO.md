@@ -21,6 +21,9 @@ o destino sem olhar o estoque dele, e a alocação seguia com o preço/m² da or
 - Na aba Receitas, a troca de tipologia passa a mostrar o preço/m² que o servidor gravou.
 - Teste HTTP contra Express real: `backend/rotas/alocacao-tipologia-rota.test.ts`. Sem migração,
   `versao` mantida.
+
+---
+
 ## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
 
 - `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na
