@@ -13,7 +13,7 @@ import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo, escaparHtml } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -325,9 +325,9 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean, temaCss = '
   const linhasHtml = linhas.map((r) => {
     // Linha de nota: uma célula só, atravessando as três colunas — não há
     // número para alinhar à direita.
-    if (r.nota) return `<tr class="nota"><td colspan="3">${r.l}</td></tr>`;
+    if (r.nota) return `<tr class="nota"><td colspan="3">${escaparHtml(r.l)}</td></tr>`;
     const sub = r.l.startsWith('=');
-    return `<tr class="${sub ? 'sub' : ''}"><td>${r.l}</td><td class="v">${celulaProforma(r)}</td><td class="v">${pctVgvProforma(r, p)}</td></tr>`;
+    return `<tr class="${sub ? 'sub' : ''}"><td>${escaparHtml(r.l)}</td><td class="v">${escaparHtml(celulaProforma(r))}</td><td class="v">${escaparHtml(pctVgvProforma(r, p))}</td></tr>`;
   }).join('');
 
   // #571: VGV ≤ 0 → "—", não "0,0%" (mesmo padrão do CSV e da tela).
@@ -338,7 +338,7 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean, temaCss = '
     ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Vendável / gleba', fmtPctOuIndef(p.eficienciaPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]]
     : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPctOuIndef(p.custoObrasVgvPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]];
 
-  const html = `<!doctype html><html lang="pt-BR" data-theme="light"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome}</title>
+  const html = `<!doctype html><html lang="pt-BR" data-theme="light"><head><meta charset="utf-8"><title>${escaparHtml(estudo.nome_exibicao || estudo.nome)}</title>
   <style>${temaCss}</style>
   <style>
     body { font-family: 'Inter', system-ui, sans-serif; color: var(--cor-texto-forte); margin: 32px; }
@@ -352,11 +352,11 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean, temaCss = '
     tr.nota td { font-size: 11px; font-style: italic; color: var(--cor-texto); background: var(--cor-alerta-fundo); }
     @media print { button { display: none; } }
   </style></head><body>
-    <h1>${estudo.nome_exibicao || estudo.nome}</h1>
-    <div class="sub-h">${estudo.tipo_empreendimento} · ${estudo.status} · Estudo de Viabilidade — UrbiVerso</div>
-    <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${r}</div><div class="v">${v}</div></div>`).join('')}</div>
+    <h1>${escaparHtml(estudo.nome_exibicao || estudo.nome)}</h1>
+    <div class="sub-h">${escaparHtml(estudo.tipo_empreendimento)} · ${escaparHtml(estudo.status)} · Estudo de Viabilidade — UrbiVerso</div>
+    <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${escaparHtml(r)}</div><div class="v">${escaparHtml(v)}</div></div>`).join('')}</div>
     <table><thead><tr><td>Linha</td><td class="v">R$</td><td class="v">% VGV</td></tr></thead>
-    <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${fmtPctOuIndef(p.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
+    <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${escaparHtml(fmtPctOuIndef(p.margemLiquidaPct))}</td><td class="v"></td></tr></tbody></table>
     <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">Imprimir / Salvar PDF</button>
   </body></html>`;
   return html;
@@ -631,7 +631,7 @@ function svgFluxoMensal(c: FluxoCalc): string {
   const passo = Math.max(3, Math.round(c.prazo / 10));
   let eixo = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" class="eixo"/>`;
   for (let i = 0; i < c.prazo; i += passo) {
-    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" class="rotulo" text-anchor="middle">${c.meses[i]}</text>`;
+    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" class="rotulo" text-anchor="middle">${escaparHtml(c.meses[i])}</text>`;
   }
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${eixo}${barras}</svg>`;
 }
@@ -648,11 +648,11 @@ function svgFluxoAcumulado(c: FluxoCalc): string {
   const passo = Math.max(3, Math.round(c.prazo / 10));
   let eixo = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" class="eixo" stroke-dasharray="4,3"/>`;
   for (let i = 0; i < c.prazo; i += passo) {
-    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" class="rotulo" text-anchor="middle">${c.meses[i]}</text>`;
+    eixo += `<text x="${x(i).toFixed(1)}" y="${H - 6}" font-size="8" class="rotulo" text-anchor="middle">${escaparHtml(c.meses[i])}</text>`;
   }
   const payback = c.paybackMes !== null
     ? `<line x1="${x(c.paybackMes)}" y1="${padT}" x2="${x(c.paybackMes)}" y2="${H - padB}" class="payback" stroke-dasharray="2,2"/>` +
-      `<text x="${(x(c.paybackMes) + 3).toFixed(1)}" y="${padT + 10}" font-size="8" class="payback">Payback ${c.paybackData}</text>`
+      `<text x="${(x(c.paybackMes) + 3).toFixed(1)}" y="${padT + 10}" font-size="8" class="payback">Payback ${escaparHtml(c.paybackData)}</text>`
     : '';
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${eixo}<path d="${linha}" class="linha" stroke-width="1.5"/>${payback}</svg>`;
 }
@@ -690,9 +690,9 @@ export function htmlFluxo(
     ['Carteira Máxima', fmtR$(c.carteiraClientesMaxima)],
   ];
   const cab = `
-    <h1>${estudo.nome_exibicao || estudo.nome}</h1>
-    <div class="sub-h">Fluxo de Caixa (Avançado) · ${estudo.tipo_empreendimento} · Estudo de Viabilidade — UrbiVerso</div>
-    <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${r}</div><div class="v">${v}</div></div>`).join('')}</div>`;
+    <h1>${escaparHtml(estudo.nome_exibicao || estudo.nome)}</h1>
+    <div class="sub-h">Fluxo de Caixa (Avançado) · ${escaparHtml(estudo.tipo_empreendimento)} · Estudo de Viabilidade — UrbiVerso</div>
+    <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${escaparHtml(r)}</div><div class="v">${escaparHtml(v)}</div></div>`).join('')}</div>`;
 
   const fmtCel = (v: number, custo: boolean) => celulaFx(v, { custo }, true);
 
@@ -700,21 +700,21 @@ export function htmlFluxo(
   for (let p = 0; p * POR_PAGINA < c.prazo; p++) {
     const ini = p * POR_PAGINA;
     const fim = Math.min(ini + POR_PAGINA, c.prazo);
-    const ths = c.meses.slice(ini, fim).map((m) => `<th>${m}</th>`).join('');
+    const ths = c.meses.slice(ini, fim).map((m) => `<th>${escaparHtml(m)}</th>`).join('');
     const trs = linhas.map((l) => {
       const cls = l.nivel === 0 ? 'g0' : l.nivel === 1 ? 'g1' : 'g2';
-      const tds = l.mensal.slice(ini, fim).map((v) => `<td class="v">${celulaFx(v, l, true)}</td>`).join('');
-      return `<tr class="${cls}"><td class="nome">${'&nbsp;&nbsp;'.repeat(l.nivel)}${l.nome}</td>
-        <td class="v">${l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : ''}</td>
-        <td class="v">${l.duracao ? `${l.duracao}m` : ''}</td>
-        <td class="v">${l.ocultarTotal ? '' : fmtCel(l.total, l.custo)}</td>
-        <td class="v">${l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : ''}</td>
-        <td class="v">${l.pctVgv !== undefined ? fmtPct(l.pctVgv) : ''}</td>${tds}</tr>`;
+      const tds = l.mensal.slice(ini, fim).map((v) => `<td class="v">${escaparHtml(celulaFx(v, l, true))}</td>`).join('');
+      return `<tr class="${cls}"><td class="nome">${'&nbsp;&nbsp;'.repeat(l.nivel)}${escaparHtml(l.nome)}</td>
+        <td class="v">${escaparHtml(l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : '')}</td>
+        <td class="v">${l.duracao ? `${escaparHtml(l.duracao)}m` : ''}</td>
+        <td class="v">${escaparHtml(l.ocultarTotal ? '' : fmtCel(l.total, l.custo))}</td>
+        <td class="v">${escaparHtml(l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : '')}</td>
+        <td class="v">${escaparHtml(l.pctVgv !== undefined ? fmtPct(l.pctVgv) : '')}</td>${tds}</tr>`;
     }).join('');
     paginas.push(`
       <section class="pagina">
         ${cab}
-        <div class="faixa">${rotuloColunas} ${ini + 1}–${fim} de ${c.prazo}</div>
+        <div class="faixa">${escaparHtml(rotuloColunas)} ${ini + 1}–${fim} de ${c.prazo}</div>
         <table>
           <thead><tr><th class="nome">Linha</th><th>Início</th><th>Duração</th><th>Total</th><th>VPL</th><th>% VGV</th>${ths}</tr></thead>
           <tbody>${trs}</tbody>
@@ -729,9 +729,9 @@ export function htmlFluxo(
     </section>`);
   const linhasReconciliacao = divergencias.length
     ? divergencias.map((d) => `<tr class="${d.severidade === 'erro' ? 'div-erro' : 'div-alerta'}">
-        <td class="nome">${d.codigo}</td><td>${d.severidade}</td><td>${d.linha ?? ''}</td>
-        <td>${d.mes === undefined ? '' : d.mes + 1}</td><td>${d.esperado}</td>
-        <td>${d.encontrado}</td><td>${d.diferenca}</td><td class="nome">${d.mensagem}</td></tr>`).join('')
+        <td class="nome">${escaparHtml(d.codigo)}</td><td>${escaparHtml(d.severidade)}</td><td>${escaparHtml(d.linha ?? '')}</td>
+        <td>${d.mes === undefined ? '' : escaparHtml(d.mes + 1)}</td><td>${escaparHtml(d.esperado)}</td>
+        <td>${escaparHtml(d.encontrado)}</td><td>${escaparHtml(d.diferenca)}</td><td class="nome">${escaparHtml(d.mensagem)}</td></tr>`).join('')
     : '<tr><td class="nome" colspan="8">Todas as invariantes reconciliadas.</td></tr>';
   paginas.push(`
     <section class="pagina">
@@ -746,8 +746,8 @@ export function htmlFluxo(
   // #269: mesma fonte da tela — sem cálculo próprio da exportação.
   if (permutaFisica.length > 0) {
     const linhasPermuta = permutaFisica.map((p) => `<tr>
-        <td class="nome">${p.nome}</td><td>${fmtNum(p.quantidadePermutada)}</td>
-        <td>${fmtNum(p.quantidadeTotal)}</td><td>${fmtNum(p.areaPermutada)} m²</td></tr>`).join('');
+        <td class="nome">${escaparHtml(p.nome)}</td><td>${escaparHtml(fmtNum(p.quantidadePermutada))}</td>
+        <td>${escaparHtml(fmtNum(p.quantidadeTotal))}</td><td>${escaparHtml(fmtNum(p.areaPermutada))} m²</td></tr>`).join('');
     paginas.push(`
     <section class="pagina">
       ${cab}
@@ -757,7 +757,7 @@ export function htmlFluxo(
     </section>`);
   }
 
-  return `<!doctype html><html lang="pt-BR" data-theme="light"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome} — Fluxo de Caixa</title>
+  return `<!doctype html><html lang="pt-BR" data-theme="light"><head><meta charset="utf-8"><title>${escaparHtml(estudo.nome_exibicao || estudo.nome)} — Fluxo de Caixa</title>
   <style>${temaCss}</style>
   <style>
     @page { size: A4 landscape; margin: 10mm; }
