@@ -28,6 +28,28 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+## 2026-11-16 — Carteira com carência que a parcela não paga: sem zeramento forçado, sem juros negativos
+
+Item A1 do diagnóstico de 2026-11-11. Um `prazo_fixo`/`ate_marco` com o 1º vencimento dois ou mais
+meses depois da venda (parcelamento legado trimestral/semestral/anual, ou plano gravado pela API) e
+taxa > 0 tem a PMT de uma tabela com 1º vencimento em `s + 1`, mas a carteira capitaliza cada mês
+da carência. O saldo que sobrava no último vencimento era zerado pelo grampo de `carteiraSaldoSafra`,
+o `CARTEIRA_NAO_ZERA` não disparava, e a repartição juros × principal de
+`calcularRecebiveisComponentes` (que lê o juro de cada parcela do saldo da carteira) devolvia o
+excesso como juro negativo na última parcela.
+
+- `carteiraSaldoSafra` não grampeia mais esse caso: o saldo fica na série e o `CARTEIRA_NAO_ZERA`
+  acusa. A `carteira_pos_marco`, que capitaliza a carência na própria parcela, segue grampeada.
+- O juro de cada parcela tem teto no juro que o plano ainda tem a pagar; nenhum mês sai negativo e
+  juros + principal continuam fechando o recebido.
+- O recebimento não muda (as parcelas são as mesmas), nem TIR, VPL e exposição; o plano mensal não
+  muda. **Muda a carteira máxima publicada** desses planos, porque o saldo da carência deixa de ser
+  zerado no último vencimento — medido na revisão (30 safras de R$ 1 mi, 10% à vista, 30% parcelado,
+  12% a.a.): trimestral +R$ 6.406,75, semestral +R$ 15.351,58, anual +R$ 33.785,52, mesmo mês da
+  máxima. Sem migração, `versao` mantida.
+- **Fica para o autor:** se a parcela deve capitalizar a carência (como a carteira própria faz) ou
+  se a periodicidade legada deveria ser "parcelas a cada N meses" — é a decisão pendente da #808,
+  que também cobre o `CARTEIRA_RESSURGE` que continua disparando durante a carência.
 
 ---
 
@@ -40,6 +62,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   função que monta cada documento, inclusive o SVG do fluxo. Visual e paridade tela×arquivo intactos.
 - Teste `frontend/exportar-escape.test.ts` com `<img src=x onerror=alert(1)>` e `</style><script>`.
 - Fora deste PR: U3 (injeção de fórmula e separador no CSV), outro assunto.
+
+---
+
 ## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
 
 - `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na
