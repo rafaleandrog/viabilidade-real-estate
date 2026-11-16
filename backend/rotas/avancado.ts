@@ -1405,6 +1405,51 @@ async function alocacaoDaFase(req: Request, res: Response, faseId: number): Prom
   return aloc;
 }
 
+/**
+ * Regras que uma alocação deve à sua tipologia — as MESMAS no POST e no PATCH
+ * que troca a tipologia: o id é numérico (400) e a tipologia pertence ao
+ * estudo (404). Devolve a tipologia, ou `null` com a resposta já enviada.
+ */
+async function tipologiaParaAlocacao(req: Request, res: Response, estudoId: number, bruto: unknown): Promise<any | null> {
+  const tipologiaId = parseInt(bruto as any);
+  if (isNaN(tipologiaId)) { erro(res, 400, 'TIPOLOGIA_OBRIGATORIA', 'Informe a tipologia da alocação'); return null; }
+  const tip = await req.dados!.buscar('avancado_tipologias', tipologiaId);
+  if (!tip || Number(tip.estudo_id) !== estudoId) {
+    erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo'); return null;
+  }
+  return tip;
+}
+
+/**
+ * Estoque da tipologia para `unidades`: saldo no estudo inteiro, sem a própria
+ * alocação em edição. `exigirSaldo` é a regra de ENTRAR numa tipologia — POST e
+ * PATCH que troca a tipologia —: sem saldo nenhum, recusa até 0 unidades. O
+ * PATCH que só muda as unidades na mesma tipologia não a aplica, como antes.
+ * Responde o 422 e devolve `false` quando a escrita deve ser recusada.
+ */
+async function unidadesCabemNaTipologia(
+  req: Request, res: Response, tip: any, unidades: number, opts: { ignorarAlocId?: number; exigirSaldo: boolean },
+): Promise<boolean> {
+  const saldo = tip ? await saldoTipologiaNoEstudo(req, tip, opts.ignorarAlocId) : 0;
+  if (opts.exigirSaldo && saldo <= 0) {
+    erro(res, 422, 'SALDO_ESGOTADO', `A tipologia "${tip?.nome || 'sem nome'}" não tem unidades disponíveis (todas as fases)`); return false;
+  }
+  if (unidades > saldo) {
+    erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia (somando todas as fases)`); return false;
+  }
+  return true;
+}
+
+/** Unidades do corpo: inteiro ≥ 0 (a mesma coerção no POST e no PATCH). */
+function unidadesDoCorpo(v: unknown): number {
+  return Math.max(0, Math.round(Number(v) || 0));
+}
+
+/** Preço/m² informado no corpo, ou o da tipologia quando o corpo não o traz. */
+function precoM2DaAlocacao(corpo: unknown, tip: any): number {
+  return corpo !== undefined ? Number(corpo) || 0 : (Number(tip.preco_m2) || 0);
+}
+
 rotasAvancado.post('/estudos/:id/avancado/fases/:fid/alocacoes', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
@@ -1413,27 +1458,17 @@ rotasAvancado.post('/estudos/:id/avancado/fases/:fid/alocacoes', async (req: Req
     const fase = await faseDoEstudo(req, res, estudo.id);
     if (!fase) return;
 
-    const tipologiaId = parseInt(req.body.tipologia_id);
-    if (isNaN(tipologiaId)) { erro(res, 400, 'TIPOLOGIA_OBRIGATORIA', 'Informe a tipologia da alocação'); return; }
-    const tip = await req.dados!.buscar('avancado_tipologias', tipologiaId);
-    if (!tip || Number(tip.estudo_id) !== estudo.id) {
-      erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo'); return;
-    }
-    const unidades = Math.max(0, Math.round(Number(req.body.unidades) || 0));
-    const saldo = await saldoTipologiaNoEstudo(req, tip);
-    if (saldo <= 0) {
-      erro(res, 422, 'SALDO_ESGOTADO', `A tipologia "${tip.nome || 'sem nome'}" não tem unidades disponíveis (todas as fases)`); return;
-    }
-    if (unidades > saldo) {
-      erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia (somando todas as fases)`); return;
-    }
+    const tip = await tipologiaParaAlocacao(req, res, estudo.id, req.body.tipologia_id);
+    if (!tip) return;
+    const unidades = unidadesDoCorpo(req.body.unidades);
+    if (!(await unidadesCabemNaTipologia(req, res, tip, unidades, { exigirSaldo: true }))) return;
     const existentes = await alocacoesDaFase(req, fase.id);
     const criada = await req.dados!.criar('avancado_alocacoes', {
       estudo_id: estudo.id,
       fase_id: fase.id,
       tipologia_id: tip.id,
       unidades,
-      preco_m2: req.body.preco_m2 !== undefined ? Number(req.body.preco_m2) || 0 : (Number(tip.preco_m2) || 0),
+      preco_m2: precoM2DaAlocacao(req.body.preco_m2, tip),
       ordem: existentes.length,
     });
     res.status(201).json(criada);
@@ -1454,23 +1489,28 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (re
     if (!aloc) return;
 
     const dados: Record<string, any> = {};
+    // Trocar a tipologia é ENTRAR noutra tipologia, e as regras do POST valem
+    // inteiras: pertença ao estudo, estoque do destino para as unidades que a
+    // alocação terá (as do corpo, ou as que ela já tem) e o preço/m² do
+    // destino, salvo preço informado. Antes o saldo só era conferido quando o
+    // corpo trazia `unidades`, e trocar só a `tipologia_id` levava as unidades
+    // e o preço/m² da origem para o destino sem conferir nada.
+    let tipNova: any = null;
     if (req.body.tipologia_id !== undefined) {
-      const tid = parseInt(req.body.tipologia_id);
-      const t = await req.dados!.buscar('avancado_tipologias', tid);
-      if (!t || Number(t.estudo_id) !== estudo.id) { erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo'); return; }
-      dados.tipologia_id = tid;
+      const t = await tipologiaParaAlocacao(req, res, estudo.id, req.body.tipologia_id);
+      if (!t) return;
+      dados.tipologia_id = Number(t.id);
+      if (Number(t.id) !== Number(aloc.tipologia_id)) tipNova = t;
     }
-    if (req.body.preco_m2 !== undefined) dados.preco_m2 = Number(req.body.preco_m2) || 0;
+    if (req.body.preco_m2 !== undefined || tipNova) dados.preco_m2 = precoM2DaAlocacao(req.body.preco_m2, tipNova ?? {});
     if (req.body.ordem !== undefined) dados.ordem = Number(req.body.ordem) || 0;
-    if (req.body.unidades !== undefined) {
-      const unidades = Math.max(0, Math.round(Number(req.body.unidades) || 0));
-      const tipId = dados.tipologia_id ?? Number(aloc.tipologia_id);
-      const tip = await req.dados!.buscar('avancado_tipologias', tipId);
-      const saldo = tip ? await saldoTipologiaNoEstudo(req, tip, Number(aloc.id)) : 0;
-      if (unidades > saldo) {
-        erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia (somando todas as fases)`); return;
-      }
-      dados.unidades = unidades;
+    if (req.body.unidades !== undefined) dados.unidades = unidadesDoCorpo(req.body.unidades);
+    if (tipNova) {
+      const unidades = dados.unidades ?? (Number(aloc.unidades) || 0);
+      if (!(await unidadesCabemNaTipologia(req, res, tipNova, unidades, { ignorarAlocId: Number(aloc.id), exigirSaldo: true }))) return;
+    } else if (dados.unidades !== undefined) {
+      const tip = await req.dados!.buscar('avancado_tipologias', Number(aloc.tipologia_id));
+      if (!(await unidadesCabemNaTipologia(req, res, tip, dados.unidades, { ignorarAlocId: Number(aloc.id), exigirSaldo: false }))) return;
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     // Reduzir as unidades, ou levar a alocação para outra tipologia, tira
