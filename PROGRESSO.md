@@ -21,6 +21,17 @@ o destino sem olhar o estoque dele, e a alocação seguia com o preço/m² da or
 - Na aba Receitas, a troca de tipologia passa a mostrar o preço/m² que o servidor gravou.
 - Teste HTTP contra Express real: `backend/rotas/alocacao-tipologia-rota.test.ts`. Sem migração,
   `versao` mantida.
+## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
+
+- `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na
+  tabela; `mercado_regioes` não o declara, então a exclusão sempre dava 500. Agora usa
+  `dados.deletar`, e o `schema.json` já define o destino dos filhos: coletas em cascata e
+  `regiao_mercado_id` dos estudos anulado. Sem migração, sem bump de `versao`.
+- Região inexistente devolve 404 (`REGIAO_NAO_ENCONTRADA`); o gate de admin fica como estava.
+- Decisão não fixada pelo item: não recusar com 409 quando há estudo vinculado, porque o schema já
+  anula o vínculo e o retrato do estudo guarda a localidade por conta própria.
+- Teste HTTP contra Express real: `backend/rotas/mercado-regiao-delete-rota.test.ts`.
+- Guia atualizado: `docs/analise-mercado.md`.
 
 ---
 
