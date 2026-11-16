@@ -24,6 +24,9 @@ o destino sem olhar o estoque dele, e a alocação seguia com o preço/m² da or
   editado depois do pedido (`camposDoServidorNaAlocacao`). Teste: `frontend/alocacao-destino.test.ts`.
 - Teste HTTP contra Express real: `backend/rotas/alocacao-tipologia-rota.test.ts`. Sem migração,
   `versao` mantida.
+
+---
+
 ## 2026-11-16 — Carteira com carência que a parcela não paga: sem zeramento forçado, sem juros negativos
 
 Item A1 do diagnóstico de 2026-11-11. Um `prazo_fixo`/`ate_marco` com o 1º vencimento dois ou mais
