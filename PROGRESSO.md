@@ -27,6 +27,15 @@ o destino sem olhar o estoque dele, e a alocação seguia com o preço/m² da or
 
 ---
 
+## 2026-11-16 — PDF exportado escapa todo texto vindo de dado (item U1 do índice de segurança)
+
+- `htmlProforma` e `htmlFluxo` (`frontend/exportar.ts`), cujo HTML é escrito por `document.write`
+  numa janela da mesma origem, interpolavam cru o nome do estudo, o tipo, o status, a linha, a
+  tipologia da permuta, os campos e a mensagem de divergência e os rótulos de mês. Todos passam agora
+  por `escaparHtml` (`frontend/viab-format.ts`), a única função de escape do documento, enumerada pela
+  função que monta cada documento, inclusive o SVG do fluxo. Visual e paridade tela×arquivo intactos.
+- Teste `frontend/exportar-escape.test.ts` com `<img src=x onerror=alert(1)>` e `</style><script>`.
+- Fora deste PR: U3 (injeção de fórmula e separador no CSV), outro assunto.
 ## 2026-11-14 — Excluir região monitorada deixa de dar 500 (item B4 do índice #858)
 
 - `DELETE /mercado/regioes/:rid` chamava `dados.remover` (soft delete), que exige `soft_delete` na
