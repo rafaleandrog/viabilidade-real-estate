@@ -28,6 +28,9 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   continua descartando o rascunho.
 - Testes: `frontend/premissas-rascunho.test.ts` e o caso de render
   `premissas-rascunho-troca-aba`. Guia atualizado: `docs/preliminar.md`.
+
+---
+
 ## 2026-11-14 — Trocar a tipologia de uma alocação confere o estoque do destino (item Q1 do índice de diagnóstico)
 
 Achado reproduzido ao vivo na Pinguim: o `PATCH …/fases/:fid/alocacoes/:aid` só conferia o saldo
