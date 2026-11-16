@@ -7,7 +7,8 @@ import {
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
 import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, baseProdutosM2, produtosDoEstudo, type ProformaInput, type Proforma } from './proforma.js';
-import { alocacaoAlv, areaMediaDaLinha, areaTotalDaLinha, pctAlvEfetivo, rotuloBaseProdutos, somaPctAlv, validarSomaPctAlv, validarProdutosParaSubmissao } from './produtos-alv.js';
+import { alocacaoAlv, areaMediaDaLinha, areaTotalDaLinha, pctAlvEfetivo, rotuloBaseProdutos, somaPctAlv, validarSomaPctAlv } from './produtos-alv.js';
+import { validarProdutosParaSubmissao } from './produtos-submissao.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, trocaBadgePremissas, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -1256,13 +1257,15 @@ export class ViabTelaPremissas extends LitElement {
           (${m2(Math.abs(a.restante))}) acima do disponível. Os produtos precisam somar 100% da ${rotulo}
           para salvar as premissas e submeter o estudo.
         </urbi-banner>` : nothing}
-      ${this._renderAvisoSubmissaoProdutos(alv, rotulo)}
+      ${this._renderAvisoSubmissaoProdutos(this._basePersistida(), rotulo)}
     `;
   }
 
   /**
-   * O que a SUBMISSÃO recusaria e o salvamento não: base zerada com produto
-   * cadastrado e produto que não forma VGV (0 unidades, sem preço, 0% da base).
+   * O que a SUBMISSÃO (e a aprovação) recusaria e o salvamento não: base zerada
+   * com produto cadastrado por % e produto que não forma VGV (0 unidades, sem
+   * preço, 0% da base). Sobre a base SALVA (`_basePersistida`), a mesma que o
+   * servidor lê — uma área ainda não salva não muda o que a submissão vê.
    * A regra e o texto são os do portão (`validarProdutosParaSubmissao`, a mesma
    * função que `POST /estudos/:id/status` chama) — a soma ≠ 100% já tem os dois
    * banners acima, então ela não se repete aqui. Alerta, não erro: não trava o

@@ -25,7 +25,8 @@ import {
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
-import { validarProdutosParaSubmissao, areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
+import { areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
+import { validarProdutosParaSubmissao } from '../../frontend/produtos-submissao.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 import { funcaoEfetivaDoMembro } from '../../frontend/membros-regras.js';
@@ -979,7 +980,13 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
     // este catálogo para correção, mas a API aceita linhas em `preliminar_produtos`
     // em qualquer nível e a duplicação as copia — um catálogo obsoleto que não
     // fecha 100% barraria a submissão de um estudo Avançado sem saída na tela.
-    if (novoStatus === 'em_analise'
+    //
+    // A mesma regra vale na APROVAÇÃO (`em_analise → aprovado`): em análise o
+    // estudo não está travado (`STATUS_TRAVADO`), então o editor pode zerar as
+    // unidades de um produto depois de submeter, e um estudo que já estava em
+    // análise antes desta regra nunca passou por ela. Conferir só na entrada da
+    // análise deixaria o aprovador aprovar com VGV zerado.
+    if ((novoStatus === 'em_analise' || novoStatus === 'aprovado')
       && estudo.nivel_analise !== 'avancado'
       && (estudo.tipo_empreendimento === 'loteamento' || estudo.tipo_empreendimento === 'incorporacao')) {
       // `varrerTudo`, e não `listar` com página fixa: a soma precisa do catálogo

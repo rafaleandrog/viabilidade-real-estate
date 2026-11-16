@@ -19,8 +19,14 @@ Dois buracos do portão de `POST /estudos/:id/status` → `em_analise`, achados 
   submissão, não no `POST`/`PATCH` do produto — a linha nasce vazia e é preenchida campo a campo.
 - A aba Produtos mostra o mesmo texto num `urbi-banner` de alerta (`_renderAvisoSubmissaoProdutos`),
   pela mesma função; não trava o salvamento. Ordem do portão: base → soma → VGV.
-- Testes: HTTP da submissão (`backend/rotas/submissao-produtos-rota.test.ts`), lógica pura em
-  `produtos-alv.test.ts` e o caso de render `produto-sem-vgv-aviso`. Sem migração, `versao` mantida.
+- A **aprovação** (`em_analise → aprovado`) confere o mesmo catálogo: em análise o estudo não está
+  travado, e um produto pode ser zerado depois de submetido. Base 0 só recusa catálogo com produto
+  por `pct_alv` (só de legados segue pela checagem de VGV). O predicado "não forma VGV" é o do motor
+  (`produtoCompoeCatalogo` sobre `produtosComAreaDerivada`), em `frontend/produtos-submissao.ts`
+  (arquivo próprio para não criar ciclo com `proforma.ts`); o aviso usa a base salva.
+- Testes: HTTP da submissão e da aprovação (`backend/rotas/submissao-produtos-rota.test.ts`), lógica
+  pura e equivalência com o motor em `produtos-submissao.test.ts` e o caso de render
+  `produto-sem-vgv-aviso`. Sem migração, `versao` mantida.
 
 ---
 

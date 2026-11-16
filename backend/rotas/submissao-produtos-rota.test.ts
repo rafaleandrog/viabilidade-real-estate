@@ -33,14 +33,14 @@ class DadosFake {
   }
 }
 
-// 26 = editor (nível escrita, membro editor do estudo).
+// 26 = editor (nível escrita, membro editor do estudo); 1 = admin do app (aprova em qualquer estudo).
 function criarApp(dados: DadosFake) {
   const app = express();
   app.use(express.json());
   app.use((req: any, _res, next) => {
     const uid = Number(req.header('x-usuario'));
     req.dados = dados;
-    req.contexto = { nivelApp: uid === 26 ? 'escrita' : 'nenhuma', usuario: { id: uid, nome: `U${uid}` } };
+    req.contexto = { nivelApp: uid === 26 ? 'escrita' : uid === 1 ? 'admin' : 'nenhuma', usuario: { id: uid, nome: `U${uid}` } };
     req.eventos = { publicar: async () => {}, inscreverUsuario: async () => {}, cancelarInscricao: async () => {} };
     next();
   });
@@ -48,14 +48,14 @@ function criarApp(dados: DadosFake) {
   return app;
 }
 
-async function submeter(dados: DadosFake, estudoId: number): Promise<{ status: number; j: any }> {
+async function submeter(dados: DadosFake, estudoId: number, status = 'em_analise', usuario = '26'): Promise<{ status: number; j: any }> {
   const server = criarApp(dados).listen(0);
   await new Promise<void>((r) => server.once('listening', () => r()));
   const { port } = server.address() as AddressInfo;
   try {
     const r = await fetch(`http://127.0.0.1:${port}/estudos/${estudoId}/status`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-usuario': '26' },
-      body: JSON.stringify({ status: 'em_analise' }),
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-usuario': usuario },
+      body: JSON.stringify({ status }),
     });
     return { status: r.status, j: await r.json() };
   } finally { await new Promise<void>((r) => server.close(() => r())); }
@@ -140,6 +140,59 @@ test('submissão: caso normal (base positiva, 100%, unidades e preço) passa', a
 test('submissão: catálogo vazio continua passando (decisão anterior preservada)', async () => {
   const dados = new DadosFake();
   const id = estudoIncorporacao(dados, 0, []);
+  const r = await submeter(dados, id);
+  assert.equal(r.status, 200, JSON.stringify(r.j));
+});
+
+// A APROVAÇÃO confere o mesmo catálogo: em análise o estudo não está travado, e o
+// editor pode zerar as unidades de um produto depois de submeter — ou o estudo já
+// estava em análise antes desta regra. Sem o portão aqui, o aprovador aprovaria
+// com VGV zerado.
+function emAnalise(dados: DadosFake, base: number, produtos: Record<string, any>[]): number {
+  const id = estudoIncorporacao(dados, base, produtos);
+  dados.tabelas.get('estudos')!.get(id)!.status = 'em_analise';
+  return id;
+}
+
+test('aprovação: produto com 0 unidades em estudo já em análise é recusado', async () => {
+  const dados = new DadosFake();
+  const id = emAnalise(dados, 1000, [
+    { nome: 'Torre A', pct_alv: 60, preco_venda_m2: 10_000, unidades: 50 },
+    { nome: 'Torre B', pct_alv: 40, preco_venda_m2: 10_000, unidades: 0 },
+  ]);
+  const r = await submeter(dados, id, 'aprovado', '1');
+  assert.equal(r.status, 422, JSON.stringify(r.j));
+  assert.equal(r.j.codigo, 'PRODUTO_SEM_VGV');
+  assert.match(r.j.mensagem, /Torre B/);
+  assert.equal(statusDe(dados, id), 'em_analise');
+});
+
+test('aprovação: base 0 com produto por % é recusada', async () => {
+  const dados = new DadosFake();
+  const id = emAnalise(dados, 0, [{ nome: 'Torre A', pct_alv: 100, preco_venda_m2: 10_000, unidades: 50 }]);
+  const r = await submeter(dados, id, 'aprovado', '1');
+  assert.equal(r.status, 422, JSON.stringify(r.j));
+  assert.equal(r.j.codigo, 'BASE_PRODUTOS_ZERADA');
+  assert.equal(statusDe(dados, id), 'em_analise');
+});
+
+test('aprovação: catálogo válido aprova; reprovar e devolver não conferem o catálogo', async () => {
+  const dados = new DadosFake();
+  const ok = emAnalise(dados, 1000, [{ nome: 'Torre A', pct_alv: 100, preco_venda_m2: 10_000, unidades: 50 }]);
+  assert.equal((await submeter(dados, ok, 'aprovado', '1')).status, 200);
+  assert.equal(statusDe(dados, ok), 'aprovado');
+  for (const destino of ['reprovado', 'rascunho']) {
+    const id = emAnalise(dados, 1000, [{ nome: 'Torre B', pct_alv: 100, preco_venda_m2: 10_000, unidades: 0 }]);
+    const r = await submeter(dados, id, destino, '1');
+    assert.equal(r.status, 200, `${destino}: ${JSON.stringify(r.j)}`);
+  }
+});
+
+test('submissão: catálogo só de legados (sem pct_alv) com base 0 passa', async () => {
+  const dados = new DadosFake();
+  const id = estudoIncorporacao(dados, 0, [
+    { nome: 'Legado', area_media_m2: 80, preco_venda_m2: 9_000, unidades: 10 },
+  ]);
   const r = await submeter(dados, id);
   assert.equal(r.status, 200, JSON.stringify(r.j));
 });

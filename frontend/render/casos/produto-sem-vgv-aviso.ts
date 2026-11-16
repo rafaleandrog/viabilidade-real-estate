@@ -2,7 +2,7 @@
 // (`frontend/tela-premissas.ts:_renderAvisoSubmissaoProdutos`) — produto com 0
 // unidades, que o motor descarta do VGV em silêncio e que a submissão recusa.
 //
-// A regra é pura e testada em `produtos-alv.test.ts`, e o portão do servidor em
+// A regra é pura e testada em `produtos-submissao.test.ts`, e o portão do servidor em
 // `backend/rotas/submissao-produtos-rota.test.ts`; nenhum dos dois vê o DOM, e
 // apagar a chamada do template deixaria as duas suítes verdes.
 
