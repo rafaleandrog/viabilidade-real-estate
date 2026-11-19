@@ -16,20 +16,31 @@ Antes de reescrever o painel, leia nele:
 
 1. **Antes de tudo, a seção "Adiado para a próxima triagem" do painel anterior**: as entradas que
    passaram do limite ontem entram antes das novas.
-2. Issues abertas ou comentadas desde o último painel.
-3. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK):
-   - `## Aprovadas`: cada linha vira issue do dono, já aprovada, citando a linha. Antes de criar,
-     procure issue que já cite a linha, para não duplicar.
+2. Issues abertas ou comentadas desde o último painel, **exceto a própria issue-painel**. Os
+   comentários dela só entram pelos passos que os leem: as respostas do dono (§ 1), as
+   `Observação:` (item 5) e os aprendizados (§ 5). O registro de trabalho concluído é só leitura.
+3. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK, § Ideias da app):
+   - **Antes de qualquer linha:** procure issue que já cite a linha. Achou, a linha já é trabalho:
+     não vira item de novo, não volta a "Esperando" e entra no PR de saída abaixo. O mesmo vale
+     para linha já listada em "Esperando o seu sim" ou em "Adiado".
+   - `## Aprovadas`: cada linha vira issue do dono, já aprovada, com o rótulo `spec` e citando a
+     linha.
    - `## Braindump`: ideia crua, **não aprovada**. Não vira item sozinha: entra em "Esperando o seu
-     sim" com a pergunta "aprova?", dentro de `max_esperando_dono`. Caixa marcada vira issue do dono.
-     Linha já listada em "Esperando o seu sim" ou em "Adiado" não se repete.
-   - `## Descartadas`: **nunca** vira item. É a lista do que não propor de novo (SKILL.md § 4).
-   Linha que virou issue **sai** do `ideias.md` ("a linha sai quando vira issue"): junte as saídas
-   do dia num PR de manutenção que só remove essas linhas e cita as issues. Nunca apague linha de
-   `Descartadas`.
-4. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, pelas rotas de leitura que o
-   `ajuda.md` do SDK documenta. Bug relatado ali segue o caminho que o processo do repositório
-   define para bug.
+     sim" com a pergunta "aprova?", dentro de `max_esperando_dono`. Caixa marcada vira issue do dono
+     com `spec`; recusa do dono move a linha para `Descartadas`, com o motivo no fim.
+   - `## Descartadas`: **nunca** vira item. É a lista do que não propor de novo (SKILL.md § 4), e
+     linha dela nunca é apagada.
+   **A linha sai do `ideias.md` no mesmo passo em que vira issue** (`documentacao.md`: "Ideia
+   aprovada vira issue com o label `spec`, e a linha sai do `ideias.md` no mesmo passo"). Como todo
+   arquivo do repositório muda por PR, o passo é: criada a issue, abra **na mesma sessão** o PR que
+   remove a linha (e move as recusadas para `Descartadas`), citando as issues. Esse PR é
+   manutenção e segue a autonomia do prompt; enquanto ele não entra, é a issue que cita a linha que
+   impede o item de nascer de novo.
+4. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, **só** por rota de leitura
+   que o `ajuda.md` do SDK fixado documente. Se ele não documentar rota que liste casos (é o caso do
+   SDK 57.0.0, que documenta só o `sentinela/status`), escreva em "Não lido" que não há rota
+   documentada e siga — nunca adivinhe endereço. Bug relatado ali segue o caminho que o processo do
+   repositório define para bug.
 5. Os comentários `Observação:` deixados na issue-painel desde o último painel, por qualquer sessão
    (rule do repositório, item 3, e EXECUCAO § 4). É daqui que nascem os itens da IA.
 6. **Só às segundas-feiras:** SDK do lockfile contra o publicado (e o kit, onde houver), avisos de

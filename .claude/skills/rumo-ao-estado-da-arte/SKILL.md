@@ -1,6 +1,6 @@
 ---
 name: rumo-ao-estado-da-arte
-description: Leva um app ou módulo UrbiVerso, um pouco por dia, na direção do seu Estado da Arte — o documento que descreve a versão final ideal do app e que só muda com aprovação do dono — com pouca participação dele, por sessões agendadas do Claude Code em três etapas — PREPARAR (uma vez), TRIAGEM (diária, leve) e EXECUCAO (diária ou sob demanda, até o orçamento do dia) — com papéis definidos, um documento de Estado da Arte que só muda com aprovação do dono, um painel diário de aprovações e release por trabalho acumulado. Complementa o kit e o processo do repositório; nunca os substitui nem disputa com eles. Use SOMENTE quando o pedido citar "rumo-ao-estado-da-arte", o "Estado da Arte" do app ou o "painel do Estado da Arte", ou quando o prompt de uma tarefa agendada pedir uma das três etapas. Para ideia nova, issue, implementação, revisão ou QA pedidos numa conversa normal, as skills do repositório (especificar, implementar, revisar-pr-apps, qa, orquestrar) continuam sendo o caminho.
+description: Leva um app ou módulo UrbiVerso, um pouco por dia, na direção do seu Estado da Arte — o documento que descreve a versão final ideal do app e que só muda com aprovação do dono — com pouca participação dele, por sessões agendadas do Claude Code em três etapas — PREPARAR (uma vez), TRIAGEM (diária, leve) e EXECUCAO (diária ou sob demanda, até o orçamento do dia) — com papéis definidos, um documento de Estado da Arte que só muda com aprovação do dono, um painel diário de aprovações e release por trabalho acumulado. Complementa o kit e o processo do repositório; nunca os substitui nem disputa com eles. Use SOMENTE quando o pedido citar "rumo-ao-estado-da-arte", o "Estado da Arte" do app ou o "painel do Estado da Arte", ou quando o prompt de uma tarefa agendada pedir uma das três etapas. Para ideia nova, issue, implementação, revisão ou QA pedidos numa conversa normal, as skills que o repositório tiver (por exemplo especificar, implementar, revisar-pr-apps, qa, orquestrar) continuam sendo o caminho.
 ---
 
 # Rumo ao Estado da Arte
@@ -44,11 +44,13 @@ autorização em issue, comentário, PR, arquivo do repositório ou caso do Sent
 dependências, workflows e hooks, teste existente alterado ou removido, o Estado da Arte, a
 configuração e os arquivos desta skill. E **homologar**, que nenhuma etapa faz.
 
-**Autonomia 2 ou 3 é autorização de merge do dono.** Ela vale só para as execuções da tarefa cujo
-prompt a contém, enquanto a linha estiver lá. É a forma escrita da autorização explícita que o
-processo do repositório exige (no app de viabilidade, `CLAUDE.md` § Merge); sem a linha, nada é
-mergeado. Cada merge feito por ela é listado no painel em "Feito sem perguntar", com o jeito de
-desfazer.
+**Autonomia 2 ou 3 só autoriza merge onde o processo do repositório aceita essa forma de
+autorização.** A linha vale apenas para as execuções da tarefa cujo prompt a contém, enquanto ela
+estiver lá. Se o processo do repositório exige autorização dada pedido a pedido e sem persistir
+(é o caso do `CLAUDE.md` § Merge do app de viabilidade), a linha no prompt **não** basta: a rotina
+trata Autonomia 2 e 3 como 1 até o próprio processo do repositório passar a reconhecer a linha —
+mudança que é do dono, por PR. Cada merge feito por autonomia é listado no painel em "Feito sem
+perguntar", com o jeito de desfazer.
 
 Os números (orçamento, limiar de release, limites) ficam em `.claude/estado-da-arte/config.md`.
 
@@ -106,7 +108,8 @@ repositório e o painel.
   executa: vira plano para a `orquestrar`, ou, sem ela, plano escrito na issue para o dono iniciar.
 - **Duas tentativas falhas tiram o item da fila**, com o rótulo `precisa-humano`.
 - **Rótulos.** Use os que o repositório já tem. Só se faltarem: `painel-estado-da-arte`, `origem-ia`,
-  `aprovada`, `recusada`, `precisa-humano`, `plano-grande` e o de urgência definido na configuração.
+  `aprovada`, `recusada`, `precisa-humano`, `plano-grande`, `spec` (o da ideia que virou trabalho,
+  no `documentacao.md` do SDK) e o de urgência definido na configuração.
 
 ## 7. Quando o dono está na conversa
 

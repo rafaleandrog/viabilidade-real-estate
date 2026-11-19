@@ -8,7 +8,7 @@ Só passe ao seguinte quando o anterior passar. Os limiares são ponto de partid
 | T1 | TRIAGEM com **Run now** | O ambiente de nuvem instala o SDK privado e lê o repositório | O painel aparece, e "Não lido" traz só o esperado |
 | T2 | TRIAGEM por 3 dias | A fila é a que você montaria | Você concorda com a ordem e com o que ficou esperando o seu sim |
 | T3 | EXECUCAO com `Autonomia: 1`, 5 itens | Um PR pronto sai de um item sem você | 4 de 5 PRs você aceitaria sem tocar |
-| T4 | EXECUCAO com `Autonomia: 2`, 2 semanas | O merge automático funciona e é confiável | A sessão mergeia sem ficar esperando confirmação, e nada é revertido |
+| T4 | EXECUCAO com `Autonomia: 2`, 2 semanas (só depois de o processo do repositório reconhecer a linha: SKILL.md § 3) | O merge automático funciona e é confiável | A sessão mergeia sem ficar esperando confirmação, e nada é revertido |
 | T5 | `Release: automática` | A pré-release sai sozinha | A tag aparece e a instância de homologação a recebe |
 | T6 | Rótulo `agora` numa issue | A sessão sob demanda abre e respeita o saldo | Com saldo, trabalha; sem saldo, deixa na fila |
 
