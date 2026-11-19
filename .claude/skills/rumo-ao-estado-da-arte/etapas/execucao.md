@@ -66,10 +66,14 @@ Conte os pontos mergeados desde a última release. O limiar é `release_pontos`,
 com ao menos uma mudança.
 
 - **Abaixo do limiar:** nada.
-- **Há migração, mudança de schema ou de manifesto entre as mudanças:** proponha no painel, em
-  "Esperando o seu sim", com o que muda e o que não tem volta. Nunca dispare.
+- **Há algo sensível entre as mudanças** — qualquer item da lista "sempre esperam o dono" do
+  SKILL.md § 3 (migração, `schema.json`, manifesto, permissões, dependências, workflows e hooks,
+  teste existente alterado ou removido, Estado da Arte, configuração, arquivos desta skill), mesmo
+  que o dono já o tenha mergeado: proponha no painel, em "Esperando o seu sim", com o que muda e o
+  que não tem volta. Nunca dispare.
 - **Sem nada sensível e com `Release: automática` no prompt:** dispare o workflow de release do
-  repositório, do jeito que o `KIT.md` ou o `CLAUDE.md` definem, e anote a tag no painel.
+  repositório, do jeito que o `KIT.md` (onde houver) ou o `CLAUDE.md` definem, e anote a tag no
+  painel.
 - **Sem a linha no prompt:** proponha no painel com a lista do que entra.
 
 Em todos os casos, escreva no painel o roteiro do que o dono deve conferir na homologação.

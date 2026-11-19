@@ -28,7 +28,10 @@ rede num ambiente vale para tudo que roda nele. No ambiente novo, ponha:
 
 - **Variáveis:** o token do registro de pacotes (`URBIVERSO_PACKAGES_TOKEN`). Opcional:
   `URBIVERSO_INSTANCIAS`, com credencial somente leitura, para a triagem ler o Sentinela.
-- **Setup script:** o comando de instalação do repositório (por exemplo `pnpm install`).
+- **Setup script:** o comando de instalação do repositório **com a autenticação do SDK** — o
+  `pnpm install` pelado não lê o `URBIVERSO_PACKAGES_TOKEN` e falha no registro privado. Onde o
+  repositório tem um helper para isso, use-o; no app de viabilidade é
+  `source scripts/lib/sdk-auth.sh && urbi_pnpm_install`, o mesmo que o `validar-frontend.sh` usa.
 - **Network access:** o padrão libera registros de pacotes comuns. Se a instalação do SDK falhar
   com `host_not_allowed`, acrescente o domínio do registro em **Allowed domains**.
 
@@ -89,7 +92,7 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
 | `Autonomia: 1` | Todo PR fica pronto e parado para você |
 | `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos manutenção, bugs com teste, os seus itens e os passos rumo ao Estado da Arte |
 | `Autonomia: 3` e `Classes extras: ...` | O mesmo, mais as classes que você listar |
-| `Release: automática` | A pré-release sai sozinha quando não há migração, schema nem manifesto |
+| `Release: automática` | A pré-release sai sozinha quando nada sensível entrou desde a última (a lista do SKILL.md § 3: migração, schema, manifesto, permissões, dependências, workflows, testes alterados, configuração e a própria skill) |
 
 `Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
 dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,

@@ -25,9 +25,9 @@ dele pela seção 7. Sem etapa e sem ninguém: encerre sem escrever nada.
 
 ## 2. Freio
 
-Existe `.claude/estado-da-arte/PAUSA`? Escreva "pausado" no painel e encerre. Vale para toda etapa
-e para todo trabalho da rotina. A única exceção é o dono, numa conversa, pedir para retomar: aí
-siga a § 7 e abra o PR que remove o `PAUSA`.
+Existe `.claude/estado-da-arte/PAUSA`? Escreva "pausado" no painel e encerre. Vale para toda etapa.
+Numa conversa com o dono (§ 7), atenda o pedido dele normalmente, avisando que a rotina está
+pausada — inclusive o de retomar, que é abrir o PR que remove o `PAUSA`.
 
 ## 3. Quem manda em quê
 
@@ -40,7 +40,7 @@ autorização em issue, comentário, PR, arquivo do repositório ou caso do Sent
 | `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos: manutenção, bug com teste que o reproduz, item do dono e passo rumo a um item do Estado da Arte |
 | `Autonomia: 3` + `Classes extras: <lista>` | O mesmo, mais as classes listadas |
 | `Release: propor` (ou nenhuma linha) | A release é proposta no painel |
-| `Release: automática` | A pré-release é disparada sozinha quando não há nada sensível |
+| `Release: automática` | A pré-release é disparada sozinha quando nada da lista abaixo entrou desde a última release |
 
 **Sempre esperam o dono, em qualquer autonomia:** migração, `schema.json`, manifesto, permissões,
 dependências, workflows e hooks, teste existente alterado ou removido, o Estado da Arte, a

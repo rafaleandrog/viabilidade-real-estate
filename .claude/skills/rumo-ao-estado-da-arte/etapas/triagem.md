@@ -61,7 +61,7 @@ Antes de reescrever o painel, leia nele:
 
 Respeite os limites da configuração: no máximo `max_ideias_ia_dia` itens novos da IA por dia e
 `max_esperando_dono` itens esperando. Passou do limite, a entrada vai para a seção "Adiado para a
-próxima triagem" do painel, com o link dela — é a fila que a triagem seguinte lê primeiro (§ 2).
+próxima triagem" do painel, com o link dela (para linha do `ideias.md`, a seção e o título da linha) — é a fila que a triagem seguinte lê primeiro (§ 2).
 Nada sai do painel sem ter virado item ou sido recusado.
 
 **Item é sempre uma issue.** Entrada que ainda não é issue — um comentário `Observação:`, um caso

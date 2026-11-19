@@ -6,6 +6,7 @@ Estado da Arte: painel — <data> · autonomia <n> · orçamento <gasto>/<total>
 ## Esperando o seu sim
 Marque a caixa para aprovar. Para recusar, comente o motivo.
 - [ ] #<n> <título> — <por que precisa de você>
+- [ ] `ideias.md` › Braindump: <título da linha> — aprova? (vira issue com a caixa marcada)
 
 ## Propostas para o Estado da Arte
 - PR #<n> — <item> — <entrada que originou>
@@ -16,7 +17,7 @@ Cada um você inicia pela `orquestrar`, ou, onde ela não existe, numa sessão s
 
 ## Adiado para a próxima triagem
 Entradas que passaram do limite do dia. A próxima triagem as lê antes das novas.
-- <link da entrada> — <o que é>
+- <link da entrada, ou `ideias.md` › <seção>: <título da linha>> — <o que é>
 
 ## Fila pronta, em ordem
 1. #<n> — <tipo> — <pontos>
