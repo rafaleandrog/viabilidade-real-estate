@@ -91,6 +91,11 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
 | `Autonomia: 3` e `Classes extras: ...` | O mesmo, mais as classes que você listar |
 | `Release: automática` | A pré-release sai sozinha quando não há migração, schema nem manifesto |
 
+Pôr `Autonomia: 2` ou `3` no prompt **é** a sua autorização explícita de merge para as execuções
+daquela tarefa, enquanto a linha estiver lá. Se o processo do repositório só aceita autorização
+pedido a pedido, como o `CLAUDE.md` § Merge do app de viabilidade, decida isso conscientemente: a
+linha no prompt é a forma de dar essa autorização a cada disparo, e apagá-la a retira.
+
 ## 8. O seu dia a dia
 
 - **Trazer uma ideia, um bug ou um link:** uma linha no `ideias.md`, uma issue, ou dizer "anota
@@ -111,8 +116,9 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
   `Autonomia: 1` nada entra sem você, então o pior caso é um PR a mais para fechar.
 - **CI e verificações do repositório.** Os PRs da rotina passam pelas mesmas verificações de
   qualquer PR. Se alguma barrar os arquivos novos, é um ajuste a fazer no PR de instalação.
-- **Para desinstalar:** desligue as tarefas, apague `.claude/skills/rumo-ao-estado-da-arte/` e
-  `.claude/estado-da-arte/`, e feche a issue-painel. Nada mais terá sido alterado.
+- **Para desinstalar:** desligue as tarefas, apague `.claude/skills/rumo-ao-estado-da-arte/`,
+  `.claude/rules/rumo-ao-estado-da-arte.md` e `.claude/estado-da-arte/`, e feche a issue-painel.
+  Nada mais terá sido alterado. Sem apagar a rule, toda sessão continuaria a seguir a rotina.
 
 ## 10. Outro app
 

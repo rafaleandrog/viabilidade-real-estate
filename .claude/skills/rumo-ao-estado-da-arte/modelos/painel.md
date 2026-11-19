@@ -11,8 +11,12 @@ Marque a caixa para aprovar. Para recusar, comente o motivo.
 - PR #<n> — <item> — <entrada que originou>
 
 ## Planos grandes
-Cada um você inicia pela `orquestrar`.
+Cada um você inicia pela `orquestrar`, ou, onde ela não existe, numa sessão sua a partir do plano escrito na issue.
 - #<n> <título>
+
+## Adiado para a próxima triagem
+Entradas que passaram do limite do dia. A próxima triagem as lê antes das novas.
+- <link da entrada> — <o que é>
 
 ## Fila pronta, em ordem
 1. #<n> — <tipo> — <pontos>

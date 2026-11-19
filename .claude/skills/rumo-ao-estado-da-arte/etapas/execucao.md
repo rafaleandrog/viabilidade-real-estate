@@ -5,8 +5,11 @@
 Leia no painel quanto do `orcamento_diario` já foi gasto hoje. Sem saldo: anote "sem saldo" e
 encerre. Não comece item que custa mais que o saldo.
 
-**Sob demanda** (sessão disparada por rótulo numa issue): trabalhe só na issue aberta mais antiga
-com o rótulo de urgência da configuração. Não há nenhuma, ou não há saldo: deixe na fila e encerre.
+**Sob demanda** (sessão disparada por rótulo numa issue): confira primeiro **o rótulo que o evento
+acabou de aplicar**. Se não for o `rotulo_urgente` da configuração, encerre sem escrever nada — o
+gatilho dispara a cada rótulo posto em qualquer issue. Sendo ele, trabalhe só na issue do evento, e
+só se ela ainda não tiver branch ou PR desta rotina; já tendo, ou sem saldo, deixe na fila e
+encerre.
 
 ## 2. A ordem
 
@@ -26,24 +29,27 @@ Lido o código, o item não cabe numa sessão ou é sensível: comente, marque `
 
 ## 4. Implementar (Construtor)
 
-Siga **o processo do repositório** por inteiro: o do `CLAUDE.md`, o do `KIT.md` e a skill
-`implementar`, incluindo o empacotador limpo antes do commit e os registros que o repositório exige.
+Siga **o processo do repositório** por inteiro: o do `CLAUDE.md` e, quando o repositório os
+tiver, o do `KIT.md` e a skill `implementar` — incluindo o empacotador limpo antes do commit e os
+registros que o repositório exige. É esta etapa, e só ela, que altera código do app (SKILL.md § 6).
 
 - Defeito: primeiro um teste que **falha** no código atual, depois o conserto.
 - **Nunca altere, pule nem remova teste existente.** Parece necessário? Pare e leve ao dono.
 - Peça uma solução geral: os testes verificam, não definem a solução.
 - Não toque em Estado da Arte, configuração nem nos arquivos desta skill.
 - Mesmo erro duas vezes sem nada novo: pare e escreva na issue o que tentou.
-- O que você notar e não for deste item, anote para a TRIAGEM. Não conserte de passagem.
+- O que você notar e não for deste item, anote para a TRIAGEM como comentário `Observação:` na
+  issue-painel. Não conserte de passagem e não abra issue por conta própria.
 
 ## 5. Revisar e mergear (Revisor e Liberador)
 
-PR com `Closes #<n>` e o relato do que rodou. Depois: `/revisar-pr-apps <n> — máximo 3 rodadas`,
-sem passar autorização de merge à revisão.
+PR com `Closes #<n>` e o relato do que rodou. Depois, a revisão pela skill `revisar-pr-apps` do
+repositório, com as rodadas que o processo dele define, sem passar autorização de merge à revisão.
 
 Mergeia quando valem **todas**:
 
-1. a revisão fechou em **Sucesso**;
+1. a revisão fechou sem bloqueante pendente (no repositório que tem o status
+   `revisao/bloqueantes`, ele verde no head atual);
 2. o CI do **head atual** está verde (pendente não é verde);
 3. o item está dentro da autonomia do prompt (SKILL.md § 3) e não toca nada da lista do que
    sempre espera o dono.

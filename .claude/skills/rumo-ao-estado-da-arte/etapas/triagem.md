@@ -14,13 +14,25 @@ Antes de reescrever o painel, leia nele:
 
 ## 2. Recolher as entradas novas
 
-1. Issues abertas ou comentadas desde o último painel.
-2. Linhas do `ideias.md` que ainda não viraram issue. Cada uma vira issue do dono, citando a
-   linha. Não edite o `ideias.md`: é pela issue que você sabe que a linha já foi tratada.
-3. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, pelas rotas de leitura que
-   `ajuda.md` do pacote documenta. Bug relatado ali continua pelo caminho do kit.
-4. O que as sessões de EXECUCAO deixaram anotado como observação.
-5. **Só às segundas-feiras:** SDK do lockfile contra o publicado, kit contra o publicado, avisos de
+1. **Antes de tudo, a seção "Adiado para a próxima triagem" do painel anterior**: as entradas que
+   passaram do limite ontem entram antes das novas.
+2. Issues abertas ou comentadas desde o último painel.
+3. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK):
+   - `## Aprovadas`: cada linha vira issue do dono, já aprovada, citando a linha. Antes de criar,
+     procure issue que já cite a linha, para não duplicar.
+   - `## Braindump`: ideia crua, **não aprovada**. Não vira item sozinha: entra em "Esperando o seu
+     sim" com a pergunta "aprova?", dentro de `max_esperando_dono`. Caixa marcada vira issue do dono.
+     Linha já listada em "Esperando o seu sim" ou em "Adiado" não se repete.
+   - `## Descartadas`: **nunca** vira item. É a lista do que não propor de novo (SKILL.md § 4).
+   Linha que virou issue **sai** do `ideias.md` ("a linha sai quando vira issue"): junte as saídas
+   do dia num PR de manutenção que só remove essas linhas e cita as issues. Nunca apague linha de
+   `Descartadas`.
+4. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, pelas rotas de leitura que o
+   `ajuda.md` do SDK documenta. Bug relatado ali segue o caminho que o processo do repositório
+   define para bug.
+5. Os comentários `Observação:` deixados na issue-painel desde o último painel, por qualquer sessão
+   (rule do repositório, item 3, e EXECUCAO § 4). É daqui que nascem os itens da IA.
+6. **Só às segundas-feiras:** SDK do lockfile contra o publicado (e o kit, onde houver), avisos de
    obsolescência do empacotador com as datas do `obsolescencias.json` do SDK publicado.
 
 ## 3. Classificar cada entrada (Triador)
@@ -32,7 +44,9 @@ Antes de reescrever o painel, leia nele:
   "Esperando o seu sim".
 
 Respeite os limites da configuração: no máximo `max_ideias_ia_dia` itens novos da IA por dia e
-`max_esperando_dono` itens esperando. Passou do limite, guarde a observação para o dia seguinte.
+`max_esperando_dono` itens esperando. Passou do limite, a entrada vai para a seção "Adiado para a
+próxima triagem" do painel, com o link dela — é a fila que a triagem seguinte lê primeiro (§ 2).
+Nada sai do painel sem ter virado item ou sido recusado.
 
 ## 4. Propor mudanças no Estado da Arte (Guardião)
 
