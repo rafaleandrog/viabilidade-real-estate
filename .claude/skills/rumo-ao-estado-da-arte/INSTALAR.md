@@ -92,7 +92,7 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
 | `Autonomia: 1` | Todo PR fica pronto e parado para você |
 | `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos manutenção, bugs com teste, os seus itens e os passos rumo ao Estado da Arte |
 | `Autonomia: 3` e `Classes extras: ...` | O mesmo, mais as classes que você listar |
-| `Release: automática` | A pré-release sai sozinha quando nada sensível entrou desde a última (a lista do SKILL.md § 3: migração, schema, manifesto, permissões, dependências, workflows, testes alterados, configuração e a própria skill) |
+| `Release: automática` | A pré-release sai sozinha quando nada da lista "sempre esperam o dono" (SKILL.md § 3) entrou desde a última |
 
 `Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
 dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,
