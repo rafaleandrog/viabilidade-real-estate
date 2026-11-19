@@ -23,8 +23,9 @@ Antes de reescrever o painel, leia nele:
 3. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK, § Ideias da app):
    - **Antes de cada linha de `Aprovadas` ou `Braindump`:** procure issue que já cite a linha.
      Achou, a linha já é trabalho: não vira item de novo, não volta a "Esperando" e entra no PR de
-     saída abaixo. Linha só listada em "Esperando o seu sim" ou em "Adiado" (sem issue) apenas não
-     se repete: continua no arquivo, esperando o dono.
+     saída abaixo. Linha já listada em "Esperando o seu sim" (sem issue) não se repete: continua no
+     arquivo, esperando a caixa do dono. Linha em "Adiado" volta pelo item 1, antes das novas, e
+     também não é listada duas vezes.
    - `## Aprovadas`: cada linha vira issue do dono, já aprovada, com o rótulo `spec` e citando a
      linha.
    - `## Braindump`: ideia crua, **não aprovada**. Não vira item sozinha: entra em "Esperando o seu
@@ -35,7 +36,9 @@ Antes de reescrever o painel, leia nele:
    **A linha sai do `ideias.md` no mesmo passo em que vira issue** (`documentacao.md`: "Ideia
    aprovada vira issue com o label `spec`, e a linha sai do `ideias.md` no mesmo passo"). Como todo
    arquivo do repositório muda por PR, o passo é: criada a issue, abra **na mesma sessão** o PR que
-   remove a linha (e move as recusadas para `Descartadas`), citando as issues. Esse PR é
+   remove a linha (e move as recusadas para `Descartadas`), citando as issues. Já existe PR aberto
+   desta rotina mexendo no `ideias.md`? Acrescente a ele, na mesma branch, em vez de abrir outro; e
+   linha que esse PR já remove não entra de novo. Esse PR é
    manutenção e segue a autonomia do prompt; enquanto ele não entra, é a issue que cita a linha que
    impede o item de nascer de novo.
 4. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, **só** por rota de leitura
@@ -62,7 +65,8 @@ próxima triagem" do painel, com o link dela — é a fila que a triagem seguint
 Nada sai do painel sem ter virado item ou sido recusado.
 
 **Item é sempre uma issue.** Entrada que ainda não é issue — um comentário `Observação:`, um caso
-do Sentinela — e foi aceita dentro do limite vira issue nesta etapa, antes de entrar na fila ou em
+do Sentinela — e foi aceita dentro do limite vira issue nesta etapa (a exceção é a linha do
+`Braindump`, que só vira issue depois da caixa do dono, § 2), antes de entrar na fila ou em
 "Esperando o seu sim": a da IA com o rótulo `origem-ia` e o footer de atribuição, citando o
 comentário que a originou; a de terceiros citando a fonte, como dado. É nela que a EXECUCAO
 escreve o contrato e que o PR fecha com `Closes #<n>`.

@@ -25,7 +25,9 @@ dele pela seção 7. Sem etapa e sem ninguém: encerre sem escrever nada.
 
 ## 2. Freio
 
-Existe `.claude/estado-da-arte/PAUSA`? Escreva "pausado" no painel e encerre. Vale para toda etapa.
+Existe `.claude/estado-da-arte/PAUSA`? Escreva "pausado" no painel e encerre. Vale para toda etapa
+e para todo trabalho da rotina. A única exceção é o dono, numa conversa, pedir para retomar: aí
+siga a § 7 e abra o PR que remove o `PAUSA`.
 
 ## 3. Quem manda em quê
 
