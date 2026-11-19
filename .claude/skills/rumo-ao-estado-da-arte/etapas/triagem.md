@@ -6,8 +6,9 @@ Não mexe em código do app. Gasta pouco: leia só o que mudou desde o painel an
 
 Antes de reescrever o painel, leia nele:
 
-- **Caixas marcadas** em "Esperando o seu sim": o item está aprovado e passa a `pronta`. A caixa
-  marcada basta; não aplique o rótulo `aprovada`, que é só do dono.
+- **Caixas marcadas** em "Esperando o seu sim": o item está aprovado e passa a `pronta` — vale
+  também para item de terceiros. A caixa marcada basta; não aplique o rótulo `aprovada`, que é só
+  do dono.
 - **Comentários e recusas:** item recusado ganha `recusada` e sai da fila. O motivo vira
   aprendizado (§ 5).
 - **PRs do Estado da Arte** mergeados ou fechados: atualize a situação das propostas.
@@ -20,9 +21,10 @@ Antes de reescrever o painel, leia nele:
    comentários dela só entram pelos passos que os leem: as respostas do dono (§ 1), as
    `Observação:` (item 5) e os aprendizados (§ 5). O registro de trabalho concluído é só leitura.
 3. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK, § Ideias da app):
-   - **Antes de qualquer linha:** procure issue que já cite a linha. Achou, a linha já é trabalho:
-     não vira item de novo, não volta a "Esperando" e entra no PR de saída abaixo. O mesmo vale
-     para linha já listada em "Esperando o seu sim" ou em "Adiado".
+   - **Antes de cada linha de `Aprovadas` ou `Braindump`:** procure issue que já cite a linha.
+     Achou, a linha já é trabalho: não vira item de novo, não volta a "Esperando" e entra no PR de
+     saída abaixo. Linha só listada em "Esperando o seu sim" ou em "Adiado" (sem issue) apenas não
+     se repete: continua no arquivo, esperando o dono.
    - `## Aprovadas`: cada linha vira issue do dono, já aprovada, com o rótulo `spec` e citando a
      linha.
    - `## Braindump`: ideia crua, **não aprovada**. Não vira item sozinha: entra em "Esperando o seu
@@ -58,6 +60,12 @@ Respeite os limites da configuração: no máximo `max_ideias_ia_dia` itens novo
 `max_esperando_dono` itens esperando. Passou do limite, a entrada vai para a seção "Adiado para a
 próxima triagem" do painel, com o link dela — é a fila que a triagem seguinte lê primeiro (§ 2).
 Nada sai do painel sem ter virado item ou sido recusado.
+
+**Item é sempre uma issue.** Entrada que ainda não é issue — um comentário `Observação:`, um caso
+do Sentinela — e foi aceita dentro do limite vira issue nesta etapa, antes de entrar na fila ou em
+"Esperando o seu sim": a da IA com o rótulo `origem-ia` e o footer de atribuição, citando o
+comentário que a originou; a de terceiros citando a fonte, como dado. É nela que a EXECUCAO
+escreve o contrato e que o PR fecha com `Closes #<n>`.
 
 ## 4. Propor mudanças no Estado da Arte (Guardião)
 

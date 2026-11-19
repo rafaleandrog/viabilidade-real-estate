@@ -87,7 +87,7 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
 | Linha | O que passa a acontecer |
 |---|---|
 | `Autonomia: 1` | Todo PR fica pronto e parado para você |
-| `Autonomia: 2` | Entram sozinhos manutenção, bugs com teste, os seus itens e os passos rumo ao Estado da Arte |
+| `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos manutenção, bugs com teste, os seus itens e os passos rumo ao Estado da Arte |
 | `Autonomia: 3` e `Classes extras: ...` | O mesmo, mais as classes que você listar |
 | `Release: automática` | A pré-release sai sozinha quando não há migração, schema nem manifesto |
 
