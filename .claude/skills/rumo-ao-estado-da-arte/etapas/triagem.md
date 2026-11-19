@@ -11,16 +11,16 @@ Antes de reescrever o painel, leia nele:
   do dono. **Exceção: item que já tem PR pronto e parado.** A caixa não o devolve à fila (não há o
   que implementar de novo) nem autoriza a rotina a mergear: ele passa para "Aprovados, aguardando o
   seu merge", com o link do PR, e o merge é do dono.
-- **Comentários e recusas:** item recusado ganha `recusada` e sai da fila. O motivo vira
-  aprendizado (§ 5).
+- **Comentários e recusas:** item recusado ganha `recusada` e sai da fila; se já tinha PR aberto
+  da rotina, feche o PR citando a recusa. O motivo vira aprendizado (§ 5).
 - **PRs do Estado da Arte** mergeados ou fechados: atualize a situação das propostas.
 
 ## 2. Recolher as entradas novas
 
 1. **Antes de tudo, o painel anterior inteiro.** Tudo o que ele listava e não se resolveu continua
    no painel novo: a "Fila pronta" que a EXECUCAO não alcançou, os itens de "Esperando o seu sim"
-   com a caixa ainda desmarcada, os "Aprovados, aguardando o seu merge" cujo PR ainda não foi
-   mergeado, os "Planos grandes" e as propostas abertas. As entradas de
+   com a caixa ainda desmarcada, os "Aprovados, aguardando o seu merge" cujo PR segue aberto (PR
+   fechado sem merge volta a "Esperando o seu sim", perguntando o que fazer com o item), os "Planos grandes" e as propostas abertas. As entradas de
    "Adiado para a próxima triagem" entram antes das novas. Reescrever o painel (§ 6) nunca tira
    item da fila: só sai o que virou PR mergeado, foi recusado ou fechado. "Feito sem perguntar"
    é a exceção ao contrário: o que entrou ali fica, com o jeito de desfazer, até a release

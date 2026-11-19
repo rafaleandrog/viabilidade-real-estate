@@ -25,7 +25,8 @@ encerre.
 Escreva na issue, se ainda não houver: objetivo, restrições, "pronto quando" verificável e o que
 pede aprovação. Leia `.claude/estado-da-arte/aprendizados.md` antes: é como o dono decide.
 Lido o código, o item não cabe numa sessão ou é sensível: comente, marque `plano-grande` ou leve a
-"Esperando o seu sim", e passe ao próximo.
+"Esperando o seu sim", e passe ao próximo. Item sensível cuja caixa o dono **já** marcou não volta
+para lá: implemente, e o PR para no portão de merge (§ 5), que ele sempre segura.
 
 ## 4. Implementar (Construtor)
 
