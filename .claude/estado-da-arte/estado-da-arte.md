@@ -8,9 +8,10 @@
 > `manifesto.json`, dos guias em `docs/`, do `ideias.md`, das issues abertas (em especial o índice
 > de diagnóstico #858) e dos documentos de `referencia/`. Nada aqui é regra de negócio nova: onde a
 > frase é leitura da IA, e não algo que o dono já disse ou decidiu, ela está marcada com **(?)** e
-> repetida em § Perguntas ao dono. Situação de cada item medida contra a `main` em `8a6417a`, pelas seções
-> do `PROGRESSO.md` de 2026-11-12 a 2026-11-16. Várias issues citadas seguem abertas no GitHub com
-> o código já entregue, à espera de conferência ao vivo na Pinguim; a situação diz qual é o caso.
+> repetida em § Perguntas ao dono. Situação de cada item medida contra a `main` em `8a6417a`,
+> pelas seções do `PROGRESSO.md` de 2026-11-12 a 2026-11-16 e pela lista de issues abertas no GitHub nesse dia.
+> Algumas issues seguem abertas com o código já entregue (#860, #861, #862); a situação de cada
+> item diz o que o `PROGRESSO.md` registra como pendente.
 
 ## Para quem é e o que resolve
 
@@ -115,9 +116,11 @@ Um item por coisa que o app deve ser ou fazer na versão final.
   **(?)**
 - **Pronto quando:** #860, #861 e #865 e os itens B1–B7, Q2, Q6 e U4–U7 do #858 fechados, cada um
   com teste HTTP contra Express real; a QA de remoção e acesso (#870) passa na Pinguim.
-- **Situação:** parcial — código entregue para B1, B2, B3, B5, Q2 e a #860 (2026-11-12), para B4 e
-  a #861, teto da função pelo nível (2026-11-14), e para U4, U5 e U7 (2026-11-16). As issues
-  #860 e #861 seguem abertas: falta revalidar ao vivo com a skill `qa` e, na #861, o levantamento da Laputa antes do upgrade. B6, B7, Q6, #865 e #870 abertos.
+- **Situação:** parcial — código entregue para a #860 e para os achados de permissão de
+  2026-11-12 (que a IA lê como B1, B2, B3, B5 e Q2 do #858), para B4 e a #861, teto da função pelo
+  nível (2026-11-14), e para U4, U5 e U7 (2026-11-16). As issues #860 e #861 seguem abertas no
+  GitHub; na #861 o `PROGRESSO.md` registra que falta revalidar ao vivo
+  com a skill `qa` e o levantamento da Laputa antes do upgrade. B6, B7, Q6, #865 e #870 abertos.
 
 ### 7. Mercado e Apelo Comercial por IA que de fato produzem leitura
 
