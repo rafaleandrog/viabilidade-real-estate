@@ -115,7 +115,9 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 - **Por que importa:** o estudo aprovado é a decisão da diretoria; precisa ser o número que ela viu.
   **(?)**
 - **Pronto quando:** #860, #861 e #865 e os itens B1–B7, Q2, Q6 e U4–U7 do #858 fechados, cada um
-  com teste HTTP contra Express real; a QA de remoção e acesso (#870) passa na Pinguim.
+  com teste HTTP contra Express real; e a QA de remoção e acesso (#870) registrada como aprovada
+  na própria issue. Rodar essa QA na Pinguim é do dono (ou de uma sessão da skill `qa` que ele
+  pedir): a rotina não escreve na instância, só confere o registro.
 - **Situação:** parcial — código entregue para a #860 e para os achados de permissão de
   2026-11-12 (que a IA lê como B1, B2, B3, B5 e Q2 do #858), para B4 e a #861, teto da função pelo
   nível (2026-11-14), e para U4, U5 e U7 (2026-11-16). As issues #860 e #861 seguem abertas no
