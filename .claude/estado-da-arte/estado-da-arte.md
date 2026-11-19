@@ -8,7 +8,9 @@
 > `manifesto.json`, dos guias em `docs/`, do `ideias.md`, das issues abertas (em especial o índice
 > de diagnóstico #858) e dos documentos de `referencia/`. Nada aqui é regra de negócio nova: onde a
 > frase é leitura da IA, e não algo que o dono já disse ou decidiu, ela está marcada com **(?)** e
-> repetida em § Perguntas ao dono. Situação de cada item medida contra a `main` em `8a6417a`.
+> repetida em § Perguntas ao dono. Situação de cada item medida contra a `main` em `8a6417a`, pelas seções
+> do `PROGRESSO.md` de 2026-11-12 a 2026-11-16. Várias issues citadas seguem abertas no GitHub com
+> o código já entregue, à espera de conferência ao vivo na Pinguim; a situação diz qual é o caso.
 
 ## Para quem é e o que resolve
 
@@ -53,7 +55,8 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 - **Por que importa:** é a decisão rápida de seguir ou não com um terreno. **(?)**
 - **Pronto quando:** os itens P1–P9, Q3, Q4 e U2 do índice #858 e as issues #842 e #812 estão
   fechados com diff; `validar-frontend.sh` verde, com caso de render para cada fiação nova.
-- **Situação:** parcial — Q3, Q4 e U2 entregues em 2026-11-16 (índice ainda sem as caixas marcadas); P1–P9, #842 e #812 abertos.
+- **Situação:** parcial — P1 (2026-11-12), Q3, Q4 e U2 (2026-11-16) entregues, com o índice #858
+  ainda sem as caixas marcadas; P2–P9, #842 e #812 abertos.
 
 ### 2. Estudo Avançado com motor mensal por safras e componentes
 
@@ -81,13 +84,14 @@ Um item por coisa que o app deve ser ou fazer na versão final.
   Braindump do `ideias.md`, não aprovados — por isso não entram no "pronto quando" sem o sim do dono.
 - **Situação:** parcial.
 
-### 4. Funding em três operações independentes
+### 4. Funding em operações independentes
 
 - **O que é:** dívida, equity, financiamento à produção (com gatilho de exposição mínima, catch-up e
   cash sweep) e antecipação de recebíveis, sem waterfall e sem competição por caixa, seguindo
   `referencia/fluxo-investidor-formulas.md` (e a §4.3 de `referencia/funding-capital-stack.md` para
   o financiamento à produção).
-- **Por que importa:** decisão já tomada pelo dono na Rodada 7 (#355) e mantida na Rodada 8.
+- **Por que importa:** decisão já tomada pelo dono na Rodada 7 (#355, três operações; a antecipação
+  de recebíveis veio depois, como quarta) e mantida na Rodada 8.
 - **Pronto quando:** Q12 do #858 fechado (o `valor` da antecipação é lido pelo motor ou deixa de
   ser gravado) e o alerta D14 continua coberto por teste.
 - **Situação:** parcial (quase feito).
@@ -111,7 +115,9 @@ Um item por coisa que o app deve ser ou fazer na versão final.
   **(?)**
 - **Pronto quando:** #860, #861 e #865 e os itens B1–B7, Q2, Q6 e U4–U7 do #858 fechados, cada um
   com teste HTTP contra Express real; a QA de remoção e acesso (#870) passa na Pinguim.
-- **Situação:** parcial — U4, U5 e U7 entregues em 2026-11-16; os P1 #860 e #861 abertos.
+- **Situação:** parcial — código entregue para B1, B2, B3, B5, Q2 e a #860 (2026-11-12), para B4 e
+  a #861, teto da função pelo nível (2026-11-14), e para U4, U5 e U7 (2026-11-16). As issues
+  #860 e #861 seguem abertas: falta revalidar ao vivo com a skill `qa` e, na #861, o levantamento da Laputa antes do upgrade. B6, B7, Q6, #865 e #870 abertos.
 
 ### 7. Mercado e Apelo Comercial por IA que de fato produzem leitura
 
@@ -119,10 +125,11 @@ Um item por coisa que o app deve ser ou fazer na versão final.
   monitoradas, com coleta diária vinda de uma fonte externa; o Apelo Comercial grava as 24 notas e
   o score geral a partir dos documentos anexados.
 - **Por que importa:** **(?)** — o manifesto declara a IA e a rotina diária, mas hoje a coleta roda
-  `sem_fonte_externa` e o Apelo conclui sem notas.
+  `sem_fonte_externa`.
 - **Pronto quando:** #862 e #868 fechados; a rotina grava coletas na Pinguim com fonte configurada
   (D3 e B9 do #858).
-- **Situação:** parcial.
+- **Situação:** parcial — a gravação das 24 notas e do score (#862) foi entregue em 2026-11-14 e
+  falta rodar a análise na Pinguim; a coleta segue sem fonte externa (D3, B9).
 
 ### 8. Exportação segura e fiel à tela
 
@@ -131,7 +138,7 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 - **Por que importa:** o estudo circula fora do app. **(?)**
 - **Pronto quando:** U1, U3 e U9 do #858 fechados. **(?)** Exportar os Cenários do Preliminar e a
   Proforma do Avançado está no Braindump do `ideias.md` — entra aqui só se o dono aprovar.
-- **Situação:** parcial.
+- **Situação:** parcial — U1 (escape do PDF) entregue em 2026-11-16; U3 e U9 abertos.
 
 ### 9. Estudo auditável
 
@@ -154,7 +161,7 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 ## Fora do Estado da Arte, de propósito
 
 - **Linha de crédito rotativa no funding** — reintroduziria a competição por caixa (Rodada 8).
-- **Capital Stack com waterfall de quatro camadas** — substituído pelas três operações independentes.
+- **Capital Stack com waterfall de quatro camadas** — substituído pelas operações independentes do item 4.
 - **Promover o nível do estudo no lugar** ou **compartilhar premissas ao vivo** entre Preliminar e
   Avançado — fechados (#441, #486); o caminho é o item 5.
 - **Mudar a base de receita líquida do equity** para casar com as planilhas — divergência
