@@ -1,0 +1,136 @@
+# Como pôr para rodar no Claude Code
+
+Tudo é feito em https://claude.ai/code/routines (as "tarefas agendadas", antes chamadas de
+rotinas). O recurso está em prévia: se um rótulo de tela diferir, vale a documentação em
+https://code.claude.com/docs/en/routines.md.
+
+## 1. Subir os arquivos
+
+O pacote traz uma pasta `.claude` com duas coisas, que vão para a raiz do repositório:
+
+- `.claude/skills/rumo-ao-estado-da-arte/`: a skill;
+- `.claude/rules/rumo-ao-estado-da-arte.md`: o arquivo que faz **toda sessão** do repositório seguir o
+  modelo. Arquivos em `.claude/rules/` são carregados no início de cada sessão, junto do `CLAUDE.md`.
+
+Leve os dois à branch principal num PR só de processo, sem código do app. O jeito mais simples é
+abrir uma sessão no repositório, anexar o pacote e escrever:
+
+```
+Adicione estes arquivos em .claude/, sem alterar nenhum arquivo existente, num PR só de processo,
+seguindo o processo deste repositório.
+```
+
+## 2. Preparar o ambiente de nuvem
+
+No formulário de qualquer tarefa, em **Cloud environment**, **crie um ambiente novo só para esta
+rotina**. Não edite um ambiente que as suas sessões de hoje usam: mudança de variável, script ou
+rede num ambiente vale para tudo que roda nele. No ambiente novo, ponha:
+
+- **Variáveis:** o token do registro de pacotes (`URBIVERSO_PACKAGES_TOKEN`). Opcional:
+  `URBIVERSO_INSTANCIAS`, com credencial somente leitura, para a triagem ler o Sentinela — no
+  formato que a `roteador-urbiverso` lê. Onde ela não existe (é o caso do app de viabilidade), use
+  as variáveis que a skill de instância do repositório consome: na `instancia-urbiverso`,
+  `URBIVERSO_URL` e `URBIVERSO_TOKEN`, com um token somente leitura.
+- **Setup script:** o comando de instalação do repositório **com a autenticação do SDK** — o
+  `pnpm install` pelado não lê o `URBIVERSO_PACKAGES_TOKEN` e falha no registro privado. Onde o
+  repositório tem um helper para isso, use-o; no app de viabilidade é
+  `source scripts/lib/sdk-auth.sh && urbi_pnpm_install`, o mesmo que o `validar-frontend.sh` usa.
+- **Network access:** o padrão libera registros de pacotes comuns. Se a instalação do SDK falhar
+  com `host_not_allowed`, acrescente o domínio do registro em **Allowed domains**. Se pôs a
+  credencial da instância para ler o Sentinela, acrescente também o domínio do `URBIVERSO_URL`:
+  sem ele o proxy recusa a conexão (`CONNECT … 403`).
+
+## 3. Rodar o PREPARAR, uma vez, com você presente
+
+Abra uma sessão normal do Claude Code no repositório e escreva:
+
+```
+Use a skill rumo-ao-estado-da-arte na etapa PREPARAR neste repositório.
+```
+
+Ela abre um PR com o Estado da Arte v1, em `.claude/estado-da-arte/`, e os outros arquivos da rotina. **Leia o Estado da Arte, corrija
+o que estiver errado e faça o merge.** A rotina só começa depois disso.
+
+A partir daqui, toda sessão que você abrir no repositório já trabalha no modelo. Os passos 4 a 6
+ligam a parte automática e podem ficar para depois.
+
+## 4. Criar a tarefa da triagem
+
+**New task** → nome `Estado da Arte · triagem` → repositório → o ambiente do passo 2 → um modelo leve,
+esforço baixo → gatilho **Schedule**, diário, alguns minutos depois da hora cheia (por exemplo
+06:07) → em **Connectors**, remova os que não forem usados. Prompt:
+
+```
+Use a skill rumo-ao-estado-da-arte na etapa TRIAGEM neste repositório.
+Ninguém acompanha esta sessão: não pergunte nada.
+Autonomia: 1
+```
+
+## 5. Criar a tarefa da execução
+
+Igual, com nome `Estado da Arte · execução`, um modelo mais forte e horário uma hora depois da triagem.
+Prompt:
+
+```
+Use a skill rumo-ao-estado-da-arte na etapa EXECUCAO neste repositório.
+Ninguém acompanha esta sessão: não pergunte nada.
+Autonomia: 1
+Release: propor
+```
+
+## 6. Sessão na hora (opcional)
+
+Edite a tarefa da execução → **+** em **Trigger** → **GitHub event** → evento **Issue**, ação
+`labeled`. É preciso ter o Claude GitHub App instalado no repositório; a tela pede se faltar.
+A partir daí, pôr o rótulo `agora` numa issue abre uma sessão, que trabalha se houver saldo.
+
+Atenção: o gatilho dispara a cada rótulo posto em qualquer issue, não só no `agora`. A sessão
+confere o rótulo e encerra se não for o caso, mas cada disparo conta como uma execução. Se o
+repositório rotula issues com frequência, deixe este passo para depois.
+
+## 7. O botão de autonomia
+
+Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
+
+| Linha | O que passa a acontecer |
+|---|---|
+| `Autonomia: 1` | Todo PR fica pronto e parado para você |
+| `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos manutenção, bugs com teste, os seus itens e os passos rumo ao Estado da Arte |
+| `Autonomia: 3` e `Classes extras: ...` | O mesmo, mais as classes que você listar |
+| `Release: automática` | A pré-release sai sozinha quando nada da lista "sempre esperam o dono" (SKILL.md § 3) entrou desde a última |
+
+`Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
+dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,
+como o `CLAUDE.md` § Merge do app de viabilidade, a rotina trata 2 e 3 como 1 até você mudar o
+próprio processo do repositório, por PR, para reconhecer a linha.
+
+## 8. O seu dia a dia
+
+- **Trazer uma ideia, um bug ou um link:** uma linha no `ideias.md`, uma issue, ou dizer "anota
+  isso" em qualquer sessão.
+- **Ver e aprovar:** abra a issue `Estado da Arte: painel`. Marque a caixa do que aprova, comente o que
+  recusa, e faça o merge das propostas para o Estado da Arte que fizerem sentido.
+- **Algo urgente:** o rótulo `agora` na issue.
+- **Parar tudo:** crie o arquivo `.claude/estado-da-arte/PAUSA`. Ou desligue as tarefas na tela delas.
+- **Testar uma release:** homologue na instância, como já faz hoje.
+
+## 9. Para não atrapalhar o que já funciona
+
+- **Uso do plano.** As tarefas agendadas gastam a mesma cota das suas sessões normais. Comece com
+  um app e acompanhe em claude.ai/settings/usage. Se faltar cota para o seu trabalho, baixe o
+  `orcamento_diario` ou desligue a execução.
+- **Trabalho em paralelo.** A rotina não pega issue que já tem branch, PR ou arco em andamento.
+  Mesmo assim, PRs dela podem conflitar com os seus em arquivos que todo PR edita. Com
+  `Autonomia: 1` nada entra sem você, então o pior caso é um PR a mais para fechar.
+- **CI e verificações do repositório.** Os PRs da rotina passam pelas mesmas verificações de
+  qualquer PR. Se alguma barrar os arquivos novos, é um ajuste a fazer no PR de instalação.
+- **Para desinstalar:** desligue as tarefas, apague `.claude/skills/rumo-ao-estado-da-arte/`,
+  `.claude/rules/rumo-ao-estado-da-arte.md` e `.claude/estado-da-arte/`, e feche a issue-painel.
+  Sem apagar a rule, toda sessão continuaria a seguir a rotina. Ficam o `ideias.md` (se foi a
+  PREPARAR que o criou, decida se ele fica como caixa de ideias do app) e as issues e PRs que a
+  rotina abriu, que você fecha ou mantém como quiser.
+
+## 10. Outro app
+
+Repita os passos 1 a 5 no outro repositório. Cada app tem o seu Estado da Arte, o seu painel e a
+sua autonomia.
