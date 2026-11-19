@@ -8,6 +8,10 @@ Marque a caixa para aprovar. Para recusar, comente o motivo.
 - [ ] #<n> <título> — <por que precisa de você>
 - [ ] `ideias.md` › Braindump: <título da linha> — aprova? (vira issue com a caixa marcada)
 
+## Aprovados, aguardando o seu merge
+PR pronto e parado cuja caixa você marcou. O merge é seu.
+- PR #<n> <título>
+
 ## Propostas para o Estado da Arte
 - PR #<n> — <item> — <entrada que originou>
 

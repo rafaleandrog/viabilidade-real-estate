@@ -27,7 +27,10 @@ rotina**. Não edite um ambiente que as suas sessões de hoje usam: mudança de 
 rede num ambiente vale para tudo que roda nele. No ambiente novo, ponha:
 
 - **Variáveis:** o token do registro de pacotes (`URBIVERSO_PACKAGES_TOKEN`). Opcional:
-  `URBIVERSO_INSTANCIAS`, com credencial somente leitura, para a triagem ler o Sentinela.
+  `URBIVERSO_INSTANCIAS`, com credencial somente leitura, para a triagem ler o Sentinela — no
+  formato que a `roteador-urbiverso` lê. Onde ela não existe (é o caso do app de viabilidade), use
+  as variáveis que a skill de instância do repositório consome: na `instancia-urbiverso`,
+  `URBIVERSO_URL` e `URBIVERSO_TOKEN`, com um token somente leitura.
 - **Setup script:** o comando de instalação do repositório **com a autenticação do SDK** — o
   `pnpm install` pelado não lê o `URBIVERSO_PACKAGES_TOKEN` e falha no registro privado. Onde o
   repositório tem um helper para isso, use-o; no app de viabilidade é
