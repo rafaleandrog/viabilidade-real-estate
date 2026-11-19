@@ -96,7 +96,7 @@ repositório e o painel.
   `.claude/estado-da-arte/` (onde mora o Estado da Arte), o `ideias.md` e a issue-painel. **O código
   do app** muda só pelo Construtor (`etapas/execucao.md` § 4), num PR de um item da fila.
   Precisa mudar processo ou configuração? Vira item "Esperando o seu sim", nunca edição direta.
-- **Não atravesse o trabalho dos outros.** Não pegue issue que já tem branch, PR ou responsável,
+- **Não atravesse o trabalho dos outros.** Não pegue issue que já tem branch ou PR **aberto**, ou responsável,
   nem issue que faça parte de um arco da `orquestrar` (onde ela existir) em andamento. Não empurre commit em branch
   que não seja desta rotina. Na dúvida se alguém está mexendo, deixe para o dia seguinte.
 

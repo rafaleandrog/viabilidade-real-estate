@@ -20,7 +20,9 @@ Antes de reescrever o painel, leia nele:
 1. **Antes de tudo, o painel anterior inteiro.** Tudo o que ele listava e não se resolveu continua
    no painel novo: a "Fila pronta" que a EXECUCAO não alcançou, os itens de "Esperando o seu sim"
    com a caixa ainda desmarcada, os "Aprovados, aguardando o seu merge" cujo PR segue aberto (PR
-   fechado sem merge volta a "Esperando o seu sim", perguntando o que fazer com o item), os "Planos grandes" e as propostas abertas. As entradas de
+   fechado sem merge: o PR e a branch dele saem de cena, e o item volta a "Esperando o seu sim"
+   como item **sem PR**, perguntando o que fazer; caixa marcada o põe `pronta`, e a EXECUCAO abre
+   PR novo, partindo dos comentários do fechado), os "Planos grandes" e as propostas abertas. As entradas de
    "Adiado para a próxima triagem" entram antes das novas. Reescrever o painel (§ 6) nunca tira
    item da fila: só sai o que virou PR mergeado, foi recusado ou fechado. "Feito sem perguntar"
    é a exceção ao contrário: o que entrou ali fica, com o jeito de desfazer, até a release
