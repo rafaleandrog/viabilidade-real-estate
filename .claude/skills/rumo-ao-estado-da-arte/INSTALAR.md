@@ -36,7 +36,9 @@ rede num ambiente vale para tudo que roda nele. No ambiente novo, ponha:
   repositório tem um helper para isso, use-o; no app de viabilidade é
   `source scripts/lib/sdk-auth.sh && urbi_pnpm_install`, o mesmo que o `validar-frontend.sh` usa.
 - **Network access:** o padrão libera registros de pacotes comuns. Se a instalação do SDK falhar
-  com `host_not_allowed`, acrescente o domínio do registro em **Allowed domains**.
+  com `host_not_allowed`, acrescente o domínio do registro em **Allowed domains**. Se pôs a
+  credencial da instância para ler o Sentinela, acrescente também o domínio do `URBIVERSO_URL`:
+  sem ele o proxy recusa a conexão (`CONNECT … 403`).
 
 ## 3. Rodar o PREPARAR, uma vez, com você presente
 

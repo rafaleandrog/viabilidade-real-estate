@@ -19,11 +19,12 @@ Antes de reescrever o painel, leia nele:
 
 1. **Antes de tudo, o painel anterior inteiro.** Tudo o que ele listava e não se resolveu continua
    no painel novo: a "Fila pronta" que a EXECUCAO não alcançou, os itens de "Esperando o seu sim"
-   com a caixa ainda desmarcada, os "Planos grandes" e as propostas abertas. As entradas de
+   com a caixa ainda desmarcada, os "Aprovados, aguardando o seu merge" cujo PR ainda não foi
+   mergeado, os "Planos grandes" e as propostas abertas. As entradas de
    "Adiado para a próxima triagem" entram antes das novas. Reescrever o painel (§ 6) nunca tira
    item da fila: só sai o que virou PR mergeado, foi recusado ou fechado. "Feito sem perguntar"
    é a exceção ao contrário: o que entrou ali fica, com o jeito de desfazer, até a release
-   seguinte.
+   seguinte; quando o bloco de release (§ 6) registra uma tag nova, a seção é esvaziada.
 2. Issues abertas ou comentadas desde o último painel, **exceto a própria issue-painel**. Os
    comentários dela só entram pelos passos que os leem: as respostas do dono (§ 1), as
    `Observação:` (item 5) e os aprendizados (§ 5). O registro de trabalho concluído é só leitura.
