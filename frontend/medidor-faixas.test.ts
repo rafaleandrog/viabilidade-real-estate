@@ -141,3 +141,48 @@ test('#571: val null → sem medidor, sem bola, sem variante — mesmo com bench
 test('#571: val null no fallback automático também não desenha nada', () => {
   assert.equal(montarMedidor({ regra_comparacao: 'atingir_ou_superar', valor: 25 }, null), null);
 });
+
+// #899: valor IGUAL à meta/corte conta como atingido, nas duas regras, sem
+// arredondar antes de comparar.
+test('#899 fallback atingir_ou_superar: igual à meta é verde; logo abaixo é vermelho', () => {
+  const b = { regra_comparacao: 'atingir_ou_superar', valor: 25 };
+  assert.equal(bolaFaixa(b, 25), '🟢');
+  assert.equal(varianteFaixa(b, 25), 'sucesso');
+  assert.equal(varianteFaixa(b, 25.000001), 'sucesso');
+  assert.equal(varianteFaixa(b, 24.999999), 'erro');
+  // 24,96 arredondaria para 25,0 — a comparação é de plena precisão.
+  assert.equal(varianteFaixa(b, 24.96), 'erro');
+});
+
+test('#899 fallback nao_exceder: igual ao teto é verde; logo acima é vermelho', () => {
+  const b = { regra_comparacao: 'nao_exceder', valor: 35 };
+  assert.equal(varianteFaixa(b, 35), 'sucesso');
+  assert.equal(varianteFaixa(b, 34.999999), 'sucesso');
+  assert.equal(varianteFaixa(b, 35.000001), 'erro');
+  assert.equal(varianteFaixa(b, 35.04), 'erro');
+});
+
+test('#899 configurado: valor no corte vai para a faixa melhor nas duas regras', () => {
+  const cfg = { medidor_min: 0, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 };
+  const a = { regra_comparacao: 'atingir_ou_superar', valor: 30, ...cfg };
+  assert.equal(varianteFaixa(a, 20), 'alerta');
+  assert.equal(varianteFaixa(a, 19.999999), 'erro');
+  assert.equal(varianteFaixa(a, 30), 'sucesso');
+  assert.equal(varianteFaixa(a, 29.999999), 'alerta');
+  const n = { regra_comparacao: 'nao_exceder', valor: 30, ...cfg };
+  assert.equal(varianteFaixa(n, 20), 'sucesso');
+  assert.equal(varianteFaixa(n, 20.000001), 'alerta');
+  assert.equal(varianteFaixa(n, 30), 'alerta');
+  assert.equal(varianteFaixa(n, 30.000001), 'erro');
+});
+
+// Fiação (classe 1): as telas que colorem KPI/medidor por benchmark chamam as
+// funções puras; apagar a chamada na tela deixa a pura verde, e aqui vermelho.
+test('#899 fiação: telas usam varianteFaixa/bolaFaixa e o cálculo usa faixaDoValor', async () => {
+  const { readFileSync } = await import('node:fs');
+  const le = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  assert.match(le('frontend/tela-proforma.ts'), /varianteFaixa\(co, p\.custoObrasVgvPct\)/);
+  assert.match(le('frontend/tela-proforma.ts'), /bolaFaixa\(this\._bm\(m\.bmCampo\), valNum\)/);
+  assert.match(le('frontend/tela-premissas.ts'), /varianteFaixa\(ml, p\.margemLiquidaPct\)/);
+  assert.match(le('frontend/medidor-faixas.ts'), /return faixaDoValor\(b, cfg\.faixas, val\)\.cor/);
+});
