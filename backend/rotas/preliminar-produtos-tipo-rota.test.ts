@@ -144,5 +144,9 @@ test('#812 lixo nos campos numéricos → 400 CAMPO_INVALIDO (nunca 500); string
     assert.equal(post.status, 201, JSON.stringify(post.corpo));
     assert.equal(post.corpo.preco_venda_m2, 1234.5);
     assert.equal(post.corpo.unidades, 3);
+    // Coluna inteira: o fracionário é recusado pela rota, não chega ao shell.
+    const frac = await enviar(base, 'POST', '/estudos/1/preliminar/produtos', { nome: 'X', unidades: 2.5 });
+    assert.equal(frac.status, 400, JSON.stringify(frac.corpo));
+    assert.equal(frac.corpo.codigo, 'CAMPO_INVALIDO');
   });
 });
