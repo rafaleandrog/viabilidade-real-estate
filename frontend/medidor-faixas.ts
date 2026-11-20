@@ -63,8 +63,17 @@ function corFaixa(b: any, val: number | null): string | null {
   if (val === null) return null;
   const cfg = montarMedidor(b, val);
   if (!cfg) return null;
-  const faixa = cfg.faixas.find((f) => val <= f.ate) ?? cfg.faixas[cfg.faixas.length - 1];
-  return faixa.cor;
+  return faixaDoValor(b, cfg.faixas, val).cor;
+}
+
+// Faixa em que o valor cai, comparando o valor de PLENA precisão (nunca
+// arredondado antes) com o corte. Valor exatamente NO corte pertence à faixa
+// melhor: em "atingir ou superar" a faixa de cima (atingir a meta é cumpri-la);
+// em "não exceder" a de baixo (igual ao teto não o ultrapassa).
+export function faixaDoValor(b: any, faixas: FaixaMedidor[], val: number): FaixaMedidor {
+  const naoExceder = b?.regra_comparacao === 'nao_exceder';
+  const achada = faixas.find((f) => (naoExceder ? val <= f.ate : val < f.ate));
+  return achada ?? faixas[faixas.length - 1];
 }
 
 // Bola colorida (🟢/🟡/🔴) da faixa — para usar como emoji de status em urbi-badge.
