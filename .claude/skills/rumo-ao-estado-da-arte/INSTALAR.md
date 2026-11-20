@@ -95,7 +95,9 @@ conversa, que é resumida com o tempo.
 
 ## 6. Sessão na hora (opcional)
 
-Edite a tarefa da execução (na variante 5b, a tarefa única) → **+** em **Trigger** → **GitHub event** → evento **Issue**, ação
+Na variante 5b, **não** ponha este gatilho na tarefa única (ela roda a TRIAGEM inteira antes de
+conferir o rótulo): crie para ele uma tarefa separada, só de EXECUCAO, com o prompt do passo 5.
+Edite a tarefa da execução → **+** em **Trigger** → **GitHub event** → evento **Issue**, ação
 `labeled`. É preciso ter o Claude GitHub App instalado no repositório; a tela pede se faltar.
 A partir daí, pôr o rótulo `agora` numa issue abre uma sessão, que trabalha se houver saldo.
 
