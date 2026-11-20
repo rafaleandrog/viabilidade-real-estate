@@ -93,6 +93,29 @@ Máximo de PRs implementados neste disparo: 3
 A sessão começa cada disparo pelo painel e pelos comentários `Continuação:`, não pela memória da
 conversa, que é resumida com o tempo.
 
+### Trocar a sessão da rotina (para apagar a antiga ou zerar o contexto)
+
+A tarefa fica **presa a uma sessão**: apagada a sessão, os disparos não têm onde cair. E a
+conversa cresce a cada disparo, deixando cada um mais caro. Para trocar, sem perder nada (a memória
+da rotina é o repositório, o painel e os `Continuação:`):
+
+1. Abra uma sessão nova **com o repositório** no mesmo ambiente. Uma sessão pode fazer isso por
+   `create_session` com `source_url` do repositório e a tag `rumo-ao-estado-da-arte`. Mande nela um
+   teste só de leitura: repositório clonado, skills do repositório na lista, a linha `[processo]`
+   do hook, as ferramentas do GitHub e as de agendamento. O CLI do Kimi pode faltar; o motor de
+   revisão o instala sozinho na primeira revisão.
+2. Crie a tarefa nova presa a essa sessão, com os mesmos horários e o mesmo prompt, e só então
+   desligue a antiga. O texto do prompt de uma tarefa só muda a partir da conversa em que ela
+   posta; por isso trocar de sessão é criar outra tarefa, não editar a antiga.
+3. Atualize o que lia a sessão antiga pelo id, por exemplo um acompanhamento. Esse texto também
+   só muda a partir da conversa dele.
+4. Depois do primeiro disparo na sessão nova, a antiga pode ser apagada.
+
+**O que não funciona:** a tarefa no modo "sessão nova a cada disparo", criada por uma sessão pelas
+ferramentas de agendamento, nasce **sem o repositório e sem conectores**. Não há clone, nem skills
+do repositório, nem as ferramentas do GitHub. Esse modo só serve se você criar a tarefa na tela de
+rotinas do claude.ai, escolhendo o repositório e o conector do GitHub.
+
 ## 6. Sessão na hora (opcional)
 
 Na variante 5b, **não** ponha este gatilho na tarefa única (ela roda a TRIAGEM inteira antes de
