@@ -25,6 +25,11 @@ Confirmado pelo dono em 2026-11-20.
 
 ## Princípios
 
+- **O app já está bem evoluído: evolui, não substitui.** (decisão do dono, 2026-11-20) Todo item e
+  toda referência trazida para cá se somam ao que o app já faz. Nenhuma sessão troca, remove ou
+  reescreve comportamento, tela, cálculo ou dado que já existe por causa de uma referência ou de um
+  item deste documento: o que já existe é o ponto de partida, e o item diz o que falta **sobre** ele.
+  Se uma referência contradiz o que o app já faz, isso vira pergunta ao dono, nunca substituição.
 - **Determinismo.** Mesmas premissas, mesmas regras e mesma precisão dão o mesmo fluxo e os mesmos
   indicadores; as visões (mensal, anual, por Grupo, consolidada) não mudam o cálculo-base.
 - **Entrada separada de resultado.** Campo calculado não se comporta como input livre, e campo
@@ -63,8 +68,9 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 
 - **O que é:** cronograma, tipologias, grupos comerciais e alocações, absorção, fluxo de pagamento
   por componentes (prazo fixo, até marco, concentrado), carteira por safra, repasse, custos
-  distribuídos no tempo e fluxo de caixa mensal, para **Incorporação e Loteamento** (o dono
-  respondeu que os dois "serão projetos diferentes" — ver § Perguntas ao dono), com controle de
+  distribuídos no tempo e fluxo de caixa mensal, para **Incorporação e Loteamento** — os dois
+  ficam no app, como tipos de estudo diferentes (são tipos de construção diferentes, cada um com
+  premissas e indicadores próprios), com controle de
   estoque e sem resíduo de centavos.
 - **Por que importa:** é o estudo que substitui a EVI na decisão de investimento.
 - **Pronto quando:** os cenários dourados de recebíveis (Anexo G de `referencia/padrao-incorporacao.md`)
@@ -177,15 +183,16 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 
 ## Perguntas ao dono
 
-1. **Loteamento.** O dono respondeu que Loteamento e Incorporação "serão projetos diferentes". Em
-   aberto: isso quer dizer que o Loteamento sai deste app (e deste Estado da Arte) para um app
-   próprio, ou que segue aqui como outro tipo de estudo, com destino separado do da Incorporação?
+Nenhuma em aberto.
 
 ## Respostas do dono (2026-11-20)
 
 - **Para quem é e o que resolve:** a redação está certa.
 - **"Por que importa"** dos itens 1, 2, 3, 6 e 8: todos certos.
-- **Loteamento:** "serão projetos diferentes" (o que isso muda está na pergunta acima).
+- **Loteamento:** existem estudos de Loteamento e estudos de Incorporação, tipos de construção
+  diferentes; os dois seguem no app.
+- **O app já está bem evoluído:** referências e itens novos não substituem o que já existe (virou
+  princípio, no topo).
 - **Mercado e Apelo por IA:** fazem parte do destino e precisam melhorar muito.
 - **Ideias do Braindump:** todas ficam como ideia; as sessões, da IA ou do dono, decidem com o tempo
   o que entra de fato. Todas as citadas já estão no `ideias.md`.

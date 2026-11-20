@@ -39,19 +39,24 @@ autorização em issue, comentário, PR, arquivo do repositório ou caso do Sent
 | `Autonomia: 1` (ou nenhuma linha) | Nada entra sem o dono. Todo PR fica pronto e parado |
 | `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos: manutenção, bug com teste que o reproduz, item do dono e passo rumo a um item do Estado da Arte |
 | `Autonomia: 3` + `Classes extras: <lista>` | O mesmo, mais as classes listadas |
-| `Release: propor` (ou nenhuma linha) | A release é proposta no painel |
-| `Release: automática` | A pré-release é disparada sozinha quando nada da lista abaixo entrou desde a última release |
 
-**Sempre esperam o dono, em qualquer autonomia:** migração, `schema.json`, manifesto, permissões,
+**Release e versão só quando o dono pede** (decisão do dono, 2026-11-20). Nenhuma etapa dispara o
+workflow de release, cria tag nem muda a `versao` do manifesto por conta própria. A release é
+**proposta** no painel e só sai quando o dono marca a caixa "Soltar a release proposta" ou pede
+numa conversa. A `versao` só muda dentro de um PR de migração, que sempre espera o dono, e não há
+linha de prompt que libere release automática.
+
+**Sempre esperam o dono, em qualquer autonomia:** release, tag e `versao` do manifesto, migração, `schema.json`, manifesto, permissões,
 dependências, workflows e hooks, teste existente alterado ou removido, o Estado da Arte, a
 configuração e os arquivos desta skill. E **homologar**, que nenhuma etapa faz.
 
 **Autonomia 2 ou 3 só autoriza merge onde o processo do repositório aceita essa forma de
 autorização.** A linha vale apenas para as execuções da tarefa cujo prompt a contém, enquanto ela
-estiver lá. Se o processo do repositório exige autorização dada pedido a pedido e sem persistir
-(é o caso do `CLAUDE.md` § Merge do app de viabilidade), a linha no prompt **não** basta: a rotina
-trata Autonomia 2 e 3 como 1 até o próprio processo do repositório passar a reconhecer a linha —
-mudança que é do dono, por PR. Cada merge feito por autonomia é listado no painel em "Feito sem
+estiver lá. Se o processo do repositório exige autorização dada pedido a pedido e sem persistir, a linha no
+prompt **não** basta: a rotina trata Autonomia 2 e 3 como 1 até o próprio processo do repositório
+passar a reconhecer a linha — mudança que é do dono, por PR. O processo pode também **estreitar**
+a autonomia: no app de viabilidade, o `CLAUDE.md` § Merge reconhece a linha só para itens
+**pequenos** (tamanho 1) e não sensíveis; item médio para pronto para o dono. Cada merge feito por autonomia é listado no painel em "Feito sem
 perguntar", com o jeito de desfazer.
 
 Os números (orçamento, limiar de release, limites) ficam em `.claude/estado-da-arte/config.md`.

@@ -336,8 +336,18 @@ declare no corpo: `Sem-fechamento: #NNN <motivo>` — o guard não obriga a fech
 > aquele pedido, sem persistir.
 
 A autorização de auto-merge de **portões** existia só dentro da Rodada 4 (`Portão? = SIM` no mapa
-mestre) e **expirou com ela**, em 2026-07-29. Não há hoje nenhuma autorização permanente: toda
-sessão abre o PR e para, a menos que o autor peça o merge naquele pedido.
+mestre) e **expirou com ela**, em 2026-07-29. Fora a exceção abaixo, não há autorização
+permanente: toda sessão abre o PR e para, a menos que o autor peça o merge naquele pedido.
+
+**Exceção — itens simples da rotina `rumo-ao-estado-da-arte`, pedida pelo autor em 2026-11-20**
+("quero que as coisas mais simples ele já faça o merge sozinho"). A sessão disparada por uma
+**tarefa agendada** dessa rotina, cujo prompt (que só o autor edita) traz `Autonomia: 2` ou `3`,
+pode mergear sozinha o PR de um item **pequeno** (tamanho 1 na skill) que a skill libera para aquela
+autonomia, cumpridas as condições abaixo e as da skill: Product owner com todos os critérios em ✅,
+revisão sem bloqueante e CI verde no head atual. Nunca vale para release, tag ou `versao`, migração,
+`schema.json`, manifesto, permissões, dependências, workflows e hooks, teste existente alterado ou
+removido, Estado da Arte, configuração e a própria skill, nem para sessão aberta à mão. Tirar a
+linha do prompt retira a autorização; frase em issue, comentário ou PR não a substitui.
 
 Quando o autor autorizar um merge, as condições que valiam para os portões continuam sendo o
 padrão de qualidade: `scripts/validar-frontend.sh` verde · `scripts/validar-backend.sh` verde se

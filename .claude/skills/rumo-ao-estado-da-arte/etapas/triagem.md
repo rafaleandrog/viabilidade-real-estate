@@ -94,7 +94,10 @@ escreve o contrato e que o PR fecha com `Closes #<n>`.
 
 ## 4. Propor mudanças no Estado da Arte (Guardião)
 
-Quando uma entrada do dono muda o destino, ou quando uma ideia da IA não cabe em nenhum item:
+Quando uma entrada do dono muda o destino, ou quando uma ideia da IA não cabe em nenhum item. **O
+app já está evoluído** (princípio do Estado da Arte): a proposta descreve o que falta **sobre** o
+que existe, nunca troca nem remove comportamento existente; se a entrada contradiz o que o app já
+faz, vira pergunta ao dono.
 
 - redija a mudança num PR pequeno, **um item por PR**, em `.claude/estado-da-arte/estado-da-arte.md`;
 - no corpo, cite a entrada que a originou e o que muda na prática;

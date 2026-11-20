@@ -110,8 +110,9 @@ registre no painel qual ação parou e encerre.
 ## 6. Release (Liberador) — só quando o dono manda
 
 O padrão é **propor**: a release sai quando o dono manda. Ele manda de dois jeitos: marcando, em
-"Esperando o seu sim", a caixa **"Soltar a release proposta"**, ou pondo `Release: automática` no
-prompt da tarefa. **Caixa de release marcada** (a TRIAGEM a registra no bloco Release como
+"Esperando o seu sim", a caixa **"Soltar a release proposta"**, ou pedindo numa conversa. Não
+existe release automática, e a rotina nunca muda a `versao` do manifesto fora de um PR de migração
+(SKILL.md § 3). **Caixa de release marcada** (a TRIAGEM a registra no bloco Release como
 "aprovada pelo dono"): dispare o workflow de release do repositório nesta execução, anote a tag e
 esvazie a proposta — vale também para release com item sensível, porque é o comando dele, dado
 vendo o que muda e o que não tem volta.
@@ -125,10 +126,7 @@ com ao menos uma mudança.
   teste existente alterado ou removido, Estado da Arte, configuração, arquivos desta skill), mesmo
   que o dono já o tenha mergeado: proponha em "Esperando o seu sim", como a caixa "Soltar a
   release proposta", com o que muda e o que não tem volta. Sem a caixa marcada, nunca dispare.
-- **Sem nada sensível e com `Release: automática` no prompt:** dispare o workflow de release do
-  repositório, do jeito que o `KIT.md` (onde houver) ou o `CLAUDE.md` definem, e anote a tag no
-  painel.
-- **Sem a linha no prompt:** proponha em "Esperando o seu sim", como a caixa "Soltar a release
+- **Sem nada sensível:** proponha em "Esperando o seu sim", como a caixa "Soltar a release
   proposta", com a lista do que entra. A proposta continua no painel (TRIAGEM § 2, item 1) até a
   caixa ser marcada ou recusada.
 

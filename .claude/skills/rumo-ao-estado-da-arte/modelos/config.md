@@ -1,6 +1,7 @@
 # Configuração da rotina rumo ao Estado da Arte
 
-Só números e nomes. A autonomia e a autorização de release ficam no prompt da tarefa agendada.
+Só números e nomes. A autonomia fica no prompt da tarefa agendada; a release só sai a pedido do dono
+(caixa no painel ou conversa), nunca por configuração.
 Mudança neste arquivo só por PR que o dono mergeia.
 
 orcamento_diario: 3        # pontos por dia (pequeno = 1, médio = 2)

@@ -75,7 +75,6 @@ Prompt:
 Use a skill rumo-ao-estado-da-arte na etapa EXECUCAO neste repositório.
 Ninguém acompanha esta sessão: não pergunte nada.
 Autonomia: 1
-Release: propor
 ```
 
 ## 6. Sessão na hora (opcional)
@@ -97,13 +96,12 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
 | `Autonomia: 1` | Todo PR fica pronto e parado para você |
 | `Autonomia: 2` | Onde o processo do repositório aceita (ver abaixo), entram sozinhos manutenção, bugs com teste, os seus itens e os passos rumo ao Estado da Arte |
 | `Autonomia: 3` e `Classes extras: ...` | O mesmo, mais as classes que você listar |
-| `Release: automática` | A pré-release sai sozinha quando nada da lista "sempre esperam o dono" (SKILL.md § 3) entrou desde a última |
 
 `Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
 dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,
 a rotina trata 2 e 3 como 1 até você mudar o próprio processo do repositório, por PR, para
-reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge ainda não a reconhece: hoje os PRs da rotina
-ficam prontos e parados para o seu merge.)
+reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge a reconhece só para itens pequenos e não
+sensíveis; o resto para pronto para o seu merge.)
 
 ## 8. O seu dia a dia
 
