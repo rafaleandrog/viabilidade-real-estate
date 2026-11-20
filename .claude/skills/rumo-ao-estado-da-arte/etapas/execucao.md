@@ -3,7 +3,10 @@
 ## 1. Orçamento
 
 Leia no painel quanto do `orcamento_diario` já foi gasto hoje. Sem saldo: anote "sem saldo" e
-encerre. Não comece item que custa mais que o saldo.
+encerre. Não comece item que custa mais que o saldo. **Por disparo**, no máximo
+`max_prs_por_disparo` PRs novos implementados (o prompt da tarefa pode fixar um número menor, e o do
+prompt vale). Cuidar de PR desta rotina já aberto (achado de revisão, CI, conflito) não conta como
+PR novo.
 
 **Sob demanda** (sessão disparada por rótulo numa issue): confira primeiro **o rótulo que o evento
 acabou de aplicar**. Se não for o `rotulo_urgente` da configuração, encerre sem escrever nada — o

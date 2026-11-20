@@ -20,6 +20,12 @@ divergência vai para o painel.
 | TRIAGEM | `etapas/triagem.md` | todo dia, modelo leve | a fila classificada e o painel do dia |
 | EXECUCAO | `etapas/execucao.md` | todo dia, e sob demanda | itens da fila até o merge, dentro do orçamento |
 
+**As duas etapas diárias podem rodar no mesmo disparo** — é o modo do app de viabilidade: uma
+tarefa agendada só, presa a uma sessão persistente, disparada em horários fixos, com o prompt
+pedindo "TRIAGEM e, em seguida, EXECUCAO". Aí a sessão roda a TRIAGEM inteira, depois a EXECUCAO,
+e encerra o disparo; o disparo seguinte chega na mesma conversa e começa pelo painel e pelos
+`Continuação:` (nunca pela memória da conversa, que é resumida com o tempo).
+
 Leia **por inteiro** o arquivo da etapa. Sem etapa no prompt e com o dono presente, trate o pedido
 dele pela seção 7. Sem etapa e sem ninguém: encerre sem escrever nada.
 

@@ -4,10 +4,11 @@ Só números e nomes. A autonomia fica no prompt da tarefa agendada; a release s
 (caixa no painel ou conversa), nunca por configuração.
 Mudança neste arquivo só por PR que o dono mergeia.
 
-orcamento_diario: 3        # pontos por dia (pequeno = 1, médio = 2)
+orcamento_diario: 18       # teto de pontos por dia (pequeno = 1, médio = 2), somando os disparos
+max_prs_por_disparo: 3     # PRs implementados no máximo em cada disparo da tarefa agendada
 release_pontos: 5          # pontos mergeados desde a última release que disparam a proposta
 release_dias: 7            # ou dias desde a última release, com ao menos uma mudança
 max_ideias_ia_dia: 3       # itens novos que a IA pode registrar por dia
-max_esperando_dono: 5      # itens que podem ficar esperando o dono ao mesmo tempo
+max_esperando_dono: 10     # itens que podem ficar esperando o dono ao mesmo tempo
 rotulo_urgente: agora      # rótulo que o dono põe numa issue para abrir sessão na hora
 instancia: nenhuma         # nome da entrada em URBIVERSO_INSTANCIAS, para ler o Sentinela
