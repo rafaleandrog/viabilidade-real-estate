@@ -54,8 +54,10 @@ export function montarMedidor(b: any, val: number | null): ConfigMedidor | null 
   return { min: 0, max, faixas, foraEscala: false };
 }
 
-// Cor da faixa do velocímetro em que o valor cai — a MESMA faixa/cor do medidor
-// (config de 3 faixas ou fallback de 2). null quando não há medidor válido.
+// Cor da faixa do velocímetro em que o valor cai (config de 3 faixas ou fallback
+// de 2). No corte exato o KPI fica na faixa mais favorável; o arco do medidor
+// trata `ate` como inclusivo e pinta esse ponto com a faixa de baixo — só ali
+// as duas cores podem diferir. null quando não há medidor válido.
 function corFaixa(b: any, val: number | null): string | null {
   // #571: sai cedo e explícito — `montarMedidor` também recusa `null`, mas
   // por dentro dele o TS não consegue estreitar o `val` desta função de volta
@@ -63,8 +65,17 @@ function corFaixa(b: any, val: number | null): string | null {
   if (val === null) return null;
   const cfg = montarMedidor(b, val);
   if (!cfg) return null;
-  const faixa = cfg.faixas.find((f) => val <= f.ate) ?? cfg.faixas[cfg.faixas.length - 1];
-  return faixa.cor;
+  return faixaDoValor(b, cfg.faixas, val).cor;
+}
+
+// Faixa em que o valor cai, comparando o valor de PLENA precisão (nunca
+// arredondado antes) com o corte. Valor exatamente NO corte pertence à faixa
+// melhor: em "atingir ou superar" a faixa de cima (atingir a meta é cumpri-la);
+// em "não exceder" a de baixo (igual ao teto não o ultrapassa).
+export function faixaDoValor(b: any, faixas: FaixaMedidor[], val: number): FaixaMedidor {
+  const naoExceder = b?.regra_comparacao === 'nao_exceder';
+  const achada = faixas.find((f) => (naoExceder ? val <= f.ate : val < f.ate));
+  return achada ?? faixas[faixas.length - 1];
 }
 
 // Bola colorida (🟢/🟡/🔴) da faixa — para usar como emoji de status em urbi-badge.
