@@ -52,6 +52,50 @@ Confirmado pelo dono em 2026-11-20.
 
 Um item por coisa que o app deve ser ou fazer na versão final.
 
+### 0. Referência de mercado: OSPA Capital (ospa.capital) — primeira referência do dono
+
+> **Fonte e limites.** Referência trazida pelo dono em 2026-11-20. O site `ospa.capital` (o
+> aplicativo) e `ospa.com.br/capital` (o institucional) **não puderam ser lidos direto** desta
+> sessão: o proxy de rede do ambiente recusa a conexão. O que segue saiu dos trechos indexados por
+> busca das páginas da própria empresa (material de marketing, sem verificação independente) e de
+> reportagem do Portas sobre a OSPA. Páginas citadas: `ospa.capital/home`,
+> `ospa.com.br/ospa-capital`, `…/ospa-capital/incorporador`, `…/ospa-capital/investidor`,
+> `…/ospa-capital/credito-ponte`, `…/capital/apoio-a-producao`, `…/place`, `ospa.com.br/llms.txt` e
+> `lp.ospa.com.br/ospa-capital-estrutura-capital-mcmv`. Para ler as telas de verdade, o dono precisa
+> liberar esses domínios na rede do ambiente.
+
+**O que é a OSPA Capital.** Braço do Grupo OSPA (Porto Alegre, 2005; antes escritório de
+arquitetura; linhas `architecture`, `place` e `capital`). Apresenta-se como "plataforma de
+viabilidade e crédito para o mercado imobiliário": análise de viabilidade "em minutos", estratégia
+de crédito e conexão do projeto com investidores institucionais (FIIs, FIDCs, gestoras, family
+offices), cobrando taxa de sucesso só quando o capital é captado e assinatura para o pipeline
+privado. Declara que não é corretora nem distribuidora habilitada pela CVM. Produtos citados:
+crédito ponte, apoio à produção e análise de viabilidade.
+
+**O que se espera do app a partir dela.** O dono quer que o app evolua na direção destas
+capacidades. Pelo princípio do topo, **cada uma se soma ao que o app já faz**. A coluna "já existe"
+é o ponto de partida, e nada nela é substituído.
+
+| # | Capacidade da OSPA (nome deles) | Já existe no app (preservar) | O que falta | Tamanho |
+|---|---|---|---|---|
+| 0.1 | **Viabilidade & Cenários** — fluxos e indicadores a partir de poucos inputs; cenários otimista, base e pessimista instantâneos | Preliminar com Proforma e Cenários (tornado, margem de segurança, Bear/Base/Bull); Avançado com fluxo mensal e Cenários manuais | No Avançado, gerar com um comando os três cenários (otimista, base, pessimista) a partir do estudo real e compará-los lado a lado | médio |
+| 0.2 | Indicadores para investidor: **TIR, MOIC, Equity Multiple, Yield**, cap rate e LTV padronizados | TIR, VPL, payback, exposição e ROI do projeto; MOIC por operação de funding | Equity Multiple e Yield do projeto, LTV de cada operação de dívida, num quadro "visão do investidor" | pequeno |
+| 0.3 | Estudo montado **a partir dos documentos do projeto** ou **conectando o ERP** | Entrada manual; importador de formulários por script (fora da tela); Apelo Comercial lê documentos anexados com IA | Criar ou preencher um estudo a partir de documentos anexados (memorial, planilha, formulário), com revisão humana antes de salvar; integração com o **Sienge**, o ERP da empresa; e, quando existir, com o **app de orçamento** da instância, que terá os dados reais de custo da empresa | grande |
+| 0.4 | **Estrutura de capital / estratégia de crédito** — simulação de alavancagem; crédito ponte; apoio à produção; terreno, pré-obra e equity (MCMV) | Funding com dívida, equity, financiamento à produção e antecipação de recebíveis | Comparar estruturas de capital alternativas lado a lado (com e sem crédito ponte, mais ou menos equity) com o efeito na exposição e na TIR do incorporador | médio |
+| 0.5 | **Diligência Digital e Risk Score** — mais de 50 pontos de risco jurídico e técnico, pré-diligência e inconsistências documentais | Invariantes numéricas do fluxo; documentos anexados; Apelo Comercial (score de mercado) | Checklist de diligência do terreno e do projeto com pontuação de risco, pendências e apontamento de inconsistências | grande |
+| 0.6 | **Data Room** e organização documental | Anexos do empreendimento e documentos do Apelo | Data room do estudo, com documentos por categoria e acesso controlado para quem vai avaliar o projeto | médio |
+| 0.7 | Material para investidor (pré-diligência "pronta") | Exportação da Proforma (Preliminar) e do Fluxo de Caixa (Avançado) em PDF/Excel | Um dossiê do projeto em PDF com indicadores, cenários, estrutura de capital e riscos | médio |
+| 0.8 | **Governança & RI** — investidores atualizados sobre obra, vendas e desempenho; **planejado × realizado** | Ciclo de vida do estudo; membros e funções | Depois de aprovado, acompanhar o realizado de obra e vendas contra o planejado do estudo | grande |
+| 0.9 | **CRM de Captação** — pipeline de investidores, histórico de negociação, pedidos de documento e term sheets | — | **Desejo futuro, sem previsão de entrar no escopo** (decisão do dono, 2026-11-20). Não é passo autorizado | — |
+| 0.10 | **Matching com investidores** — o projeto cruzado com a tese de veículos (região, cap rate, LTV) | — | **Desejo futuro, sem previsão de entrar no escopo** (decisão do dono, 2026-11-20). Não é passo autorizado | — |
+| 0.11 | **OSPA place** — potencial construtivo, zoneamento, volumetria, IA sobre legislação | Aba Terrenos com coeficientes, gabarito e área máxima construída; terreno do Núcleo | Entra no app (decisão do dono, 2026-11-20): planejar o potencial construtivo do terreno a partir do zoneamento, a simulação volumétrica e a consulta à legislação, somando-se à aba Terrenos | grande |
+
+- **Por que importa:** é a primeira referência de mercado que o dono escolheu para o destino do app.
+- **Pronto quando:** cada linha de 0.1 a 0.8 e a 0.11 tem a própria issue com spec e critérios, e
+  ela fecha com o comportamento entregue sem regressão no que a coluna "já existe" descreve. As
+  linhas 0.9 e 0.10 são desejo futuro: ficam no `ideias.md` e não entram no "pronto quando".
+- **Situação:** falta — nenhuma das capacidades da coluna "o que falta" existe hoje.
+
 ### 1. Estudo Preliminar confiável
 
 - **O que é:** das premissas (terreno e áreas, custos, permutas, catálogo de produtos) sai na hora
@@ -198,3 +242,8 @@ Nenhuma em aberto.
   o que entra de fato. Todas as citadas já estão no `ideias.md`.
 - **O que falta:** nada no momento; o dono vai trazer referências (dados, links, imagens) para
   complementar.
+- **OSPA, CRM de captação e matching com investidores (0.9 e 0.10):** desejo futuro, ainda sem
+  previsão de entrar no escopo.
+- **OSPA, ERP (0.3):** a empresa usa o Sienge; em breve haverá um app de orçamento com dados reais
+  da empresa, que também deve alimentar o estudo.
+- **OSPA place (0.11):** sim, planejar para ter.
