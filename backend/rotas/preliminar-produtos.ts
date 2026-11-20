@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
-import { numeroEstrito } from './coercao-numerica.js';
+import { numeroEstrito, coagirNumericosDeclarados } from './coercao-numerica.js';
+import esquema from '../../schema.json';
 
 // Catálogo de Produtos do Preliminar (#315 — item 3 da Rodada 7): tabela
 // dinâmica (add/remove) com Nome, Área média, Preço de venda e Unidades;
@@ -21,6 +22,30 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 // #781/#784: `pct_alv` (participação na base do estudo: ALV no Loteamento, áreas
 // privativas fechadas na Incorporação) entra logo depois de `tipo`.
 export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
+
+// #812 — os valores válidos de `tipo` vêm do `schema.json`, não de lista escrita
+// à mão: o shell recusa o que não está em `opcoes`, e sem a checagem aqui a
+// recusa do CLIENTE voltava como `500 ERRO_INTERNO` pelo `catch` genérico.
+export const TIPOS_PRODUTO: string[] = (esquema as any).tabelas.preliminar_produtos.colunas.tipo.opcoes;
+
+/** Mensagem do erro de `tipo`, ou `null` quando ausente (default do schema / PATCH inalterado) ou válido. */
+export function erroTipoProduto(body: Record<string, any>): string | null {
+  if (body.tipo === undefined) return null;
+  if (typeof body.tipo === 'string' && TIPOS_PRODUTO.includes(body.tipo)) return null;
+  return `tipo deve ser um de: ${TIPOS_PRODUTO.join(', ')}`;
+}
+
+/**
+ * Coage os campos numéricos declarados (`area_media_m2`, `preco_venda_m2`,
+ * `unidades`, `ordem`, `pct_alv`) pelo parser único; lixo vira 400
+ * `CAMPO_INVALIDO` em vez de 500. Muta `dados` e devolve `false` se respondeu.
+ */
+function coagirNumericosOuResponder(res: Response, dados: Record<string, any>): boolean {
+  const r = coagirNumericosDeclarados('preliminar_produtos', dados);
+  if ('falha' in r) { erro(res, 400, 'CAMPO_INVALIDO', r.falha.mensagem); return false; }
+  Object.assign(dados, r.dados);
+  return true;
+}
 
 /**
  * #781 — `pct_alv` é percentual: número estrito entre 0 e 100. Parser único do
@@ -86,12 +111,15 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
 
     const msgPct = erroPctAlv(req.body);
     if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
+    const msgTipo = erroTipoProduto(req.body);
+    if (msgTipo) { erro(res, 400, 'TIPO_INVALIDO', msgTipo); return; }
 
     const existentes = await req.dados!.listar('preliminar_produtos', { filtros: { estudo_id: estudoId }, por_pagina: 500 });
     const dados: Record<string, any> = { estudo_id: estudoId, nome: '', ordem: existentes.total };
     for (const campo of CAMPOS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
+    if (!coagirNumericosOuResponder(res, dados)) return;
     const criado = await req.dados!.criar('preliminar_produtos', comPctAlvNumerico(dados));
     res.status(201).json(criado);
   } catch (e: any) {
@@ -111,12 +139,15 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
 
     const msgPct = erroPctAlv(req.body);
     if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
+    const msgTipo = erroTipoProduto(req.body);
+    if (msgTipo) { erro(res, 400, 'TIPO_INVALIDO', msgTipo); return; }
 
     const dados: Record<string, any> = {};
     for (const campo of CAMPOS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    if (!coagirNumericosOuResponder(res, dados)) return;
     const atualizado = await req.dados!.atualizar('preliminar_produtos', p.id, comPctAlvNumerico(dados));
     res.json(atualizado);
   } catch (e: any) {
