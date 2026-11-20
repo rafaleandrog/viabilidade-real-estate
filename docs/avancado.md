@@ -91,7 +91,8 @@ reconciliação.
 
 A **Absorção de vendas** de cada Grupo distribui o percentual vendido em até quatro períodos que vêm
 do Cronograma: **Pré-lançamento** (quando o estudo tem essa fase), **Lançamento**, **Durante a
-obra** e **Pós-chaves** — este último é o que sobra para fechar 100% e é calculado sozinho. Cada
+obra** e **Pós-chaves** — este último é o que sobra para fechar 100% e é calculado sozinho; o
+percentual gravado do Pós-chaves, inclusive num Grupo criado por API, é sempre esse valor derivado. Cada
 período espalha o seu percentual por igual pelos meses que tem. O Pós-chaves começa no mês seguinte
 à entrega e dura o que o Grupo definir em **Janela Pós-chaves**, de 1 a 12 meses (12 é o padrão);
 ele não depende da duração da fase Pós-obras do Cronograma, que é de custo. Uma janela curta

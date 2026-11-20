@@ -3,7 +3,7 @@ import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
-import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
+import { eSemeaduraObrigatoria, pctPosChavesDerivado } from '../../frontend/fluxo-shared.js';
 import { erroComponentePagamento, erroDestinoSaldoChaves } from '../../frontend/fluxo-pagamento-contrato.js';
 import { fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
 import { normalizarLinhasPagamento } from '../../frontend/fluxo-caixa-motor.js';
@@ -299,11 +299,11 @@ export function validarFluxoPagamento(fp: any): string | null {
 export function absorcaoPadrao(temPreLancamento: boolean): Record<string, any> {
   const blocos: any[] = [];
   if (temPreLancamento) blocos.push({ evento: 'pre_lancamento', pct: 0 });
-  blocos.push(
-    { evento: 'lancamento', pct: 30 },
-    { evento: 'obra', pct: 40 },
-    { evento: 'pos_obra', pct: 0 }, // Pós-obra: derivado = 100 − 30 − 40 = 30
-  );
+  blocos.push({ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 40 });
+  // Pós-chaves grava o valor EFETIVO (100 − 30 − 40 = 30), pela mesma função
+  // da tela e do motor (`pctPosChavesDerivado`) — nunca um placeholder 0.
+  // (Comentário mantido neste tamanho: as citações de doc abaixo dependem das linhas.)
+  blocos.push({ evento: 'pos_obra', pct: pctPosChavesDerivado(blocos) });
   return { modo: 'distribuido', correcao_estoque: false, blocos };
 }
 export function fluxoPagamentoPadrao(): Record<string, any> {
@@ -1213,7 +1213,7 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
     if (req.body.absorcao !== undefined) {
       const invalido = validarAbsorcao(req.body.absorcao);
       if (invalido) { erro(res, 400, 'ABSORCAO_INVALIDA', invalido); return; }
-      dados.absorcao = req.body.absorcao;
+      dados.absorcao = absorcaoComPosChavesDerivado(req.body.absorcao);
     }
     if (req.body.fluxo_pagamento !== undefined) {
       const invalido = validarFluxoPagamento(req.body.fluxo_pagamento);
@@ -2368,4 +2368,15 @@ export function coagirOuRecusar(res: Response, tabela: string, dados: Record<str
   const r = coagirNumericosDeclarados(tabela, dados);
   if ('falha' in r) { erro(res, 400, 'CAMPO_INVALIDO', r.falha.mensagem); return null; }
   return r.dados;
+}
+
+/** Regrava o bloco `pos_obra` com o % derivado dos demais (modo distribuído); outros modos voltam intactos. */
+export function absorcaoComPosChavesDerivado(a: any): any {
+  if (!a || typeof a !== 'object' || a.modo !== 'distribuido' || !Array.isArray(a.blocos)) return a;
+  const pct = pctPosChavesDerivado(a.blocos);
+  const tem = a.blocos.some((b: any) => b?.evento === 'pos_obra');
+  const blocos = tem
+    ? a.blocos.map((b: any) => (b?.evento === 'pos_obra' ? { ...b, pct } : b))
+    : [...a.blocos, { evento: 'pos_obra', pct }];
+  return { ...a, blocos };
 }
