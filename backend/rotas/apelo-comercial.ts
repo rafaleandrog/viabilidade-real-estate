@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
 import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js';
 import { produtosDoEstudo, type ProformaInput } from '../../frontend/proforma.js';
+import { idDeRota } from './coercao-numerica.js';
 import {
   FATORES, SCHEMA_RESPOSTA, instrucoesSistema, calcularScores,
   montarContextoApeloDoEstudo, normalizarRespostaApelo, contarNotasValidas,
@@ -23,7 +24,7 @@ async function garantirApelo(req: Request, estudoId: number): Promise<any> {
 // GET /estudos/:id/apelo-comercial — resultado + documentos
 rotasApelo.get('/estudos/:id/apelo-comercial', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoLeituraEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -45,7 +46,7 @@ rotasApelo.get('/estudos/:id/apelo-comercial', async (req: Request, res: Respons
 // POST /estudos/:id/apelo-comercial/documentos — associar upload + metadados
 rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -73,8 +74,8 @@ rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, 
 // PATCH …/remover (e DELETE) /estudos/:id/apelo-comercial/documentos/:docId
 async function removerDocumentoApelo(req: Request, res: Response): Promise<void> {
   try {
-    const estudoId = parseInt(req.params.id);
-    const docId = parseInt(req.params.docId);
+    const estudoId = idDeRota(req.params.id);
+    const docId = idDeRota(req.params.docId);
     if (isNaN(estudoId) || isNaN(docId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -107,7 +108,7 @@ rotasApelo.delete('/estudos/:id/apelo-comercial/documentos/:docId', removerDocum
 // POST /estudos/:id/apelo-comercial — dispara a análise de IA
 rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
-import { numeroEstrito } from './coercao-numerica.js';
+import { idDeRota, numeroEstrito } from './coercao-numerica.js';
 
 // Catálogo de Produtos do Preliminar (#315 — item 3 da Rodada 7): tabela
 // dinâmica (add/remove) com Nome, Área média, Preço de venda e Unidades;
@@ -47,7 +47,7 @@ function comPctAlvNumerico(dados: Record<string, any>): Record<string, any> {
 }
 
 async function produtoDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
-  const pid = parseInt(req.params.pid);
+  const pid = idDeRota(req.params.pid);
   if (isNaN(pid)) { erro(res, 400, 'ID_INVALIDO', 'ID do produto inválido'); return null; }
   const p = await req.dados!.buscar('preliminar_produtos', pid);
   if (!p || Number(p.estudo_id) !== estudoId) {
@@ -59,7 +59,7 @@ async function produtoDoEstudo(req: Request, res: Response, estudoId: number): P
 
 rotasPreliminarProdutos.get('/estudos/:id/preliminar/produtos', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoLeituraEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -79,7 +79,7 @@ rotasPreliminarProdutos.get('/estudos/:id/preliminar/produtos', async (req: Requ
 
 rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -102,7 +102,7 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
 
 rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -127,7 +127,7 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
 
 async function removerProdutoPreliminar(req: Request, res: Response): Promise<void> {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }

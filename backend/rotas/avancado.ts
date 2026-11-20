@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
-import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
+import { coagirNumericosDeclarados, coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria } from '../../frontend/fluxo-shared.js';
 import { erroComponentePagamento, erroDestinoSaldoChaves } from '../../frontend/fluxo-pagamento-contrato.js';
 import { fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
@@ -421,7 +421,7 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 
 /** Carrega o estudo e garante nível avançado (422 NIVEL_INVALIDO se preliminar). */
 async function estudoAvancado(req: Request, res: Response): Promise<any | null> {
-  const estudoId = parseInt(req.params.id);
+  const estudoId = idDeRota(req.params.id);
   if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return null; }
   const estudo = await req.dados!.buscar('estudos', estudoId);
   if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return null; }
@@ -783,7 +783,7 @@ rotasAvancado.post('/avancado/curvas', async (req: Request, res: Response) => {
 rotasAvancado.patch('/avancado/curvas/:cid', async (req: Request, res: Response) => {
   try {
     if (!exigirAdminApp(req, res)) return;
-    const id = parseInt(req.params.cid);
+    const id = idDeRota(req.params.cid);
     if (isNaN(id)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const dados: Record<string, any> = {};
@@ -812,7 +812,7 @@ rotasAvancado.patch('/avancado/curvas/:cid', async (req: Request, res: Response)
 rotasAvancado.delete('/avancado/curvas/:cid', async (req: Request, res: Response) => {
   try {
     if (!exigirAdminApp(req, res)) return;
-    const id = parseInt(req.params.cid);
+    const id = idDeRota(req.params.cid);
     if (isNaN(id)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const curva = await req.dados!.buscar('avancado_curvas', id);
     if (!curva) { erro(res, 404, 'CURVA_NAO_ENCONTRADA', 'Curva não encontrada'); return; }
@@ -851,7 +851,7 @@ const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'area_pri
 // ── Catálogo de tipologias (nível estudo) ──
 
 async function tipologiaDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
-  const tid = parseInt(req.params.tid);
+  const tid = idDeRota(req.params.tid);
   if (isNaN(tid)) { erro(res, 400, 'ID_INVALIDO', 'ID da tipologia inválido'); return null; }
   const tip = await req.dados!.buscar('avancado_tipologias', tid);
   if (!tip || Number(tip.estudo_id) !== estudoId) {
@@ -1075,7 +1075,7 @@ rotasAvancado.delete('/estudos/:id/avancado/tipologias/:tid', removerTipologia);
 // ── Fases (dona da Absorção e do Fluxo de Pagamento) ──
 
 async function faseDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
-  const fid = parseInt(req.params.fid);
+  const fid = idDeRota(req.params.fid);
   if (isNaN(fid)) { erro(res, 400, 'ID_INVALIDO', 'ID da fase inválido'); return null; }
   const fase = await req.dados!.buscar('avancado_fases', fid);
   if (!fase || Number(fase.estudo_id) !== estudoId) {
@@ -1395,7 +1395,7 @@ async function permutaCabeAposReducao(
 }
 
 async function alocacaoDaFase(req: Request, res: Response, faseId: number): Promise<any | null> {
-  const aid = parseInt(req.params.aid);
+  const aid = idDeRota(req.params.aid);
   if (isNaN(aid)) { erro(res, 400, 'ID_INVALIDO', 'ID da alocação inválido'); return null; }
   const aloc = await req.dados!.buscar('avancado_alocacoes', aid);
   if (!aloc || Number(aloc.fase_id) !== faseId) {
@@ -1921,7 +1921,7 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
 
-    const cid = parseInt(req.params.cid);
+    const cid = idDeRota(req.params.cid);
     if (isNaN(cid)) { erro(res, 400, 'ID_INVALIDO', 'ID da linha de custo inválido'); return; }
     const custo = await req.dados!.buscar('avancado_linhas_custo', cid);
     if (!custo || Number(custo.estudo_id) !== estudo.id) {
@@ -2230,7 +2230,7 @@ async function removerCusto(req: Request, res: Response): Promise<void> {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const cid = parseInt(req.params.cid);
+    const cid = idDeRota(req.params.cid);
     if (isNaN(cid)) { erro(res, 400, 'ID_INVALIDO', 'ID da linha de custo inválido'); return; }
     const custo = await req.dados!.buscar('avancado_linhas_custo', cid);
     if (!custo || Number(custo.estudo_id) !== estudo.id) {
@@ -2308,7 +2308,7 @@ rotasAvancado.patch('/estudos/:id/avancado/cenarios/:cid', async (req: Request, 
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
 
-    const cid = parseInt(req.params.cid);
+    const cid = idDeRota(req.params.cid);
     if (isNaN(cid)) { erro(res, 400, 'ID_INVALIDO', 'ID do cenário inválido'); return; }
     const cen = await req.dados!.buscar('avancado_cenarios', cid);
     if (!cen || Number(cen.estudo_id) !== estudo.id) {
@@ -2337,7 +2337,7 @@ async function removerCenario(req: Request, res: Response): Promise<void> {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const cid = parseInt(req.params.cid);
+    const cid = idDeRota(req.params.cid);
     if (isNaN(cid)) { erro(res, 400, 'ID_INVALIDO', 'ID do cenário inválido'); return; }
     const cen = await req.dados!.buscar('avancado_cenarios', cid);
     if (!cen || Number(cen.estudo_id) !== estudo.id) {

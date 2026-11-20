@@ -106,6 +106,23 @@ export function numeroEstrito(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Id de parâmetro de rota (`req.params.*`): inteiro estrito e positivo, ou `NaN`.
+ *
+ * Devolve `NaN` (e não `null`) de propósito: toda rota já barra o id inválido com
+ * `if (isNaN(id)) → 400 ID_INVALIDO` antes de qualquer leitura, e `NaN` encaixa
+ * nessa guarda sem reescrevê-la. Substitui `parseInt`, que aceitava `1e3`
+ * (lido como 1), `12abc` (12) e `0x10` (0); aqui passam só os dígitos decimais
+ * de `numeroEstrito`, e `0`/negativos/fracionários também são recusados.
+ */
+export function idDeRota(v: unknown): number {
+  // Só dígitos: `numeroEstrito` aceita sinal, ponto e espaço nas pontas, e um id
+  // de rota não tem nenhum dos três.
+  if (typeof v !== 'string' || !/^\d+$/.test(v)) return NaN;
+  const n = numeroEstrito(v);
+  return n !== null && Number.isInteger(n) && n > 0 ? n : NaN;
+}
+
 /** Colunas numéricas por tabela, derivadas do `schema.json` (fonte única). */
 const NUMERICAS_POR_TABELA: Map<string, Map<string, boolean>> = (() => {
   const mapa = new Map<string, Map<string, boolean>>();
