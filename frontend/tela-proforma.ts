@@ -22,6 +22,7 @@ import {
 } from './exportar.js';
 export { ehLinhaReceitaOuResultado, celulaProforma };
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
+import { kpiAreaPermutada } from './kpi-area-permutada.js';
 import { montarFaixaCenarios } from './faixa-cenarios-motor.js';
 import './faixa-cenarios.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
@@ -282,6 +283,7 @@ export class ViabTelaProforma extends LitElement {
        tela-resumo.ts. */
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 260px)); gap: 12px; margin-bottom: 16px; }
     .kpis urbi-kpi { min-width: 0; }
+    .kpi-nota { margin: -8px 0 16px; font-size: var(--texto-legenda); color: var(--cor-texto-sec); }
     /* Aviso do excedente de permuta: acima da tabela, dentro do card. */
     urbi-banner.aviso-permuta { display: block; margin-bottom: 14px; }
     /* Mesmo respiro do estado vazio do catálogo em Premissas → Produtos. */
@@ -580,7 +582,8 @@ export class ViabTelaProforma extends LitElement {
   private _renderKpis(p: Proforma, lot: boolean): TemplateResult {
     const co = this._bm('custo_obras_vgv');
     const ml = this._bm('margem_liquida');
-    const temPermuta = p.areaPermutaFisica > 0 || p.permutaFinResidencial > 0 || p.permutaFinNaoResidencial > 0;
+    // Área permutada: "—" + nota quando a permuta é só financeira (`kpiAreaPermutada`).
+    const permuta = kpiAreaPermutada(p.areaPermutaFisica, p.permutaFinResidencial + p.permutaFinNaoResidencial);
     const kpis: { rot: string; val: string; variante: string }[] = [
       { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
       { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
@@ -602,7 +605,7 @@ export class ViabTelaProforma extends LitElement {
     // #611: sem área de gleba `eficienciaPct` já vem `null` do motor, e a
     // troca por "—" não depende de cor nenhuma.
     if (lot) kpis.push({ rot: 'Vendável / gleba', val: fmtPctOuIndef(p.eficienciaPct), variante: '' });
-    if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
+    if (permuta) kpis.push({ rot: permuta.rot, val: permuta.val, variante: '' });
     // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
     // fica só nos badges da análise de sensibilidade).
     // #571: VGV ≤ 0 (ex.: permuta física capa 100% da base) — os dois vêm
@@ -611,7 +614,8 @@ export class ViabTelaProforma extends LitElement {
     kpis.push({ rot: 'Margem sobre VGV', val: fmtPctOuIndef(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
     return html`<div class="kpis">
       ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
-    </div>`;
+    </div>
+    ${permuta?.nota ? html`<p class="kpi-nota">${permuta.nota}</p>` : nothing}`;
   }
 
   private _toggle(g: Grupo) {

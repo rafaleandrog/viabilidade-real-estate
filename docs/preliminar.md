@@ -92,7 +92,9 @@ Duas sub-abas.
 
 **Proforma.** Acima da tabela, os cards **Área vendável**, **Nº de unidades**, **Custo obras / VGV**
 e **Margem sobre VGV** — mais **Vendável / gleba** no Loteamento e **Área permutada** quando há
-permuta física. A tabela, de cima para baixo: **Receita bruta (VGV)** (precedida de **VGV sem
+permuta. Com permuta física, o card mostra os m² entregues; com **só permuta financeira** (sem área
+entregue) o valor do card é "—", e uma nota abaixo dos cards diz que a permuta é só financeira, com o
+montante em R$ (2 casas); sem permuta nenhuma o card não aparece. A tabela, de cima para baixo: **Receita bruta (VGV)** (precedida de **VGV sem
 permuta física** e das permutas quando há permuta física); **= Deduções sobre VGV**, que abre
 imposto, corretagem, marketing e permuta financeira; **= Receita líquida**; **= Custo direto total**,
 que abre os custos diretos; **= Receita operacional**; **= Custo indireto total**, que abre os
