@@ -54,8 +54,10 @@ export function montarMedidor(b: any, val: number | null): ConfigMedidor | null 
   return { min: 0, max, faixas, foraEscala: false };
 }
 
-// Cor da faixa do velocímetro em que o valor cai — a MESMA faixa/cor do medidor
-// (config de 3 faixas ou fallback de 2). null quando não há medidor válido.
+// Cor da faixa do velocímetro em que o valor cai (config de 3 faixas ou fallback
+// de 2). No corte exato o KPI fica na faixa mais favorável; o arco do medidor
+// trata `ate` como inclusivo e pinta esse ponto com a faixa de baixo — só ali
+// as duas cores podem diferir. null quando não há medidor válido.
 function corFaixa(b: any, val: number | null): string | null {
   // #571: sai cedo e explícito — `montarMedidor` também recusa `null`, mas
   // por dentro dele o TS não consegue estreitar o `val` desta função de volta

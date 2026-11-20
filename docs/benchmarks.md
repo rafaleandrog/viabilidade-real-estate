@@ -30,8 +30,9 @@ Os benchmarks aparecem em três lugares dos estudos:
    atingido e vermelho quando não; *não exceder* (Custo obras / VGV ≤ 35 %) o inverso. É a cor dos
    cards de KPI e dos medidores da aba Gráficos, cujas faixas vêm de **Mín**, **Faixa 1 até**,
    **Faixa 2 até** e **Máx** — em branco, as faixas saem automaticamente da meta. Valor
-   exatamente igual à meta (ou a um corte de faixa) conta como atingido nas duas regras; a
-   comparação usa o valor completo, sem arredondar antes.
+   exatamente igual à meta conta como atingido nas duas regras, e valor exatamente num corte de
+   faixa fica na mais favorável das duas faixas que se encontram ali; a comparação usa o valor
+   completo, sem arredondar antes.
 2. **Variações dos cenários.** Na análise de sensibilidade de Cenários, **Var +** e **Var −** do
    indicador de sensibilidade da variável escolhida são as variações de Bull e Bear (10 % quando
    não há benchmark). Não há sobrescrita por estudo.
