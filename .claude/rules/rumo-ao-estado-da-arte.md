@@ -8,7 +8,10 @@ processo do `CLAUDE.md` e do `KIT.md` (quando existir); não os substitui. Em co
    avise que falta rodar a etapa PREPARAR da skill e siga normalmente.
 2. **Ligue o pedido ao destino.** Diga em uma linha qual item do Estado da Arte o trabalho avança,
    ou que ele está fora. Se o pedido do dono muda o destino, proponha a mudança no documento num
-   PR separado, para ele mergear. Nenhuma sessão edita o Estado da Arte direto.
+   PR separado, para ele mergear. Nenhuma sessão edita o Estado da Arte direto. O app já está
+   evoluído: nada do Estado da Arte autoriza substituir o que já existe.
+7. **Release, tag e `versao` do manifesto só quando o dono pede.** Nenhuma sessão as cria ou muda
+   por conta própria.
 3. **O que você notar e não for do pedido** (bug, melhoria, dívida) não se conserta de passagem
    nem vira issue na hora: deixe um comentário começando com `Observação:` na issue
    `Estado da Arte: painel`. A TRIAGEM decide o que vira issue `origem-ia`, dentro do limite diário.

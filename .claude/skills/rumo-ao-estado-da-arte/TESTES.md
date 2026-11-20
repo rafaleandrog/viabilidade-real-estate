@@ -9,7 +9,7 @@ Só passe ao seguinte quando o anterior passar. Os limiares são ponto de partid
 | T2 | TRIAGEM por 3 dias | A fila é a que você montaria | Você concorda com a ordem e com o que ficou esperando o seu sim |
 | T3 | EXECUCAO com `Autonomia: 1`, 5 itens | Um PR pronto sai de um item sem você | 4 de 5 PRs você aceitaria sem tocar |
 | T4 | EXECUCAO com `Autonomia: 2`, 2 semanas (só depois de o processo do repositório reconhecer a linha: SKILL.md § 3) | O merge automático funciona e é confiável | A sessão mergeia sem ficar esperando confirmação, e nada é revertido |
-| T5 | `Release: automática` | A pré-release sai sozinha | A tag aparece e a instância de homologação a recebe |
+| T5 | Caixa "Soltar a release proposta" marcada | A release sai só com o seu sim | A tag aparece só depois da caixa, e a instância de homologação a recebe |
 | T6 | Rótulo `agora` numa issue | A sessão sob demanda abre e respeita o saldo | Com saldo, trabalha; sem saldo, deixa na fila |
 
 ## O que cada teste pode revelar
