@@ -107,20 +107,28 @@ registre no painel qual ação parou e encerre.
 
 ## 6. Release (Liberador) — só quando o dono manda
 
-O padrão é **propor**: a release sai quando o dono manda, marcando a caixa da proposta no painel
-ou pondo `Release: automática` no prompt da tarefa. Conte os pontos mergeados desde a última release. O limiar é `release_pontos`, ou `release_dias`
+O padrão é **propor**: a release sai quando o dono manda. Ele manda de dois jeitos: marcando, em
+"Esperando o seu sim", a caixa **"Soltar a release proposta"**, ou pondo `Release: automática` no
+prompt da tarefa. **Caixa de release marcada** (a TRIAGEM a registra no bloco Release como
+"aprovada pelo dono"): dispare o workflow de release do repositório nesta execução, anote a tag e
+esvazie a proposta — vale também para release com item sensível, porque é o comando dele, dado
+vendo o que muda e o que não tem volta.
+
+Conte os pontos mergeados desde a última release. O limiar é `release_pontos`, ou `release_dias`
 com ao menos uma mudança.
 
 - **Abaixo do limiar:** nada.
 - **Há algo sensível entre as mudanças** — qualquer item da lista "sempre esperam o dono" do
   SKILL.md § 3 (migração, `schema.json`, manifesto, permissões, dependências, workflows e hooks,
   teste existente alterado ou removido, Estado da Arte, configuração, arquivos desta skill), mesmo
-  que o dono já o tenha mergeado: proponha no painel, em "Esperando o seu sim", com o que muda e o
-  que não tem volta. Nunca dispare.
+  que o dono já o tenha mergeado: proponha em "Esperando o seu sim", como a caixa "Soltar a
+  release proposta", com o que muda e o que não tem volta. Sem a caixa marcada, nunca dispare.
 - **Sem nada sensível e com `Release: automática` no prompt:** dispare o workflow de release do
   repositório, do jeito que o `KIT.md` (onde houver) ou o `CLAUDE.md` definem, e anote a tag no
   painel.
-- **Sem a linha no prompt:** proponha no painel com a lista do que entra.
+- **Sem a linha no prompt:** proponha em "Esperando o seu sim", como a caixa "Soltar a release
+  proposta", com a lista do que entra. A proposta continua no painel (TRIAGEM § 2, item 1) até a
+  caixa ser marcada ou recusada.
 
 Em todos os casos, escreva no painel o roteiro do que o dono deve conferir na homologação.
 **Homologar é sempre dele.**
