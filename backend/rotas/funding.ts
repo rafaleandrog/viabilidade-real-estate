@@ -4,6 +4,7 @@ import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus 
 // propósito: `duplicarDadosAvancado` (lá) precisa da mesma lista para copiar as
 // operações (#609), e este arquivo JÁ importa daquele — declarar a constante
 // aqui e importá-la de lá fecharia um CICLO de módulos por uma lista de strings.
+import { idDeRota } from './coercao-numerica.js';
 import {
   ancorarLinhaCusto, ancorarLinhaCustoEmFase, lerCronograma, CAMPOS_OPERACAO, coagirOuRecusar,
 } from './avancado.js';
@@ -92,7 +93,7 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 
 /** Carrega o estudo e garante nível avançado (422 NIVEL_INVALIDO se preliminar). */
 async function estudoAvancado(req: Request, res: Response): Promise<any | null> {
-  const estudoId = parseInt(req.params.id);
+  const estudoId = idDeRota(req.params.id);
   if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return null; }
   const estudo = await req.dados!.buscar('estudos', estudoId);
   if (!estudo) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return null; }
@@ -360,7 +361,7 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
 
-    const oid = parseInt(req.params.oid);
+    const oid = idDeRota(req.params.oid);
     if (isNaN(oid)) { erro(res, 400, 'ID_INVALIDO', 'ID da operação inválido'); return; }
     const operacao = await req.dados!.buscar('avancado_funding_operacoes', oid);
     if (!operacao || Number(operacao.estudo_id) !== estudo.id) {
@@ -412,7 +413,7 @@ async function removerOperacaoFunding(req: Request, res: Response): Promise<void
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const oid = parseInt(req.params.oid);
+    const oid = idDeRota(req.params.oid);
     if (isNaN(oid)) { erro(res, 400, 'ID_INVALIDO', 'ID da operação inválido'); return; }
     const operacao = await req.dados!.buscar('avancado_funding_operacoes', oid);
     if (!operacao || Number(operacao.estudo_id) !== estudo.id) {

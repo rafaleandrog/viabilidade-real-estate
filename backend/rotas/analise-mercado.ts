@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
+import { idDeRota } from './coercao-numerica.js';
 import {
   SCHEMA_ANALISE, instrucoesSistemaAnalise, montarContextoAnalise,
   normalizarAnalise, CAMPOS_INDICADOR,
@@ -24,7 +25,7 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 // GET /estudos/:id/analise-mercado — snapshot de mercado (ou null)
 rotasAnaliseMercado.get('/estudos/:id/analise-mercado', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoLeituraEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -57,7 +58,7 @@ rotasAnaliseMercado.get('/estudos/:id/analise-mercado', async (req: Request, res
 // PATCH /estudos/:id/analise-mercado/regiao — vincula o estudo a uma região monitorada
 rotasAnaliseMercado.patch('/estudos/:id/analise-mercado/regiao', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -85,7 +86,7 @@ rotasAnaliseMercado.patch('/estudos/:id/analise-mercado/regiao', async (req: Req
 // precisa decidir quando gastá-la. Exige editor, como toda escrita no estudo.
 rotasAnaliseMercado.post('/estudos/:id/analise-mercado', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -208,7 +209,7 @@ rotasAnaliseMercado.post('/mercado/regioes', async (req: Request, res: Response)
 rotasAnaliseMercado.patch('/mercado/regioes/:rid', async (req: Request, res: Response) => {
   try {
     if (!exigirAdmin(req, res)) return;
-    const rid = parseInt(req.params.rid);
+    const rid = idDeRota(req.params.rid);
     if (isNaN(rid)) { erro(res, 400, 'ID_INVALIDO', 'ID inválido'); return; }
     const dados: Record<string, any> = {};
     for (const campo of CAMPOS_REGIAO) {
@@ -231,7 +232,7 @@ rotasAnaliseMercado.patch('/mercado/regioes/:rid', async (req: Request, res: Res
 rotasAnaliseMercado.delete('/mercado/regioes/:rid', async (req: Request, res: Response) => {
   try {
     if (!exigirAdmin(req, res)) return;
-    const rid = parseInt(req.params.rid);
+    const rid = idDeRota(req.params.rid);
     if (isNaN(rid)) { erro(res, 400, 'ID_INVALIDO', 'ID inválido'); return; }
     // `remover` é soft delete e exige `soft_delete` na tabela, que mercado_regioes não declara
     // (daí o 500 de sempre). `deletar` é o certo: o schema já define o destino dos filhos —
@@ -248,7 +249,7 @@ rotasAnaliseMercado.delete('/mercado/regioes/:rid', async (req: Request, res: Re
 // GET /mercado/regioes/:rid/coletas — o que a rotina diária juntou
 rotasAnaliseMercado.get('/mercado/regioes/:rid/coletas', async (req: Request, res: Response) => {
   try {
-    const rid = parseInt(req.params.rid);
+    const rid = idDeRota(req.params.rid);
     if (isNaN(rid)) { erro(res, 400, 'ID_INVALIDO', 'ID inválido'); return; }
     const c = await req.dados!.listar('mercado_coletas', { filtros: { regiao_id: rid }, por_pagina: 100 });
     const coletas = (c.dados ?? []).sort((a: any, b: any) =>
