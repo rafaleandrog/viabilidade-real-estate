@@ -77,8 +77,26 @@ Ninguém acompanha esta sessão: não pergunte nada.
 Autonomia: 1
 ```
 
+## 5b. Variante: uma tarefa só, numa sessão persistente (a do app de viabilidade)
+
+Em vez das tarefas dos passos 4 e 5, uma tarefa só, presa a uma sessão dedicada (mesmo ambiente),
+disparada em horários fixos — por exemplo 6h, 14h e 22h —, cada disparo fazendo a TRIAGEM e depois
+a EXECUCAO na mesma conversa. Prompt:
+
+```
+Use a skill rumo-ao-estado-da-arte neste repositório: etapa TRIAGEM e, em seguida, etapa EXECUCAO.
+Ninguém acompanha esta sessão: não pergunte nada; o que precisar do dono vai para o painel.
+Autonomia: 2
+Máximo de PRs implementados neste disparo: 3
+```
+
+A sessão começa cada disparo pelo painel e pelos comentários `Continuação:`, não pela memória da
+conversa, que é resumida com o tempo.
+
 ## 6. Sessão na hora (opcional)
 
+Na variante 5b, **não** ponha este gatilho na tarefa única (ela roda a TRIAGEM inteira antes de
+conferir o rótulo): crie para ele uma tarefa separada, só de EXECUCAO, com o prompt do passo 5.
 Edite a tarefa da execução → **+** em **Trigger** → **GitHub event** → evento **Issue**, ação
 `labeled`. É preciso ter o Claude GitHub App instalado no repositório; a tela pede se faltar.
 A partir daí, pôr o rótulo `agora` numa issue abre uma sessão, que trabalha se houver saldo.
@@ -89,7 +107,8 @@ repositório rotula issues com frequência, deixe este passo para depois.
 
 ## 7. O botão de autonomia
 
-Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
+Você muda a autonomia editando o **prompt** das duas tarefas (na variante 5b, da tarefa única), e
+nada mais:
 
 | Linha | O que passa a acontecer |
 |---|---|

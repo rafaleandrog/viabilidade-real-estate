@@ -85,6 +85,19 @@ Respeite os limites da configuração: no máximo `max_ideias_ia_dia` itens novo
 próxima triagem" do painel, com o link dela (para linha do `ideias.md`, a seção e o título da linha) — é a fila que a triagem seguinte lê primeiro (§ 2).
 Nada sai do painel sem ter virado item ou sido recusado.
 
+**Issue que pede decisão do dono** (o corpo ou os comentários oferecem saídas e pedem a escolha
+dele): a triagem lê as saídas, escreve na issue um comentário `Recomendação:` com a saída que ela
+recomenda e o porquê (pelo Estado da Arte, pelos aprendizados e pelo código), e põe em "Esperando o
+seu sim" a caixa "aprovar a recomendação da #N". Caixa marcada: o item vira `pronta` com a saída
+recomendada. Se o dono responder outra saída na issue, vale a dele. Sem resposta, o item espera,
+dentro de `max_esperando_dono`, e o excedente vai para "Adiado".
+
+**Issue com o código já entregue** (o `PROGRESSO.md` ou um PR mergeado mostra a entrega): vai para
+a seção **"Para você testar e fechar"** do painel, **sem caixa** — "testar na homologação e fechar
+#N", com o roteiro do teste, ou "fechar #N", com a evidência. Ela nunca entra na fila nem em
+"Esperando o seu sim", e sai do painel quando o dono fecha a issue. A rotina não fecha issue do
+dono sozinha.
+
 **Item é sempre uma issue.** Entrada que ainda não é issue — um comentário `Observação:`, um caso
 do Sentinela — e foi aceita dentro do limite vira issue nesta etapa (a exceção é a linha do
 `Braindump`, que só vira issue depois da caixa do dono, § 2), antes de entrar na fila ou em
