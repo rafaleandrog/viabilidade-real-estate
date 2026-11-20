@@ -28,7 +28,7 @@ import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
 import { areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
 import { validarProdutosParaSubmissao } from '../../frontend/produtos-submissao.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
-import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
+import { coagirNumericosDeclarados, coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
 import { funcaoEfetivaDoMembro } from '../../frontend/membros-regras.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
@@ -659,7 +659,7 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
 // ---------------------------------------------------------------
 rotasEstudos.get('/estudos/:id', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const estudo = await req.dados!.buscar('estudos', estudoId);
@@ -708,7 +708,7 @@ rotasEstudos.get('/estudos/:id', async (req: Request, res: Response) => {
 // ---------------------------------------------------------------
 rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const estudo = await req.dados!.buscar('estudos', estudoId);
@@ -795,7 +795,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
 // ---------------------------------------------------------------
 async function removerEstudo(req: Request, res: Response): Promise<void> {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     // #860 (decisão do autor): o editor exclui o estudo só em Rascunho; nos
@@ -847,7 +847,7 @@ rotasEstudos.delete('/estudos/:id', removerEstudo);
 // ---------------------------------------------------------------
 rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const perm = await exigirEditor(req, estudoId);
@@ -942,7 +942,7 @@ export { gateTransicao };
 
 rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const novoStatus = req.body.status;
