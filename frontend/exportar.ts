@@ -13,7 +13,7 @@ import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo, escaparHtml } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo, escaparHtml } from './viab-format.js'; import { celulaTextoCsv, ROTULO_FIXO_FLUXO } from './csv-escape.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -217,18 +217,18 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
 export function csvProforma(estudo: any, p: Proforma, lot: boolean): string {
   const linhas = linhasProforma(p, lot);
   const rows: string[] = [];
-  rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
-  rows.push('Tipo;' + estudo.tipo_empreendimento);
+  rows.push('Estudo;' + celulaTextoCsv(estudo.nome_exibicao || estudo.nome));
+  rows.push('Tipo;' + celulaTextoCsv(estudo.tipo_empreendimento));
   rows.push('');
   rows.push('Linha;R$;% VGV');
   for (const r of linhas) {
     // Linha de nota: o texto ocupa a coluna do rótulo e as outras duas ficam
     // vazias. "0,00" ali seria um número inventado.
-    if (r.nota) { rows.push(`${r.l};;`); continue; }
+    if (r.nota) { rows.push(`${r.l};;`); continue; } // frase fixa: `exportar-proforma.test.ts` exige `frase;;` literal
     // #571: "—", igual à tela (`_pctVgv`, tela-proforma.ts) e ao PDF logo
     // abaixo — antes saía vazio aqui, e vazio não é a mesma coisa que
     // indefinido para quem lê o CSV.
-    rows.push(`${r.l};${celulaProforma(r)};${pctVgvProforma(r, p)}`);
+    rows.push(`${celulaTextoCsv(r.l, false)};${celulaProforma(r)};${pctVgvProforma(r, p)}`);
   }
   rows.push('');
   rows.push(`Margem sobre VGV;${fmtPctOuIndef(p.margemLiquidaPct)}`);
@@ -553,25 +553,26 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
   return linhas;
 }
 
-export function exportarFluxoCSV(
+export function csvFluxo(
   estudo: any,
   c: FluxoCalc,
   dataInicio: string | null,
   funding: FundingNoFluxo | null = null,
   divergencias: Divergencia[] = [],
   permutaFisica: PermutaFisicaTipologia[] = [],
-) {
+): string {
   const rows: string[] = [];
-  rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
+  rows.push('Estudo;' + celulaTextoCsv(estudo.nome_exibicao || estudo.nome));
   rows.push('Nível;Avançado');
   rows.push('');
   rows.push(['Linha', 'Início', 'Duração', 'Total', 'VPL', '% VGV', ...c.meses].join(';'));
   const linhas = linhasFluxo(c, funding);
   for (const l of linhas) {
     if (l.separadorAntes) rows.push('');
+    // O recuo entra depois da neutralização: o gatilho é o nome, não o recuo.
     const indent = '  '.repeat(l.nivel);
     rows.push([
-      indent + l.nome,
+      celulaTextoCsv(l.nome, l.nome !== ROTULO_FIXO_FLUXO, indent),
       l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : '',
       l.duracao ? `${l.duracao}m` : '',
       l.ocultarTotal ? '' : fmtR$(l.total, false),
@@ -600,9 +601,9 @@ export function exportarFluxoCSV(
   rows.push('Código;Severidade;Linha;Safra;Mês;Esperado;Encontrado;Diferença;Mensagem');
   if (divergencias.length === 0) rows.push('OK;sucesso;;;;0;0;0;Todas as invariantes reconciliadas');
   for (const d of divergencias) rows.push([
-    d.codigo, d.severidade, d.linha ?? '', d.safra ?? '',
+    celulaTextoCsv(d.codigo), celulaTextoCsv(d.severidade), celulaTextoCsv(d.linha), celulaTextoCsv(d.safra),
     d.mes === undefined ? '' : d.mes + 1, d.esperado, d.encontrado, d.diferenca,
-    d.mensagem.replaceAll(';', ','),
+    celulaTextoCsv(d.mensagem),
   ].join(';'));
   // #269: área e quantidade permutada por tipologia — mesma fonte da tela
   // (`permutaFisicaPorTipologia`), sem cálculo próprio da exportação.
@@ -611,11 +612,22 @@ export function exportarFluxoCSV(
     rows.push('Permuta Física — Área e Quantidade por Tipologia');
     rows.push('Tipologia;Permutada;Catálogo;Área Permutada (m²)');
     for (const p of permutaFisica) rows.push([
-      p.nome, p.quantidadePermutada, p.quantidadeTotal, fmtNum(p.areaPermutada),
+      celulaTextoCsv(p.nome), p.quantidadePermutada, p.quantidadeTotal, fmtNum(p.areaPermutada),
     ].join(';'));
   }
+  return rows.join('\n');
+}
+
+export function exportarFluxoCSV(
+  estudo: any,
+  c: FluxoCalc,
+  dataInicio: string | null,
+  funding: FundingNoFluxo | null = null,
+  divergencias: Divergencia[] = [],
+  permutaFisica: PermutaFisicaTipologia[] = [],
+) {
   const nome = (estudo.id_legivel || 'estudo') + '_fluxo-caixa.csv';
-  baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
+  baixar(nome, csvFluxo(estudo, c, dataInicio, funding, divergencias, permutaFisica), 'text/csv;charset=utf-8');
 }
 
 /** SVG (string) de barras do fluxo mensal para o PDF. As cores vêm das classes, no CSS de `htmlFluxo`. */
