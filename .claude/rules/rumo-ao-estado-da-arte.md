@@ -14,5 +14,8 @@ processo do `CLAUDE.md` e do `KIT.md` (quando existir); não os substitui. Em co
    `Estado da Arte: painel`. A TRIAGEM decide o que vira issue `origem-ia`, dentro do limite diário.
 4. **Quando o dono corrigir, recusar ou reescrever algo**, registre o aprendizado como comentário
    na issue `Estado da Arte: painel`: o que ele pediu, o que foi entendido, o que ele queria.
-5. **Ao terminar um trabalho**, deixe na issue-painel um comentário de uma ou duas linhas com o que
-   foi feito, para a triagem seguinte.
+5. **Ao terminar ou interromper um trabalho**, deixe na issue do item um comentário começando com
+   `Continuação:` — o que foi feito, onde está (branch, PR) e o próximo passo — e, na issue-painel,
+   uma ou duas linhas com o que foi feito. Vale para toda sessão, da rotina ou aberta pelo dono: é
+   assim que a sessão seguinte continua de onde esta parou em vez de repetir.
+6. **Pergunta ao dono vai na conversa**, completa e respondível ali. Arquivo e painel só registram.

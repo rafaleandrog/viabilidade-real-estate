@@ -101,8 +101,9 @@ Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
 
 `Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
 dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,
-como o `CLAUDE.md` § Merge do app de viabilidade, a rotina trata 2 e 3 como 1 até você mudar o
-próprio processo do repositório, por PR, para reconhecer a linha.
+a rotina trata 2 e 3 como 1 até você mudar o próprio processo do repositório, por PR, para
+reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge ainda não a reconhece: hoje os PRs da rotina
+ficam prontos e parados para o seu merge.)
 
 ## 8. O seu dia a dia
 
@@ -113,6 +114,10 @@ próprio processo do repositório, por PR, para reconhecer a linha.
 - **Algo urgente:** o rótulo `agora` na issue.
 - **Parar tudo:** crie o arquivo `.claude/estado-da-arte/PAUSA`. Ou desligue as tarefas na tela delas.
 - **Testar uma release:** homologue na instância, como já faz hoje.
+- **Avançar um assunto por conta própria:** abra uma sessão sua, ou escreva numa sessão já aberta,
+  como sempre. A rule do repositório faz essa sessão deixar um `Continuação:` na issue do item, e a
+  rotina segue dali no dia seguinte, sem refazer. Para mandar informação à rotina sem abrir sessão,
+  comente na issue do item ou no painel: a triagem lê.
 
 ## 9. Para não atrapalhar o que já funciona
 

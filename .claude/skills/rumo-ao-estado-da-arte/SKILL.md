@@ -83,10 +83,16 @@ repositório e o painel.
 | Triador | Transformar cada entrada em item com origem, tipo e tamanho | TRIAGEM | Mexer em código |
 | Guardião | Redigir propostas para o Estado da Arte e dizer o que falta para chegar lá | TRIAGEM | Escrever no documento fora de PR |
 | Relator | O painel do dia e os aprendizados | TRIAGEM | Aprovar o que quer que seja |
-| Planejador | O contrato de cada item antes do código | EXECUCAO | Começar item sem "pronto quando" |
-| Construtor | Implementar um item até o PR | EXECUCAO | Tocar em teste existente, Estado da Arte ou configuração |
-| Revisor | A revisão, pela `revisar-pr-apps` | EXECUCAO | Receber autorização de merge |
-| Liberador | Merge dentro da autonomia, e a release | EXECUCAO | Homologar, ou soltar release com item sensível |
+| Product manager | A spec de cada item: o quê, por quê e os critérios de aceite numerados | EXECUCAO | Começar item sem critério verificável |
+| Arquiteto | O plano: contratos tocados e as fatias testáveis | EXECUCAO | Fatia que não se testa sozinha |
+| Dev (o Construtor) | Implementar uma fatia por vez, até o PR | EXECUCAO | Tocar em teste existente, Estado da Arte ou configuração |
+| QA, System, UI/UX, Segurança (o Revisor) | Validar: testes e navegador, consistência, tela (só se houver), permissão e dado pessoal | EXECUCAO | Receber autorização de merge; achou problema, devolve ao Dev |
+| Product owner | Conferir a spec critério por critério, último portão | EXECUCAO | Aprovar com critério sem evidência |
+| Liberador | Merge dentro da autonomia, e a release quando o dono manda | EXECUCAO | Homologar, ou soltar release com item sensível |
+
+**O modelo forte pensa, o de execução faz** (pedido do dono): spec, plano e Product owner no modelo
+da sessão; cada fatia e cada validador num subagente no modelo de execução, com o modelo explícito.
+O passo a passo está em `etapas/execucao.md` § "O fluxo de cada item".
 
 ## 6. Regras que valem sempre
 
@@ -99,6 +105,13 @@ repositório e o painel.
 - **Não atravesse o trabalho dos outros.** Não pegue issue que já tem branch ou PR **aberto**, ou responsável,
   nem issue que faça parte de um arco da `orquestrar` (onde ela existir) em andamento. Não empurre commit em branch
   que não seja desta rotina. Na dúvida se alguém está mexendo, deixe para o dia seguinte.
+- **Continue, nunca repita.** O dono pode abrir sessões próprias ou acrescentar informação numa
+  sessão aberta para avançar um assunto sozinho. Antes de agir, toda etapa olha o que já aconteceu:
+  commits e PRs desde o último painel, os comentários `Continuação:` das issues e, com a ferramenta
+  de sessões do Claude Code disponível, as sessões recentes do dono e se seguem ativas. Feito sai da
+  fila; em andamento noutra sessão não é pego; pela metade e parado continua de onde parou. Toda
+  sessão que trabalha num item, da rotina ou do dono, deixa na issue um `Continuação:` com o que
+  fez, onde está (branch, PR) e o próximo passo — é o que a rule do repositório pede.
 
 - **Sem ninguém do outro lado, não pergunte.** Na dúvida, o caminho é o conservador: não mergear,
   deixar no painel e dizer por quê. Com o dono presente (PREPARAR, seção 7), pergunte à vontade.
@@ -128,3 +141,7 @@ trabalho segue pelas skills que o repositório já tem.
 - **Mudar o Estado da Arte:** abra o PR com a mudança e deixe para ele fazer o merge.
 - **Correção ou recusa dele:** além de cumprir, registre o aprendizado (`etapas/triagem.md` § 5).
 - **Pausar ou retomar:** crie ou remova `.claude/estado-da-arte/PAUSA`, por PR.
+- **Perguntas ao dono vão na conversa**, completas e respondíveis ali; o arquivo e o painel só
+  registram. Ele não abre arquivo para ler pergunta.
+- **O dono avança um assunto por conta própria** (nesta conversa ou noutra): ao terminar, deixe o
+  `Continuação:` na issue do item, para a rotina seguir dali.
