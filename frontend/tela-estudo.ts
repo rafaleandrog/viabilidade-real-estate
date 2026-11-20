@@ -12,7 +12,7 @@ import {
 } from './viabilidade-api.js';
 
 import { premissasNaoSalvas, reaplicarRascunho, estudoDepoisDaRecarga, avisarSaidaSeNaoSalvo, transicaoDescartaRascunho } from './premissas-rascunho.js';
-import { carregarSeAindaAtual } from './estudo-carga.js';
+import { SequenciaDeCargas } from './estudo-carga.js';
 import { acoesDoMembro, opcoesDeFuncao, podeGerirMembros, formNovoMembro } from './membros-regras.js';
 
 @customElement('viab-tela-estudo')
@@ -93,29 +93,35 @@ export class ViabTelaEstudo extends LitElement {
     if (changed.has('estudoId')) this._carregar();
   }
 
+  private _cargas = new SequenciaDeCargas();
+
   private async _carregar() {
     if (!this.estudoId) return;
-    const idPedido = this.estudoId;
+    const id = this.estudoId;
     this.carregando = true;
-    try {
-      // Resposta de um estudo que já não é o atual (troca rápida) é descartada
-      // sem tocar na tela nem em `carregando`: a carga do estudo novo o gerencia.
-      const carga = await carregarSeAindaAtual(idPedido, buscarEstudo, () => this.estudoId);
-      if (!carga.atual) return;
+    // Só o ÚLTIMO pedido é aplicado (resposta, erro e `carregando`): resposta
+    // velha — de outro estudo ou do mesmo, recarregado depois — é descartada.
+    const carga = await this._cargas.carregar(() => buscarEstudo(id));
+    if (!carga.ultimo) return;
+    if ('erro' in carga) {
+      console.error('Erro ao carregar estudo:', carga.erro);
+    } else {
       const estudo = carga.resposta;
-      if (estudo?.erro) { urbiVerso.notificar(estudo.mensagem || 'Sem acesso', 'erro'); this.estudo = null; this._estudoSalvo = null; }
-      else {
-        // Recarga do mesmo estudo (terreno do Núcleo alterado, troca de
-        // status) preserva o rascunho das Premissas ainda não salvo — regra e
-        // exceção em `estudoDepoisDaRecarga`.
-        this.estudo = estudoDepoisDaRecarga(estudo, this.estudo, this._estudoSalvo);
-        this._estudoSalvo = estudo;
-        this.membros = estudo.membros || [];
+      try {
+        if (estudo?.erro) { urbiVerso.notificar(estudo.mensagem || 'Sem acesso', 'erro'); this.estudo = null; this._estudoSalvo = null; }
+        else {
+          // Recarga do mesmo estudo (terreno do Núcleo alterado, troca de
+          // status) preserva o rascunho das Premissas ainda não salvo — regra e
+          // exceção em `estudoDepoisDaRecarga`.
+          this.estudo = estudoDepoisDaRecarga(estudo, this.estudo, this._estudoSalvo);
+          this._estudoSalvo = estudo;
+          this.membros = estudo.membros || [];
+        }
+      } catch (e) {
+        console.error('Erro ao carregar estudo:', e);
       }
-    } catch (e) {
-      console.error('Erro ao carregar estudo:', e);
     }
-    if (this.estudoId === idPedido) this.carregando = false;
+    this.carregando = false;
   }
 
   render() {
