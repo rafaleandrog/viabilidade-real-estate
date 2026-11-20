@@ -27,7 +27,7 @@ Entradas que passaram do limite do dia. A próxima triagem as lê antes das nova
 1. #<n> — <tipo> — <pontos>
 
 ## Release
-<nada a propor | proposta: o que entra | disparada: tag> — roteiro para conferir na homologação
+<nada a propor | proposta: o que entra (a caixa "Soltar a release proposta" está em "Esperando o seu sim") | aprovada pelo dono, a disparar | disparada: tag> — roteiro para conferir na homologação
 
 ## Rumo ao Estado da Arte
 <n> itens feitos, <n> parciais, <n> faltando

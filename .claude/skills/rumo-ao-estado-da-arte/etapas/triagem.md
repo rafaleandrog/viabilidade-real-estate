@@ -11,6 +11,8 @@ Antes de reescrever o painel, leia nele:
   do dono. **Exceção: item que já tem PR pronto e parado.** A caixa não o devolve à fila (não há o
   que implementar de novo) nem autoriza a rotina a mergear: ele passa para "Aprovados, aguardando o
   seu merge", com o link do PR, e o merge é do dono.
+- **Caixa "Soltar a release proposta" marcada:** registre no bloco Release "aprovada pelo dono,
+  a disparar"; a EXECUCAO seguinte dispara (`etapas/execucao.md` § 6).
 - **Comentários e recusas:** item recusado ganha `recusada` e sai da fila; se já tinha PR aberto
   da rotina, feche o PR citando a recusa. O motivo vira aprendizado (§ 5).
 - **PRs do Estado da Arte** mergeados ou fechados: atualize a situação das propostas.
@@ -27,10 +29,19 @@ Antes de reescrever o painel, leia nele:
    item da fila: só sai o que virou PR mergeado, foi recusado ou fechado. "Feito sem perguntar"
    é a exceção ao contrário: o que entrou ali fica, com o jeito de desfazer, até a release
    seguinte; quando o bloco de release (§ 6) registra uma tag nova, a seção é esvaziada.
-2. Issues abertas ou comentadas desde o último painel, **exceto a própria issue-painel**. Os
+2. **O trabalho feito fora da rotina desde o último painel** (SKILL.md § 6, "Continue, nunca
+   repita"): commits na branch principal, PRs e branches abertos, mergeados ou fechados, os
+   comentários `Continuação:` e, com a ferramenta de sessões do Claude Code disponível, as sessões
+   recentes do dono e se seguem ativas. Item que esse trabalho concluiu sai da fila; item em
+   andamento noutra sessão fica marcado "em andamento por outra sessão" e não é pego; item que
+   ficou pela metade, sem sessão ativa: se a continuação é só um comentário ou um PR desta rotina,
+   entra na fila como "continuar de <PR ou comentário>"; se está numa **branch ou PR do dono**,
+   vai para "Esperando o seu sim" como "continuar a sua branch <nome>?". Com a caixa marcada, a
+   EXECUCAO continua numa branch própria criada a partir da dele (`etapas/execucao.md`).
+3. Issues abertas ou comentadas desde o último painel, **exceto a própria issue-painel**. Os
    comentários dela só entram pelos passos que os leem: as respostas do dono (§ 1), as
-   `Observação:` (item 5) e os aprendizados (§ 5). O registro de trabalho concluído é só leitura.
-3. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK, § Ideias da app):
+   `Observação:` (item 6) e os aprendizados (§ 5). O registro de trabalho concluído é só leitura.
+4. O `ideias.md`, **por seção** (é a estrutura do `documentacao.md` do SDK, § Ideias da app):
    - **Antes de cada linha de `Aprovadas` ou `Braindump`:** procure issue que já cite a linha.
      Achou, a linha já é trabalho: não vira item de novo, não volta a "Esperando" e entra no PR de
      saída abaixo. Linha já listada em "Esperando o seu sim" (sem issue) não se repete: continua no
@@ -51,14 +62,14 @@ Antes de reescrever o painel, leia nele:
    linha que esse PR já remove não entra de novo. Esse PR é
    manutenção e segue a autonomia do prompt; enquanto ele não entra, é a issue que cita a linha que
    impede o item de nascer de novo.
-4. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, **só** por rota de leitura
+5. Com credencial: casos do Sentinela desta app sem Ordem de Serviço, **só** por rota de leitura
    que o `ajuda.md` do SDK fixado documente. Se ele não documentar rota que liste casos (é o caso do
    SDK 57.0.0, que documenta só o `sentinela/status`), escreva em "Não lido" que não há rota
    documentada e siga — nunca adivinhe endereço. Bug relatado ali segue o caminho que o processo do
    repositório define para bug.
-5. Os comentários `Observação:` deixados na issue-painel desde o último painel, por qualquer sessão
+6. Os comentários `Observação:` deixados na issue-painel desde o último painel, por qualquer sessão
    (rule do repositório, item 3, e EXECUCAO § 4). É daqui que nascem os itens da IA.
-6. **Só às segundas-feiras:** SDK do lockfile contra o publicado (e o kit, onde houver), avisos de
+7. **Só às segundas-feiras:** SDK do lockfile contra o publicado (e o kit, onde houver), avisos de
    obsolescência do empacotador com as datas do `obsolescencias.json` do SDK publicado.
 
 ## 3. Classificar cada entrada (Triador)
