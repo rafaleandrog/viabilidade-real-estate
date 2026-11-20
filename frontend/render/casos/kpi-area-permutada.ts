@@ -27,6 +27,7 @@ export const caso = {
     'urbi-botao.variante',
     'urbi-card.titulo',
     'urbi-kpi.variante',
+    'urbi-prosa.papel',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).urbiVerso.api = async (rota: string) => {

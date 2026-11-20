@@ -283,7 +283,6 @@ export class ViabTelaProforma extends LitElement {
        tela-resumo.ts. */
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 260px)); gap: 12px; margin-bottom: 16px; }
     .kpis urbi-kpi { min-width: 0; }
-    .kpi-nota { margin: -8px 0 16px; font-size: var(--texto-legenda); color: var(--cor-texto-sec); }
     /* Aviso do excedente de permuta: acima da tabela, dentro do card. */
     urbi-banner.aviso-permuta { display: block; margin-bottom: 14px; }
     /* Mesmo respiro do estado vazio do catálogo em Premissas → Produtos. */
@@ -615,7 +614,7 @@ export class ViabTelaProforma extends LitElement {
     return html`<div class="kpis">
       ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
     </div>
-    ${permuta?.nota ? html`<p class="kpi-nota">${permuta.nota}</p>` : nothing}`;
+    ${permuta?.nota ? html`<urbi-prosa class="kpi-nota" papel="dica">${permuta.nota}</urbi-prosa>` : nothing}`;
   }
 
   private _toggle(g: Grupo) {
