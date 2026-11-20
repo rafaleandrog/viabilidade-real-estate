@@ -95,7 +95,7 @@ conversa, que é resumida com o tempo.
 
 ## 6. Sessão na hora (opcional)
 
-Edite a tarefa da execução → **+** em **Trigger** → **GitHub event** → evento **Issue**, ação
+Edite a tarefa da execução (na variante 5b, a tarefa única) → **+** em **Trigger** → **GitHub event** → evento **Issue**, ação
 `labeled`. É preciso ter o Claude GitHub App instalado no repositório; a tela pede se faltar.
 A partir daí, pôr o rótulo `agora` numa issue abre uma sessão, que trabalha se houver saldo.
 
@@ -105,7 +105,8 @@ repositório rotula issues com frequência, deixe este passo para depois.
 
 ## 7. O botão de autonomia
 
-Você muda a autonomia editando o **prompt** das duas tarefas, e nada mais:
+Você muda a autonomia editando o **prompt** das duas tarefas (na variante 5b, da tarefa única), e
+nada mais:
 
 | Linha | O que passa a acontecer |
 |---|---|

@@ -8,6 +8,10 @@ Marque a caixa para aprovar. Para recusar, comente o motivo.
 - [ ] #<n> <título> — <por que precisa de você>
 - [ ] `ideias.md` › Braindump: <título da linha> — aprova? (vira issue com a caixa marcada)
 
+## Para você testar e fechar
+Código já entregue. Sem caixa: sai daqui quando você fecha a issue.
+- #<n> — testar na homologação (roteiro) e fechar | fechar (evidência)
+
 ## Aprovados, aguardando o seu merge
 PR pronto e parado cuja caixa você marcou. O merge é seu.
 - PR #<n> <título>
