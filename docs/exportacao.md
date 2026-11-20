@@ -41,9 +41,9 @@ enxerga.
 O texto digitado no app — nome do estudo, nome de linha, tipologia, mensagem de divergência — sai
 protegido no CSV: a célula que contém `;`, aspas ou quebra de linha vem entre aspas (com as aspas
 internas dobradas), e o texto que começa com `=`, `+`, `-`, `@`, tabulação ou retorno de carro
-ganha um apóstrofo na frente, para a planilha o ler como texto e não como fórmula. Números não
-recebem o apóstrofo. Os rótulos fixos de totais iniciados por `=` (como `= Resultado`) e a nota de
-permuta limitada saem como sempre saíram, sem essa proteção.
+ganha um apóstrofo na frente, para a planilha o ler como texto e não como fórmula. Isso vale para todo texto,
+inclusive os rótulos de totais (`= Resultado` sai como `'= Resultado`) e a nota de permuta
+limitada; na tela o rótulo continua sem o apóstrofo. Números não recebem o apóstrofo.
 
 Os Cenários (a análise de sensibilidade) são visualizados na tela e não têm
 exportação própria.

@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { calcularProforma, type ProformaInput } from './proforma.js';
 import { calcularFluxo } from './fluxo-caixa-motor.js';
 import { celulaTextoCsv } from './csv-escape.js';
-import { csvProforma, csvFluxo } from './exportar.js';
+import { csvProforma, csvFluxo, avisoPermutaCapada } from './exportar.js';
 import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 
 test('texto comum passa intacto', () => {
@@ -45,9 +45,8 @@ test('número formatado NÃO é texto: negativo continua sem apóstrofo', () => 
 });
 
 test('recuo vai depois da neutralização e dentro das aspas', () => {
-  assert.equal(celulaTextoCsv('=A', true, '  '), "  '=A");
-  assert.equal(celulaTextoCsv('=A;B', true, '  '), `"  '=A;B"`);
-  assert.equal(celulaTextoCsv('= Fixo', false), '= Fixo');
+  assert.equal(celulaTextoCsv('=A', '  '), "  '=A");
+  assert.equal(celulaTextoCsv('=A;B', '  '), `"  '=A;B"`);
 });
 
 const INPUT: ProformaInput = {
@@ -56,13 +55,14 @@ const INPUT: ProformaInput = {
   produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 30 }],
 };
 
-test('csvProforma: nome de estudo malicioso vira UMA célula, e rótulos fixos não mudam', () => {
+test('csvProforma: nome de estudo malicioso vira UMA célula, e rótulos fixos de totais também saem protegidos', () => {
   const p = calcularProforma(INPUT);
   const estudo = { nome: '=SOMA(1;2)', tipo_empreendimento: 'incorporacao' };
   const linhas = csvProforma(estudo, p, false).split('\n');
   assert.equal(linhas[0], `Estudo;"'=SOMA(1;2)"`);
   assert.equal(linhas[1], 'Tipo;incorporacao');
-  assert.ok(linhas.some((l) => l.startsWith('= Resultado;')), 'rótulo fixo alterado');
+  assert.ok(linhas.some((l) => l.startsWith("'= Resultado;")), 'rótulo de total sem apóstrofo');
+  assert.ok(!linhas.some((l) => l.startsWith('= ')), 'sobrou rótulo iniciado por `=` sem proteção');
   assert.ok(linhas.some((l) => l.startsWith('Receita bruta (VGV);')));
   // O tipo também é texto: fiação da chamada, não só da função pura.
   const tipoMalicioso = csvProforma({ nome: 'X', tipo_empreendimento: '@t;x' }, p, false).split('\n');
@@ -81,7 +81,9 @@ test('csvFluxo: nome de linha com fórmula/`;` e recuo, em uma célula só', () 
     jurosTabelaAaEstudo: 12,
   } as any);
   const estudo = { nome: 'a\nb', tipo_empreendimento: 'incorporacao' };
-  const csv = csvFluxo(estudo, calc, null, null, [
+  // Força uma dedução de receita, para a linha "= Receita Líquida do Projeto" existir no relatório.
+  const comDeducao = { ...calc, receitaMensal: calc.receitaMensal.map((v) => v - 100) };
+  const csv = csvFluxo(estudo, comDeducao, null, null, [
     { codigo: '=X', severidade: '+s', linha: '-l', safra: '@f', esperado: 0, encontrado: 1, diferenca: 1, mensagem: 'a;b "c"' } as any,
   ], [{ nome: '@t;1', quantidadePermutada: 1, quantidadeTotal: 2, areaPermutada: 3 } as any]);
   assert.ok(csv.startsWith('Estudo;"a\nb"\n'), csv.slice(0, 40));
@@ -89,5 +91,15 @@ test('csvFluxo: nome de linha com fórmula/`;` e recuo, em uma célula só', () 
   assert.ok(csv.includes('"a;b ""c"""'), 'mensagem da divergência sem escape');
   assert.ok(csv.includes("'=X;'+s;'-l;'@f;"), 'código/severidade/linha/safra da divergência sem neutralização');
   assert.ok(csv.includes(`"'@t;1";1;2;`), 'tipologia sem escape');
-  assert.ok(!csv.includes("'= Receita"), 'rótulo fixo foi neutralizado');
+  assert.ok(csv.includes("'= Receita Líquida do Projeto;"), 'rótulo de total do Fluxo sem apóstrofo');
+});
+
+test('csvProforma: nota de permuta limitada, que contém `;`, sai entre aspas numa célula só', () => {
+  const p = calcularProforma({
+    ...INPUT, produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 3 }],
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 600,
+  });
+  const frase = avisoPermutaCapada(p);
+  assert.ok(frase.includes(';'), 'o fixture precisa gerar nota com `;`');
+  assert.ok(csvProforma({ nome: 'E', tipo_empreendimento: 'incorporacao' }, p, false).split('\n').includes(`"${frase}";;`));
 });

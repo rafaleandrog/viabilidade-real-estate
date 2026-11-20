@@ -13,7 +13,7 @@ import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo, escaparHtml } from './viab-format.js'; import { celulaTextoCsv, ROTULO_FIXO_FLUXO } from './csv-escape.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo, escaparHtml } from './viab-format.js'; import { celulaTextoCsv } from './csv-escape.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -224,11 +224,11 @@ export function csvProforma(estudo: any, p: Proforma, lot: boolean): string {
   for (const r of linhas) {
     // Linha de nota: o texto ocupa a coluna do rótulo e as outras duas ficam
     // vazias. "0,00" ali seria um número inventado.
-    if (r.nota) { rows.push(`${r.l};;`); continue; } // frase fixa: `exportar-proforma.test.ts` exige `frase;;` literal
+    if (r.nota) { rows.push(`${celulaTextoCsv(r.l)};;`); continue; }
     // #571: "—", igual à tela (`_pctVgv`, tela-proforma.ts) e ao PDF logo
     // abaixo — antes saía vazio aqui, e vazio não é a mesma coisa que
     // indefinido para quem lê o CSV.
-    rows.push(`${celulaTextoCsv(r.l, false)};${celulaProforma(r)};${pctVgvProforma(r, p)}`);
+    rows.push(`${celulaTextoCsv(r.l)};${celulaProforma(r)};${pctVgvProforma(r, p)}`);
   }
   rows.push('');
   rows.push(`Margem sobre VGV;${fmtPctOuIndef(p.margemLiquidaPct)}`);
@@ -572,7 +572,7 @@ export function csvFluxo(
     // O recuo entra depois da neutralização: o gatilho é o nome, não o recuo.
     const indent = '  '.repeat(l.nivel);
     rows.push([
-      celulaTextoCsv(l.nome, l.nome !== ROTULO_FIXO_FLUXO, indent),
+      celulaTextoCsv(l.nome, indent),
       l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : '',
       l.duracao ? `${l.duracao}m` : '',
       l.ocultarTotal ? '' : fmtR$(l.total, false),
