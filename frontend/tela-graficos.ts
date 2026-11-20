@@ -212,7 +212,7 @@ export class ViabTelaGraficos extends LitElement {
   // horizontal ranqueada) — é ali, e não mais na pizza, que mora o toggle
   // "excluir terreno".
   private _renderCascata(p: Proforma): TemplateResult {
-    const cascata = calcularCascataResultado(p);
+    const cascata = calcularCascataResultado(p, this.estudo.tipo_empreendimento === 'loteamento');
     return html`
       <viab-grafico-cascata
         .etapas=${cascata.etapas}

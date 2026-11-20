@@ -24,6 +24,7 @@
 // só o que `calcularProforma` de fato calcula.
 
 import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
+import { rotuloPermutaFisica, rotuloPermutaFinanceira } from './rotulos-permuta.js';
 
 export interface EtapaCascata {
   id: string;
@@ -63,13 +64,13 @@ interface EtapaBruta {
 
 const LIMIAR = 0.005;
 
-export function calcularCascataResultado(p: Proforma): CascataResultado {
+export function calcularCascataResultado(p: Proforma, lot = false): CascataResultado {
   const vgvBruto = vgvBrutoDeProforma(p);
   const brutas: EtapaBruta[] = [
     { id: 'vgv_tabela', rotulo: 'VGV de tabela', valor: vgvBruto, tipo: 'subtotal' },
   ];
   if (p.vgvPermutaResidencial > LIMIAR) {
-    brutas.push({ id: 'permuta_fisica_r', rotulo: '(-) Permuta física residencial', valor: p.vgvPermutaResidencial, tipo: 'deducao' });
+    brutas.push({ id: 'permuta_fisica_r', rotulo: `(-) ${rotuloPermutaFisica(lot)}`, valor: p.vgvPermutaResidencial, tipo: 'deducao' });
   }
   if (p.vgvPermutaNaoResidencial > LIMIAR) {
     brutas.push({ id: 'permuta_fisica_nr', rotulo: '(-) Permuta física não residencial', valor: p.vgvPermutaNaoResidencial, tipo: 'deducao' });
@@ -79,7 +80,7 @@ export function calcularCascataResultado(p: Proforma): CascataResultado {
   if (p.corretagem > LIMIAR) brutas.push({ id: 'corretagem', rotulo: '(-) Corretagem', valor: p.corretagem, tipo: 'deducao' });
   if (p.marketing > LIMIAR) brutas.push({ id: 'marketing', rotulo: '(-) Marketing', valor: p.marketing, tipo: 'deducao' });
   if (p.permutaFinResidencial > LIMIAR) {
-    brutas.push({ id: 'permuta_fin_r', rotulo: '(-) Permuta financeira residencial', valor: p.permutaFinResidencial, tipo: 'deducao' });
+    brutas.push({ id: 'permuta_fin_r', rotulo: `(-) ${rotuloPermutaFinanceira(lot)}`, valor: p.permutaFinResidencial, tipo: 'deducao' });
   }
   if (p.permutaFinNaoResidencial > LIMIAR) {
     brutas.push({ id: 'permuta_fin_nr', rotulo: '(-) Permuta financeira não residencial', valor: p.permutaFinNaoResidencial, tipo: 'deducao' });
