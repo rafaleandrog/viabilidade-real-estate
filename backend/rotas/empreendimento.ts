@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { acessoLeituraEstudo, acessoEscritaEstudo, acessoNegado } from '../permissoes-estudo.js';
+import { idDeRota } from './coercao-numerica.js';
 
 // Rotas da aba "Empreendimento → Informações" (nível Avançado · Lote 4 · #16):
 // anexos do estudo (imagem principal, renders, plantas). Espelha o padrão dos
@@ -21,7 +22,7 @@ const CATEGORIAS = ['imagem_principal', 'render', 'planta'];
 // GET /estudos/:id/empreendimento/documentos — lista anexos do estudo
 rotasEmpreendimento.get('/estudos/:id/empreendimento/documentos', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoLeituraEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -50,7 +51,7 @@ rotasEmpreendimento.get('/estudos/:id/empreendimento/documentos', async (req: Re
 // POST /estudos/:id/empreendimento/documentos — associa upload + metadados
 rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -77,8 +78,8 @@ rotasEmpreendimento.post('/estudos/:id/empreendimento/documentos', async (req: R
 // PATCH …/remover (e DELETE) /estudos/:id/empreendimento/documentos/:docId
 async function removerDocumentoEmpreendimento(req: Request, res: Response): Promise<void> {
   try {
-    const estudoId = parseInt(req.params.id);
-    const docId = parseInt(req.params.docId);
+    const estudoId = idDeRota(req.params.id);
+    const docId = idDeRota(req.params.docId);
     if (isNaN(estudoId) || isNaN(docId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
     const acesso = await acessoEscritaEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }

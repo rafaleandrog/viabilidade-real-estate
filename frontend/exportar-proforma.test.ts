@@ -62,7 +62,7 @@ test('CSV: a nota sai por inteiro, com as colunas R$ e % VGV vazias', () => {
   assert.ok(csv.includes(frase), `o CSV não trouxe a frase do corte:\n${csv}`);
   // A linha da nota é o texto + dois separadores vazios: "0,00" ali seria um
   // número inventado, e um valor na coluna % VGV seria pior ainda.
-  assert.ok(csv.split('\n').includes(`${frase};;`), 'a nota tem que ocupar só a coluna do rótulo');
+  assert.ok(csv.split('\n').includes(`"${frase}";;`), 'a nota tem que ocupar só a coluna do rótulo');
 });
 
 test('PDF: a nota sai por inteiro, numa célula que atravessa as três colunas', () => {
@@ -166,7 +166,7 @@ test('notação: custo/dedução SEMPRE entre parênteses no CSV — nunca "-R$"
   const p = calcularProforma(DEFICITARIO);
   const csv = csvProforma(ESTUDO, p, false);
   assert.ok(csv.includes('(-) Terreno;(15.000.000);'), `linha do Terreno sem parênteses:\n${csv}`);
-  assert.ok(csv.includes('= Custo direto total;(15.000.000);'), `consolidado de custo sem parênteses:\n${csv}`);
+  assert.ok(csv.includes("'= Custo direto total;(15.000.000);"), `consolidado de custo sem parênteses:\n${csv}`);
   // A receita, positiva, sai PLANA — o conserto não pode virar "tudo entre parênteses".
   assert.ok(csv.includes('Receita bruta (VGV);10.000.000;'), `a receita positiva ganhou marca:\n${csv}`);
 });
@@ -187,14 +187,14 @@ test('notação: valor negativo sai entre parênteses, não com sinal de menos (
     assert.ok(!/(?<![\w-])-\s?\d[\d.]*(?:,\d+)?(?![\d,]*%)(?!\w)/.test(texto.replace(/-\) /g, '')), `${onde} ainda tem número com sinal de menos:\n${texto}`);
     assert.ok(!texto.includes('-R$'), `${onde} ainda tem "-R$":\n${texto}`);
   }
-  assert.ok(csv.includes('= Receita operacional;('), `Receita operacional negativa sem parênteses no CSV:\n${csv}`);
+  assert.ok(csv.includes("'= Receita operacional;("), `Receita operacional negativa sem parênteses no CSV:\n${csv}`);
   assert.ok(html.includes('<td class="v">(') , `nenhuma célula entre parênteses no PDF:\n${html}`);
 });
 
 test('notação: a % VGV do Resultado leva o SINAL; as demais são magnitude', () => {
   const p = calcularProforma(DEFICITARIO);
   const csv = csvProforma(ESTUDO, p, false);
-  const linhaResultado = csv.split('\n').find((l) => l.startsWith('= Resultado;'))!;
+  const linhaResultado = csv.split('\n').find((l) => l.startsWith("'= Resultado;"))!;
   assert.ok(linhaResultado.endsWith('%'), `linha do Resultado sem %: ${linhaResultado}`);
   assert.ok(linhaResultado.split(';')[2].startsWith('-'),
     `a margem negativa saiu POSITIVA na % VGV — o defeito do Math.abs: ${linhaResultado}`);

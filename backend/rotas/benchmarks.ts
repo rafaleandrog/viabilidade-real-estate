@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { idDeRota } from './coercao-numerica.js';
 
 export const rotasBenchmarks: ReturnType<typeof Router> = Router();
 
@@ -118,7 +119,7 @@ rotasBenchmarks.post('/benchmarks', async (req: Request, res: Response) => {
 rotasBenchmarks.patch('/benchmarks/:id', async (req: Request, res: Response) => {
   try {
     if (!exigirAdmin(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = idDeRota(req.params.id);
     if (isNaN(id)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const dados: Record<string, any> = {};
@@ -145,7 +146,7 @@ rotasBenchmarks.patch('/benchmarks/:id', async (req: Request, res: Response) => 
 rotasBenchmarks.delete('/benchmarks/:id', async (req: Request, res: Response) => {
   try {
     if (!exigirAdmin(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = idDeRota(req.params.id);
     if (isNaN(id)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const ok = await req.dados!.deletar('benchmarks', id);
     if (!ok) { erro(res, 404, 'BENCHMARK_NAO_ENCONTRADO', 'Benchmark não encontrado'); return; }

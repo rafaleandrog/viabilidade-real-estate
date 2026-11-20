@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { exigirEditor, acessoLeituraEstudo, acessoNegado } from '../permissoes-estudo.js';
+import { idDeRota } from './coercao-numerica.js';
 
 export const rotasImoveisEstudo: ReturnType<typeof Router> = Router();
 
@@ -15,7 +16,7 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 // GET /estudos/:id/imoveis
 rotasImoveisEstudo.get('/estudos/:id/imoveis', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoLeituraEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -30,7 +31,7 @@ rotasImoveisEstudo.get('/estudos/:id/imoveis', async (req: Request, res: Respons
 // POST /estudos/:id/imoveis — vincular imóvel (editor+, apenas Rascunho)
 rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const estudo = await req.dados!.buscar('estudos', estudoId);
@@ -86,8 +87,8 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
 // PATCH …/remover (e DELETE) /estudos/:id/imoveis/:vinculoId — desvincular (editor+, apenas Rascunho)
 async function desvincularImovel(req: Request, res: Response): Promise<void> {
   try {
-    const estudoId = parseInt(req.params.id);
-    const vinculoId = parseInt(req.params.vinculoId);
+    const estudoId = idDeRota(req.params.id);
+    const vinculoId = idDeRota(req.params.vinculoId);
     if (isNaN(estudoId) || isNaN(vinculoId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
 
     const estudo = await req.dados!.buscar('estudos', estudoId);

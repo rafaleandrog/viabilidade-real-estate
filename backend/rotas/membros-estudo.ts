@@ -5,7 +5,7 @@ import {
 } from '../permissoes-estudo.js';
 import { inscreverMembroEstudo, desinscreverMembroEstudo } from '../eventos-viabilidade.js';
 import { ehFuncaoEstudo, decidirNivelDoAlvo } from '../../frontend/membros-regras.js';
-import { numeroEstrito } from './coercao-numerica.js';
+import { idDeRota, numeroEstrito } from './coercao-numerica.js';
 
 export const rotasMembrosEstudo: ReturnType<typeof Router> = Router();
 
@@ -113,7 +113,7 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 // GET /estudos/:id/membros
 rotasMembrosEstudo.get('/estudos/:id/membros', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     const acesso = await acessoLeituraEstudo(req, estudoId);
     if (acessoNegado(acesso)) { erro(res, acesso.http, acesso.codigo, acesso.mensagem); return; }
@@ -128,7 +128,7 @@ rotasMembrosEstudo.get('/estudos/:id/membros', async (req: Request, res: Respons
 // POST /estudos/:id/membros — adicionar membro (editor+)
 rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
+    const estudoId = idDeRota(req.params.id);
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const { funcao } = req.body;
@@ -172,8 +172,8 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
 // PATCH /estudos/:id/membros/:usuarioId — mudar função (editor+)
 rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
-    const usuarioId = parseInt(req.params.usuarioId);
+    const estudoId = idDeRota(req.params.id);
+    const usuarioId = idDeRota(req.params.usuarioId);
     if (isNaN(estudoId) || isNaN(usuarioId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
 
     const { funcao } = req.body;
@@ -219,8 +219,8 @@ rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId', async (req: Request,
 // PATCH /estudos/:id/membros/:usuarioId/remover — remover membro (editor+)
 rotasMembrosEstudo.patch('/estudos/:id/membros/:usuarioId/remover', async (req: Request, res: Response) => {
   try {
-    const estudoId = parseInt(req.params.id);
-    const usuarioId = parseInt(req.params.usuarioId);
+    const estudoId = idDeRota(req.params.id);
+    const usuarioId = idDeRota(req.params.usuarioId);
     if (isNaN(estudoId) || isNaN(usuarioId)) { erro(res, 400, 'ID_INVALIDO', 'IDs devem ser números'); return; }
 
     const acesso = await acessoEscritaEstudo(req, estudoId);
