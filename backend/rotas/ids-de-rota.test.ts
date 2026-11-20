@@ -15,13 +15,16 @@ import { rotasMembrosEstudo } from './membros-estudo.js';
 import { rotasPreliminarProdutos } from './preliminar-produtos.js';
 
 // Ids de `req.params` lidos com o parser estrito (`idDeRota`). Antes, `parseInt`
-// aceitava `1e3` (como 1), `12abc` (12) e `0x10` (0) e a rota lia/gravava o
+// aceitava `1e3` (como 1), `12abc` (12) e `0x10` (16) e a rota lia/gravava o
 // registro errado em silêncio. A função pura é testada em separado; o que se
 // prova aqui, por HTTP contra um Express real, é a FIAÇÃO: cada arquivo de rota
-// recusa o id inválido com 400 ID_INVALIDO ANTES de qualquer leitura de dados.
+// recusa o id inválido com 400 ID_INVALIDO ANTES de ler o recurso.
 
 test('idDeRota: só inteiro decimal positivo; o resto vira NaN', () => {
   assert.equal(idDeRota('1'), 1);
+  assert.equal(idDeRota('2147483647'), 2147483647);
+  assert.ok(Number.isNaN(idDeRota('2147483648')), 'acima do teto int4');
+  assert.ok(Number.isNaN(idDeRota('99999999999999999999')), 'acima de MAX_SAFE_INTEGER');
   assert.equal(idDeRota('12'), 12);
   assert.equal(idDeRota('007'), 7);
   for (const ruim of ['1e3', '12abc', '0x10', '-1', '0', '1.5', '', ' 1', 'abc', undefined, null, NaN, Infinity]) {
@@ -72,7 +75,7 @@ async function comServidor(dados: any, fn: (req: (metodo: string, caminho: strin
 const INVALIDOS = ['1e3', '12abc', '-1'];
 
 // Uma rota de CADA arquivo que lê `req.params`; os ids secundários (docId,
-// usuarioId, vinculoId, rid, oid, cid, pid) entram com o id do estudo válido,
+// usuarioId, vinculoId, rid, oid, pid) entram com o id do estudo válido,
 // para provar que o segundo parâmetro também passa pelo parser. `{id}` é
 // trocado pelo valor inválido.
 const ROTAS: Array<[string, string, string]> = [

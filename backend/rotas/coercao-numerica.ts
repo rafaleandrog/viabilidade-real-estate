@@ -110,17 +110,20 @@ export function numeroEstrito(v: unknown): number | null {
  * Id de parâmetro de rota (`req.params.*`): inteiro estrito e positivo, ou `NaN`.
  *
  * Devolve `NaN` (e não `null`) de propósito: toda rota já barra o id inválido com
- * `if (isNaN(id)) → 400 ID_INVALIDO` antes de qualquer leitura, e `NaN` encaixa
+ * `if (isNaN(id)) → 400 ID_INVALIDO` antes de ler o recurso, e `NaN` encaixa
  * nessa guarda sem reescrevê-la. Substitui `parseInt`, que aceitava `1e3`
- * (lido como 1), `12abc` (12) e `0x10` (0); aqui passam só os dígitos decimais
+ * (lido como 1), `12abc` (12) e `0x10` (16); aqui passam só os dígitos decimais
  * de `numeroEstrito`, e `0`/negativos/fracionários também são recusados.
+ * O teto é o do `int4` (2147483647), o mesmo de `idUsuario` e `idImovel`: acima
+ * dele o banco recusaria a leitura com 500, e acima de `MAX_SAFE_INTEGER` o
+ * número já seria arredondado para outro id.
  */
 export function idDeRota(v: unknown): number {
   // Só dígitos: `numeroEstrito` aceita sinal, ponto e espaço nas pontas, e um id
   // de rota não tem nenhum dos três.
   if (typeof v !== 'string' || !/^\d+$/.test(v)) return NaN;
   const n = numeroEstrito(v);
-  return n !== null && Number.isInteger(n) && n > 0 ? n : NaN;
+  return n !== null && Number.isInteger(n) && n > 0 && n <= 2147483647 ? n : NaN;
 }
 
 /** Colunas numéricas por tabela, derivadas do `schema.json` (fonte única). */
