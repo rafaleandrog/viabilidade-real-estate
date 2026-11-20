@@ -34,8 +34,10 @@ Antes de reescrever o painel, leia nele:
    comentários `Continuação:` e, com a ferramenta de sessões do Claude Code disponível, as sessões
    recentes do dono e se seguem ativas. Item que esse trabalho concluiu sai da fila; item em
    andamento noutra sessão fica marcado "em andamento por outra sessão" e não é pego; item que
-   ficou pela metade, sem sessão ativa, entra na fila como "continuar de <PR, branch ou
-   comentário>".
+   ficou pela metade, sem sessão ativa: se a continuação é só um comentário ou um PR desta rotina,
+   entra na fila como "continuar de <PR ou comentário>"; se está numa **branch ou PR do dono**,
+   vai para "Esperando o seu sim" como "continuar a sua branch <nome>?". Com a caixa marcada, a
+   EXECUCAO continua numa branch própria criada a partir da dele (`etapas/execucao.md`).
 3. Issues abertas ou comentadas desde o último painel, **exceto a própria issue-painel**. Os
    comentários dela só entram pelos passos que os leem: as respostas do dono (§ 1), as
    `Observação:` (item 6) e os aprendizados (§ 5). O registro de trabalho concluído é só leitura.

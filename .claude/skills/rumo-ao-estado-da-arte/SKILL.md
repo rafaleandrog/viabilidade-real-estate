@@ -104,7 +104,8 @@ O passo a passo está em `etapas/execucao.md` § "O fluxo de cada item".
   Precisa mudar processo ou configuração? Vira item "Esperando o seu sim", nunca edição direta.
 - **Não atravesse o trabalho dos outros.** Não pegue issue que já tem branch ou PR **aberto**, ou responsável,
   nem issue que faça parte de um arco da `orquestrar` (onde ela existir) em andamento. Não empurre commit em branch
-  que não seja desta rotina. Na dúvida se alguém está mexendo, deixe para o dia seguinte.
+  que não seja desta rotina (para continuar a branch do dono, com o sim dele, crie uma da rotina a
+  partir dela). Na dúvida se alguém está mexendo, deixe para o dia seguinte.
 - **Continue, nunca repita.** O dono pode abrir sessões próprias ou acrescentar informação numa
   sessão aberta para avançar um assunto sozinho. Antes de agir, toda etapa olha o que já aconteceu:
   commits e PRs desde o último painel, os comentários `Continuação:` das issues e, com a ferramenta
