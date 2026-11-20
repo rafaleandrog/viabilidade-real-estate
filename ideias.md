@@ -18,6 +18,9 @@ Ideia que não cabe numa linha deixou de ser ideia — abra a issue.
 - **Coobrigação na antecipação de recebíveis**: distinguir cessão com e sem coobrigação, que só muda número quando houver inadimplência no motor.
 - **Resultado após funding na Análise Financeira**: uma linha ao lado do Resultado desalavancado, deduzindo os juros do financiamento à produção.
 
+- **CRM de captação de investidores**: pipeline de investidores do projeto, com histórico de negociação, pedidos de documento e term sheets, como o da OSPA Capital. Desejo futuro, sem previsão de entrar no escopo.
+- **Matching do projeto com investidores**: cruzar o estudo com a tese de fundos, gestoras e family offices (região, cap rate, LTV), como a OSPA Capital faz. Desejo futuro, sem previsão de entrar no escopo.
+
 ## Aprovadas
 
 ## Descartadas
