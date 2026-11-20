@@ -72,7 +72,10 @@ export class ViabTelaEstudo extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     window.addEventListener('beforeunload', this._antesDeSair);
-    this._carregar();
+    // Na PRIMEIRA conexão a carga é do `updated` (que vê `estudoId` mudar); aqui
+    // só a RECONEXÃO recarrega. Duas cargas do mesmo id na montagem faziam a
+    // última — se falhasse — descartar o sucesso da primeira (#907).
+    if (this.hasUpdated) this._carregar();
   }
 
   disconnectedCallback() {
