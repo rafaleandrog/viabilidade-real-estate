@@ -35,9 +35,15 @@ nas demais é a magnitude. Nenhuma célula traz o símbolo "R$" — o cabeçalho
 KPIs do topo do PDF mantêm o símbolo porque ali não há cabeçalho.
 
 Um efeito no CSV, deliberado: a notação contábil grava custo como `(1.234,56)`, e o Excel em
-português importa parêntese como número negativo. Não há risco de parsing (o separador é `;` e
-nenhum valor contém `;`, aspas ou quebra de linha); o que muda é o sinal que uma fórmula sua
+português importa parêntese como número negativo; o que muda é o sinal que uma fórmula sua
 enxerga.
+
+O texto digitado no app — nome do estudo, nome de linha, tipologia, mensagem de divergência — sai
+protegido no CSV: a célula que contém `;`, aspas ou quebra de linha vem entre aspas (com as aspas
+internas dobradas), e o texto que começa com `=`, `+`, `-`, `@`, tabulação ou retorno de carro
+ganha um apóstrofo na frente, para a planilha o ler como texto e não como fórmula. Números não
+recebem o apóstrofo. Os rótulos fixos de totais iniciados por `=` (como `= Resultado`) e a nota de
+permuta limitada saem como sempre saíram, sem essa proteção.
 
 Os Cenários (a análise de sensibilidade) são visualizados na tela e não têm
 exportação própria.

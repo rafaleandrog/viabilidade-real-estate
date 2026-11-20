@@ -64,6 +64,9 @@ test('csvProforma: nome de estudo malicioso vira UMA célula, e rótulos fixos n
   assert.equal(linhas[1], 'Tipo;incorporacao');
   assert.ok(linhas.some((l) => l.startsWith('= Resultado;')), 'rótulo fixo alterado');
   assert.ok(linhas.some((l) => l.startsWith('Receita bruta (VGV);')));
+  // O tipo também é texto: fiação da chamada, não só da função pura.
+  const tipoMalicioso = csvProforma({ nome: 'X', tipo_empreendimento: '@t;x' }, p, false).split('\n');
+  assert.equal(tipoMalicioso[1], `Tipo;"'@t;x"`);
 });
 
 test('csvFluxo: nome de linha com fórmula/`;` e recuo, em uma célula só', () => {
@@ -79,11 +82,12 @@ test('csvFluxo: nome de linha com fórmula/`;` e recuo, em uma célula só', () 
   } as any);
   const estudo = { nome: 'a\nb', tipo_empreendimento: 'incorporacao' };
   const csv = csvFluxo(estudo, calc, null, null, [
-    { codigo: 'X', severidade: 'alerta', esperado: 0, encontrado: 1, diferenca: 1, mensagem: 'a;b "c"' } as any,
+    { codigo: '=X', severidade: '+s', linha: '-l', safra: '@f', esperado: 0, encontrado: 1, diferenca: 1, mensagem: 'a;b "c"' } as any,
   ], [{ nome: '@t;1', quantidadePermutada: 1, quantidadeTotal: 2, areaPermutada: 3 } as any]);
   assert.ok(csv.startsWith('Estudo;"a\nb"\n'), csv.slice(0, 40));
   assert.ok(csv.includes('"    \'=HYPERLINK(""x"";""y"")";'), `nome da linha sem escape:\n${csv}`);
   assert.ok(csv.includes('"a;b ""c"""'), 'mensagem da divergência sem escape');
+  assert.ok(csv.includes("'=X;'+s;'-l;'@f;"), 'código/severidade/linha/safra da divergência sem neutralização');
   assert.ok(csv.includes(`"'@t;1";1;2;`), 'tipologia sem escape');
   assert.ok(!csv.includes("'= Receita"), 'rótulo fixo foi neutralizado');
 });
