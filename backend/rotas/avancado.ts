@@ -2372,11 +2372,14 @@ export function coagirOuRecusar(res: Response, tabela: string, dados: Record<str
 
 /** Regrava o bloco `pos_obra` com o % derivado dos demais (modo distribuído); outros modos voltam intactos. */
 export function absorcaoComPosChavesDerivado(a: any): any {
-  if (!a || typeof a !== 'object' || a.modo !== 'distribuido' || !Array.isArray(a.blocos)) return a;
-  const pct = pctPosChavesDerivado(a.blocos);
-  const tem = a.blocos.some((b: any) => b?.evento === 'pos_obra');
+  if (!a || typeof a !== 'object' || a.modo !== 'distribuido') return a;
+  // Distribuído sem `blocos` é o mesmo que nenhum período informado: o motor
+  // deriva o Pós-chaves inteiro, e é esse o valor que fica gravado.
+  const origem: any[] = Array.isArray(a.blocos) ? a.blocos : [];
+  const pct = pctPosChavesDerivado(origem);
+  const tem = origem.some((b: any) => b?.evento === 'pos_obra');
   const blocos = tem
-    ? a.blocos.map((b: any) => (b?.evento === 'pos_obra' ? { ...b, pct } : b))
-    : [...a.blocos, { evento: 'pos_obra', pct }];
+    ? origem.map((b: any) => (b?.evento === 'pos_obra' ? { ...b, pct } : b))
+    : [...origem, { evento: 'pos_obra', pct }];
   return { ...a, blocos };
 }

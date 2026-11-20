@@ -93,3 +93,15 @@ test('PATCH que muda os blocos regrava o pos_obra derivado, ignorando o valor en
     assert.equal(pctPos(salvo.absorcao.blocos), 30);
   });
 });
+
+test('PATCH distribuído sem blocos grava o pos_obra derivado (100), não um plano sem Pós-chaves', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise', tipo_empreendimento: 'incorporacao' });
+  const fid = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'receita', nome: 'G', ordem: 0 });
+  await comServidor(dados, async (base) => {
+    const r = await enviar(base, 'PATCH', `/estudos/1/avancado/fases/${fid}`, { absorcao: { modo: 'distribuido' } });
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    const salvo = await dados.buscar('avancado_fases', fid);
+    assert.equal(pctPos(salvo.absorcao.blocos), 100);
+  });
+});
