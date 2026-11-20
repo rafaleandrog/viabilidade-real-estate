@@ -40,7 +40,9 @@ sempre com o modelo explícito.
 
 Leia o último comentário `Continuação:` da issue, o PR e a branch dela, e o painel. Outra sessão (a
 do dono, inclusive) pode ter avançado: **continue de onde parou, nunca recomece.** Item com sessão
-do dono ativa nele, ou com branch ou PR aberto que não é desta rotina, não é pego (SKILL.md § 6).
+do dono ativa nele, ou com branch ou PR aberto que não é desta rotina, não é pego (SKILL.md § 6). Sem
+a ferramenta de sessões do Claude Code nesta sessão, vale só o sinal de branch, PR e
+`Continuação:`; registre no painel, em "Não lido", que as sessões não puderam ser consultadas.
 
 ## 3. Spec e plano (Product manager e Arquiteto)
 

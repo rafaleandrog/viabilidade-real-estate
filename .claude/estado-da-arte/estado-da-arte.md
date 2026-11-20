@@ -80,10 +80,11 @@ Um item por coisa que o app deve ser ou fazer na versão final.
   calculados sem descontinuidade — TIR existe também em prejuízo grande, exposição tem piso em zero,
   e "Resultado" significa a mesma coisa em toda superfície.
 - **Por que importa:** é o que a diretoria lê para aprovar.
-- **Pronto quando:** A2 e A3 do #858 fechados; decisão do dono sobre "uma só leitura do resultado"
-  (ideia no `ideias.md`) aplicada em todas as superfícies. Os KPIs da EVI ainda ausentes
-  (exposição após funding a partir do lançamento, VPL com data-base escolhível) estão no
-  Braindump do `ideias.md`: o dono decide com o tempo se entram.
+- **Pronto quando:** A2 e A3 do #858 fechados.
+- **Ideias ligadas, ainda não decididas** (ficam fora do "pronto quando" e **não** são passo
+  autorizado deste item; só entram quando o dono aprovar): "uma só leitura do resultado" em todas as
+  superfícies, e os KPIs da EVI ainda ausentes (exposição após funding a partir do lançamento, VPL
+  com data-base escolhível). Todas no Braindump do `ideias.md`.
 - **Situação:** parcial.
 
 ### 4. Funding em operações independentes
@@ -142,8 +143,9 @@ Um item por coisa que o app deve ser ou fazer na versão final.
 - **O que é:** PDF e Excel/CSV com a mesma ordem e os mesmos números da tela, sem HTML cru nem
   fórmula injetada, com rótulos legíveis (não `em_analise`).
 - **Por que importa:** o estudo circula fora do app.
-- **Pronto quando:** U1, U3 e U9 do #858 fechados. Exportar os Cenários do Preliminar e a
-  Proforma do Avançado está no Braindump do `ideias.md`: o dono decide com o tempo se entra.
+- **Pronto quando:** U1, U3 e U9 do #858 fechados.
+- **Ideias ligadas, ainda não decididas** (fora do "pronto quando"; não são passo autorizado):
+  exportar os Cenários do Preliminar e a Proforma do Avançado. No Braindump do `ideias.md`.
 - **Situação:** parcial — U1 (escape do PDF) entregue em 2026-11-16; U3 e U9 abertos.
 
 ### 9. Estudo auditável
