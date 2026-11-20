@@ -418,3 +418,15 @@ test('#10 (2026-09-14): Loteamento com permuta física — mesma identidade e se
   const headerReceitaBruta = linhas.find((r) => r.l === 'Receita bruta (VGV)')!;
   assert.ok(!headerReceitaBruta.semPct, '"Receita bruta (VGV)" continua mostrando % VGV');
 });
+
+test('#900: permuta financeira — Loteamento sem "residencial" (tela e exportação); Incorporação inalterada', () => {
+  const com = { permuta_financeira_residencial_modo: 'pct_vgv', permuta_financeira_residencial_pct: 5 };
+  const lot = { ...LOT_COM_PERMUTA, ...com };
+  assert.ok(rotulosTela(lot).includes('(-) Permuta financeira'));
+  assert.deepEqual(rotulosTela(lot), rotulosExport(lot));
+  assert.ok(!rotulosTela(lot).some((l) => /residencial/i.test(l)), rotulosTela(lot).join(' | '));
+  assert.ok(!rotulosExport(lot).some((l) => /residencial/i.test(l)), rotulosExport(lot).join(' | '));
+  const inc = { ...INC_COM_PERMUTA, ...com };
+  assert.ok(rotulosTela(inc).includes('(-) Permuta financeira residencial'));
+  assert.deepEqual(rotulosTela(inc), rotulosExport(inc));
+});
