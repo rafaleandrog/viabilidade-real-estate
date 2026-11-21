@@ -84,7 +84,9 @@ Na sub-aba Produtos, abaixo do catálogo, o card **Resumo** mostra os KPIs do ti
 lotes** e **Margem sobre VGV**. Na Incorporação: **Área privativa total**, **Área construída**,
 **Nº de unidades**, **Preço médio/unid.**, **Custo obras / VGV** e **Margem sobre VGV** (os dois
 últimos contra o benchmark). Abaixo deles, o preço sugerido por m² — o preço que faria o resultado
-bater o piso definido no benchmark `resultado_final`. Tudo recalculado a cada edição.
+bater o piso definido no benchmark `resultado_final`; sem produtos cadastrados, o banner pede o
+cadastro (área, preço e unidades) em vez de dizer que o preço é inatingível. Tudo recalculado a cada
+edição.
 
 ### Resultado
 
@@ -142,7 +144,8 @@ escala); a **cadeia de áreas**, do terreno à área vendida, em barras proporci
 contra benchmark. Um aviso aparece quando a área do catálogo de produtos não fecha com a base
 informada em Terreno & Áreas (a ALV, ou as áreas privativas fechadas) — a mesma falta de
 fechamento que, no cadastro por %, é a soma dos percentuais diferente de 100% e impede salvar as
-premissas.
+premissas. Sem nenhum produto com área, preço e unidades cadastrados, a aba mostra só o aviso de
+estado vazio, com a orientação de preencher as três colunas em Premissas → Produtos.
 
 ### Análise de Mercado
 
