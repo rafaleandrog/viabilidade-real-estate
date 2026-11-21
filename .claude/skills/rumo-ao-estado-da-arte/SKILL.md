@@ -24,7 +24,8 @@ divergência vai para o painel.
 tarefa agendada só, presa a uma sessão persistente, disparada em horários fixos, com o prompt
 pedindo "TRIAGEM e, em seguida, EXECUCAO". Aí a sessão roda a TRIAGEM inteira, depois a EXECUCAO,
 e encerra o disparo; o disparo seguinte chega na mesma conversa e começa pelo painel e pelos
-`Continuação:` (nunca pela memória da conversa, que é resumida com o tempo).
+`Continuação:` (nunca pela memória da conversa, que é resumida com o tempo). Trocar a sessão
+(para apagar a antiga ou zerar o contexto) segue o `INSTALAR.md` § "Trocar a sessão da rotina".
 
 Leia **por inteiro** o arquivo da etapa. Sem etapa no prompt e com o dono presente, trate o pedido
 dele pela seção 7. Sem etapa e sem ninguém: encerre sem escrever nada.

@@ -7,6 +7,7 @@ import {
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
 import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, baseProdutosM2, produtosDoEstudo, type ProformaInput, type Proforma } from './proforma.js';
+import { rotuloPermutaFinanceira } from './rotulos-permuta.js';
 import { alocacaoAlv, areaMediaDaLinha, areaTotalDaLinha, pctAlvEfetivo, rotuloBaseProdutos, somaPctAlv, validarSomaPctAlv } from './produtos-alv.js';
 import { validarProdutosParaSubmissao } from './produtos-submissao.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
@@ -214,7 +215,7 @@ export function linhasCascataIncorporacao(
 // mesmo molde. `PERMUTA_FIN_R`/`PERMUTA_FIN_NR`, com os rótulos
 // "residencial"/"não residencial", continuam exclusivas da Incorporação.
 const PERMUTA_FIN_LOT: CustoUnidade = {
-  modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira', padrao: 'pct_vgv', campoCanonico: 'permuta_financeira_residencial_valor_canonico',
+  modoKey: 'permuta_financeira_residencial_modo', rotulo: rotuloPermutaFinanceira(true), padrao: 'pct_vgv', campoCanonico: 'permuta_financeira_residencial_valor_canonico',
   opcoes: [
     { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_residencial_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgvResidencial' } },
     { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_residencial_valor', sufixo: 'R$', conv: { tipo: 'identidade' } },

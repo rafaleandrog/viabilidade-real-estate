@@ -8,6 +8,7 @@
 // (`proforma-avancado.ts`), com denominador diferente — ver
 // `frontend/rotulos-indicador.ts` para o inventário completo.
 import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
+import { rotuloPermutaFisica, rotuloPermutaFinanceira } from './rotulos-permuta.js';
 // #349: `ROTULOS_COMPONENTES_*` saíram daqui junto com os blocos "Componente ·
 // …" e Carteira, que a exportação deixou de listar para espelhar a tabela.
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
@@ -177,7 +178,7 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
       // #574 (achado 7): rótulo espelha o que a tela já usa no Loteamento
       // (`tela-proforma.ts`, `montarLinhasProforma`) — não é rótulo novo, é a
       // exportação parar de divergir da tela.
-      { l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, semPct: true },
+      { l: `(-) ${rotuloPermutaFisica(lot)}`, v: p.vgvPermutaResidencial, ocultarSeZero: true, semPct: true },
       { l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, semPct: true },
     ] : []),
     { l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' },
@@ -185,7 +186,7 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Imposto', v: p.imposto, ocultarSeZero: true },
     { l: '(-) Corretagem', v: p.corretagem, ocultarSeZero: true },
     { l: '(-) Marketing', v: p.marketing, ocultarSeZero: true },
-    { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true },
+    { l: `(-) ${rotuloPermutaFinanceira(lot)}`, v: p.permutaFinResidencial, ocultarSeZero: true },
     { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true },
     { l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado', natureza: 'receita' },
     { l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado' },
