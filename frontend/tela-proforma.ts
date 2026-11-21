@@ -4,6 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, produtosDoEstudo, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
+import { rotuloPermutaFisica, rotuloPermutaFinanceira } from './rotulos-permuta.js';
 import { rotuloAlavanca, ehCustoLike, variaveisSensibilidade } from './variaveis-sensibilidade.js';
 import { fmtVariacao } from './cenario-variacao.js';
 import {
@@ -152,7 +153,7 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
     : e.infra_modo === 'valor_fixo' ? 'valor fixo'
     : `${pct(e.infra_pct)} do VGV`;
   const construcaoMemo = e.construcao_modo === 'valor_total' ? 'valor total' : `${rsm2(e.custo_construcao_m2)} × área privativa`;
-  const permutaFinRMemo = e.permuta_financeira_residencial_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.permuta_financeira_residencial_pct)} do VGV res.`;
+  const permutaFinRMemo = e.permuta_financeira_residencial_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.permuta_financeira_residencial_pct)} do VGV${lot ? '' : ' res.'}`;
   const permutaFinNRMemo = e.permuta_financeira_nao_residencial_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.permuta_financeira_nao_residencial_pct)} do VGV n/res.`;
   // #10: descrição da permuta física — m² entregues e % da área privativa total.
   const permMemo = (area: number) => p.areaPrivativa > 0
@@ -189,7 +190,7 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
     // valor que só existe DEPOIS delas.
     linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true, ocultarSeZero: true, toggle: 'receita', semPct: true });
     for (const linha of linhasProduto) linhas.push({ ...linha, semPct: true });
-    linhas.push({ l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial), semPct: true });
+    linhas.push({ l: `(-) ${rotuloPermutaFisica(lot)}`, v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial), semPct: true });
     linhas.push({ l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, memo: permMemo(p.areaPermutaNaoResidencial), semPct: true });
     linhas.push({ l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' });
   } else {
@@ -204,7 +205,7 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   linhas.push({ l: '(-) Imposto', v: p.imposto, grupo: 'deducoes', ocultarSeZero: true, memo: impostoMemo });
   linhas.push({ l: '(-) Corretagem', v: p.corretagem, grupo: 'deducoes', ocultarSeZero: true, memo: `${pct(e.corretagem_percentual)} do VGV` });
   linhas.push({ l: '(-) Marketing', v: p.marketing, grupo: 'deducoes', ocultarSeZero: true, memo: `${pct(e.marketing_percentual)} do VGV` });
-  linhas.push({ l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinRMemo });
+  linhas.push({ l: `(-) ${rotuloPermutaFinanceira(lot)}`, v: p.permutaFinResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinRMemo });
   linhas.push({ l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinNRMemo });
   linhas.push({ l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado', natureza: 'receita' });
   // #9: totais de custo invertidos — o total é o header do grupo colapsável.

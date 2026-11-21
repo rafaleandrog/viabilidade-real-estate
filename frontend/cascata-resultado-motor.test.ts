@@ -172,3 +172,27 @@ test('calcularCascataResultado: estudo vazio não quebra (vgv=0 → tamanhos em 
     assert.ok(Number.isFinite(e.tamanhoPct), `${e.id} tamanhoPct não finito`);
   }
 });
+
+// #900 — o Loteamento só tem UM campo de cada permuta, então a cascata usa o
+// vocabulário de lotes ("Permuta física/financeira"), não o da Incorporação.
+test('#900: rótulos das permutas na cascata — Loteamento sem "residencial", Incorporação inalterada', () => {
+  const comPermutas = {
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
+    permuta_financeira_residencial_modo: 'pct_vgv', permuta_financeira_residencial_pct: 5,
+  };
+  const rotulos = (e: ProformaInput, lot: boolean) =>
+    calcularCascataResultado(calcularProforma(e), lot).etapas.map((x) => x.rotulo);
+
+  const lot = rotulos({ ...LOT, ...comPermutas }, true);
+  assert.ok(lot.includes('(-) Permuta física'), lot.join(' | '));
+  assert.ok(lot.includes('(-) Permuta financeira'), lot.join(' | '));
+  assert.ok(!lot.some((r) => /residencial/i.test(r)), `Loteamento com vocabulário de Incorporação: ${lot.join(' | ')}`);
+
+  const inc = rotulos({ ...INCORP, ...comPermutas }, false);
+  assert.ok(inc.includes('(-) Permuta física residencial'), inc.join(' | '));
+  assert.ok(inc.includes('(-) Permuta financeira residencial'), inc.join(' | '));
+
+  // Fiação: a tela tem de passar o tipo do estudo à cascata.
+  const tela = readFileSync(new URL('./tela-graficos.ts', import.meta.url), 'utf8');
+  assert.match(tela, /calcularCascataResultado\(p, this\.estudo\.tipo_empreendimento === 'loteamento'\)/);
+});
