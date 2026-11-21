@@ -94,15 +94,24 @@ export interface AlocacaoAlv {
   estado: EstadoAlocacaoAlv;
 }
 
+/**
+ * Estado da alocação a partir do restante (`100 − soma`, em pontos percentuais
+ * da base), com a tolerância de arredondamento. Ponto único: Premissas e a aba
+ * Gráficos decidem completa/falta/excesso por aqui.
+ */
+export function estadoDoRestante(restantePct: number): EstadoAlocacaoAlv {
+  // Compara o desvio SEM arredondar, com uma folga de ponto flutuante: `100 - 99.99`
+  // dá 0.010000000000005116 e reprovaria o limite exato, mas arredondar a 4 casas
+  // aceitaria 99.98996 (desvio real 0.01004) — linha antiga tem % com mais casas.
+  return Math.abs(restantePct) <= TOLERANCIA_SOMA_PCT_ALV + 1e-9
+    ? 'completa' : restantePct > 0 ? 'falta' : 'excesso';
+}
+
 /** Estado da alocação da ALV pelo catálogo, com a tolerância de arredondamento. */
 export function alocacaoAlv(produtos: ProdutoAlv[] | undefined, alvM2: number): AlocacaoAlv {
   const soma = somaPctAlv(produtos, alvM2);
   const restante = 100 - soma;
-  // Compara o desvio SEM arredondar, com uma folga de ponto flutuante: `100 - 99.99`
-  // dá 0.010000000000005116 e reprovaria o limite exato, mas arredondar a 4 casas
-  // aceitaria 99.98996 (desvio real 0.01004) — linha antiga tem % com mais casas.
-  const estado: EstadoAlocacaoAlv = Math.abs(restante) <= TOLERANCIA_SOMA_PCT_ALV + 1e-9
-    ? 'completa' : restante > 0 ? 'falta' : 'excesso';
+  const estado = estadoDoRestante(restante);
   return { soma, restante, estado };
 }
 

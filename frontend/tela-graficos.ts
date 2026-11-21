@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
+import { estadoConsistenciaAlocacao } from './consistencia-alocacao.js';
 import { SEM_PRODUTOS_ICONE, SEM_PRODUTOS_MENSAGEM, SEM_PRODUTOS_SUBMENSAGEM } from './sem-produtos.js';
 import { fmtR$Kpi, fmtR$, fmtM2, fmtPctOuIndef } from './viab-format.js';
 import {
@@ -307,8 +308,9 @@ export class ViabTelaGraficos extends LitElement {
     // desenhava "ainda faltam alocar" para qualquer estudo com área — uma
     // piscada de aviso falso, permanente se a mesma `Promise.all` falhar.
     if (!this.produtosCarregados) return html``;
-    const excesso = p.diferencaAreaAlocada > 0;
-    const sobra = p.diferencaAreaAlocada < 0;
+    const estado = estadoConsistenciaAlocacao(p.pctAreaAlocada, p.diferencaAreaAlocada);
+    const excesso = estado === 'excesso';
+    const sobra = estado === 'falta';
     if (!excesso && !sobra) return html``;
     const base = lot ? 'ALV' : 'área privativa fechada';
     return html`
