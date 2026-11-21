@@ -14,8 +14,8 @@
 
 > **Entrada fora do carimbo:** o espelho contém 1 entrada que o carimbo acima não cobre, `urbi-prosa`,
 > escrita à mão a partir do `dist/index.d.ts` do SDK fixado (`57.0.0`), porque o monorepo não estava
-> acessível. Com ela o conteúdo real é 29 primitivos · 198 props. A próxima sincronização regenera
-> tudo e remove esta nota.
+> acessível. Com ela o conteúdo real é 29 primitivos · 198 props. O sincronizador regrava o bloco
+> acima e o `primitivos.json` inteiro, mas não esta nota: quem rodar o sincronizador a remove à mão.
 
 ## Por que este diretório existe
 
