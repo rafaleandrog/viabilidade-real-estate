@@ -80,3 +80,17 @@ test('#907: reconectar o elemento recarrega, e só o último pedido vale', async
   assert.equal(el.estudo?.nome, 'nova', '`_cargas` tem de ser a mesma sequência entre chamadas');
   assert.equal(el.carregando, false);
 });
+
+test('#907: resposta velha que chega antes da última não libera `carregando`', async () => {
+  const el = await montar();
+  el._carregar(); // segunda carga do mesmo estudo, ainda em voo
+  assert.equal(chamadas.length, 2);
+  chamadas[0].ok({ id: 7, nome: 'velha', status: 'rascunho' });
+  await assentar();
+  assert.equal(el.carregando, true, 'só o último pedido pode desligar `carregando`');
+  assert.equal(el.estudo, null, 'resposta velha não pode ser aplicada');
+  chamadas[1].ok({ id: 7, nome: 'nova', status: 'rascunho' });
+  await assentar();
+  assert.equal(el.carregando, false);
+  assert.equal(el.estudo?.nome, 'nova');
+});
