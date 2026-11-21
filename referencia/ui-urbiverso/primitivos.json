@@ -2832,6 +2832,81 @@
       "risco_box_model": false,
       "risco_box_model_altura": false
     },
+    "urbi-prosa": {
+      "classe": "UrbiProsa",
+      "arquivo": "node_modules/@urbiverso/sdk/dist/index.d.ts",
+      "origem_manual": "Entrada escrita à mão a partir de node_modules/@urbiverso/sdk/dist/index.d.ts (declare class UrbiProsa, SDK 57.0.0), não do monorepo; a próxima execução do sincronizador a substitui.",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiProsa"
+      ],
+      "props": [
+        {
+          "propriedade": "papel",
+          "atributo": "papel",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiProsa"
+        },
+        {
+          "propriedade": "inline",
+          "atributo": "inline",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiProsa"
+        },
+        {
+          "propriedade": "truncar",
+          "atributo": "truncar",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiProsa"
+        },
+        {
+          "propriedade": "pre",
+          "atributo": "pre",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiProsa"
+        }
+      ],
+      "atributos_convencao": [
+        "expandir"
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        }
+      ],
+      "risco_box_model": false,
+      "risco_box_model_altura": false
+    },
     "urbi-select": {
       "classe": "UrbiSelect",
       "arquivo": "ui/src/urbi-select.ts",
