@@ -95,7 +95,9 @@ conversa, que é resumida com o tempo.
 
 ### Trocar a sessão da rotina (para apagar a antiga ou zerar o contexto)
 
-A tarefa fica **presa a uma sessão**: apagada a sessão, os disparos não têm onde cair. E a
+Nesta variante a tarefa fica **presa a uma sessão** (ela posta sempre na mesma conversa; as tarefas
+dos passos 4 e 5, criadas pela tela com sessão nova a cada disparo, não têm esse problema): apagada
+a sessão, os disparos não têm onde cair. E a
 conversa cresce a cada disparo, deixando cada um mais caro. Para trocar, sem perder nada (a memória
 da rotina é o repositório, o painel e os `Continuação:`):
 
@@ -104,11 +106,13 @@ da rotina é o repositório, o painel e os `Continuação:`):
    teste só de leitura: repositório clonado, skills do repositório na lista, a linha `[processo]`
    do hook, as ferramentas do GitHub e as de agendamento. O CLI do Kimi pode faltar; o motor de
    revisão o instala sozinho na primeira revisão.
-2. Crie a tarefa nova presa a essa sessão, com os mesmos horários e o mesmo prompt, e só então
-   desligue a antiga. O texto do prompt de uma tarefa só muda a partir da conversa em que ela
+2. Crie a tarefa nova presa a essa sessão (`create_trigger` com `persistent_session_id` da
+   sessão nova), com os mesmos horários e o mesmo prompt, e só então desligue a antiga. Pelas
+   ferramentas de agendamento, o prompt de uma tarefa só muda a partir da conversa em que ela
    posta; por isso trocar de sessão é criar outra tarefa, não editar a antiga.
-3. Atualize o que lia a sessão antiga pelo id, por exemplo um acompanhamento. Esse texto também
-   só muda a partir da conversa dele.
+3. Atualize o que lia a sessão antiga pelo id, se houver — por exemplo uma tarefa sua de
+   acompanhamento que lê o histórico da rotina. O texto dela também só muda a partir da conversa
+   dela.
 4. Depois do primeiro disparo na sessão nova, a antiga pode ser apagada.
 
 **O que não funciona:** a tarefa no modo "sessão nova a cada disparo", criada por uma sessão pelas
