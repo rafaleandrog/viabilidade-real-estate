@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
+import { SEM_PRODUTOS_ICONE, SEM_PRODUTOS_MENSAGEM, SEM_PRODUTOS_SUBMENSAGEM } from './sem-produtos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, produtosDoEstudo, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
@@ -544,9 +545,9 @@ export class ViabTelaProforma extends LitElement {
   private _renderSemProdutos(titulo: string): TemplateResult {
     return html`<urbi-card titulo=${titulo}>
       <div class="pf-vazio">
-        <urbi-estado-vazio icone="fa-solid fa-boxes-stacked"
-          mensagem="Nenhum produto com área, preço e unidades cadastrado."
-          submensagem="A Proforma sai do catálogo de Produtos: preencha as três colunas em Premissas → Produtos para ver VGV, custos e resultado."
+        <urbi-estado-vazio icone=${SEM_PRODUTOS_ICONE}
+          mensagem=${SEM_PRODUTOS_MENSAGEM}
+          submensagem=${SEM_PRODUTOS_SUBMENSAGEM}
         ></urbi-estado-vazio>
       </div>
     </urbi-card>`;

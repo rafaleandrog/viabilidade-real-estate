@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
+import { SEM_PRODUTOS_ICONE, SEM_PRODUTOS_MENSAGEM, SEM_PRODUTOS_SUBMENSAGEM } from './sem-produtos.js';
 import { fmtR$Kpi, fmtR$, fmtM2, fmtPctOuIndef } from './viab-format.js';
 import {
   calcularProforma, eficienciaParaFaixa, roiParaFaixa, vgvBrutoDeProforma,
@@ -46,6 +47,7 @@ export class ViabTelaGraficos extends LitElement {
   private _idCarregado: number | null = null;
 
   static styles = [estiloConteudo, css`
+    .gr-vazio { padding: 8px 0; }
     .graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .graficos + .graficos { margin-top: 16px; }
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
@@ -130,6 +132,16 @@ export class ViabTelaGraficos extends LitElement {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
+    if (this.produtosCarregados && p.semProdutos) {
+      return html`<urbi-card titulo="Gráficos">
+        <div class="gr-vazio">
+          <urbi-estado-vazio icone=${SEM_PRODUTOS_ICONE}
+            mensagem=${SEM_PRODUTOS_MENSAGEM}
+            submensagem=${SEM_PRODUTOS_SUBMENSAGEM}
+          ></urbi-estado-vazio>
+        </div>
+      </urbi-card>`;
+    }
     return html`
       ${this._renderKpisPreliminar(p)}
       ${this._renderConsistencia(p, lot)}

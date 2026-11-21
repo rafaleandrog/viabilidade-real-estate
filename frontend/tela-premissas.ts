@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
+import { textoPrecoSugerido } from './sem-produtos.js';
 import { fmtR$, fmtR$Kpi, fmtNum, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2 } from './viab-format.js';
 import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
@@ -1569,6 +1570,7 @@ export class ViabTelaPremissas extends LitElement {
     const piso = this._benchmark('resultado_final');
     let precoSug: number | null = null;
     if (piso && Number(piso.valor) > 0) precoSug = precoSugeridoM2(this._entradaProforma(), Number(piso.valor));
+    const textoSug = textoPrecoSugerido({ catalogoCarregado: this._produtosLidos, semProdutos: p.semProdutos, precoSug });
 
     return html`
       <urbi-card titulo="Resumo">
@@ -1581,7 +1583,7 @@ export class ViabTelaPremissas extends LitElement {
         ${piso
           ? html`<urbi-banner variante="info">
               Preço sugerido/m² para atingir o piso de resultado final (${fmtPctEntrada(Number(piso.valor))}):
-              <strong>${precoSug !== null ? fmtR$(precoSug) + '/m²' : 'inatingível com as premissas atuais'}</strong>
+              <strong>${textoSug ?? fmtR$(precoSug as number) + '/m²'}</strong>
             </urbi-banner>`
           : html`<p class="sec">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}
       </urbi-card>
