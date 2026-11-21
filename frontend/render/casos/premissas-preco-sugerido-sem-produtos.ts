@@ -43,7 +43,7 @@ export const caso = {
       aliquotaRet: 4,
     });
     raiz.appendChild(el);
-    // Espera a carga assentar (`_catalogoCarregado` vira `true` no fim de `_init`).
+    // Espera a carga assentar (o catálogo lido, `_produtosLidos`, decide o texto).
     await new Promise((r) => setTimeout(r, 50));
     await (el as any).updateComplete;
   },

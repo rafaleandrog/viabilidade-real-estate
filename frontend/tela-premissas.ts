@@ -1570,7 +1570,7 @@ export class ViabTelaPremissas extends LitElement {
     const piso = this._benchmark('resultado_final');
     let precoSug: number | null = null;
     if (piso && Number(piso.valor) > 0) precoSug = precoSugeridoM2(this._entradaProforma(), Number(piso.valor));
-    const textoSug = textoPrecoSugerido({ catalogoCarregado: this._catalogoCarregado, semProdutos: p.semProdutos, precoSug });
+    const textoSug = textoPrecoSugerido({ catalogoCarregado: this._produtosLidos, semProdutos: p.semProdutos, precoSug });
 
     return html`
       <urbi-card titulo="Resumo">
