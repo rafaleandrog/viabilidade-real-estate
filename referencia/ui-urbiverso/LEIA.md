@@ -12,6 +12,11 @@
 > | Conteúdo | 28 primitivos · 194 props (incluindo herdadas) · 85 tokens |
 <!-- CARIMBO:FIM -->
 
+> **Entrada fora do carimbo:** o espelho contém 1 entrada que o carimbo acima não cobre, `urbi-prosa`,
+> escrita à mão a partir do `dist/index.d.ts` do SDK fixado (`57.0.0`), porque o monorepo não estava
+> acessível. Com ela o conteúdo real é 29 primitivos · 198 props. A próxima sincronização regenera
+> tudo e remove esta nota.
+
 ## Por que este diretório existe
 
 A fonte canônica de props de primitivo `urbi-*` e de tokens CSS é o **bundle do SDK**

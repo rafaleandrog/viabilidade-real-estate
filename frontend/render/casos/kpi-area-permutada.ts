@@ -44,7 +44,20 @@ export const caso = {
     const sr = tela?.shadowRoot ?? null;
     const kpis = Array.from(sr?.querySelectorAll('urbi-kpi') ?? []) as any[];
     const area = kpis.find((k) => k.getAttribute('rotulo') === 'Área permutada');
+    // Folga: a nota tem de ficar mais perto da faixa de KPIs que do card seguinte.
+    const faixa = sr?.querySelector('.faixa-kpis') as HTMLElement | null;
+    const nota = sr?.querySelector('.kpi-nota') as HTMLElement | null;
+    const proximo = faixa?.nextElementSibling as HTMLElement | null;
+    const kpisEl = sr?.querySelector('.faixa-kpis > .kpis') as HTMLElement | null;
+    let distNotaFaixa: number | null = null;
+    let distNotaProximo: number | null = null;
+    if (kpisEl && nota && proximo) {
+      distNotaFaixa = nota.getBoundingClientRect().top - kpisEl.getBoundingClientRect().bottom;
+      distNotaProximo = proximo.getBoundingClientRect().top - nota.getBoundingClientRect().bottom;
+    }
     return {
+      distNotaFaixa,
+      distNotaProximo,
       valorAreaPermutada: area ? String(area.valor) : null,
       nota: sr?.querySelector('.kpi-nota')?.textContent?.trim() ?? null,
     };

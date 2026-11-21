@@ -2834,7 +2834,8 @@
     },
     "urbi-prosa": {
       "classe": "UrbiProsa",
-      "arquivo": "ui/src/urbi-prosa.ts",
+      "arquivo": "node_modules/@urbiverso/sdk/dist/index.d.ts",
+      "origem_manual": "Entrada escrita à mão a partir de node_modules/@urbiverso/sdk/dist/index.d.ts (declare class UrbiProsa, SDK 57.0.0), não do monorepo; a próxima execução do sincronizador a substitui.",
       "base": "UrbiPrimitivoDeConteudo",
       "linhagem": [
         "UrbiPrimitivoDeConteudo",

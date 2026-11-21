@@ -284,6 +284,9 @@ export class ViabTelaProforma extends LitElement {
        tela-resumo.ts. */
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 260px)); gap: 12px; margin-bottom: 16px; }
     .kpis urbi-kpi { min-width: 0; }
+    /* O PAI dá a folga (ui.md: sem margem em primitivo): a nota fica a 8px da faixa e a faixa inteira dá os 16px ao card seguinte. */
+    .faixa-kpis { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .faixa-kpis > .kpis { margin-bottom: 0; }
     /* Aviso do excedente de permuta: acima da tabela, dentro do card. */
     urbi-banner.aviso-permuta { display: block; margin-bottom: 14px; }
     /* Mesmo respiro do estado vazio do catálogo em Premissas → Produtos. */
@@ -612,10 +615,12 @@ export class ViabTelaProforma extends LitElement {
     // `null` do motor, e `fmtPctOuIndef` mostra "—", nunca "0,0%".
     kpis.push({ rot: 'Custo obras / VGV', val: fmtPctOuIndef(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) });
     kpis.push({ rot: 'Margem sobre VGV', val: fmtPctOuIndef(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
-    return html`<div class="kpis">
-      ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
-    </div>
-    ${permuta?.nota ? html`<urbi-prosa class="kpi-nota" papel="dica">${permuta.nota}</urbi-prosa>` : nothing}`;
+    return html`<div class="faixa-kpis">
+      <div class="kpis">
+        ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
+      </div>
+      ${permuta?.nota ? html`<urbi-prosa class="kpi-nota" papel="dica">${permuta.nota}</urbi-prosa>` : nothing}
+    </div>`;
   }
 
   private _toggle(g: Grupo) {
