@@ -15,9 +15,10 @@ export const caso = {
     // visível. Mesma decisão de `proforma-sem-produtos.ts`.
     { seletor: 'div.gr-vazio', minimo: 1 },
   ],
-  // Sem a cascata: o `viab-grafico-cascata` só existe no ramo com produtos.
-  // `exigir` só sabe exigir presença, então a ausência é provada pelo teste
-  // (`contar` do estado vazio e checagem do DOM via `a.montagem`).
+  // Sem a cascata: o `viab-grafico-cascata` e a faixa de KPIs só existem no
+  // ramo com produtos. `exigir` só sabe exigir presença, então a ausência é
+  // medida por `medir` e afirmada pelo teste. (`naoDeclaradas` NÃO serve para
+  // isso: o harness só confronta primitivos do espelho e ignora `viab-*`.)
   aceitaNaoReproduzido: [
     'urbi-card.titulo',
     'urbi-estado-vazio.icone',
@@ -33,5 +34,12 @@ export const caso = {
     // senão o caso mediria o estado "carregando".
     await new Promise((r) => setTimeout(r, 50));
     await (el as any).updateComplete;
+  },
+  async medir(raiz: HTMLElement): Promise<{ cascata: number; kpis: number }> {
+    const sr = (raiz.querySelector('viab-tela-graficos') as any).shadowRoot!;
+    return {
+      cascata: sr.querySelectorAll('viab-grafico-cascata').length,
+      kpis: sr.querySelectorAll('div.kpis-preliminar').length,
+    };
   },
 };

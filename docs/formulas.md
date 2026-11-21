@@ -52,8 +52,9 @@ Duas regras governam essa fonte:
 
 - **Só compõe catálogo a linha com as três grandezas maiores que zero** (área média, preço e
   unidades). Uma linha recém-adicionada, em branco, não conta. Sem nenhuma linha efetiva o estudo
-  está em **estado vazio**: a Proforma e a sub-aba **Cenários** não mostram tabela nem KPI, e nenhuma
-  despesa em % do VGV produz valor. Não há fallback para os campos antigos de área × preço da
+  está em **estado vazio**: a Proforma, a sub-aba **Cenários** e a aba **Gráficos** não mostram
+  tabela, KPI nem gráfico, e nenhuma despesa em % do VGV produz valor. O banner de preço sugerido
+  de Premissas pede o cadastro dos produtos em vez de dizer "inatingível". Não há fallback para os campos antigos de área × preço da
   linha do estudo — eles não têm entrada em tela.
 - **A permuta física é capada no VGV bruto da própria categoria.** A permuta pedida de cada tipo
   (`área entregue × preço médio daquele tipo`) é cortada quando vale mais que o VGV bruto daquele
