@@ -475,11 +475,13 @@ test('#609 as três filhas de remapeamento simples estão declaradas, e nenhuma 
   }
 });
 
-test('#609 toda filha declara `por_pagina` acima de 1 — sem truncamento silencioso', () => {
-  // Um `por_pagina: 1` aqui copiaria UMA linha do catálogo e nada acusaria: a
-  // cópia teria produtos, só que menos. É o mesmo cuidado do `anexarProdutos`.
+test('#838 nenhuma filha carrega limite de página — a cópia varre tudo', () => {
+  // Antes (#609) cada filha declarava um `por_pagina`, e o maior deles (500, no
+  // catálogo de Produtos) truncava em silêncio. Desde a #838 a rota lê cada
+  // filha com `varrerTudo`; o teste de rota com 501 produtos e 101 imóveis está
+  // em `estudos-duplicar-rota.test.ts`.
   for (const f of FILHAS_SIMPLES) {
-    assert.ok(f.porPagina > 1, `${f.tabela} com por_pagina=${f.porPagina}`);
+    assert.equal('porPagina' in f, false, `${f.tabela} voltou a declarar limite de página`);
     assert.ok(f.campos.length > 0, `${f.tabela} sem campos declarados`);
   }
 });
