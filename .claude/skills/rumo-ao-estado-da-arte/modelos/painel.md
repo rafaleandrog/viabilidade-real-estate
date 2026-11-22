@@ -9,8 +9,9 @@ Marque a caixa para aprovar. Para recusar, comente o motivo.
 - [ ] `ideias.md` › Braindump: <título da linha> — aprova? (vira issue com a caixa marcada)
 
 ## Para você testar e fechar
-Código já entregue. Sem caixa: sai daqui quando você fecha a issue.
-- #<n> — testar na homologação (roteiro) e fechar | fechar (evidência)
+Código já entregue, cujo critério de aceite é um teste na instância. Sem caixa: sai daqui quando você fecha a issue.
+Issue entregue sem esse critério não aparece aqui: a rotina a fecha sozinha, com a evidência.
+- #<n> — testar na homologação (roteiro) e fechar
 
 ## Prontos para o Merge de hoje
 PRs com `pronto-para-merge`, que a tarefa de Merge leva até o fim no próximo disparo dela
@@ -38,6 +39,10 @@ Entradas que passaram do limite do dia. A próxima triagem as lê antes das nova
 
 ## Release
 <nada a propor | proposta: o que entra (a caixa "Soltar a release proposta" está em "Esperando o seu sim") | aprovada pelo dono, a disparar | disparada: tag> — roteiro para conferir na homologação
+
+## Varredura de issues entregues
+Última varredura: <data e hora> · até o commit `<sha>` da branch principal. Preserve esta linha ao reescrever o painel; o Merge a atualiza.
+- fechadas nesta varredura: #<n> (PR #<m>)
 
 ## Rumo ao Estado da Arte
 <n> itens feitos, <n> parciais, <n> faltando

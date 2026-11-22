@@ -35,10 +35,12 @@ entra na lista "Aprovados, aguardando o seu merge".
 ## 2b. Varredura de issues entregues e abertas
 
 Depois dos merges, todo disparo: liste as issues abertas citadas por PRs mergeados e por commits da
-branch principal desde a varredura anterior (registrada no painel). Para cada uma, confira no código
+branch principal desde a varredura anterior (data e commit na seção "Varredura de issues
+entregues" do painel; sem registro, desde a última release). Para cada uma, confira no código
 se o pedido inteiro está entregue. Entregue: feche, com o PR ou commit e a evidência. Parcial:
-comente o que falta. Teste na instância como critério: "Para você testar e fechar". Registre no
-painel a data da varredura e o que ela fechou.
+comente o que falta. Teste na instância como critério: "Para você testar e fechar". Atualize no
+painel a seção "Varredura de issues entregues": data, commit da branch principal até onde
+conferiu e o que fechou.
 
 ## 3. Release e painel
 

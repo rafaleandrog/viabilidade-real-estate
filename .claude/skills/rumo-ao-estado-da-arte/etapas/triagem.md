@@ -100,7 +100,8 @@ cita o PR ou commit e a evidência — regra fixa do dono, 2026-11-22: issue res
 qualquer que tenha sido o caminho (no app de viabilidade, `CLAUDE.md` § Fechamento de issue). A
 única exceção é a issue cujo critério de aceite é um teste na instância: ela vai para a seção
 **"Para você testar e fechar"** do painel, **sem caixa**, com o roteiro do teste, e sai do painel
-quando o dono a fecha. Entrega parcial não fecha: comente o que falta.
+quando o dono a fecha. Entrega parcial não fecha: comente o que falta. Ao reescrever o painel,
+preserve a seção "Varredura de issues entregues", que é o cursor da varredura do Merge.
 
 **Item é sempre uma issue.** Entrada que ainda não é issue — um comentário `Observação:`, um caso
 do Sentinela — e foi aceita dentro do limite vira issue nesta etapa (a exceção é a linha do
