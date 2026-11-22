@@ -27,8 +27,9 @@ Na sub-aba **Proforma** de **Resultado**, os botões **Exportar Excel** e **Expo
 - **Excel** — gera um CSV (UTF-8 com BOM, separador `;`, decimais em vírgula) que o Excel abre
   diretamente, com todas as linhas da Proforma e o percentual sobre o VGV.
 
-O tipo de empreendimento e o status aparecem no CSV e no cabeçalho dos PDFs com os mesmos rótulos
-da tela ("Incorporação", "Em análise"), e não com o valor interno.
+O tipo de empreendimento sai no CSV e no cabeçalho dos dois PDFs, e o status no cabeçalho do PDF
+da Proforma, com os mesmos rótulos da tela ("Incorporação", "Em análise"), e não com o valor
+interno.
 
 A coluna **R$** do CSV e do PDF usa a mesma célula da tabela da tela: receita e resultado com o
 sinal real (negativo entre parênteses, positivo sem marca) e custo ou dedução sempre entre
