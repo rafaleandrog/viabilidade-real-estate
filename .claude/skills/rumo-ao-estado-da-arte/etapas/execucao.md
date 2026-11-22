@@ -57,7 +57,8 @@ contratos que o item toca (rotas, schema, SDK, telas) e as **fatias**, na ordem,
 testável sozinha. Leia `.claude/estado-da-arte/aprendizados.md` e o item do Estado da Arte antes: é
 como o dono decide e para onde o app vai.
 Lido o código, o item não cabe numa sessão ou é sensível: comente, marque `plano-grande` ou leve a
-"Esperando o seu sim", e passe ao próximo. Item sensível cuja caixa o dono **já** marcou não volta
+"Esperando o seu sim", e passe ao próximo. Item grande com o plano já aprovado pelo dono, ou com o
+rótulo `sessao-dedicada`, vai para uma sessão dedicada (`SKILL.md` § 8), não para este disparo. Item sensível cuja caixa o dono **já** marcou não volta
 para lá: implemente, e o PR para no portão de merge (§ 5), que ele sempre segura.
 
 ## 4. Implementar, uma fatia por vez (Dev)

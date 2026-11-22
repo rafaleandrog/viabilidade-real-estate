@@ -77,7 +77,7 @@ Ninguém acompanha esta sessão: não pergunte nada.
 Autonomia: 1
 ```
 
-## 5b. Variante: uma tarefa só, numa sessão persistente (a do app de viabilidade)
+## 5b. Variante: uma tarefa só, numa sessão persistente (a do app de viabilidade até 2026-11-21)
 
 Em vez das tarefas dos passos 4 e 5, uma tarefa só, presa a uma sessão dedicada (mesmo ambiente),
 disparada em horários fixos — por exemplo 6h, 14h e 22h —, cada disparo fazendo a TRIAGEM e depois

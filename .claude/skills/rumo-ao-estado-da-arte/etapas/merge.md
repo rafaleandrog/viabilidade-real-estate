@@ -5,14 +5,18 @@ dia.
 
 ## 1. O que entra
 
-Os PRs desta rotina (branch `claude/rotina-*`) com o rótulo `pronto-para-merge`, mais os PRs cuja
-caixa o dono marcou no painel. Do mais antigo para o mais novo, **um de cada vez**.
+Os PRs desta rotina (branch `claude/rotina-*`) com o rótulo `pronto-para-merge`. Do mais antigo
+para o mais novo, **um de cada vez**. PR cuja caixa o dono marcou no painel, sem o rótulo, só
+entra na lista "Aprovados, aguardando o seu merge".
 
 ## 2. Para cada PR
 
 1. Sincronize com a branch principal **por merge** (nunca rebase nem force-push).
 2. A sincronização mudou arquivo do PR? Faça a rodada delta de revisão pela `revisar-pr-apps`.
-   Não mudou? A revisão anterior vale.
+   Não mudou? Mesmo assim o head é novo, e a atestação vale **só para o head em que foi
+   publicada** (no app de viabilidade, o `revisao-registrada.yml` invalida a cada push): publique
+   uma reatestação no head atual, dizendo que a sincronização não mudou o diff do PR e citando a
+   revisão anterior. Sem atestação no head atual, não há merge.
 3. Espere o CI do head atual, que tem de ser **posterior** ao último commit da branch principal, e
    confira a revisão sem bloqueante no head atual (no app de viabilidade, `revisao/bloqueantes`).
 4. Pode mergear se a exceção de merge do processo do repositório libera esta tarefa agendada para
