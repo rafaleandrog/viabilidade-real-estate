@@ -66,6 +66,22 @@ class DadosFake {
     return atualizado;
   }
 
+  // Como o real: filtrar e gravar num passo só, filtro ESTRITO (chave com valor
+  // vazio ou `null` lança em vez de alargar), devolve quantos foram atingidos.
+  async atualizarVarios(tabela: string, seletor: { filtros?: Record<string, any> }, patch: Record<string, any>) {
+    const filtros = seletor.filtros ?? {};
+    if (Object.keys(filtros).length === 0) throw new Error('DadosFake: seletor vazio');
+    for (const [k, v] of Object.entries(filtros)) {
+      if (v === null || v === undefined || v === '') throw new Error(`DadosFake: filtro ${k} não vira condição`);
+    }
+    const tab = this.tabelas.get(tabela);
+    let n = 0;
+    for (const [id, linha] of tab ?? []) {
+      if (Object.entries(filtros).every(([k, v]) => linha[k] === v)) { tab!.set(id, { ...linha, ...patch }); n++; }
+    }
+    return n;
+  }
+
   async criar(tabela: string, dados: Record<string, any>) {
     const id = this.semear(tabela, dados);
     return this.buscar(tabela, id);
@@ -806,5 +822,54 @@ test('#938 linha ancorada a fase: soltar a âncora (fase_ancora_id: null) libera
     assert.equal(linha.fase_ancora_id, null);
     assert.equal(linha.inicio_mes, 2);
     assert.equal(linha.duracao_meses, 5);
+  });
+});
+
+// ── #940: remover uma fase solta as linhas de custo presas a ela ────────────
+// Decisão do dono: soltar. A linha passa a `customizado`, com o início e a
+// duração que já tinha. Mutação que este teste derruba: apagar o laço que
+// solta as linhas em `removerFase`.
+test('#940 remover a fase solta as linhas presas a ela, mantendo início e duração; as demais não mudam', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  dados.semear('estudos', { id: 2, nivel_analise: 'avancado', status: 'em_analise' });
+  const f1 = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'cronograma', nome: 'Obra', inicio_mes: 6, duracao_meses: 12 });
+  const f2 = dados.semear('avancado_fases', { estudo_id: 1, tipo: 'cronograma', nome: 'Pós-obra', inicio_mes: 18, duracao_meses: 6 });
+  // `cronograma_evento: 'obra'` no semeado (e não o `customizado` que a rota
+  // grava ao ancorar) para a asserção abaixo provar que a remoção escreve o campo.
+  const presa = dados.semear('avancado_linhas_custo', custoObraBase(1, { fase_ancora_id: f1, cronograma_evento: 'obra', inicio_mes: 6, duracao_meses: 12 }));
+  const opPresa = dados.semear('avancado_funding_operacoes', { estudo_id: 1, tipo: 'divida', nome: 'CG', fase_ancora_id: f1, cronograma_evento: 'obra', inicio_mes: 6 });
+  const opOutra = dados.semear('avancado_funding_operacoes', { estudo_id: 1, tipo: 'equity', nome: 'Sócio', fase_ancora_id: f2, cronograma_evento: 'customizado', inicio_mes: 18 });
+  const outraFase = dados.semear('avancado_linhas_custo', custoObraBase(1, { fase_ancora_id: f2, inicio_mes: 18, duracao_meses: 6 }));
+  const outroEstudo = dados.semear('avancado_linhas_custo', custoObraBase(2, { fase_ancora_id: f1, inicio_mes: 6, duracao_meses: 12 }));
+
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/1/avancado/fases/${f1}/remover`, { method: 'PATCH' });
+    const corpo = await res.json();
+    assert.equal(res.status, 200, JSON.stringify(corpo));
+    assert.equal(corpo.linhas_soltas, 1);
+    assert.equal(corpo.operacoes_soltas, 1);
+    assert.equal(await dados.buscar('avancado_fases', f1), null, 'a fase foi removida');
+
+    const l = await dados.buscar('avancado_linhas_custo', presa);
+    assert.equal(l.fase_ancora_id, null);
+    assert.equal(l.cronograma_evento, 'customizado');
+    assert.equal(l.inicio_mes, 6);
+    assert.equal(l.duracao_meses, 12);
+
+    assert.equal((await dados.buscar('avancado_linhas_custo', outraFase)).fase_ancora_id, f2, 'presa a outra fase não muda');
+    assert.equal((await dados.buscar('avancado_linhas_custo', outroEstudo)).fase_ancora_id, f1, 'linha de outro estudo não muda');
+
+    const op = await dados.buscar('avancado_funding_operacoes', opPresa);
+    assert.equal(op.fase_ancora_id, null, 'a operação de funding presa à fase também é solta');
+    assert.equal(op.cronograma_evento, 'customizado');
+    assert.equal(op.inicio_mes, 6);
+    assert.equal((await dados.buscar('avancado_funding_operacoes', opOutra)).fase_ancora_id, f2, 'operação presa a outra fase não muda');
+
+    // Solta, a linha volta a ser editável — o 422 da #938 não se aplica mais.
+    const patch = await fetch(`${base}/estudos/1/avancado/custos/${presa}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ duracao_meses: 9 }),
+    });
+    assert.equal(patch.status, 200);
   });
 });
