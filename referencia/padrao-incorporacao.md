@@ -3251,21 +3251,27 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 ### Armadilhas mapeadas pela lista de bugs (2026-08-01)
 
 > Diferente das A1–A8 acima, estas nasceram **não resolvidas**, cada uma com issue aberta. Elas
-> ficam aqui porque são o tipo de erro que se reintroduz sozinho. A que já foi resolvida diz isso na
-> própria nota (✅ **Resolvida**) e continua no lugar pela história — hoje, a A9.
+> ficam aqui porque são o tipo de erro que se reintroduz sozinho. A que já foi resolvida, no todo ou
+> em parte, diz isso na própria nota e continua no lugar pela história — hoje, a A9, resolvida em
+> parte.
 
-**A9 — Início e Duração não são campos simétricos em Custos.** ✅ **Resolvida** (#249, validada
-por #255) — a nota fica pela história, e deixou de ser armadilha aberta. Hoje as duas grandezas
-travam juntas nas duas camadas. Na API, `resolverTravamentoCusto` (`backend/rotas/avancado.ts:157`)
-devolve o erro quando o corpo traz `inicio_mes` **ou** `duracao_meses` numa linha ancorada sem
-trazer a âncora, e o PATCH de custos responde 422 `CAMPO_TRAVADO` tanto para a fase-âncora
-(`:1975`) quanto para o evento do cronograma (`:1986`). Quando o corpo traz a âncora junto
-(`fase_ancora_id`, ou um `cronograma_evento` diferente de `customizado`, mesmo repetindo a atual),
-não há 422: início e duração são recalculados a partir dela e os valores enviados são ignorados. Na tela, as colunas Início e Duração decidem pelo mesmo
-`regimeCronogramaLinha` (`frontend/tela-fluxo-custos.ts:985` e `:1016`): Construção, fase-âncora e
-evento fixo mostram as duas como calculadas, sem campo editável. O risco que a nota descrevia — a
-próxima mudança de Cronograma apagar uma duração editada, porque `reancorarCustos` reescreve as duas
-— deixou de existir, porque a duração ancorada não é mais editável.
+**A9 — Início e Duração não são campos simétricos em Custos.** 🟡 **Resolvida na tela e no ramo do
+evento; aberta no ramo da fase-âncora da API.**
+
+- **Tela:** as colunas Início e Duração decidem pelo mesmo `regimeCronogramaLinha`
+  (`frontend/tela-fluxo-custos.ts:985` e `:1016`). Construção, fase-âncora e evento fixo mostram as
+  duas grandezas como calculadas, sem campo editável.
+- **API, linha ancorada num evento do cronograma:** `resolverTravamentoCusto`
+  (`backend/rotas/avancado.ts:157`) recebe a âncora do evento sempre, e o PATCH responde 422
+  `CAMPO_TRAVADO` (`:1986`) quando o corpo traz `inicio_mes` **ou** `duracao_meses` sem trazer a
+  âncora. Com um `cronograma_evento` diferente de `customizado` no corpo, mesmo repetindo o atual,
+  início e duração são recalculados a partir dele e os valores enviados são ignorados.
+- **API, linha ancorada numa fase — ainda aberta:** o ramo da fase só lê a âncora quando o corpo
+  troca `fase_ancora_id` (`:1963-1966`). Sem ela no corpo, a âncora chega `null` a
+  `resolverTravamentoCusto`, que não trava nada, e o PATCH **grava** `inicio_mes` e `duracao_meses`
+  enviados em silêncio; o 422 de `:1975` nunca dispara. A próxima mudança de Cronograma apaga esses
+  valores sem aviso, porque `reancorarCustos` reescreve as duas grandezas. Só cliente de API chega
+  aqui: a tela não oferece o campo.
 
 **A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
