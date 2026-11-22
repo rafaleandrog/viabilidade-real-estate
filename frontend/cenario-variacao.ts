@@ -68,6 +68,9 @@ export function fmtVariacao(pct: number): string {
  */
 export const TEXTO_VARIACAO_SEM_BASE = 'n/d';
 
+/** O motivo do "n/d", no `title` e no `aria-label` de quem o publica. */
+export const MOTIVO_SEM_BASE = 'O cenário real não tem exposição: não há base para a variação';
+
 /** A exposição de referência é zero (abaixo de meio centavo): a variação não se define. */
 export function exposicaoSemBase(base: number | null | undefined): boolean {
   return base != null && Number.isFinite(base) && Math.abs(base) < 0.005;

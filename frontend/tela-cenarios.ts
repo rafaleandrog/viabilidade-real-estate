@@ -13,7 +13,7 @@ import { marcos, comparacaoCenario, emMilhoes, dominioYEstatico, ESCALA_MILHOES 
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
-import { calcularVariacao, exposicaoSemBase, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
+import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   type FundingCalc, type OperacaoFunding,
@@ -670,7 +670,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${calc.paybackData ?? '—'}</td>
         <td class=${calc.exposicaoMaxima < 0 ? 'neg' : ''}>${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
         <td class="cen-var">${exposicaoSemBase(base.exposicaoMaxima)
-          ? html`<span class="cen-nd" title="O cenário real não tem exposição: não há base para a variação">${TEXTO_VARIACAO_SEM_BASE}</span>`
+          ? html`<span class="cen-nd" title=${MOTIVO_SEM_BASE} aria-label=${MOTIVO_SEM_BASE}>${TEXTO_VARIACAO_SEM_BASE}</span>`
           : this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
         <td>
           ${this.editavel ? html`

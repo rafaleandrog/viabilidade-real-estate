@@ -76,11 +76,15 @@ test('#910 n/d fiação: a linha de cenário da tabela de Cenários publica "n/d
     });
     return el;
   };
-  const cenario = { id: 9, nome: 'Custo +200%', preco_venda_pct: 0, custo_obra_pct: 200 };
+  const cenario = { id: 9, nome: 'Preço -95%', preco_venda_pct: -95, custo_obra_pct: 0 };
 
-  const semExp = tela(cfg([receita(12)], []));
+  // Base sem exposição (a venda paga o custo que vem depois); o CENÁRIO tem
+  // exposição (preço -95% não paga o custo). Assim o teste distingue ler a base
+  // de ler o cenário: só a base decide o "n/d".
+  const semExp = tela(cfg([receita(12)], [custo(1_000_000, 50, 3)]));
   const baseSem = semExp._calc({ precoVendaPct: 0, custoObraPct: 0 });
   assert.ok(Object.is(baseSem.exposicaoMaxima, 0));
+  assert.ok(semExp._calc({ precoVendaPct: -95, custoObraPct: 0 }).exposicaoMaxima < 0, 'o cenário tem de ter exposição');
   assert.ok(textosDoTemplate(semExp._linhaCenario(cenario, baseSem)).includes(TEXTO_VARIACAO_SEM_BASE));
 
   const comExp = tela(cfg([receita(20)], [custo(1_000_000, 0, 3)]));

@@ -1,7 +1,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtR$Kpi, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { calcularVariacao, exposicaoSemBase, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
+import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
 import { type FundingNoFluxo } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
@@ -114,6 +114,8 @@ export const estiloFluxoTabela = css`
   }
   .kpi-var.melhor { color: var(--cor-sucesso); }
   .kpi-var.pior { color: var(--cor-erro); }
+  /* Variação indefinida ("n/d"): neutra, e com o motivo no title. */
+  .kpi-var.kpi-nd { color: var(--cor-texto-sec); font-weight: 400; pointer-events: auto; }
   /* #456: linha de detalhe (% + mês) dos três KPIs derivados — neutra, ao
      contrário de .kpi-var, que carrega semântica de melhor/pior. */
   .kpi-info {
@@ -266,7 +268,8 @@ function varKpi(novo: number | null, base: number | null | undefined, maiorMelho
  * Os KPIs do fluxo, incluindo a Receita Bruta canônica (#237).
  *
  * `base` só é passada pela aba Cenários (#132): com ela, Resultado, TIR, VPL e
- * Exposição máxima ganham seta + variação % contra o cenário real. Payback é
+ * Exposição máxima ganham seta + variação % contra o cenário real (a exposição
+ * publica "n/d" quando o cenário real não tem exposição). Payback é
  * uma data, não um escalar comparável — fica sem indicador. Sem `base` o
  * componente renderiza exatamente como antes (aba Fluxo de Caixa e Resumo).
  */
@@ -325,7 +328,7 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
         <div class="rotulo">Exposição máxima (fluxo livre)</div>
         <div class="valor">${fmtR$Kpi(expMag)}</div>
         ${base && exposicaoSemBase(base.exposicaoMaxima)
-          ? html`<span class="kpi-var" title="O cenário real não tem exposição: não há base para a variação">${TEXTO_VARIACAO_SEM_BASE}</span>`
+          ? html`<span class="kpi-var kpi-nd" title=${MOTIVO_SEM_BASE} aria-label=${MOTIVO_SEM_BASE}>${TEXTO_VARIACAO_SEM_BASE}</span>`
           : varKpi(expMag, expBaseMag, false)}
         <div class="kpi-info">${fmtPct(pctExp)} do VGV${mesTxt(c.mesExposicaoMaxima)}</div>
       </div>
