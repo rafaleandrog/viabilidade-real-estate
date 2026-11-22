@@ -1262,8 +1262,25 @@ async function removerFase(req: Request, res: Response): Promise<void> {
         fase_ancora_id: null, cronograma_evento: 'customizado',
       });
     }
+    // A operação de funding aceita a mesma âncora, e presa a uma fase apagada
+    // ficava pior que a linha de custo: `resolverInicio` (funding.ts) lê
+    // `dados.fase_ancora_id ?? atual.fase_ancora_id`, então até mandar `null`
+    // caía na âncora morta e todo PATCH dela respondia 400. Solta igual, com o
+    // `inicio_mes` que já tinha.
+    const operacoesPresas = await req.dados!.varrerTudo('avancado_funding_operacoes', {
+      filtros: { estudo_id: estudo.id, fase_ancora_id: fase.id },
+    });
+    for (const op of operacoesPresas as any[]) {
+      await req.dados!.atualizar('avancado_funding_operacoes', Number(op.id), {
+        fase_ancora_id: null, cronograma_evento: 'customizado',
+      });
+    }
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
-    res.json({ ok: true, linhas_soltas: (presas as any[]).length });
+    res.json({
+      ok: true,
+      linhas_soltas: (presas as any[]).length,
+      operacoes_soltas: (operacoesPresas as any[]).length,
+    });
   } catch (e: any) {
     console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/fases/:fid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
