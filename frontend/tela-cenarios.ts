@@ -621,7 +621,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${tir}</td>
         <td class="cen-var"></td>
         <td>${base.paybackData ?? '—'}</td>
-        <td class="neg">${fmtR$(Math.abs(base.exposicaoMaxima))}</td>
+        <td class=${base.exposicaoMaxima < 0 ? 'neg' : ''}>${fmtR$(Math.abs(base.exposicaoMaxima))}</td>
         <td class="cen-var"></td>
         <td></td>
       </tr>
@@ -667,7 +667,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${tir}</td>
         <td class="cen-var">${this._badgeVar(calc.tir, base.tir, true)}</td>
         <td>${calc.paybackData ?? '—'}</td>
-        <td class="neg">${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
+        <td class=${calc.exposicaoMaxima < 0 ? 'neg' : ''}>${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
         <td class="cen-var">${this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
         <td>
           ${this.editavel ? html`

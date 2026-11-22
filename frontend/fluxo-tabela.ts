@@ -274,8 +274,8 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   const resultado = resultadoDe(c);
   const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
   const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
-  // #353 (BUG7-45): exposição máxima é min(fluxoAcumulado), tipicamente
-  // negativa — mas o autor quer a leitura por MAGNITUDE (módulo): exposição
+  // #353 (BUG7-45): exposição máxima é min(fluxoAcumulado) com piso em
+  // zero (nunca positiva; 0 quando o acumulado nunca fica negativo) — mas o autor quer a leitura por MAGNITUDE (módulo): exposição
   // maior (mais dinheiro em risco) é PIOR, mesmo que numericamente mais
   // negativa. Por isso aqui, ao contrário dos outros KPIs, comparamos
   // Math.abs() e usamos maiorMelhor = false (magnitude subir é pior).
