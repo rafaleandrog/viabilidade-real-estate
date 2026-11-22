@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   componentesParaSalvar, erroFormularioPagamento, espelhoDescreveComponentes,
-  fluxoPagamentoParaSalvar, formularioPagamento, formularioPagamentoDoPlano, planoSoCanonico,
+  fluxoPagamentoParaSalvar, formularioPagamento, formularioPagamentoDoPlano, planoDeNascimento, planoSoCanonico,
 } from './fluxo-pagamento-editor.js';
 
 const CRONO = [{ evento: 'obra', inicio_mes: 12, duracao_meses: 24 }];
@@ -62,4 +62,40 @@ test('espelho divergente: sem a marca, o Aplicar regeneraria e perderia o repass
   const form = formularioPagamento(PLANO_DIVERGENTE());
   const salvo = fluxoPagamentoParaSalvar(form, CRONO, 0);
   assert.equal(salvo.componentes.some((c: any) => c.tipo === 'concentrado' && c.participacaoPct === 70), false);
+});
+
+// Planos coerentes com o espelho não viram divergentes quando o cronograma muda.
+const FORM_OBRA = () => formularioPagamento({
+  entrada: [{ pct: 20, parcelas: 1, descontoPct: 0 }],
+  parcelas: [
+    { pct: 30, periodicidade: 'mensal', parcelas: 12 },
+    { pct: 20, periodicidade: 'mensal', parcelas: 24, ao_longo_obra: true },
+  ],
+  repasse: { apos_entrega_meses: 1 },
+});
+const CRONO_A = [{ evento: 'obra', inicio_mes: 6, duracao_meses: 18 }];
+const CRONO_LONGO = [{ evento: 'obra', inicio_mes: 10, duracao_meses: 36 }];
+
+test('espelho divergente: plano da tela reaberto com obra mais longa devolve true', () => {
+  const salvo = fluxoPagamentoParaSalvar(FORM_OBRA(), CRONO_A, AA);
+  assert.equal(espelhoDescreveComponentes(salvo, CRONO_LONGO), true);
+  assert.equal(formularioPagamentoDoPlano(salvo, CRONO_LONGO).espelhoDivergente, undefined);
+});
+
+test('espelho divergente: plano gravado com cronograma vazio e reaberto com cronograma devolve true', () => {
+  const salvo = fluxoPagamentoParaSalvar(FORM_OBRA(), [], AA);
+  assert.equal(espelhoDescreveComponentes(salvo, CRONO_LONGO), true);
+  assert.equal(formularioPagamentoDoPlano(salvo, CRONO_LONGO).espelhoDivergente, undefined);
+});
+
+test('espelho divergente: plano de nascimento reaberto com outro cronograma devolve true', () => {
+  const nasc = planoDeNascimento(
+    { entrada: [{ pct: 20, parcelas: 1 }], parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 12 }], repasse: { apos_entrega_meses: 1 } },
+    CRONO_A, AA,
+  );
+  assert.equal(espelhoDescreveComponentes(nasc, CRONO_LONGO), true);
+});
+
+test('espelho divergente: o caso da issue continua false com cronograma diferente', () => {
+  assert.equal(espelhoDescreveComponentes(PLANO_DIVERGENTE(), CRONO_LONGO), false);
 });

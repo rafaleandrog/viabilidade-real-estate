@@ -935,7 +935,8 @@ export class ViabFluxoReceitas extends LitElement {
     // plano tem espelho (linhas de entrada/parcelamento) — num plano só
     // canônico o controle não teria efeito (`planoSoCanonico`).
     const soCanonico = planoSoCanonico(f);
-    const editaDestino = repasse > 0 && !soCanonico;
+    // No espelho divergente o controle aparece, desabilitado, em vez de sumir.
+    const editaDestino = repasse > 0 && (!soCanonico || f.espelhoDivergente === true);
     const erroPagamento = erroFormularioPagamento(f, this.crono);
     // #585: o bloco de juros SAIU deste modal — campo, texto e o aviso de
     // "N taxas diferentes gravadas". Com uma taxa por ESTUDO não há mais o que
@@ -1089,7 +1090,7 @@ export class ViabFluxoReceitas extends LitElement {
                   .valor=${destinoSaldoChaves(f).pctBanco}
                   @urbi:input-numero-change=${(ev: CustomEvent) => this._setRepasse('pct_banco', ev.detail.valor ?? 100)}></viab-num>` : nothing}
               </div>
-              ${soCanonico ? html`
+              ${soCanonico && !f.espelhoDivergente ? html`
                 <p class="sec">Este plano foi gravado só como componentes, sem linhas de entrada e de
                   parcelamento, e por isso o destino do saldo de chaves não é editável aqui. Para
                   mudá-lo, monte o plano com linhas de entrada e de parcelamento.</p>` : nothing}

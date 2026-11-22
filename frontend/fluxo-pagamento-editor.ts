@@ -668,10 +668,27 @@ export function jurosDeTabelaConfigurados(fluxoPagamento: any): JurosDeTabela[] 
 // Espelho que não descreve os componentes gravados
 // ─────────────────────────────────────────────────────────────────────────
 
-/** A regra única: o espelho regenerado tem a mesma estrutura do array gravado. */
-function estruturaConfere(regenerados: ComponentePagamento[], persistidos: ComponentePagamento[]): boolean {
+/** Compara regenerados × persistidos, posição a posição, pela projeção dada. */
+function estruturaConfere(
+  regenerados: ComponentePagamento[], persistidos: ComponentePagamento[],
+  projecao: (c: any) => string = projecaoDoEspelho,
+): boolean {
   return regenerados.length === persistidos.length
-    && regenerados.every((r, i) => projecaoDoEspelho(r) === projecaoDoEspelho(persistidos[i]));
+    && regenerados.every((r, i) => projecao(r) === projecao(persistidos[i]));
+}
+
+/**
+ * Projeção da pergunta "o espelho descreve os componentes?": só os campos que o
+ * espelho diz e que NÃO dependem do cronograma. `marcoMes`, `mesPagamento` e o
+ * `prazoMeses` de "ao longo da obra" vêm do cronograma vigente, e um plano coerente
+ * reaberto depois de o cronograma mudar não pode virar divergente por isso.
+ */
+function projecaoDeEstrutura(c: any): string {
+  const norm = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 1e9) / 1e9 : v);
+  return JSON.stringify(
+    ['tipo', 'participacaoPct', 'descontoPct', 'sinalPct', 'carenciaMeses']
+      .map((k) => (c?.[k] === undefined ? null : norm(c[k]))),
+  );
 }
 
 /**
@@ -685,7 +702,7 @@ export function espelhoDescreveComponentes(fluxoPagamento: any, cronograma: Even
   const form = formularioPagamento(fluxoPagamento);
   if (!Array.isArray(form.componentes) || form.componentes.length === 0) return true;
   if (form.entrada.length === 0 && form.parcelas.length === 0) return true;
-  return estruturaConfere(componentesDoLegado(form, cronograma, 0), form.componentes);
+  return estruturaConfere(componentesDoLegado(form, cronograma, 0), form.componentes, projecaoDeEstrutura);
 }
 
 /** O formulário do plano, marcado quando o espelho não descreve os componentes. */
