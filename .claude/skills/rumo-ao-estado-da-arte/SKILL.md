@@ -27,6 +27,12 @@ e encerra o disparo; o disparo seguinte chega na mesma conversa e começa pelo p
 `Continuação:` (nunca pela memória da conversa, que é resumida com o tempo). Trocar a sessão
 (para apagar a antiga ou zerar o contexto) segue o `INSTALAR.md` § "Trocar a sessão da rotina".
 
+**Duas tarefas: Construtor e Merge** (o modo do app de viabilidade desde 2026-11-21). O
+**Construtor** faz a TRIAGEM leve e a EXECUCAO até o PR **pronto** (rótulo `pronto-para-merge`),
+sem mergear; o **Merge** roda a etapa `etapas/merge.md` no fim do dia. Os disparos chegam a uma
+sessão de **despacho**, que só cria uma sessão nova por disparo, com o repositório e o título no
+padrão, e encerra — o trabalho pesado sempre começa numa sessão limpa (ver § 8).
+
 Leia **por inteiro** o arquivo da etapa. Sem etapa no prompt e com o dono presente, trate o pedido
 dele pela seção 7. Sem etapa e sem ninguém: encerre sem escrever nada.
 
@@ -158,3 +164,19 @@ trabalho segue pelas skills que o repositório já tem.
   registram. Ele não abre arquivo para ler pergunta.
 - **O dono avança um assunto por conta própria** (nesta conversa ou noutra): ao terminar, deixe o
   `Continuação:` na issue do item, para a rotina seguir dali.
+
+## 8. Sessões, títulos e rótulos
+
+- **Uma sessão nova por disparo** (`modo_sessao` da configuração). A memória é o repositório, o
+  painel e os `Continuação:`; nunca a conversa.
+- **Título:** `[<apelido>] #PR1, #PR2 - DD/MM` com os PRs do disparo (Construtor), `[<apelido>]
+  merge #PR1, #PR2 - DD/MM` (Merge), `[<apelido>] #ISSUE <assunto> - DD/MM` (sessão dedicada) e
+  `[<apelido>] sem PR - DD/MM` quando não houver PR. A sessão nasce com o título provisório que o
+  despacho dá e se renomeia ao abrir os PRs; sem a ferramenta de renomear, registra no painel o
+  título que deveria ter.
+- **Item grande, ou com o rótulo `sessao-dedicada`:** ganha uma sessão própria, criada pela rotina
+  com o repositório e a tag `rumo-ao-estado-da-arte`, registrada no `Continuação:` da issue. Os
+  disparos seguintes mandam o próximo passo para ela enquanto estiver ativa; concluído o item, ela
+  é arquivada. **`sessao-nova`** numa issue: o item recomeça do zero, ignorando sessões anteriores.
+- **`pronto-para-merge`:** posto pelo Construtor no PR que passou em tudo (revisão sem bloqueante,
+  CI verde, Product owner ✅), com o head validado anotado. Só o Merge o tira.

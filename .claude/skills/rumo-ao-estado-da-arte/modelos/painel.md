@@ -12,6 +12,10 @@ Marque a caixa para aprovar. Para recusar, comente o motivo.
 Código já entregue. Sem caixa: sai daqui quando você fecha a issue.
 - #<n> — testar na homologação (roteiro) e fechar | fechar (evidência)
 
+## Prontos para o Merge de hoje
+PRs com `pronto-para-merge`, que a rotina de Merge leva até o fim às 23h41.
+- PR #<n> <título> — <tamanho> — head validado `<sha>`
+
 ## Aprovados, aguardando o seu merge
 PR pronto e parado cuja caixa você marcou. O merge é seu.
 - PR #<n> <título>

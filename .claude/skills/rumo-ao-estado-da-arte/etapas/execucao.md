@@ -94,6 +94,11 @@ Com a validação limpa, o **Product owner** confere a spec **critério por crit
 critério de aceite, a evidência (teste, medição, captura) e ✅ ou ❌, numa tabela comentada na issue.
 Um ❌ volta para o Dev. É o último portão antes do merge.
 
+**No modo de duas tarefas (Construtor e Merge), a EXECUCAO para aqui:** com tudo abaixo valendo,
+ponha no PR o rótulo `pronto-para-merge`, anote o head validado e passe ao próximo item; quem
+mergeia é `etapas/merge.md`. No modo de tarefa única, ela mesma mergeia, nas condições abaixo.
+**Antes de abrir PR novo**, confira `max_prs_prontos_aguardando`: passou, só cuide dos existentes.
+
 Mergeia quando valem **todas**:
 
 1. o Product owner marcou ✅ em todos os critérios;
