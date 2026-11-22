@@ -5,7 +5,8 @@ Só números e nomes. A autonomia fica no prompt da tarefa agendada; a release s
 Mudança neste arquivo só por PR que o dono mergeia.
 
 apelido: <apelido>         # curto, no título das sessões: "[<apelido>] #100, #101 - DD/MM"
-modo_sessao: nova_por_disparo  # nova_por_disparo (Construtor e Merge, etapas/merge.md) ou unica
+modo_sessao: unica         # unica (TRIAGEM e EXECUCAO, como em INSTALAR.md) ou nova_por_disparo, só
+                           # quando as tarefas Construtor e Merge e a sessão de despacho existirem
 orcamento_diario: 3        # teto de pontos por dia (pequeno = 1, médio = 2), somando os disparos
 max_prs_por_disparo: 2     # PRs implementados no máximo em cada disparo da tarefa agendada
 max_prs_prontos_aguardando: 4  # com este número esperando o Merge, o Construtor não abre PR novo

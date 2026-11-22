@@ -13,7 +13,8 @@ Código já entregue. Sem caixa: sai daqui quando você fecha a issue.
 - #<n> — testar na homologação (roteiro) e fechar | fechar (evidência)
 
 ## Prontos para o Merge de hoje
-PRs com `pronto-para-merge`, que a rotina de Merge leva até o fim às 23h41.
+PRs com `pronto-para-merge`, que a tarefa de Merge leva até o fim no próximo disparo dela
+(só no modo de duas tarefas; no modo de tarefa única esta seção não aparece).
 - PR #<n> <título> — <tamanho> — head validado `<sha>`
 
 ## Aprovados, aguardando o seu merge

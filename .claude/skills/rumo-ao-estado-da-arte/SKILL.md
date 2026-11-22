@@ -168,8 +168,9 @@ trabalho segue pelas skills que o repositório já tem.
 
 ## 8. Sessões, títulos e rótulos
 
-- **Uma sessão nova por disparo** (`modo_sessao` da configuração). A memória é o repositório, o
-  painel e os `Continuação:`; nunca a conversa.
+- **Com `modo_sessao: nova_por_disparo`, uma sessão nova por disparo**, criada pela sessão de
+  despacho; com `unica`, a tarefa segue na própria sessão persistente, como em `INSTALAR.md`. Nos
+  dois modos a memória é o repositório, o painel e os `Continuação:`; nunca a conversa.
 - **Título:** `[<apelido>] #PR1, #PR2 - DD/MM` com os PRs do disparo (Construtor), `[<apelido>]
   merge #PR1, #PR2 - DD/MM` (Merge), `[<apelido>] #ISSUE <assunto> - DD/MM` (sessão dedicada) e
   `[<apelido>] sem PR - DD/MM` quando não houver PR. A sessão nasce com o título provisório que o
