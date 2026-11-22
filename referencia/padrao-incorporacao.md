@@ -374,10 +374,10 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 >
 > - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:552`;
 > - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:208`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
-> quando `novo.nivel_analise === 'avancado'` (`:848-850`). Nenhuma rota promove.
+> quando `novo.nivel_analise === 'avancado'` (`:909`). Nenhuma rota promove.
 >
-> Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:336-340`) **não** listar
-> `nivel_analise`, mais `montarCopiaEstudo` (`:351-359`). O `if` de `:848` apenas **consome** o nível
+> Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:341-346`) **não** listar
+> `nivel_analise`, mais `montarCopiaEstudo` (`:356-364`). O `if` de `:909` apenas **consome** o nível
 > já preservado, para decidir se copia as tabelas do Avançado.
 >
 > Isso responde a pergunta que a #486 fazia sobre a permuta física dos estudos de Pinguim, e a
@@ -3253,13 +3253,16 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 > Diferente das A1–A8 acima, **estas ainda NÃO estão resolvidas** — cada uma tem issue aberta. Elas
 > ficam aqui porque são o tipo de erro que se reintroduz sozinho.
 
-**A9 — Início e Duração não são campos simétricos em Custos.** A UI trava o Início em três casos
-(Construção, fase-âncora, evento fixo) e a Duração **só** em Construção
-(`frontend/tela-fluxo-custos.ts:724-757` vs `:758-780`). O backend faz o mesmo: devolve 422 para
-`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1955-1967`); a duração, que antes passava, hoje também
-trava (`resolverTravamentoCusto`, `:166-170`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
-Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescreve as duas grandezas.
-→ **#249**, validada por **#255**.
+**A9 — Início e Duração não são campos simétricos em Custos.** ✅ **Resolvida** (#249, validada
+por #255) — a nota fica pela história, e deixou de ser armadilha aberta. Hoje as duas grandezas
+travam juntas nas duas camadas. Na API, `resolverTravamentoCusto` (`backend/rotas/avancado.ts:157`)
+devolve o erro quando o corpo traz `inicio_mes` **ou** `duracao_meses` numa linha ancorada, e o
+PATCH de custos responde 422 `CAMPO_TRAVADO` tanto para a fase-âncora (`:1975`) quanto para o
+evento do cronograma (`:1986`). Na tela, as colunas Início e Duração decidem pelo mesmo
+`regimeCronogramaLinha` (`frontend/tela-fluxo-custos.ts:985` e `:1016`): Construção, fase-âncora e
+evento fixo mostram as duas como calculadas, sem campo editável. O risco que a nota descrevia — a
+próxima mudança de Cronograma apagar uma duração editada, porque `reancorarCustos` reescreve as duas
+— deixou de existir, porque a duração ancorada não é mais editável.
 
 **A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido

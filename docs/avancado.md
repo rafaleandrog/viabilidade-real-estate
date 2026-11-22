@@ -36,7 +36,16 @@ Acumulado** e os **Indicadores vs. benchmark** — a página de leitura do estud
 |---|---|
 | **Informações** | Descrição do empreendimento, os dados do terreno (área e coeficientes mínimo e máximo), a imagem principal e os anexos. |
 | **Cronograma** | A **Data de início do projeto** e as fases — Planejamento, Pré-lançamento (ligado pelo interruptor **Este empreendimento tem Pré-lançamento**), Lançamento, Obra e Pós-obras — com duração em meses, desenhadas no **Gantt do cronograma**. As fases são o calendário sobre o qual custos e vendas se distribuem. |
-| **Tipologias** | O catálogo de unidades: nome, tipo de unidade (apartamento, cobertura, loja ou outro), área privativa, quantidade e vagas. Os preços ficam em Viabilidade → Receitas. |
+| **Tipologias** | O catálogo de unidades: nome, tipo de unidade (apartamento, cobertura, loja, lote ou outro), área privativa, quantidade e vagas. Os preços ficam em Viabilidade → Receitas. |
+
+#### Loteamento no Avançado
+
+O Avançado serve os dois tipos de empreendimento, e no Loteamento quatro coisas mudam:
+
+- **Tipologia é lote.** A tipologia nova de um estudo Loteamento nasce com o tipo de unidade **lote**; a área privativa é a área de cada lote, e a quantidade é o número de lotes.
+- **Infraestrutura é a Construção.** Não há categoria própria de infraestrutura: o custo dela entra na linha **Construção** do grupo Obras, a mesma linha semeada da Incorporação (no Preliminar ela se chama Infraestrutura).
+- **Terreno em R$/m².** A linha de custo nova de um estudo Loteamento nasce em **R$/m² do terreno**, sobre a área do terreno informada em Informações; é a unidade natural do **Preço** do terreno.
+- **Sem cascata de áreas.** O Avançado não tem a cascata do Preliminar (poligonal, APP, áreas públicas e privadas, até a ALV) e não confere a soma da área dos lotes contra a ALV: essa consistência fica com quem cadastra as tipologias.
 
 ### Custos
 
@@ -229,6 +238,13 @@ vendas` em `diretos`, **sem** `subcategoria` (ausente, vazia ou só com espaços
 uma linha assim, a rota devolve a existente (`200`, a de menor `id`) em vez de criar outra; a criação
 de verdade responde `201`. É o que a aba Custos manda ao semear. Sem `"semeadura": true`, ou com
 qualquer outra combinação — inclusive a mesma categoria com subcategoria —, a rota cria sempre.
+
+**Estudo Avançado criado só pela API nasce sem as três linhas semeadas.** Quem as cria é a aba
+Custos, ao abrir um estudo editável; o servidor não as semeia no `POST /estudos`. Um cliente de API
+que crie o estudo e calcule sem abrir a tela precisa criar as três antes, com o `POST
+/estudos/:id/avancado/custos` acima e `"semeadura": true`: **Preço** em `terreno`, **Construção** em
+`obra` e **Corretagem de vendas** em `diretos`, em % do VGV. Sem elas o fluxo sai sem custo de
+terreno, de construção e de corretagem, e nada acusa a falta.
 
 O plano de pagamento de um grupo de receita (`fluxo_pagamento`) só gera juros de tabela, carteira de clientes e repasse
 quando está no formato canônico, a lista `componentes`. Por isso a API o normaliza na escrita: o grupo novo nasce com
