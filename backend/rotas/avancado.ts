@@ -1961,9 +1961,12 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
     const faseAncoraFinal = dados.fase_ancora_id !== undefined ? dados.fase_ancora_id : custo.fase_ancora_id;
     if (faseAncoraFinal !== undefined && faseAncoraFinal !== null) {
       const trocandoAncora = dados.fase_ancora_id !== undefined;
-      let ancoraFase: { inicio_mes: number; duracao_meses: number } | null = null;
+      // #938: a âncora é lida também quando ela NÃO muda — antes só se lia na
+      // troca, e sem ela `resolverTravamentoCusto` não travava nada: início e
+      // duração enviados eram gravados em silêncio numa linha presa à fase.
+      const ancoraFase: { inicio_mes: number; duracao_meses: number } | null =
+        await ancorarLinhaCustoEmFase(req, estudo.id, Number(faseAncoraFinal));
       if (trocandoAncora) {
-        ancoraFase = await ancorarLinhaCustoEmFase(req, estudo.id, Number(faseAncoraFinal));
         if (!ancoraFase) {
           erro(res, 400, 'FASE_ANCORA_INVALIDA', 'fase_ancora_id deve ser uma fase do Cronograma deste estudo');
           return;
