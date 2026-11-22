@@ -377,12 +377,13 @@ async function anexarImagemPrincipal(req: Request, estudos: any[]): Promise<void
   for (const e of estudos) e.imagem_principal_url = null;
   if (estudos.length === 0 || !req.arquivos) return;
   const ids = new Set(estudos.map((e) => Number(e.id)));
-  const docs = await req.dados!.listar('estudo_documentos', {
-    filtros: { categoria: 'imagem_principal' }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  // #909 — `varrerTudo`, sem teto de página (antes `por_pagina: 500`).
+  const docs = await req.dados!.varrerTudo('estudo_documentos', {
+    filtros: { categoria: 'imagem_principal' }, ordenar: 'ordem', ordem: 'asc',
   });
   // Primeira imagem principal (menor ordem) de cada estudo da lista.
   const arquivoPorEstudo = new Map<number, number>();
-  for (const d of docs.dados) {
+  for (const d of docs as any[]) {
     const eid = Number(d.estudo_id);
     if (ids.has(eid) && !arquivoPorEstudo.has(eid) && d.documento != null) {
       arquivoPorEstudo.set(eid, Number(d.documento));
@@ -510,12 +511,10 @@ async function anexarProdutos(req: Request, estudos: any[]): Promise<void> {
   for (const e of estudos) e.produtos = [];
   if (estudos.length === 0) return;
   const ids = new Set(estudos.map((e) => Number(e.id)));
-  // `por_pagina` alto de propósito: a lista de estudos vai a 200 e cada um
-  // pode ter dezenas de produtos, então o teto de 500 do helper de imagem
-  // truncaria silenciosamente — e um truncamento aqui volta a produzir
-  // exatamente o "—" que este helper existe para eliminar.
-  const r = await req.dados!.listar('preliminar_produtos', { por_pagina: 100000 });
-  const porEstudo = agruparProdutosPorEstudo(r.dados, ids);
+  // #909 — `varrerTudo`: qualquer teto de página trunca o catálogo em silêncio
+  // e volta a produzir o "—" que este helper existe para eliminar.
+  const produtos = await req.dados!.varrerTudo('preliminar_produtos');
+  const porEstudo = agruparProdutosPorEstudo(produtos as any[], ids);
   for (const e of estudos) e.produtos = porEstudo.get(Number(e.id)) ?? [];
 }
 
@@ -610,39 +609,37 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
     const { tipo_empreendimento, status } = req.query as Record<string, string>;
 
     let estudos: any[];
+    const filtros: Record<string, any> = {};
+    if (tipo_empreendimento) filtros.tipo_empreendimento = tipo_empreendimento;
+    if (status) filtros.status = status;
     if (req.contexto?.nivelApp === 'admin') {
       // Admin de app enxerga todos os estudos.
-      const filtros: Record<string, any> = {};
-      if (tipo_empreendimento) filtros.tipo_empreendimento = tipo_empreendimento;
-      if (status) filtros.status = status;
-      const r = await req.dados!.listar('estudos', {
-        filtros, ordenar: 'criado_em', ordem: 'desc', por_pagina: 200,
-      });
-      estudos = r.dados.map((e) => ({ ...e, _funcao: 'aprovador' }));
+      // #909 — `varrerTudo`, não `listar` com `por_pagina: 200` (truncava).
+      const todos = await req.dados!.varrerTudo('estudos', { filtros, ordenar: 'criado_em', ordem: 'desc' });
+      estudos = (todos as any[]).map((e) => ({ ...e, _funcao: 'aprovador' }));
     } else {
       // Demais: apenas estudos onde é membro.
-      const mem = await req.dados!.listar('estudo_membros', {
-        filtros: { usuario_id: userId }, por_pagina: 500,
-      });
+      const mem = await req.dados!.varrerTudo('estudo_membros', { filtros: { usuario_id: userId } });
       // A função publicada é a EFETIVA — o mínimo entre a linha e o que o nível
       // do app comporta (ver `funcaoEfetivaDoMembro`), a mesma que o detalhe e as
       // sub-rotas aplicam; senão a tela desenharia botão que o servidor recusa.
       // Função efetiva nula (nível sem acesso, ou linha inválida) = o detalhe nega
       // o acesso, e a listagem não publica o estudo em vez de cair na linha crua.
       const funcaoPorEstudo = new Map<number, string>();
-      for (const m of mem.dados) {
+      for (const m of mem as any[]) {
         const efetiva = funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp);
         if (efetiva) funcaoPorEstudo.set(Number(m.estudo_id), efetiva);
       }
-
+      // #909 — UMA varredura de `estudos`, filtrada em memória pelos ids do
+      // membro (sem `buscar` por estudo; o SDK não tem filtro "id in [...]").
+      // tipo/status vão ao servidor em `filtros`; o resto da regra é a de antes.
+      const todos = funcaoPorEstudo.size === 0 ? [] : await req.dados!.varrerTudo('estudos', { filtros });
       estudos = [];
-      for (const [estudoId, funcao] of funcaoPorEstudo) {
-        const est = await req.dados!.buscar('estudos', estudoId);
-        if (!est) continue; // removido ou inexistente
+      for (const est of todos as any[]) {
+        const funcao = funcaoPorEstudo.get(Number(est.id));
+        if (!funcao) continue;
         // Leitor não vê estudos em Rascunho ou Arquivado.
         if (funcao === 'leitor' && (est.status === 'rascunho' || est.status === 'arquivado')) continue;
-        if (tipo_empreendimento && est.tipo_empreendimento !== tipo_empreendimento) continue;
-        if (status && est.status !== status) continue;
         estudos.push({ ...est, _funcao: funcao });
       }
       estudos.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)));
