@@ -40,7 +40,13 @@ class DadosFake {
     const t = this.tabelas.get(tabela)!; const a = { ...t.get(Number(id)), ...patch }; t.set(Number(id), a); return a;
   }
   async atualizarVarios(tabela: string, seletor: { filtros?: Record<string, any> }, patch: Record<string, any>) {
-    const alvos = await this.varrerTudo(tabela, { filtros: seletor.filtros });
+    // Estrito como o real: seletor vazio ou filtro com valor vazio/`null` lança.
+    const filtros = seletor.filtros ?? {};
+    if (Object.keys(filtros).length === 0) throw new Error('DadosFake: seletor vazio');
+    for (const [k, v] of Object.entries(filtros)) {
+      if (v === null || v === undefined || v === '') throw new Error(`DadosFake: filtro ${k} não vira condição`);
+    }
+    const alvos = await this.varrerTudo(tabela, { filtros });
     for (const l of alvos) await this.atualizar(tabela, Number(l.id), patch);
     return alvos.length;
   }
