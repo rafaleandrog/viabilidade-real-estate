@@ -1,7 +1,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtR$Kpi, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { calcularVariacao } from './cenario-variacao.js';
+import { calcularVariacao, exposicaoSemBase, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
 import { type FundingNoFluxo } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
@@ -324,7 +324,9 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
              suporia que já é pós-financiamento. -->
         <div class="rotulo">Exposição máxima (fluxo livre)</div>
         <div class="valor">${fmtR$Kpi(expMag)}</div>
-        ${varKpi(expMag, expBaseMag, false)}
+        ${base && exposicaoSemBase(base.exposicaoMaxima)
+          ? html`<span class="kpi-var" title="O cenário real não tem exposição: não há base para a variação">${TEXTO_VARIACAO_SEM_BASE}</span>`
+          : varKpi(expMag, expBaseMag, false)}
         <div class="kpi-info">${fmtPct(pctExp)} do VGV${mesTxt(c.mesExposicaoMaxima)}</div>
       </div>
       <div class="kpi-card">

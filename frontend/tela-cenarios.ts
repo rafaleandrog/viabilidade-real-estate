@@ -13,7 +13,7 @@ import { marcos, comparacaoCenario, emMilhoes, dominioYEstatico, ESCALA_MILHOES 
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
-import { calcularVariacao } from './cenario-variacao.js';
+import { calcularVariacao, exposicaoSemBase, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   type FundingCalc, type OperacaoFunding,
@@ -192,6 +192,7 @@ export class ViabTelaCenarios extends LitElement {
        separada do valor — cabeçalho vazio (rótulo só em aria-label). */
     table.cen th.cen-var, table.cen td.cen-var { width: 68px; padding-left: 2px; }
     table.cen td urbi-badge { vertical-align: middle; }
+    table.cen td .cen-nd { color: var(--cor-texto-sec); font-size: 0.8rem; }
     .cen-wrap { overflow-x: auto; }
   `];
 
@@ -668,7 +669,9 @@ export class ViabTelaCenarios extends LitElement {
         <td class="cen-var">${this._badgeVar(calc.tir, base.tir, true)}</td>
         <td>${calc.paybackData ?? '—'}</td>
         <td class=${calc.exposicaoMaxima < 0 ? 'neg' : ''}>${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
-        <td class="cen-var">${this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
+        <td class="cen-var">${exposicaoSemBase(base.exposicaoMaxima)
+          ? html`<span class="cen-nd" title="O cenário real não tem exposição: não há base para a variação">${TEXTO_VARIACAO_SEM_BASE}</span>`
+          : this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
         <td>
           ${this.editavel ? html`
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
