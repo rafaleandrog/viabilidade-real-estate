@@ -94,11 +94,13 @@ seu sim" a caixa "aprovar a recomendação da #N". Caixa marcada: o item vira `p
 recomendada. Se o dono responder outra saída na issue, vale a dele. Sem resposta, o item espera,
 dentro de `max_esperando_dono`, e o excedente vai para "Adiado".
 
-**Issue com o código já entregue** (o `PROGRESSO.md` ou um PR mergeado mostra a entrega): vai para
-a seção **"Para você testar e fechar"** do painel, **sem caixa** — "testar na homologação e fechar
-#N", com o roteiro do teste, ou "fechar #N", com a evidência. Ela nunca entra na fila nem em
-"Esperando o seu sim", e sai do painel quando o dono fecha a issue. A rotina não fecha issue do
-dono sozinha.
+**Issue com o código já entregue** (o `PROGRESSO.md`, um commit ou um PR mergeado mostra a entrega
+e o código da branch principal confirma cada critério): **feche-a na hora**, com um comentário que
+cita o PR ou commit e a evidência — regra fixa do dono, 2026-11-22: issue resolvida não fica aberta,
+qualquer que tenha sido o caminho (no app de viabilidade, `CLAUDE.md` § Fechamento de issue). A
+única exceção é a issue cujo critério de aceite é um teste na instância: ela vai para a seção
+**"Para você testar e fechar"** do painel, **sem caixa**, com o roteiro do teste, e sai do painel
+quando o dono a fecha. Entrega parcial não fecha: comente o que falta.
 
 **Item é sempre uma issue.** Entrada que ainda não é issue — um comentário `Observação:`, um caso
 do Sentinela — e foi aceita dentro do limite vira issue nesta etapa (a exceção é a linha do
