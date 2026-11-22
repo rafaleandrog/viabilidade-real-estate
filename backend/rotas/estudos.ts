@@ -463,15 +463,18 @@ export function montarCopiasFilhas(
 //   · `avancado_linhas_receita` e `avancado_capital_instrumentos` — tabelas de
 //     modelos APAGADOS (nenhum `req.dados` no repositório as toca). Copiá-las
 //     seria propagar dado morto.
-export const FILHAS_SIMPLES: { tabela: string; campos: string[]; porPagina: number }[] = [
+// #838 — sem limite de página: a cópia lê cada filha com `varrerTudo`, como a
+// #634 fez nas tabelas do Avançado. Um `por_pagina` fixo truncava em silêncio
+// (o catálogo acima de 500 produtos saía com VGV diferente do original).
+export const FILHAS_SIMPLES: { tabela: string; campos: string[] }[] = [
   // O catálogo de Produtos é a ÚNICA fonte de VGV desde a #563: sem ele a
   // cópia nasce em ESTADO VAZIO carregando todas as premissas do original —
   // o P1 que abriu esta issue.
-  { tabela: 'preliminar_produtos', campos: CAMPOS_PRODUTO, porPagina: 500 },
+  { tabela: 'preliminar_produtos', campos: CAMPOS_PRODUTO },
   // Análise de mercado e apelo comercial: uma linha por estudo, toda ela dado
   // do estudo (premissas de mercado coletadas e os scores/laudo).
   {
-    tabela: 'analise_mercado', porPagina: 5,
+    tabela: 'analise_mercado',
     campos: [
       'abrangencia', 'localidade', 'preco_medio_m2', 'custo_obra_m2', 'vso_pct',
       'ipca_pct', 'selic_pct', 'incc_pct', 'focus_ipca_pct', 'focus_selic_pct',
@@ -479,7 +482,7 @@ export const FILHAS_SIMPLES: { tabela: string; campos: string[]; porPagina: numb
     ],
   },
   {
-    tabela: 'apelo_comercial', porPagina: 5,
+    tabela: 'apelo_comercial',
     campos: [
       'resultado', 'score_localizacao', 'score_infraestrutura', 'score_vetor_crescimento',
       'score_concorrencia', 'score_demanda', 'score_seguranca_juridica', 'score_geral',
@@ -871,8 +874,10 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
     // editor — inacessível). Compensa-se removendo o estudo recém-criado.
     try {
       // Copiar imóveis vinculados.
-      const imoveis = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
-      for (const im of imoveis.dados) {
+      // #838 — `varrerTudo`: com `por_pagina: 100` um estudo com mais de 100
+      // imóveis vinculados perdia, em silêncio, tudo além da página 1.
+      const imoveis = await req.dados!.varrerTudo('estudo_imoveis', { filtros: { estudo_id: estudoId } });
+      for (const im of imoveis as any[]) {
         await req.dados!.criar('estudo_imoveis', coagirNumericosOuLancar('estudo_imoveis', omitirValoresNulos({
           estudo_id: novo.id,
           imovel_nucleo_id: im.imovel_nucleo_id,
@@ -892,11 +897,9 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // esse, e não o `null`, o defeito que a #714 tentou resolver.
       // `omitirValoresNulos` segue aplicado pelo motivo revisado em
       // `./duplicar-utils.ts` — não por causa daquele erro.
-      for (const { tabela, campos, porPagina } of FILHAS_SIMPLES) {
-        const linhas = await req.dados!.listar(tabela, {
-          filtros: { estudo_id: estudoId }, por_pagina: porPagina,
-        });
-        for (const copiaFilha of montarCopiasFilhas(linhas.dados, Number(novo.id), campos)) {
+      for (const { tabela, campos } of FILHAS_SIMPLES) {
+        const linhas = await req.dados!.varrerTudo(tabela, { filtros: { estudo_id: estudoId } });
+        for (const copiaFilha of montarCopiasFilhas(linhas as any[], Number(novo.id), campos)) {
           await req.dados!.criar(tabela, coagirNumericosOuLancar(tabela, omitirValoresNulos(copiaFilha)));
         }
       }

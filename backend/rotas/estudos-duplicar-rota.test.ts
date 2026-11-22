@@ -539,3 +539,38 @@ test('fiação: duplicar copia FILHAS cujos decimais vêm do banco como string',
     assert.equal(cens.dados[0].custo_obra_pct, 5, 'cenário: decimal não coagido');
   });
 });
+
+// #838 — mesma classe da #634, nas leituras do próprio `duplicar`: o laço de
+// `estudo_imoveis` lia com `por_pagina: 100`, e `FILHAS_SIMPLES` lia o catálogo
+// de Produtos com `por_pagina: 500`. Acima disso o clone saía incompleto, com
+// VGV diferente do original, e a rota respondia 201. Mutação que este teste
+// derruba: voltar qualquer das duas leituras para `listar` com página fixa.
+test('#838 fiação: duplicar copia TODOS os 101 imóveis e os 501 produtos, não só a primeira página', async () => {
+  const dados = new DadosFake();
+  const origId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    nome: 'Preliminar grande', uf: 'DF', status: 'rascunho', sequencia: 1,
+  });
+  for (let i = 0; i < 101; i++) {
+    dados.semear('estudo_imoveis', { estudo_id: origId, imovel_nucleo_id: 5000 + i, tipo_imovel: 'lote' });
+  }
+  for (let i = 0; i < 501; i++) {
+    dados.semear('preliminar_produtos', {
+      estudo_id: origId, nome: `Produto ${i + 1}`, tipo: 'residencial',
+      area_media_m2: 50, unidades: 1, preco_m2: 10000, ordem: i,
+    });
+  }
+
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/${origId}/duplicar`, { method: 'POST' });
+    const corpo = await res.json();
+    assert.equal(res.status, 201, `esperado 201, veio ${res.status}: ${JSON.stringify(corpo)}`);
+    const novoId = Number(corpo.id);
+
+    const imoveis = await dados.listar('estudo_imoveis', { filtros: { estudo_id: novoId }, por_pagina: 10000 });
+    assert.equal(imoveis.total, 101, 'a cópia perdeu imóveis além da página 1 (100)');
+    const produtos = await dados.listar('preliminar_produtos', { filtros: { estudo_id: novoId }, por_pagina: 10000 });
+    assert.equal(produtos.total, 501, 'a cópia perdeu produtos além da página 1 (500)');
+    assert.ok(produtos.dados.some((p: any) => p.nome === 'Produto 501'), 'o 501º produto não foi copiado');
+  });
+});
