@@ -149,10 +149,14 @@ test('#749 a isenção da CARTEIRA_RESSURGE é só do concentrado: a checagem co
   // a carência que capitaliza —, que era justamente o falso positivo da #808.
   // Resolvida a #808, a carência não acusa mais (teste abaixo), e o motor não
   // produz outro saldo crescente para esses tipos (busca exaustiva por
-  // defasagem, taxa, prazo, sinal e juros no mês: nenhum). A prova de que a
-  // checagem continua ligada passou para `inicioAmortizacao` (o início por
-  // tipo, finito para os que amortizam) e `indiceRessurgimento` (o detector,
-  // sobre saldos sintéticos), nos testes "#808" a seguir.
+  // defasagem, taxa, prazo, sinal e juros no mês: nenhum) — para eles a
+  // checagem é DEFENSIVA, como já registra `fluxo-invariantes.test.ts`. O que
+  // os testes "#808" a seguir provam são as duas pontas: o início por tipo
+  // (`inicioAmortizacao`, finito para os que amortizam) e o detector sobre
+  // saldos sintéticos (`indiceRessurgimento`). A LIGAÇÃO das duas dentro de
+  // `validarComponentesSafra` não tem prova de ponta a ponta com crescimento
+  // real, porque o motor não o produz; a carência acusar sem o início (a
+  // regressão da #808) fica vermelha no teste "#808 carência…".
   for (const c of [
     { tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4, defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false },
     { tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 20, defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false },
