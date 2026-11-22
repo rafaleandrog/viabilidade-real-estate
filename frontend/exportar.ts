@@ -15,7 +15,7 @@ import { rotuloPermutaFisica, rotuloPermutaFinanceira } from './rotulos-permuta.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo, escaparHtml } from './viab-format.js'; import { celulaTextoCsv } from './csv-escape.js';
-import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
+import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js'; import { TIPO_LABEL, STATUS_LABEL } from './viab-shared.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 function baixar(nome: string, conteudo: string, mime: string) {
@@ -219,7 +219,7 @@ export function csvProforma(estudo: any, p: Proforma, lot: boolean): string {
   const linhas = linhasProforma(p, lot);
   const rows: string[] = [];
   rows.push('Estudo;' + celulaTextoCsv(estudo.nome_exibicao || estudo.nome));
-  rows.push('Tipo;' + celulaTextoCsv(estudo.tipo_empreendimento));
+  rows.push('Tipo;' + celulaTextoCsv(rotuloTipo(estudo.tipo_empreendimento)));
   rows.push('');
   rows.push('Linha;R$;% VGV');
   for (const r of linhas) {
@@ -354,7 +354,7 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean, temaCss = '
     @media print { button { display: none; } }
   </style></head><body>
     <h1>${escaparHtml(estudo.nome_exibicao || estudo.nome)}</h1>
-    <div class="sub-h">${escaparHtml(estudo.tipo_empreendimento)} · ${escaparHtml(estudo.status)} · Estudo de Viabilidade — UrbiVerso</div>
+    <div class="sub-h">${escaparHtml(rotuloTipo(estudo.tipo_empreendimento))} · ${escaparHtml(rotuloStatus(estudo.status))} · Estudo de Viabilidade — UrbiVerso</div>
     <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${escaparHtml(r)}</div><div class="v">${escaparHtml(v)}</div></div>`).join('')}</div>
     <table><thead><tr><td>Linha</td><td class="v">R$</td><td class="v">% VGV</td></tr></thead>
     <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${escaparHtml(fmtPctOuIndef(p.margemLiquidaPct))}</td><td class="v"></td></tr></tbody></table>
@@ -704,7 +704,7 @@ export function htmlFluxo(
   ];
   const cab = `
     <h1>${escaparHtml(estudo.nome_exibicao || estudo.nome)}</h1>
-    <div class="sub-h">Fluxo de Caixa (Avançado) · ${escaparHtml(estudo.tipo_empreendimento)} · Estudo de Viabilidade — UrbiVerso</div>
+    <div class="sub-h">Fluxo de Caixa (Avançado) · ${escaparHtml(rotuloTipo(estudo.tipo_empreendimento))} · Estudo de Viabilidade — UrbiVerso</div>
     <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${escaparHtml(r)}</div><div class="v">${escaparHtml(v)}</div></div>`).join('')}</div>`;
 
   const fmtCel = (v: number, custo: boolean) => celulaFx(v, { custo }, true);
@@ -824,4 +824,18 @@ export function exportarFluxoPDF(
   w.document.close();
   setTimeout(() => w.print(), 400);
   return true;
+}
+
+/**
+ * #905: tipo de empreendimento e status saem com os rótulos da tela (os mesmos
+ * mapas de `viab-shared.ts` que o Painel usa), não com o valor cru do banco.
+ * Valor fora do mapa cai no valor cru, que continua escapado por quem chama.
+ */
+export function rotuloTipo(v: unknown): string {
+  const s = v == null ? '' : String(v);
+  return TIPO_LABEL[s] ?? s;
+}
+export function rotuloStatus(v: unknown): string {
+  const s = v == null ? '' : String(v);
+  return STATUS_LABEL[s] ?? s;
 }

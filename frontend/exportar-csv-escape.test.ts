@@ -60,7 +60,7 @@ test('csvProforma: nome de estudo malicioso vira UMA célula, e rótulos fixos d
   const estudo = { nome: '=SOMA(1;2)', tipo_empreendimento: 'incorporacao' };
   const linhas = csvProforma(estudo, p, false).split('\n');
   assert.equal(linhas[0], `Estudo;"'=SOMA(1;2)"`);
-  assert.equal(linhas[1], 'Tipo;incorporacao');
+  assert.equal(linhas[1], 'Tipo;Incorporação');
   assert.ok(linhas.some((l) => l.startsWith("'= Resultado;")), 'rótulo de total sem apóstrofo');
   assert.ok(!linhas.some((l) => l.startsWith('= ')), 'sobrou rótulo iniciado por `=` sem proteção');
   assert.ok(linhas.some((l) => l.startsWith('Receita bruta (VGV);')));
