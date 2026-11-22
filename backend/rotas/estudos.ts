@@ -1042,7 +1042,8 @@ export function ordenarEstudosRecentes<T extends { id?: unknown; criado_em?: unk
 // Loteamento só edita a permuta residencial. Um rascunho que já foi
 // Incorporação pode carregar permuta financeira não residencial que o
 // Loteamento não tem campo para editar nem remover — ao trocar para Loteamento
-// ela é zerada no MESMO `atualizar` do estudo (o motor já a ignora lá).
+// ela é zerada pelo patch do estudo (o motor já a ignora lá); na troca do
+// Preliminar, depois da conversão dos produtos (ver `separarLimpezaAdiada`).
 export const CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL = [
   'permuta_financeira_nao_residencial_pct',
   'permuta_financeira_nao_residencial_modo',
