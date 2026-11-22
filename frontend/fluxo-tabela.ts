@@ -282,7 +282,9 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   const expMag = Math.abs(c.exposicaoMaxima);
   const expBaseMag = base ? Math.abs(base.exposicaoMaxima) : undefined;
   const expVariacao = expBaseMag !== undefined ? calcularVariacao(expMag, expBaseMag, false) : null;
-  const expVariante = expVariacao ? (expVariacao.melhor ? 'sucesso' : 'erro') : 'erro';
+  // Sem base de comparação, só pinta de erro quando HÁ exposição: com o piso em
+  // zero do motor, projeto sempre positivo mostra R$ 0, que não é alerta.
+  const expVariante = expVariacao ? (expVariacao.melhor ? 'sucesso' : 'erro') : (c.exposicaoMaxima < 0 ? 'erro' : '');
   // #456: os três indicadores de decisão que a EVI trata como KPI de primeira
   // classe e que o app só publicava na exportação — juros de clientes,
   // carteira máxima e o mês/%VGV da exposição. Nada editável, tudo derivado
