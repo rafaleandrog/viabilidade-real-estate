@@ -766,7 +766,7 @@ for (const campo of ['duracao_meses', 'inicio_mes'] as const) {
     await comServidor(criarApp(dados), async (base) => {
       const r = await patchCusto(base, cid, { [campo]: 3 });
       assert.equal(r.status, 422, JSON.stringify(r.corpo));
-      assert.equal(r.corpo.codigo ?? r.corpo.erro?.codigo ?? r.corpo.code, 'CAMPO_TRAVADO', JSON.stringify(r.corpo));
+      assert.equal(r.corpo.codigo, 'CAMPO_TRAVADO', JSON.stringify(r.corpo));
       const linha = await dados.buscar('avancado_linhas_custo', cid);
       assert.equal(linha.inicio_mes, 6);
       assert.equal(linha.duracao_meses, 12);
@@ -793,5 +793,18 @@ test('#938 linha ancorada a fase: PATCH de outro campo continua aceito', async (
     const r = await patchCusto(base, cid, { orcamento_valor: 1000 });
     assert.equal(r.status, 200, JSON.stringify(r.corpo));
     assert.equal((await dados.buscar('avancado_linhas_custo', cid)).orcamento_valor, 1000);
+  });
+});
+
+test('#938 linha ancorada a fase: soltar a âncora (fase_ancora_id: null) libera a edição de início e duração', async () => {
+  const dados = new DadosFake();
+  const { cid } = semearFaseAncorada(dados);
+  await comServidor(criarApp(dados), async (base) => {
+    const r = await patchCusto(base, cid, { fase_ancora_id: null, inicio_mes: 2, duracao_meses: 5 });
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    const linha = await dados.buscar('avancado_linhas_custo', cid);
+    assert.equal(linha.fase_ancora_id, null);
+    assert.equal(linha.inicio_mes, 2);
+    assert.equal(linha.duracao_meses, 5);
   });
 });
