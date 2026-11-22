@@ -3250,8 +3250,9 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 
 ### Armadilhas mapeadas pela lista de bugs (2026-08-01)
 
-> Diferente das A1–A8 acima, **estas ainda NÃO estão resolvidas** — cada uma tem issue aberta. Elas
-> ficam aqui porque são o tipo de erro que se reintroduz sozinho.
+> Diferente das A1–A8 acima, estas nasceram **não resolvidas**, cada uma com issue aberta. Elas
+> ficam aqui porque são o tipo de erro que se reintroduz sozinho. A que já foi resolvida diz isso na
+> própria nota (✅ **Resolvida**) e continua no lugar pela história — hoje, a A9.
 
 **A9 — Início e Duração não são campos simétricos em Custos.** ✅ **Resolvida** (#249, validada
 por #255) — a nota fica pela história, e deixou de ser armadilha aberta. Hoje as duas grandezas
