@@ -24,7 +24,7 @@ class DadosFake {
   async buscar(tabela: string, id: number) { return this.tabelas.get(tabela)?.get(Number(id)) ?? null; }
   async listar(tabela: string, opts: { filtros?: Record<string, any>; pagina?: number; por_pagina?: number } = {}) {
     const todas = [...(this.tabelas.get(tabela)?.values() ?? [])];
-    const linhas = todas.filter((l) => Object.entries(opts.filtros ?? {}).every(([k, v]) => l[k] === v));
+    const linhas = todas.filter((l) => Object.entries(opts.filtros ?? {}).every(([k, v]) => (Array.isArray(v) ? v.includes(l[k]) : l[k] === v)));
     const pp = opts.por_pagina ?? 20; const ini = ((opts.pagina ?? 1) - 1) * pp;
     return { dados: linhas.slice(ini, ini + pp), total: linhas.length };
   }

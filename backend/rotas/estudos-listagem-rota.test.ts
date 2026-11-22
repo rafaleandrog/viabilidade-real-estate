@@ -143,8 +143,8 @@ for (const nivel of ['admin', 'escrita'] as const) {
       if (nivel === 'admin') assert.ok(r.dados.every((e) => e._funcao === 'aprovador'));
       else {
         assert.ok(r.dados.every((e) => e.id !== N + 1), 'membro viu estudo alheio');
-        // O membro lê a tabela filtrada por tipo/status (aqui, sem filtro: todos os estudos).
-        assert.equal(d.lidas.get('estudos'), N + 1);
+        // O membro lê do banco SÓ os estudos dele (filtro `id` em array = IN), não o alheio.
+        assert.equal(d.lidas.get('estudos'), N);
       }
     });
   });

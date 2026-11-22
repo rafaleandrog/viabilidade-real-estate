@@ -629,11 +629,11 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
         const efetiva = funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp);
         if (efetiva) funcaoPorEstudo.set(Number(m.estudo_id), efetiva);
       }
-      // #909 — UMA varredura de `estudos` (tipo/status vão ao servidor em
-      // `filtros`), com a seleção pelos ids do membro em memória, sem `buscar`
-      // por estudo. O SDK aceita filtro em array (`id: [...]` vira `IN`); reduzir
-      // a leitura aos estudos do membro com ele é melhoria registrada à parte.
-      const todos = funcaoPorEstudo.size === 0 ? [] : await req.dados!.varrerTudo('estudos', { filtros });
+      // #909/#937 — UMA varredura de `estudos`, só dos estudos do membro: valor em
+      // array vira `IN` no SDK (`docs/banco-de-dados.md` § filtro-in), e tipo/status
+      // vão junto. Ids não finitos saem antes (o SDK converte tudo em string).
+      const ids = [...funcaoPorEstudo.keys()].filter((id) => Number.isFinite(id));
+      const todos = ids.length === 0 ? [] : await req.dados!.varrerTudo('estudos', { filtros: { ...filtros, id: ids } });
       estudos = [];
       for (const est of todos as any[]) {
         const funcao = funcaoPorEstudo.get(Number(est.id));
