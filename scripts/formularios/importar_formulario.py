@@ -72,7 +72,6 @@ EVENTOS = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra']
 CONHECIDOS = [
     (re.compile(r'VGV Σ (tipologias|alocações)'), '#835 (conferir-estudo ignora área aberta)'),
     (re.compile(r'Σ legado entrada\+parcelas'), '#827 (repasse derivado)'),
-    (re.compile(r'CAMADAS_DIVERGEM_PERMUTA_FISICA'), '#832 (camada Premissas inexistente no Avançado)'),
     (re.compile(r'RECEITA_BRUTA_NAO_CONSERVA'), '#824 (resíduo de centavos)'),
     (re.compile(r'pós-chaves .*GRAVADO vs DERIVADO'), '#840 (default de absorção)'),
 ]
