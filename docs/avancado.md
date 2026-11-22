@@ -132,6 +132,8 @@ presente dessas parcelas à taxa de desconto. As regras de cada tipo estão em [
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
 | **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
 
+**Exposição máxima e payback.** A **exposição máxima** é o pior ponto do fluxo acumulado livre, com piso em zero: um projeto cujo acumulado fica sempre em zero ou acima mostra **0**, e o mês da exposição não aparece. O **payback** é o primeiro mês em que o acumulado volta a ser maior ou igual a zero depois de ter ficado negativo; sem trecho negativo, ou se o acumulado nunca se recupera, o app mostra **—**. As duas grandezas leem a mesma série, a do Fluxo de Caixa Acumulado livre.
+
 A **carteira de clientes** é o saldo a receber das vendas já contratadas, somado safra a safra
 (cada mês de venda decai isolado, com a sua taxa e o seu principal): ela sobe com as parcelas da
 tabela e o saldo a repassar e zera no último vencimento de cada safra; o pico é a **carteira

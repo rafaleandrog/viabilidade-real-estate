@@ -222,7 +222,7 @@ export class ViabTelaResumo extends LitElement {
         <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
         <!-- #353: exibida como magnitude (módulo) — sem cenário base para
              comparar aqui, a variante fica fixa em "erro" (é sempre risco). -->
-        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$Kpi(Math.abs(c.exposicaoMaxima))} variante="erro"></urbi-kpi>
+        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$Kpi(Math.abs(c.exposicaoMaxima))} variante=${c.exposicaoMaxima < 0 ? "erro" : ""}></urbi-kpi>
         <urbi-kpi rotulo="VGV potencial" .valor=${fmtR$Kpi(k.vgv)}></urbi-kpi>
         <urbi-kpi rotulo="Resultado" .valor=${fmtR$Kpi(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="Margem de caixa" .valor=${fmtPctOuIndef(k.margemLiquidaPct)}
