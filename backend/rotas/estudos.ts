@@ -334,7 +334,7 @@ export function montarPatchEstudo(
   if ('falha' in coagido) {
     return { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: coagido.falha.mensagem };
   }
-  return { dados: coagido.dados };
+  return { dados: { ...coagido.dados, ...limpezaAoTrocarTipo(estudo?.tipo_empreendimento, coagido.dados.tipo_empreendimento) } };
 }
 
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
@@ -780,7 +780,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
           try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
           catch (e2) { console.error('Falha ao desfazer a conversão do produto', c.id, e2); }
         }
-        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem });
+        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem }); await req.dados!.atualizar('estudos', estudoId, coagirNumericosOuLancar('estudos', permutaNaoResidencialDe(estudo)));
         throw e;
       }
     }
@@ -1036,4 +1036,33 @@ export function ordenarEstudosRecentes<T extends { id?: unknown; criado_em?: unk
     if (ta !== tb) return tb > ta ? 1 : -1;
     return Number(b.id) - Number(a.id);
   });
+}
+
+// A semântica residencial/não residencial das permutas é da Incorporação; o
+// Loteamento só edita a permuta residencial. Um rascunho que já foi
+// Incorporação pode carregar permuta financeira não residencial que o
+// Loteamento não tem campo para editar nem remover — ao trocar para Loteamento
+// ela é zerada no MESMO `atualizar` do estudo (o motor já a ignora lá).
+export const CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL = [
+  'permuta_financeira_nao_residencial_pct',
+  'permuta_financeira_nao_residencial_modo',
+  'permuta_financeira_nao_residencial_valor',
+  'permuta_financeira_nao_residencial_valor_canonico',
+] as const;
+
+export function limpezaAoTrocarTipo(tipoOrigem: unknown, tipoDestino: unknown): Record<string, unknown> {
+  if (tipoDestino !== 'loteamento' || tipoOrigem !== 'incorporacao') return {};
+  return {
+    permuta_financeira_nao_residencial_pct: 0,
+    permuta_financeira_nao_residencial_modo: 'pct_vgv',
+    permuta_financeira_nao_residencial_valor: null,
+    permuta_financeira_nao_residencial_valor_canonico: null,
+  };
+}
+
+// Valores lidos antes da troca, para restaurar se a conversão de produtos falhar.
+export function permutaNaoResidencialDe(estudo: Record<string, any>): Record<string, unknown> {
+  const r: Record<string, unknown> = {};
+  for (const c of CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL) r[c] = estudo?.[c] ?? null;
+  return r;
 }
