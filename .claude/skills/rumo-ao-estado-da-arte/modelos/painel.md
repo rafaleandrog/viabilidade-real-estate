@@ -26,7 +26,8 @@ PR pronto e parado cuja caixa você marcou. O merge é seu.
 
 ## Planos grandes
 Cada um você inicia pela `orquestrar`, ou, onde ela não existe, numa sessão sua a partir do plano escrito na issue.
-- #<n> <título>
+No modo de duas tarefas, marcar a caixa aprova o plano: o Construtor seguinte cria a sessão dedicada do item.
+- [ ] #<n> <título>
 
 ## Adiado para a próxima triagem
 Entradas que passaram do limite do dia. A próxima triagem as lê antes das novas.

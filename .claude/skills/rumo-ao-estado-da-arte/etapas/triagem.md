@@ -11,6 +11,8 @@ Antes de reescrever o painel, leia nele:
   do dono. **Exceção: item que já tem PR pronto e parado.** A caixa não o devolve à fila (não há o
   que implementar de novo) nem autoriza a rotina a mergear: ele passa para "Aprovados, aguardando o
   seu merge", com o link do PR, e o merge é do dono.
+- **Caixa marcada em "Planos grandes"** (modo de duas tarefas): o plano está aprovado; ponha na
+  issue o rótulo `sessao-dedicada`, para o Construtor criar a sessão dedicada do item.
 - **Caixa "Soltar a release proposta" marcada:** registre no bloco Release "aprovada pelo dono,
   a disparar"; a EXECUCAO seguinte dispara (`etapas/execucao.md` § 6).
 - **Comentários e recusas:** item recusado ganha `recusada` e sai da fila; se já tinha PR aberto

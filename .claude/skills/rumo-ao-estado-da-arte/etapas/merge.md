@@ -16,7 +16,10 @@ entra na lista "Aprovados, aguardando o seu merge".
    Não mudou? Mesmo assim o head é novo, e a atestação vale **só para o head em que foi
    publicada** (no app de viabilidade, o `revisao-registrada.yml` invalida a cada push): publique
    uma reatestação no head atual, dizendo que a sincronização não mudou o diff do PR e citando a
-   revisão anterior. Sem atestação no head atual, não há merge.
+   revisão anterior. No app de viabilidade ela começa pela linha de máquina, com os 8 caracteres de
+   `git rev-parse HEAD`: `<!-- revisao-viabilidade rodada=<N+1> head=<sha8> motor=<o da revisão
+   anterior> bloqueantes=0 contratos=<o da revisão anterior> -->`; sem essa linha exata o status
+   não muda. Sem atestação no head atual, não há merge.
 3. Espere o CI do head atual, que tem de ser **posterior** ao último commit da branch principal, e
    confira a revisão sem bloqueante no head atual (no app de viabilidade, `revisao/bloqueantes`).
 4. Pode mergear se a exceção de merge do processo do repositório libera esta tarefa agendada para
