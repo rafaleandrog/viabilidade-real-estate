@@ -243,7 +243,7 @@ Nos Custos do Avançado, cada unidade percentual aplica o % sobre uma base próp
 | Unidade | Base |
 |---|---|
 | % VGV | VGV de tabela, somado das linhas de receita |
-| % Receita | receita líquida do RET sobre o VGV vendável, sem juros |
+| % Receita | receita líquida do imposto (RET ou imposto padrão do estudo) sobre o VGV vendável, sem juros |
 | % Obra | o grupo Obras inteiro (construção, outorga, decoração, gestão da obra, contingência e outros), menos as linhas em % Obra |
 | % Recebido | receita **recebida**: a soma do recebimento bruto do fluxo, com os juros de tabela — a mesma Receita Bruta da Proforma |
 | % Construção | custo de construção: as linhas de Construção, Decoração e Gestão da obra, em qualquer grupo (a gestão já resolvida sobre o grupo Obras), sem Outorga, Contingência ou Outro |

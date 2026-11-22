@@ -40,6 +40,7 @@ import {
 import { proformaAvancado } from '../frontend/proforma-avancado.js';
 import {
   mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado, ePermutaFisica,
+  impostoDoEstudoAvancado,
   type EventoCrono,
 } from '../frontend/fluxo-shared.js';
 import {
@@ -131,9 +132,7 @@ export async function conferir(id: number): Promise<Conferencia> {
     crono: (crono?.erro || crono?._http ? [] : (crono.dados || [])) as EventoCrono[],
     dataInicio: params?.erro || params?._http ? null : (params.data_inicio_projeto ?? null),
     taxa: params?.erro || params?._http ? 12 : Number(params.taxa_desconto_aa ?? 12),
-    ret: params?.erro || params?._http
-      ? { ativo: false, pct: 4 }
-      : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+    ret: impostoDoEstudoAvancado(params),
   };
   const ops: OperacaoFunding[] = (operacoes?.erro || operacoes?._http ? [] : (operacoes.dados || []));
   out.brutos = { ...d, operacoes: ops, params };
