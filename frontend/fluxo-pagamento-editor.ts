@@ -11,6 +11,12 @@ const lista = (v: any): any[] => Array.isArray(v)
   : (v && typeof v === 'object' ? [{ ...v }] : []);
 
 export interface FormularioPagamento {
+  /**
+   * O espelho legado deste formulário não descreve os `componentes` gravados
+   * (plano escrito por API). Nunca é persistido: o formulário o carrega só
+   * para a tela tratar o plano como somente canônico.
+   */
+  espelhoDivergente?: true;
   comissao: { ativo: boolean; tipo: string; pct: number };
   // #452: o sub-objeto de RET por linha SAIU do tipo e da leitura. A #346
   // tornou a RET global do estudo (`considerar_ret`/`ret_pct`, fora da linha),
@@ -148,7 +154,7 @@ function carteirasIrrepresentaveis(componentes: ComponentePagamento[] | null): b
  */
 export function planoSoCanonico(form: FormularioPagamento): boolean {
   return Array.isArray(form.componentes) && form.componentes.length > 0
-    && form.entrada.length === 0 && form.parcelas.length === 0;
+    && ((form.entrada.length === 0 && form.parcelas.length === 0) || form.espelhoDivergente === true);
 }
 
 export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
@@ -387,12 +393,11 @@ export function componentesParaSalvar(
   };
 
   // Guarda: sem espelho legado nenhum, não há edição a interpretar.
-  if (form.entrada.length === 0 && form.parcelas.length === 0) {
+  if (planoSoCanonico(form)) {
     return persistidos.map(comTaxaDoEstudo);
   }
 
-  const mesmaEstrutura = regenerados.length === persistidos.length
-    && regenerados.every((r, i) => projecaoDoEspelho(r) === projecaoDoEspelho(persistidos[i]));
+  const mesmaEstrutura = estruturaConfere(regenerados, persistidos);
   // #428: `projecaoDoEspelho` NÃO inclui `taxaMensal` de propósito — ela é o
   // pareamento por identidade, e parear por taxa faria uma troca de juros
   // desalinhar componente com componente.
@@ -475,7 +480,7 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
   if (!planoSoCanonico(form) && carteirasIrrepresentaveis(form.componentes)) {
     return 'O plano gravado nesta linha tem carteiras próprias com prazos ou carências diferentes, e este formulário representa uma só. Para salvar, monte o plano de novo com linhas de entrada e de parcelamento e uma carteira própria.';
   }
-  const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
+  const somaInformada = planoSoCanonico(form) ? 0 : [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
     return `Entrada e parcelamento somam ${somaInformada.toFixed(2)}%; o total não pode superar 100%.`;
   }
@@ -520,6 +525,7 @@ export function fluxoPagamentoParaSalvar(
   // para isso.
   const semChaveLegada: any = { ...form };
   delete semChaveLegada.juros_tabela_aa;
+  delete semChaveLegada.espelhoDivergente;
   return {
     ...semChaveLegada,
     entrada: form.entrada.map((e) => ({ ...e })),
@@ -656,4 +662,34 @@ export function jurosDeTabelaConfigurados(fluxoPagamento: any): JurosDeTabela[] 
     else porTaxa.set(chave, { anualPct, rotulos: [rotulo] });
   }
   return [...porTaxa.values()];
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Espelho que não descreve os componentes gravados
+// ─────────────────────────────────────────────────────────────────────────
+
+/** A regra única: o espelho regenerado tem a mesma estrutura do array gravado. */
+function estruturaConfere(regenerados: ComponentePagamento[], persistidos: ComponentePagamento[]): boolean {
+  return regenerados.length === persistidos.length
+    && regenerados.every((r, i) => projecaoDoEspelho(r) === projecaoDoEspelho(persistidos[i]));
+}
+
+/**
+ * `true` quando regenerar o plano pelo espelho (`entrada`/`parcelas`/`repasse`)
+ * devolve a mesma estrutura dos `componentes` gravados — ou quando não há o que
+ * comparar (sem `componentes`, ou plano só canônico). `false` é o plano escrito
+ * por API cujo espelho conta outra história: editar pelo espelho descartaria
+ * componentes.
+ */
+export function espelhoDescreveComponentes(fluxoPagamento: any, cronograma: EventoCrono[]): boolean {
+  const form = formularioPagamento(fluxoPagamento);
+  if (!Array.isArray(form.componentes) || form.componentes.length === 0) return true;
+  if (form.entrada.length === 0 && form.parcelas.length === 0) return true;
+  return estruturaConfere(componentesDoLegado(form, cronograma, 0), form.componentes);
+}
+
+/** O formulário do plano, marcado quando o espelho não descreve os componentes. */
+export function formularioPagamentoDoPlano(fluxoPagamento: any, cronograma: EventoCrono[]): FormularioPagamento {
+  const form = formularioPagamento(fluxoPagamento);
+  return espelhoDescreveComponentes(fluxoPagamento, cronograma) ? form : { ...form, espelhoDivergente: true };
 }

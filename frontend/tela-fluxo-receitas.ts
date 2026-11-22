@@ -13,7 +13,7 @@ import {
   pctRepasseDerivado, destinoSaldoChaves, parcelasAoLongoObra, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import {
-  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoDeNascimento, planoSoCanonico,
+  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamentoDoPlano, planoDeNascimento, planoSoCanonico,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -845,7 +845,7 @@ export class ViabFluxoReceitas extends LitElement {
   // ─────────────────────────────────────────────────────────────────
 
   private _abrirPagamento(f: any) {
-    this.pagForm = formularioPagamento(f.fluxo_pagamento);
+    this.pagForm = formularioPagamentoDoPlano(f.fluxo_pagamento, this.crono);
     this.modalErro = '';
     this.modalPag = f;
   }
@@ -927,7 +927,9 @@ export class ViabFluxoReceitas extends LitElement {
 
   private _renderModalPagamento(): TemplateResult {
     const f = this.pagForm;
-    const dis = !this.editavel;
+    // O plano foi gravado com componentes que o espelho (as linhas abaixo) não descreve:
+    // nada do espelho é editável, para o Aplicar não descartar componentes.
+    const dis = !this.editavel || f.espelhoDivergente === true;
     const repasse = pctRepasseDerivado(f);
     // #850: o destino do saldo de chaves só é editável quando há saldo e o
     // plano tem espelho (linhas de entrada/parcelamento) — num plano só
@@ -986,6 +988,11 @@ export class ViabFluxoReceitas extends LitElement {
                 <strong>sem juros</strong> — qualquer que seja a taxa do estudo. Clicar em
                 <strong>Aplicar</strong>, aqui embaixo, grava o plano no formato atual e poe a
                 taxa do estudo em vigor nesta linha.</p>` : nothing}
+            ${f.espelhoDivergente ? html`
+              <p class="sec espelho-divergente">⚠️ <strong>O plano desta linha foi gravado com
+                componentes que as linhas abaixo não descrevem.</strong> O cálculo usa os
+                componentes gravados, e por isso as linhas abaixo ficam só para leitura.
+                <strong>Aplicar</strong> mantém o plano como está.</p>` : nothing}
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
               <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma
@@ -1126,7 +1133,7 @@ export class ViabFluxoReceitas extends LitElement {
         <div class="modal-rodape">
           <span class="espaco"></span>
           <urbi-botao variante="secundario" @click=${() => this.modalPag = null}>Cancelar</urbi-botao>
-          ${!dis ? html`
+          ${this.editavel ? html`
             <urbi-botao variante="primario" ?desabilitado=${Boolean(erroPagamento)}
               ?carregando=${this.aplicando} @click=${this._aplicarPagamento}>Aplicar</urbi-botao>` : nothing}
         </div>
