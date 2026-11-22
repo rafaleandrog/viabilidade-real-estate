@@ -780,7 +780,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
           try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
           catch (e2) { console.error('Falha ao desfazer a conversão do produto', c.id, e2); }
         }
-        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem }); await req.dados!.atualizar('estudos', estudoId, coagirNumericosOuLancar('estudos', permutaNaoResidencialDe(estudo)));
+        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem }); try { await req.dados!.atualizar('estudos', estudoId, coagirNumericosOuLancar('estudos', permutaNaoResidencialDe(estudo))); } catch (e3) { console.error('Falha ao restaurar a permuta financeira não residencial do estudo', estudoId, e3); }
         throw e;
       }
     }
