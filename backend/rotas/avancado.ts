@@ -1250,8 +1250,10 @@ async function removerFase(req: Request, res: Response): Promise<void> {
       (a: any) => (Number(a.fase_id) === Number(fase.id) ? 0 : Number(a.unidades) || 0)))) return;
     // #940 (decisão do dono: soltar): as linhas de custo presas a esta fase
     // passam a `customizado` com o início e a duração que já tinham — o fluxo
-    // não muda de número na remoção. Sem isso a linha ficava com uma âncora
-    // morta: a tela seguia mostrando o cadeado, e a API aceitava editar. Soltas
+    // não muda de número na remoção. O schema declara `ao_deletar: "anular"`
+    // na âncora, mas isso só anula o id: o `cronograma_evento` e o resto ficam
+    // por conta da rota, e soltar aqui não depende de como a plataforma aplica a
+    // ação referencial (se ela anular também, o estado final é o mesmo). Soltas
     // ANTES de apagar a fase: se algo falhar no meio, a fase continua lá e a
     // linha solta é editável, em vez de presa a uma fase inexistente.
     const presas = await req.dados!.varrerTudo('avancado_linhas_custo', {
@@ -1262,11 +1264,10 @@ async function removerFase(req: Request, res: Response): Promise<void> {
         fase_ancora_id: null, cronograma_evento: 'customizado',
       });
     }
-    // A operação de funding aceita a mesma âncora, e presa a uma fase apagada
-    // ficava pior que a linha de custo: `resolverInicio` (funding.ts) lê
-    // `dados.fase_ancora_id ?? atual.fase_ancora_id`, então até mandar `null`
-    // caía na âncora morta e todo PATCH dela respondia 400. Solta igual, com o
-    // `inicio_mes` que já tinha.
+    // A operação de funding aceita a mesma âncora. Se a âncora ficasse apontando
+    // para a fase apagada, todo PATCH dela responderia 400: `resolverInicio`
+    // (funding.ts) lê `dados.fase_ancora_id ?? atual.fase_ancora_id`, então até
+    // mandar `null` cairia nela. Solta igual, com o `inicio_mes` que já tinha.
     const operacoesPresas = await req.dados!.varrerTudo('avancado_funding_operacoes', {
       filtros: { estudo_id: estudo.id, fase_ancora_id: fase.id },
     });
