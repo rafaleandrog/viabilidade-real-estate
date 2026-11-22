@@ -40,7 +40,7 @@ export const caso = {
     { seletor: 'table.areas .area-seletor', minimo: 7 },
     // Em cada uma das 7 linhas editáveis, o badge "% Pol." fica bloqueado; nas
     // que oferecem "% Parc.", esse também. 7 é o piso.
-    { seletor: 'table.areas .area-seletor urbi-badge.cu-badge-dis', minimo: 7 },
+    { seletor: 'table.areas .area-seletor urbi-badge.cu-badge-bloq', minimo: 7 },
     // O motivo visível abaixo da tabela.
     { seletor: 'p.area-aviso-ancora', minimo: 1 },
   ],

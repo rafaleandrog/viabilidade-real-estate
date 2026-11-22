@@ -456,6 +456,7 @@ export class ViabTelaPremissas extends LitElement {
     .cu-badges { display: flex; gap: 4px; flex: 0 0 auto; }
     .cu-badges urbi-badge { cursor: pointer; }
     .cu-badge-dis { pointer-events: none; opacity: 0.5; }
+    .cu-badge-bloq { opacity: 0.5; cursor: not-allowed; }
     .cu-valor { flex: 1 1 120px; min-width: 0; }
 
     /* Tabela de áreas em cascata (2026-08-03) — mesma convenção de linha
@@ -1403,9 +1404,11 @@ export class ViabTelaPremissas extends LitElement {
         ${opcoes.map((o) => {
           const motivo = motivoBloqueioTrocaModoArea(modoAtual, o.valor, ancora1, ancora2);
           const bloqueado = dis || motivo != null;
+          // `cu-badge-bloq`, e não `cu-badge-dis`: este mantém o ponteiro, para
+          // o `title` com o motivo aparecer no hover; o clique é barrado pela guarda.
           return html`
           <urbi-badge cor="info" interativo ?ativo=${o.valor === modoAtual}
-            class=${bloqueado ? 'cu-badge-dis' : ''} title=${motivo ?? nothing}
+            class=${dis ? 'cu-badge-dis' : motivo != null ? 'cu-badge-bloq' : ''} title=${motivo ?? nothing}
             @click=${() => { if (!bloqueado) this._trocarModoArea(campo, o.valor, l, ancora1, ancora2); }}
           >${o.rotulo}</urbi-badge>`;
         })}
