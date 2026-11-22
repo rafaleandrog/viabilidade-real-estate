@@ -6,6 +6,7 @@ import {
 } from './fluxo-caixa-motor.js';
 import {
   TOLERANCIA_PADRAO, validarComponentesSafra, validarContratacao, validarSafrasReceita,
+  inicioAmortizacao, indiceRessurgimento,
 } from './fluxo-invariantes.js';
 import type { EventoCrono } from './fluxo-shared.js';
 import { COMPONENTES_EVI, FIM_OBRA_MES } from './fixtures/evi-urbita-golden.js';
@@ -143,26 +144,65 @@ test('#749 a isenção da CARTEIRA_RESSURGE é só do concentrado: a checagem co
   assert.ok(saldos[1].saldo > saldos[0].saldo, 'o concentrado capitaliza');
   assert.deepEqual(validarComponentesSafra([concentrado], 5, 100_000), []);
 
-  // Para os que amortizam, o único saldo crescente que o motor produz hoje é
-  // o da carência que capitaliza (1º vencimento dois ou mais meses depois da
-  // venda, com juros > 0). Esse caso é um FALSO positivo registrado na #808 e
-  // fora deste conserto — aqui ele serve só para provar que a checagem não
-  // foi desligada para `prazo_fixo` nem para `ate_marco`. Quando a #808 for
-  // resolvida, este teste muda junto (e precisa de outro saldo crescente).
-  const comCarencia: ComponentePagamento[] = [
-    {
-      tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4, defasagemMeses: 3,
-      taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'trimestral',
-    },
-    {
-      tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 20, defasagemMeses: 2,
-      taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'obra com carência',
-    },
-  ];
-  for (const c of comCarencia) {
-    const r = validarComponentesSafra([c], 5, 100_000);
-    assert.equal(r.filter((d) => d.codigo === 'CARTEIRA_RESSURGE').length, 1, c.tipo);
+  // #808: este teste provava que a checagem seguia ligada para `prazo_fixo` e
+  // `ate_marco` usando o único saldo crescente que o motor produz para eles —
+  // a carência que capitaliza —, que era justamente o falso positivo da #808.
+  // Resolvida a #808, a carência não acusa mais (teste abaixo), e o motor não
+  // produz outro saldo crescente para esses tipos (busca exaustiva por
+  // defasagem, taxa, prazo, sinal e juros no mês: nenhum). A prova de que a
+  // checagem continua ligada passou para `inicioAmortizacao` (o início por
+  // tipo, finito para os que amortizam) e `indiceRessurgimento` (o detector,
+  // sobre saldos sintéticos), nos testes "#808" a seguir.
+  for (const c of [
+    { tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4, defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false },
+    { tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 20, defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false },
+  ] as ComponentePagamento[]) {
+    assert.ok(Number.isFinite(inicioAmortizacao(c, 5)), `${c.tipo}: a checagem tem de começar num mês finito`);
   }
+});
+
+test('#808 carência que capitaliza (parcelas a cada N meses, juros > 0) não acusa CARTEIRA_RESSURGE', () => {
+  // O caso mínimo da issue, medido: o saldo cresce de 100.000 a 102.010 antes
+  // do 1º vencimento (mês 8) e só então amortiza.
+  const trimestral: ComponentePagamento = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4, defasagemMeses: 3,
+    taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'parcelamento trimestral (legado)',
+  };
+  const saldos = carteiraSaldoSafra(trimestral, 5, 100_000);
+  assert.ok(saldos.some((s) => s.saldo > 100_000), 'a carência capitaliza');
+  const r = validarComponentesSafra([trimestral], 5, 100_000);
+  assert.deepEqual(r.filter((d) => d.codigo === 'CARTEIRA_RESSURGE'), []);
+  // O mesmo caso acusa CARTEIRA_NAO_ZERA (R$ 2.091,61 no mês 11): é a
+  // "observação vizinha" da #808 — a PMT não incorpora os juros da carência —,
+  // divergência real, que já saía na `main` e fica para uma issue própria.
+  assert.deepEqual(r.map((d) => d.codigo), ['CARTEIRA_NAO_ZERA']);
+
+  const ateMarco: ComponentePagamento = {
+    tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 20, defasagemMeses: 2,
+    taxaMensal: 0.01, jurosNoMesDaContratacao: false, rotulo: 'obra com carência',
+  };
+  assert.deepEqual(
+    validarComponentesSafra([ateMarco], 5, 100_000).filter((d) => d.codigo === 'CARTEIRA_RESSURGE'), [],
+  );
+});
+
+test('#808 inicioAmortizacao: o mês anterior ao 1º vencimento, por tipo', () => {
+  const pf = { tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4, defasagemMeses: 3, taxaMensal: 0.01, jurosNoMesDaContratacao: false } as ComponentePagamento;
+  assert.equal(inicioAmortizacao(pf, 5), 7); // 1ª parcela no mês 8
+  const am = { tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 20, defasagemMeses: 2, taxaMensal: 0.01, jurosNoMesDaContratacao: false } as ComponentePagamento;
+  assert.equal(inicioAmortizacao(am, 5), 6); // 1ª parcela no mês 7
+  const conc = { tipo: 'concentrado', participacaoPct: 100, mesPagamento: 15, taxaMensal: 0.01 } as ComponentePagamento;
+  assert.equal(inicioAmortizacao(conc, 5), -Infinity);
+});
+
+test('#808 indiceRessurgimento: cresce depois do início acusa, cresce antes não', () => {
+  const saldos = [
+    { mes: 5, saldo: 100 }, { mes: 6, saldo: 101 }, { mes: 7, saldo: 102 },
+    { mes: 8, saldo: 70 }, { mes: 9, saldo: 75 }, { mes: 10, saldo: 0 },
+  ];
+  assert.equal(indiceRessurgimento(saldos, 7), 4); // 70 → 75 no mês 9
+  assert.equal(indiceRessurgimento(saldos, -Infinity), 1); // sem início, a carência acusaria
+  assert.equal(indiceRessurgimento(saldos.slice(0, 4), 7), -1); // só carência: nada
 });
 
 test('#789 parcela única ANTES da venda (defasagem negativa persistida): a carteira não zera no mês da venda e CARTEIRA_NAO_ZERA continua acusando', () => {

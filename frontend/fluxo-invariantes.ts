@@ -755,6 +755,35 @@ export function validarFunding(
 }
 
 /**
+ * Mês a partir do qual a carteira de um componente que AMORTIZA não pode mais
+ * crescer: o mês anterior ao 1º vencimento. Antes dele o saldo capitaliza por
+ * desenho quando há juros de tabela.
+ *
+ * - #850: a carteira própria capitaliza durante a obra e a carência.
+ * - #808: `prazo_fixo` e `ate_marco` vencem a 1ª parcela em
+ *   `safra + defasagemMeses`; com defasagem maior que 1 (o parcelamento
+ *   periódico do legado: "parcelas a cada N meses", decisão do dono) e juros
+ *   > 0, os meses até lá capitalizam, e acusar isso era falso positivo.
+ */
+export function inicioAmortizacao(c: ComponentePagamento, safra: number): number {
+  if (c.tipo === 'carteira_pos_marco') return primeiroVencimentoCarteira(c, safra) - 1;
+  if (c.tipo === 'prazo_fixo' || c.tipo === 'ate_marco') return safra + c.defasagemMeses - 1;
+  return -Infinity;
+}
+
+/** Índice do 1º saldo que cresce em relação ao anterior, contado só a partir de
+ *  `inicio` (o mês anterior é o que precisa ser ≥ `inicio`); `-1` se não há. */
+export function indiceRessurgimento(
+  saldos: { mes: number; saldo: number }[], inicio: number, tol: number = TOLERANCIA_PADRAO,
+): number {
+  for (let i = 1; i < saldos.length; i++) {
+    if (saldos[i - 1].mes < inicio) continue;
+    if (saldos[i].saldo > saldos[i - 1].saldo + tol) return i;
+  }
+  return -1;
+}
+
+/**
  * Invariantes do motor de safras/componentes (#232-#237), para os
  * componentes de UMA safra (emenda da #240):
  *
@@ -816,24 +845,15 @@ export function validarComponentesSafra(
     // monotonicidade continua valendo para os tipos que amortizam; o
     // `CARTEIRA_NAO_ZERA` acima continua valendo para todos.
     if (c.tipo === 'concentrado') continue;
-    // #850: a carteira própria também capitaliza por desenho até o 1º
-    // vencimento (a obra e a carência) — a monotonicidade só vale dali em
-    // diante, quando ela amortiza.
-    const inicioAmortizacao = c.tipo === 'carteira_pos_marco'
-      ? primeiroVencimentoCarteira(c, safra) - 1
-      : -Infinity;
-    for (let i = 1; i < saldos.length; i++) {
-      if (saldos[i - 1].mes < inicioAmortizacao) continue;
-      if (saldos[i].saldo > saldos[i - 1].saldo + tol) {
-        out.push({
-          codigo: 'CARTEIRA_RESSURGE', severidade: 'erro', linha, safra, mes: saldos[i].mes,
-          esperado: saldos[i - 1].saldo, encontrado: saldos[i].saldo,
-          diferenca: saldos[i].saldo - saldos[i - 1].saldo,
-          mensagem: `Safra ${safra}, ${linha}: carteira cresceu no mês ${saldos[i].mes} ` +
-            `(${saldos[i - 1].saldo} → ${saldos[i].saldo}) — defeito do tipo Urbitá, não deveria ocorrer.`,
-        });
-        break; // 1ª divergência já localiza a causa para este componente
-      }
+    const i = indiceRessurgimento(saldos, inicioAmortizacao(c, safra), tol);
+    if (i >= 0) {
+      out.push({
+        codigo: 'CARTEIRA_RESSURGE', severidade: 'erro', linha, safra, mes: saldos[i].mes,
+        esperado: saldos[i - 1].saldo, encontrado: saldos[i].saldo,
+        diferenca: saldos[i].saldo - saldos[i - 1].saldo,
+        mensagem: `Safra ${safra}, ${linha}: carteira cresceu no mês ${saldos[i].mes} ` +
+          `(${saldos[i - 1].saldo} → ${saldos[i].saldo}) — defeito do tipo Urbitá, não deveria ocorrer.`,
+      });
     }
   }
 
