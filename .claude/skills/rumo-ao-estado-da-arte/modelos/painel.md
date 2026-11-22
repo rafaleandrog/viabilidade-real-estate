@@ -12,6 +12,11 @@ Marque a caixa para aprovar. Para recusar, comente o motivo.
 Código já entregue. Sem caixa: sai daqui quando você fecha a issue.
 - #<n> — testar na homologação (roteiro) e fechar | fechar (evidência)
 
+## Prontos para o Merge de hoje
+PRs com `pronto-para-merge`, que a tarefa de Merge leva até o fim no próximo disparo dela
+(só no modo de duas tarefas; no modo de tarefa única esta seção não aparece).
+- PR #<n> <título> — <tamanho> — head validado `<sha>`
+
 ## Aprovados, aguardando o seu merge
 PR pronto e parado cuja caixa você marcou. O merge é seu.
 - PR #<n> <título>
@@ -21,7 +26,8 @@ PR pronto e parado cuja caixa você marcou. O merge é seu.
 
 ## Planos grandes
 Cada um você inicia pela `orquestrar`, ou, onde ela não existe, numa sessão sua a partir do plano escrito na issue.
-- #<n> <título>
+No modo de duas tarefas, cada item tem caixa, e marcá-la aprova o plano: o Construtor seguinte cria a sessão dedicada do item. No modo de tarefa única, o item sai sem caixa.
+- [ ] #<n> <título>   (modo de tarefa única: `- #<n> <título>`)
 
 ## Adiado para a próxima triagem
 Entradas que passaram do limite do dia. A próxima triagem as lê antes das novas.

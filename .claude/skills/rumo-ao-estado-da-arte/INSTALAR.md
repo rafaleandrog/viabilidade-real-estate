@@ -77,7 +77,7 @@ Ninguém acompanha esta sessão: não pergunte nada.
 Autonomia: 1
 ```
 
-## 5b. Variante: uma tarefa só, numa sessão persistente (a do app de viabilidade)
+## 5b. Variante: uma tarefa só, numa sessão persistente (a do app de viabilidade até 2026-11-21)
 
 Em vez das tarefas dos passos 4 e 5, uma tarefa só, presa a uma sessão dedicada (mesmo ambiente),
 disparada em horários fixos — por exemplo 6h, 14h e 22h —, cada disparo fazendo a TRIAGEM e depois
@@ -120,6 +120,15 @@ ferramentas de agendamento, nasce **sem o repositório e sem conectores**. Não 
 do repositório, nem as ferramentas do GitHub. Esse modo só serve se você criar a tarefa na tela de
 rotinas do claude.ai, escolhendo o repositório e o conector do GitHub.
 
+## 5c. Variante: Construtor e Merge, com sessão de despacho (a atual do app de viabilidade)
+
+Uma sessão de **despacho** (modelo leve, título "[viab] despacho da rotina") recebe os disparos de
+duas tarefas presas a ela: **Construtor** (5h41 e 17h41) e **Merge** (23h41). Cada disparo traz o
+tipo, o título da sessão nova e o texto da tarefa; o despacho só cria a sessão nova com o
+repositório, o título e esse texto, e encerra. Por que não "criar sessão nova a cada disparo" na
+própria tarefa: nesse modo a sessão nasce sem o repositório e sem conectores. Os prompts completos
+estão nas duas tarefas; a regra de cada etapa, em `etapas/execucao.md` e `etapas/merge.md`.
+
 ## 6. Sessão na hora (opcional)
 
 Na variante 5b, **não** ponha este gatilho na tarefa única (ela roda a TRIAGEM inteira antes de
@@ -146,8 +155,8 @@ nada mais:
 `Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
 dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,
 a rotina trata 2 e 3 como 1 até você mudar o próprio processo do repositório, por PR, para
-reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge a reconhece só para itens pequenos e não
-sensíveis; o resto para pronto para o seu merge.)
+reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge a reconhece só para itens pequenos e médios
+não sensíveis; o resto para pronto para o seu merge.)
 
 ## 8. O seu dia a dia
 

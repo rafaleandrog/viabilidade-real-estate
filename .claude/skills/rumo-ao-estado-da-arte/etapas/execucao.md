@@ -57,7 +57,8 @@ contratos que o item toca (rotas, schema, SDK, telas) e as **fatias**, na ordem,
 testável sozinha. Leia `.claude/estado-da-arte/aprendizados.md` e o item do Estado da Arte antes: é
 como o dono decide e para onde o app vai.
 Lido o código, o item não cabe numa sessão ou é sensível: comente, marque `plano-grande` ou leve a
-"Esperando o seu sim", e passe ao próximo. Item sensível cuja caixa o dono **já** marcou não volta
+"Esperando o seu sim", e passe ao próximo. Item grande com o plano já aprovado pelo dono, ou com o
+rótulo `sessao-dedicada`, vai para uma sessão dedicada (`SKILL.md` § 8), não para este disparo. Item sensível cuja caixa o dono **já** marcou não volta
 para lá: implemente, e o PR para no portão de merge (§ 5), que ele sempre segura.
 
 ## 4. Implementar, uma fatia por vez (Dev)
@@ -83,6 +84,9 @@ PR com `Closes #<n>` e o relato do que rodou. Depois, a validação, com estas q
   render em Chromium; `validar-backend.sh` se tocou backend, schema ou migração).
 - **System:** consistência — a revisão pela skill `revisar-pr-apps` do repositório, com as rodadas
   que o processo dele define (camada de contratos, lentes e o App do Codex).
+  Invoque a cópia **do repositório** pelo nome exato, sem prefixo de plugin (nunca
+  `anthropic-skills:revisar-pr-apps` nem outra de nome parecido); no app de viabilidade, o
+  `CLAUDE.md` § "A revisão em si" dá os dois sinais de cópia errada e vence qualquer divergência.
 - **UI/UX:** **só se o item tem tela** — a lente de UI da `revisar-pr-apps` e o caso de render.
 - **Segurança:** permissão, autenticação e dado pessoal (PII, LGPD) — a lente de segurança da
   `revisar-pr-apps` sempre que o item toca rota, permissão ou dado de pessoa.
@@ -93,6 +97,12 @@ passe autorização de merge à revisão.
 Com a validação limpa, o **Product owner** confere a spec **critério por critério**: para cada
 critério de aceite, a evidência (teste, medição, captura) e ✅ ou ❌, numa tabela comentada na issue.
 Um ❌ volta para o Dev. É o último portão antes do merge.
+
+**No modo de duas tarefas (Construtor e Merge), a EXECUCAO para aqui:** com tudo abaixo valendo,
+ponha no PR o rótulo `pronto-para-merge`, anote o head validado e passe ao próximo item; quem
+mergeia é `etapas/merge.md`. No modo de tarefa única, ela mesma mergeia, nas condições abaixo.
+**Antes de abrir PR novo**, confira `max_prs_prontos_aguardando`: com esse número de PRs já esperando o Merge, não abra PR novo; só
+cuide dos existentes.
 
 Mergeia quando valem **todas**:
 

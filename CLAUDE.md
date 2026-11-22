@@ -339,10 +339,12 @@ A autorização de auto-merge de **portões** existia só dentro da Rodada 4 (`P
 mestre) e **expirou com ela**, em 2026-07-29. Fora a exceção abaixo, não há autorização
 permanente: toda sessão abre o PR e para, a menos que o autor peça o merge naquele pedido.
 
-**Exceção — itens simples da rotina `rumo-ao-estado-da-arte`, pedida pelo autor em 2026-11-20**
-("quero que as coisas mais simples ele já faça o merge sozinho"). A sessão disparada por uma
-**tarefa agendada** dessa rotina, cujo prompt (que só o autor edita) traz `Autonomia: 2` ou `3`,
-pode mergear sozinha o PR de um item **pequeno** (tamanho 1 na skill) que a skill libera para aquela
+**Exceção — itens pequenos e médios da rotina `rumo-ao-estado-da-arte`, pedida pelo autor em
+2026-11-20 e ampliada em 2026-11-21** ("quero que as coisas mais simples ele já faça o merge
+sozinho"; depois, o Merge mergeia também os médios). A sessão de uma **tarefa agendada** dessa
+rotina — disparada por ela ou criada pela sessão de despacho a partir do disparo, com o prompt que
+só o autor edita — cujo prompt traz `Autonomia: 2` ou `3`, pode mergear sozinha o PR de um item
+**pequeno ou médio** (tamanho 1 ou 2 na skill) que a skill libera para aquela
 autonomia, cumpridas as condições abaixo e as da skill: Product owner com todos os critérios em ✅,
 revisão sem bloqueante e CI verde no head atual. Nunca vale para release, tag ou `versao`, migração,
 `schema.json`, manifesto, permissões, dependências, workflows e hooks, teste existente alterado ou

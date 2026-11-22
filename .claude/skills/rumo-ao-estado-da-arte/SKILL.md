@@ -20,12 +20,19 @@ divergência vai para o painel.
 | TRIAGEM | `etapas/triagem.md` | todo dia, modelo leve | a fila classificada e o painel do dia |
 | EXECUCAO | `etapas/execucao.md` | todo dia, e sob demanda | itens da fila até o merge, dentro do orçamento |
 
-**As duas etapas diárias podem rodar no mesmo disparo** — é o modo do app de viabilidade: uma
+**As duas etapas diárias podem rodar no mesmo disparo** — foi o modo do app de viabilidade até
+2026-11-21 (`modo_sessao: unica`): uma
 tarefa agendada só, presa a uma sessão persistente, disparada em horários fixos, com o prompt
 pedindo "TRIAGEM e, em seguida, EXECUCAO". Aí a sessão roda a TRIAGEM inteira, depois a EXECUCAO,
 e encerra o disparo; o disparo seguinte chega na mesma conversa e começa pelo painel e pelos
 `Continuação:` (nunca pela memória da conversa, que é resumida com o tempo). Trocar a sessão
 (para apagar a antiga ou zerar o contexto) segue o `INSTALAR.md` § "Trocar a sessão da rotina".
+
+**Duas tarefas: Construtor e Merge** (o modo do app de viabilidade desde 2026-11-21). O
+**Construtor** faz a TRIAGEM leve e a EXECUCAO até o PR **pronto** (rótulo `pronto-para-merge`),
+sem mergear; o **Merge** roda a etapa `etapas/merge.md` no fim do dia. Os disparos chegam a uma
+sessão de **despacho**, que só cria uma sessão nova por disparo, com o repositório e o título no
+padrão, e encerra — o trabalho pesado sempre começa numa sessão limpa (ver § 8).
 
 Leia **por inteiro** o arquivo da etapa. Sem etapa no prompt e com o dono presente, trate o pedido
 dele pela seção 7. Sem etapa e sem ninguém: encerre sem escrever nada.
@@ -63,7 +70,7 @@ estiver lá. Se o processo do repositório exige autorização dada pedido a ped
 prompt **não** basta: a rotina trata Autonomia 2 e 3 como 1 até o próprio processo do repositório
 passar a reconhecer a linha — mudança que é do dono, por PR. O processo pode também **estreitar**
 a autonomia: no app de viabilidade, o `CLAUDE.md` § Merge reconhece a linha só para itens
-**pequenos** (tamanho 1) e não sensíveis; item médio para pronto para o dono. Cada merge feito por autonomia é listado no painel em "Feito sem
+**pequenos e médios** (tamanho 1 e 2) e não sensíveis; o resto para pronto para o dono. Cada merge feito por autonomia é listado no painel em "Feito sem
 perguntar", com o jeito de desfazer.
 
 Os números (orçamento, limiar de release, limites) ficam em `.claude/estado-da-arte/config.md`.
@@ -135,11 +142,14 @@ O passo a passo está em `etapas/execucao.md` § "O fluxo de cada item".
   como a `instancia-urbiverso`). Nunca imprima token.
 - **Tamanho em pontos.** Pequeno vale 1: cabe na trilha expressa da `orquestrar`, ou numa sessão
   curta onde ela não existe. Médio vale 2: cabe numa sessão, mas não é curto. Grande não se
-  executa: vira plano para a `orquestrar`, ou, sem ela, plano escrito na issue para o dono iniciar.
+  executa no disparo: vira plano para a `orquestrar`, ou, sem ela, plano escrito na issue para o
+  dono iniciar. Iniciar é o dono aprovar o plano (caixa marcada) ou pôr o rótulo `sessao-dedicada`:
+  só então ele vai para uma sessão dedicada (§ 8).
 - **Duas tentativas falhas tiram o item da fila**, com o rótulo `precisa-humano`.
 - **Rótulos.** Use os que o repositório já tem. Só se faltarem: `painel-estado-da-arte`, `origem-ia`,
   `aprovada`, `recusada`, `precisa-humano`, `plano-grande`, `spec` (o da ideia que virou trabalho,
-  no `documentacao.md` do SDK) e o de urgência definido na configuração.
+  no `documentacao.md` do SDK), o de urgência definido na configuração e, no modo de duas tarefas,
+  `pronto-para-merge`, `sessao-dedicada` e `sessao-nova`.
 
 ## 7. Quando o dono está na conversa
 
@@ -158,3 +168,21 @@ trabalho segue pelas skills que o repositório já tem.
   registram. Ele não abre arquivo para ler pergunta.
 - **O dono avança um assunto por conta própria** (nesta conversa ou noutra): ao terminar, deixe o
   `Continuação:` na issue do item, para a rotina seguir dali.
+
+## 8. Sessões, títulos e rótulos
+
+- **Com `modo_sessao: nova_por_disparo`, uma sessão nova por disparo**, criada pela sessão de
+  despacho; com `unica`, a tarefa segue na própria sessão persistente, como em `INSTALAR.md`. Nos
+  dois modos a memória é o repositório, o painel e os `Continuação:`; nunca a conversa.
+- **Título:** `[<apelido>] #PR1, #PR2 - DD/MM` com os PRs do disparo (Construtor), `[<apelido>]
+  merge #PR1, #PR2 - DD/MM` (Merge), `[<apelido>] #ISSUE <assunto> - DD/MM` (sessão dedicada) e
+  `[<apelido>] sem PR - DD/MM` quando não houver PR. A sessão nasce com o título provisório que o
+  despacho dá e se renomeia ao abrir os PRs; sem a ferramenta de renomear, registra no painel o
+  título que deveria ter.
+- **Item grande com o plano aprovado pelo dono, ou com o rótulo `sessao-dedicada`:** ganha uma
+  sessão própria, criada pela rotina
+  com o repositório e a tag `rumo-ao-estado-da-arte`, registrada no `Continuação:` da issue. Os
+  disparos seguintes mandam o próximo passo para ela enquanto estiver ativa; concluído o item, ela
+  é arquivada. **`sessao-nova`** numa issue: o item recomeça do zero, ignorando sessões anteriores.
+- **`pronto-para-merge`:** posto pelo Construtor no PR que passou em tudo (revisão sem bloqueante,
+  CI verde, Product owner ✅), com o head validado anotado. Só o Merge o tira.
