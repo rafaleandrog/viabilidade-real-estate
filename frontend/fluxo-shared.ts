@@ -1336,7 +1336,7 @@ function pctOu(v: unknown, substituto: number): number {
  * #834: a ÚNICA tradução de `GET /estudos/:id/avancado/parametros` para o
  * imposto que o motor aplica. Toda tela que monta `FluxoConfig` chama esta
  * função — nenhuma remonta `{ ativo, pct }` à mão, senão uma delas volta a
- * zerar o imposto fora do RET (a trava é `imposto-avancado-fiacao.test.ts`).
+ * zerar o imposto fora do RET (a trava é `imposto-avancado.test.ts`).
  *
  * Rota com erro (ou sem resposta) → `undefined`: o motor não deduz nada, o
  * mesmo comportamento de antes para a falha de carga. Fora do RET sem

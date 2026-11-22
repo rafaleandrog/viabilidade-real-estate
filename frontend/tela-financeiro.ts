@@ -36,9 +36,9 @@ import './viab-num.js';
 // Campos REALOCADOS de outras telas (mesma coluna do schema, sem duplicar dado):
 //  · `taxa_desconto_aa`   → editor mora aqui (removido do Cronograma no Lote 4;
 //    é lido pelo motor de fluxo para VPL/TIR).
-//  · `imposto_percentual` → visível aqui, mas SEMPRE DESABILITADO — o único
-//    editor de verdade é Premissas (Preliminar, componente compartilhado, não
-//    mexido). Editar lá grava a mesma coluna que esta tela mostra.
+//  · `imposto_percentual` → visível aqui, mas SEMPRE DESABILITADO. Desde a #834
+//    é também o imposto padrão do Avançado (fora do RET o motor o deduz da
+//    receita recebida); o editor do Avançado vem na fatia 2 daquela issue.
 
 // Todos os campos numéricos (decimais + inteiros) — para coerção '' → null e
 // Number(...) no salvar.
@@ -61,8 +61,8 @@ import './viab-num.js';
 //    condição colapsa em "sempre oculto aqui"; as funções puras abaixo
 //    parametrizam por `nivel` para o teste provar a regra sem montar DOM.
 //  · `imposto_percentual`             → fica VISÍVEL, sempre DESABILITADO,
-//    com nota — é o único com leitor fora daqui (Preliminar:
-//    `frontend/proforma.ts:245`, `frontend/tela-proforma.ts:226`).
+//    com nota — tem leitor no Preliminar (`calcularProforma`) e, desde a #834,
+//    no motor do Avançado fora do RET (`impostoDoEstudoAvancado`).
 //  · os outros 7 (`regime_tributario`, os 5 `aliquota_*_pct`,
 //    `imposto_sobre_permuta_fisica`) → saem do render, do `_salvar` e de
 //    `CAMPOS_NUM`. Nenhuma coluna sai do `schema.json` — dado histórico
@@ -136,8 +136,8 @@ export function sujeitoRetVisivelFinanceiro(nivel: string): boolean {
   return nivel !== 'avancado';
 }
 
-/** `imposto_percentual` é o único campo do bloco de Impostos com leitor fora
- * desta tela (Preliminar) — fica visível, mas nunca editável por aqui. */
+/** `imposto_percentual` é o único campo do bloco de Impostos com leitor (o
+ * Preliminar e, fora do RET, o Avançado) — visível, nunca editável por aqui. */
 export function impostoPercentualEditavel(_nivel: string): boolean {
   return false;
 }
@@ -269,8 +269,8 @@ export class ViabTelaFinanceiro extends LitElement {
             ? this._n('imposto_percentual', 'Imposto (se não RET)', '%', !impostoPercentualEditavel(nivel))
             : nothing}
         </div>
-        <p class="sec">Vale só para o Preliminar — editado aqui ou em Premissas, é o mesmo campo.
-          O Avançado não tem consumidor para ele.</p>
+        <p class="sec">No Avançado, é o imposto que o fluxo deduz da receita recebida quando o RET
+          não está marcado (Custos › Financeiro). No Preliminar, é o mesmo campo das Premissas.</p>
       </urbi-card>
 
       ${this.editavel
