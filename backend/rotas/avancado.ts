@@ -1248,8 +1248,22 @@ async function removerFase(req: Request, res: Response): Promise<void> {
     const doGrupo = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { fase_id: fase.id } });
     if (!(await permutaCabeAposReducao(req, res, estudo.id, doGrupo.map((a: any) => Number(a.tipologia_id)),
       (a: any) => (Number(a.fase_id) === Number(fase.id) ? 0 : Number(a.unidades) || 0)))) return;
+    // #940 (decisão do dono: soltar): as linhas de custo presas a esta fase
+    // passam a `customizado` com o início e a duração que já tinham — o fluxo
+    // não muda de número na remoção. Sem isso a linha ficava com uma âncora
+    // morta: a tela seguia mostrando o cadeado, e a API aceitava editar. Soltas
+    // ANTES de apagar a fase: se algo falhar no meio, a fase continua lá e a
+    // linha solta é editável, em vez de presa a uma fase inexistente.
+    const presas = await req.dados!.varrerTudo('avancado_linhas_custo', {
+      filtros: { estudo_id: estudo.id, fase_ancora_id: fase.id },
+    });
+    for (const linha of presas as any[]) {
+      await req.dados!.atualizar('avancado_linhas_custo', Number(linha.id), {
+        fase_ancora_id: null, cronograma_evento: 'customizado',
+      });
+    }
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
-    res.json({ ok: true });
+    res.json({ ok: true, linhas_soltas: (presas as any[]).length });
   } catch (e: any) {
     console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/fases/:fid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);

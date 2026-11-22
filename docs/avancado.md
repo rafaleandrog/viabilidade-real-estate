@@ -244,7 +244,9 @@ Numa linha de custo **ancorada** — a uma fase do cronograma (`fase_ancora_id`)
 `PATCH …/custos/:cid` que envie `inicio_mes` ou `duracao_meses` sem trazer a âncora recebe **422**
 `CAMPO_TRAVADO` e nada é gravado; com a âncora no corpo, os dois são recalculados a partir dela e os
 valores enviados são ignorados. Para editar à mão, solte a âncora antes (`fase_ancora_id: null` ou
-`cronograma_evento: "customizado"`).
+`cronograma_evento: "customizado"`). Remover uma fase (`PATCH …/fases/:fid/remover`) solta as linhas de
+custo presas a ela: elas passam a `customizado` com o início e a duração que já tinham, e a resposta
+traz `linhas_soltas` com quantas foram soltas.
 
 **Estudo Avançado criado só pela API nasce sem as três linhas semeadas.** Quem as cria é a aba
 Custos, ao abrir um estudo editável; o servidor não as semeia no `POST /estudos`. Um cliente de API
