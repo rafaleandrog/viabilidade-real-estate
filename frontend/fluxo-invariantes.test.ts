@@ -1203,17 +1203,32 @@ test('#441 validarReconciliacaoCamadas: só roda em nivel_analise avancado', () 
   );
 });
 
-test('#441 validarReconciliacaoCamadas: Catálogo com permuta e Premissas com canônico null acusa divergência (esperado = área do catálogo, encontrado = 0)', () => {
+// #832 (decisão do autor, saída b): este teste dizia o contrário — canônico
+// null acusava divergência com encontrado = 0. Era o falso positivo garantido
+// em todo Avançado com permuta física, porque o Avançado não grava a Premissa.
+test('#832 validarReconciliacaoCamadas: Catálogo com permuta e Premissas com canônico null NÃO acusa (camada inerte)', () => {
   const custos = [{
     grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
     permuta_tipologia_id: 1, permuta_quantidade: 5,
   }];
-  const estudo = { ...ESTUDO_AVANCADO_441, permuta_fisica_area_canonica: null };
+  const estudo = { ...ESTUDO_AVANCADO_441, permuta_fisica_area_canonica: null, permuta_fisica_nr_area_canonica: null };
+  assert.deepEqual(validarReconciliacaoCamadas(estudo, custos, TIPOLOGIAS_441), []);
+  // Campo ausente vale o mesmo que null.
+  assert.deepEqual(validarReconciliacaoCamadas({ ...ESTUDO_AVANCADO_441 }, custos, TIPOLOGIAS_441), []);
+});
+
+test('#832 validarReconciliacaoCamadas: canônico preenchido e DIFERENTE do Catálogo continua acusando', () => {
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 5,
+  }];
+  // Valor legado vindo do Postgres (decimal em string), diferente dos 250 m² do Catálogo.
+  const estudo = { ...ESTUDO_AVANCADO_441, permuta_fisica_area_canonica: '100.00', permuta_fisica_nr_area_canonica: null };
   const r = validarReconciliacaoCamadas(estudo, custos, TIPOLOGIAS_441);
-  const div = r.find((d) => d.codigo === 'CAMADAS_DIVERGEM_PERMUTA_FISICA' && d.linha?.includes('residencial') && !d.linha?.includes('não'));
-  assert.ok(div, 'deveria acusar divergência residencial');
-  assert.equal(div!.esperado, 250); // 5 × 50 m²
-  assert.equal(div!.encontrado, 0);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'CAMADAS_DIVERGEM_PERMUTA_FISICA');
+  assert.equal(r[0].esperado, 250); // 5 × 50 m²
+  assert.equal(r[0].encontrado, 100);
 });
 
 test('#441 validarReconciliacaoCamadas: reprova a leitura errada — unidades_permutadas legado, sem linha de custo de permuta, não acusa', () => {

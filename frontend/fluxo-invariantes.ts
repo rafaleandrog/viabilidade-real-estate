@@ -1013,6 +1013,13 @@ export function permutaFisicaDerivadaCatalogo(
  * #452): é a "rede" que impede a divergência de voltar sem ninguém notar,
  * não a reconciliação em si (que precisa de leitura derivada na Proforma,
  * fora do escopo do que este diff entrega — ver o PR).
+ *
+ * #832 (decisão do autor, saída b): canônico NULO significa "camada inerte",
+ * não "zero m²". O Avançado não tem aba Premissas e, pela decisão da #441,
+ * não grava esses campos — então nulo é o estado normal de todo Avançado, e
+ * compará-lo como 0 acusava falso positivo em todo estudo com permuta física.
+ * O alerta só sai quando a Premissa tem valor (dado legado nas duas camadas)
+ * e ele diverge do Catálogo.
  */
 export function validarReconciliacaoCamadas(
   estudo: any,
@@ -1025,7 +1032,9 @@ export function validarReconciliacaoCamadas(
   const out: Divergencia[] = [];
   const checar = (familia: 'residencial' | 'naoResidencial', campoCanonico: string, rotulo: string) => {
     const esperado = derivado[familia].areaM2;
-    const encontrado = Number(estudo?.[campoCanonico] ?? 0);
+    const bruto = estudo?.[campoCanonico];
+    if (bruto == null || bruto === '') return; // #832: camada inerte, nada a reconciliar
+    const encontrado = Number(bruto);
     if (Math.abs(esperado - encontrado) <= tol) return;
     out.push({
       codigo: 'CAMADAS_DIVERGEM_PERMUTA_FISICA', severidade: 'alerta', linha: rotulo,
