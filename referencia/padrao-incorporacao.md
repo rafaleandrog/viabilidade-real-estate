@@ -3269,9 +3269,10 @@ evento; aberta no ramo da fase-âncora da API.**
 - **API, linha ancorada numa fase — ainda aberta:** o ramo da fase só lê a âncora quando o corpo
   troca `fase_ancora_id` (`:1963-1966`). Sem ela no corpo, a âncora chega `null` a
   `resolverTravamentoCusto`, que não trava nada, e o PATCH **grava** `inicio_mes` e `duracao_meses`
-  enviados em silêncio; o 422 de `:1975` nunca dispara. A próxima mudança de Cronograma apaga esses
-  valores sem aviso, porque `reancorarCustos` reescreve as duas grandezas. Só cliente de API chega
-  aqui: a tela não oferece o campo.
+  enviados em silêncio; o 422 de `:1975` nunca dispara. Os valores gravados **ficam divergentes da
+  fase**: o reancoramento automático `reancorarCustos` (`:511`) só cobre linhas ancoradas em evento,
+  e a linha ancorada a uma fase tem `cronograma_evento = 'customizado'`, que ele pula. Só cliente de
+  API chega aqui: a tela não oferece o campo.
 
 **A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
