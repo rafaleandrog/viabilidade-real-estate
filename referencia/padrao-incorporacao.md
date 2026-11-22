@@ -3263,7 +3263,7 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 - **API:** nos dois ramos do PATCH de custos — fase-âncora e evento do cronograma — a âncora atual é
   sempre lida e entregue a `resolverTravamentoCusto` (`backend/rotas/avancado.ts:157`). Um corpo com
   `inicio_mes` **ou** `duracao_meses` numa linha ancorada, sem trazer a âncora, recebe 422
-  `CAMPO_TRAVADO` (`:2010` na fase, `:2021` no evento) e nada é gravado. Com a âncora no corpo
+  `CAMPO_TRAVADO` (`:2001` na fase, `:2012` no evento) e nada é gravado. Com a âncora no corpo
   (`fase_ancora_id`, ou um `cronograma_evento` diferente de `customizado`, mesmo repetindo a atual),
   início e duração são recalculados a partir dela e os valores enviados são ignorados.
 

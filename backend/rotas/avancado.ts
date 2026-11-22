@@ -1256,31 +1256,22 @@ async function removerFase(req: Request, res: Response): Promise<void> {
     // ação referencial (se ela anular também, o estado final é o mesmo). Soltas
     // ANTES de apagar a fase: se algo falhar no meio, a fase continua lá e a
     // linha solta é editável, em vez de presa a uma fase inexistente.
-    const presas = await req.dados!.varrerTudo('avancado_linhas_custo', {
-      filtros: { estudo_id: estudo.id, fase_ancora_id: fase.id },
-    });
-    for (const linha of presas as any[]) {
-      await req.dados!.atualizar('avancado_linhas_custo', Number(linha.id), {
-        fase_ancora_id: null, cronograma_evento: 'customizado',
-      });
-    }
+    // `atualizarVarios` com o filtro da âncora: filtrar e gravar é um comando só,
+    // então uma linha que outro editor reancorou no meio do caminho já não casa
+    // e não é tocada (achado do App do Codex na revisão).
+    const presas = { estudo_id: estudo.id, fase_ancora_id: fase.id };
+    const soltar = { fase_ancora_id: null, cronograma_evento: 'customizado' };
+    const linhasSoltas = await req.dados!.atualizarVarios('avancado_linhas_custo', { filtros: presas }, soltar);
     // A operação de funding aceita a mesma âncora. Se a âncora ficasse apontando
     // para a fase apagada, todo PATCH dela responderia 400: `resolverInicio`
     // (funding.ts) lê `dados.fase_ancora_id ?? atual.fase_ancora_id`, então até
     // mandar `null` cairia nela. Solta igual, com o `inicio_mes` que já tinha.
-    const operacoesPresas = await req.dados!.varrerTudo('avancado_funding_operacoes', {
-      filtros: { estudo_id: estudo.id, fase_ancora_id: fase.id },
-    });
-    for (const op of operacoesPresas as any[]) {
-      await req.dados!.atualizar('avancado_funding_operacoes', Number(op.id), {
-        fase_ancora_id: null, cronograma_evento: 'customizado',
-      });
-    }
+    const operacoesSoltas = await req.dados!.atualizarVarios('avancado_funding_operacoes', { filtros: presas }, soltar);
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
     res.json({
       ok: true,
-      linhas_soltas: (presas as any[]).length,
-      operacoes_soltas: (operacoesPresas as any[]).length,
+      linhas_soltas: linhasSoltas,
+      operacoes_soltas: operacoesSoltas,
     });
   } catch (e: any) {
     console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/fases/:fid:', e);

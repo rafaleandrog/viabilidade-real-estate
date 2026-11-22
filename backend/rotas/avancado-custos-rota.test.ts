@@ -66,6 +66,22 @@ class DadosFake {
     return atualizado;
   }
 
+  // Como o real: filtrar e gravar num passo só, filtro ESTRITO (chave com valor
+  // vazio ou `null` lança em vez de alargar), devolve quantos foram atingidos.
+  async atualizarVarios(tabela: string, seletor: { filtros?: Record<string, any> }, patch: Record<string, any>) {
+    const filtros = seletor.filtros ?? {};
+    if (Object.keys(filtros).length === 0) throw new Error('DadosFake: seletor vazio');
+    for (const [k, v] of Object.entries(filtros)) {
+      if (v === null || v === undefined || v === '') throw new Error(`DadosFake: filtro ${k} não vira condição`);
+    }
+    const tab = this.tabelas.get(tabela);
+    let n = 0;
+    for (const [id, linha] of tab ?? []) {
+      if (Object.entries(filtros).every(([k, v]) => linha[k] === v)) { tab!.set(id, { ...linha, ...patch }); n++; }
+    }
+    return n;
+  }
+
   async criar(tabela: string, dados: Record<string, any>) {
     const id = this.semear(tabela, dados);
     return this.buscar(tabela, id);

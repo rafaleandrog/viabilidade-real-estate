@@ -39,6 +39,11 @@ class DadosFake {
   async atualizar(tabela: string, id: number, patch: Record<string, any>) {
     const t = this.tabelas.get(tabela)!; const a = { ...t.get(Number(id)), ...patch }; t.set(Number(id), a); return a;
   }
+  async atualizarVarios(tabela: string, seletor: { filtros?: Record<string, any> }, patch: Record<string, any>) {
+    const alvos = await this.varrerTudo(tabela, { filtros: seletor.filtros });
+    for (const l of alvos) await this.atualizar(tabela, Number(l.id), patch);
+    return alvos.length;
+  }
   async criar(tabela: string, dados: Record<string, any>) { return this.buscar(tabela, this.semear(tabela, dados)); }
   async deletar(tabela: string, id: number) { this.tabelas.get(tabela)?.delete(Number(id)); }
   async remover(tabela: string, id: number) { return this.tabelas.get(tabela)?.delete(Number(id)) ?? false; }
