@@ -760,7 +760,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
       && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')
       && (dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao') // só o destino validado: typo não converte nada
       && dados.tipo_empreendimento !== tipoOrigem;
-    const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
+    const limpezaAdiada = trocaDeTipo ? separarLimpezaAdiada(dados) : {}; const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     if (trocaDeTipo) {
       // Cada produto convertido guarda o estado ANTERIOR para a compensação: se um
       // update falhar no meio, os já convertidos voltam ao que eram (com o `pct_alv`
@@ -774,13 +774,13 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
           const orig = (produtos as any[]).find((p) => Number(p.id) === a.id);
           await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
           convertidos.push({ id: a.id, antes: { area_media_m2: orig?.area_media_m2 ?? null, pct_alv: orig?.pct_alv ?? null } });
-        }
+        } if (Object.keys(limpezaAdiada).length > 0) { const limpo = await req.dados!.atualizar('estudos', estudoId, limpezaAdiada); if (atualizado && limpo) Object.assign(atualizado, limpo); }
       } catch (e) {
         for (const c of convertidos) {
           try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
           catch (e2) { console.error('Falha ao desfazer a conversão do produto', c.id, e2); }
         }
-        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem }); try { await req.dados!.atualizar('estudos', estudoId, coagirNumericosOuLancar('estudos', permutaNaoResidencialDe(estudo))); } catch (e3) { console.error('Falha ao restaurar a permuta financeira não residencial do estudo', estudoId, e3); }
+        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem });
         throw e;
       }
     }
@@ -1060,9 +1060,14 @@ export function limpezaAoTrocarTipo(tipoOrigem: unknown, tipoDestino: unknown): 
   };
 }
 
-// Valores lidos antes da troca, para restaurar se a conversão de produtos falhar.
-export function permutaNaoResidencialDe(estudo: Record<string, any>): Record<string, unknown> {
+// Na troca de tipo com conversão de produtos, a limpeza sai do patch principal e
+// só é gravada depois de a conversão dar certo: se ela falhar, a compensação
+// devolve o tipo e os campos nunca foram zerados (sem dado perdido no caminho de
+// erro). Remove as chaves de `dados` e as devolve.
+export function separarLimpezaAdiada(dados: Record<string, any>): Record<string, unknown> {
   const r: Record<string, unknown> = {};
-  for (const c of CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL) r[c] = estudo?.[c] ?? null;
+  for (const c of CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL) {
+    if (c in dados) { r[c] = dados[c]; delete dados[c]; }
+  }
   return r;
 }
