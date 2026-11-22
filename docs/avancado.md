@@ -153,8 +153,9 @@ A **reconciliação** confere o fluxo contra regras que o cálculo deve respeita
 contratada recomposta linha a linha, mês a mês, com o mesmo arredondamento do fluxo; os
 componentes de pagamento somando 100% em cada safra; a carteira de cada componente zerando no
 último vencimento; e a carteira dos componentes que amortizam nunca voltando a crescer — o saldo a
-repassar fica fora desta última, porque capitaliza até o repasse, e a carteira própria só entra
-nela a partir do 1º vencimento, porque até ali ela também capitaliza. Cada aviso aparece uma vez por
+repassar fica fora desta última, porque capitaliza até o repasse, e a carteira própria e os
+parcelamentos com 1º vencimento dois ou mais meses depois da venda (o parcelamento periódico do
+legado) só entram nela a partir do 1º vencimento, porque até ali também capitalizam. Cada aviso aparece uma vez por
 componente, na primeira safra em que acontece, e um aviso numa safra não esconde os das safras
 seguintes.
 
