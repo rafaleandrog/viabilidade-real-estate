@@ -69,7 +69,7 @@ estiver lá. Se o processo do repositório exige autorização dada pedido a ped
 prompt **não** basta: a rotina trata Autonomia 2 e 3 como 1 até o próprio processo do repositório
 passar a reconhecer a linha — mudança que é do dono, por PR. O processo pode também **estreitar**
 a autonomia: no app de viabilidade, o `CLAUDE.md` § Merge reconhece a linha só para itens
-**pequenos** (tamanho 1) e não sensíveis; item médio para pronto para o dono. Cada merge feito por autonomia é listado no painel em "Feito sem
+**pequenos e médios** (tamanho 1 e 2) e não sensíveis; o resto para pronto para o dono. Cada merge feito por autonomia é listado no painel em "Feito sem
 perguntar", com o jeito de desfazer.
 
 Os números (orçamento, limiar de release, limites) ficam em `.claude/estado-da-arte/config.md`.
@@ -145,7 +145,8 @@ O passo a passo está em `etapas/execucao.md` § "O fluxo de cada item".
 - **Duas tentativas falhas tiram o item da fila**, com o rótulo `precisa-humano`.
 - **Rótulos.** Use os que o repositório já tem. Só se faltarem: `painel-estado-da-arte`, `origem-ia`,
   `aprovada`, `recusada`, `precisa-humano`, `plano-grande`, `spec` (o da ideia que virou trabalho,
-  no `documentacao.md` do SDK) e o de urgência definido na configuração.
+  no `documentacao.md` do SDK), o de urgência definido na configuração e, no modo de duas tarefas,
+  `pronto-para-merge`, `sessao-dedicada` e `sessao-nova`.
 
 ## 7. Quando o dono está na conversa
 

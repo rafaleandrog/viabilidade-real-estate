@@ -16,8 +16,9 @@ caixa o dono marcou no painel. Do mais antigo para o mais novo, **um de cada vez
 3. Espere o CI do head atual, que tem de ser **posterior** ao último commit da branch principal, e
    confira a revisão sem bloqueante no head atual (no app de viabilidade, `revisao/bloqueantes`).
 4. Pode mergear se a exceção de merge do processo do repositório libera esta tarefa agendada para
-   aquele item (no app de viabilidade, `CLAUDE.md` § Merge: pequeno ou médio, nada sensível) ou se
-   o dono aprovou no painel. Senão, vai para "Aprovados, aguardando o seu merge", com o motivo.
+   aquele item (no app de viabilidade, `CLAUDE.md` § Merge: pequeno ou médio, nada sensível).
+   Caixa marcada no painel **não** autoriza merge (`etapas/triagem.md`): fora da exceção, o PR vai
+   para "Aprovados, aguardando o seu merge", com o motivo, e o merge é do dono.
 5. Não passou (CI vermelho, bloqueante, conflito que não se resolve): tire o
    `pronto-para-merge`, explique no `Continuação:` e deixe para o Construtor.
 6. Mergeou: confira que a issue fechou, deixe o `Continuação:` e liste em "Feito sem perguntar"

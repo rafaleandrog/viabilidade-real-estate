@@ -83,6 +83,9 @@ PR com `Closes #<n>` e o relato do que rodou. Depois, a validação, com estas q
   render em Chromium; `validar-backend.sh` se tocou backend, schema ou migração).
 - **System:** consistência — a revisão pela skill `revisar-pr-apps` do repositório, com as rodadas
   que o processo dele define (camada de contratos, lentes e o App do Codex).
+  Invoque a cópia **do repositório** pelo nome exato, sem prefixo de plugin (nunca
+  `anthropic-skills:revisar-pr-apps` nem outra de nome parecido); no app de viabilidade, o
+  `CLAUDE.md` § "A revisão em si" dá os dois sinais de cópia errada e vence qualquer divergência.
 - **UI/UX:** **só se o item tem tela** — a lente de UI da `revisar-pr-apps` e o caso de render.
 - **Segurança:** permissão, autenticação e dado pessoal (PII, LGPD) — a lente de segurança da
   `revisar-pr-apps` sempre que o item toca rota, permissão ou dado de pessoa.
@@ -97,7 +100,8 @@ Um ❌ volta para o Dev. É o último portão antes do merge.
 **No modo de duas tarefas (Construtor e Merge), a EXECUCAO para aqui:** com tudo abaixo valendo,
 ponha no PR o rótulo `pronto-para-merge`, anote o head validado e passe ao próximo item; quem
 mergeia é `etapas/merge.md`. No modo de tarefa única, ela mesma mergeia, nas condições abaixo.
-**Antes de abrir PR novo**, confira `max_prs_prontos_aguardando`: passou, só cuide dos existentes.
+**Antes de abrir PR novo**, confira `max_prs_prontos_aguardando`: com esse número de PRs já esperando o Merge, não abra PR novo; só
+cuide dos existentes.
 
 Mergeia quando valem **todas**:
 

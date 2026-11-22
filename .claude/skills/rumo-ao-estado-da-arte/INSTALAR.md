@@ -155,8 +155,8 @@ nada mais:
 `Autonomia: 2` ou `3` só tem efeito onde o processo do repositório aceita autorização de merge
 dada por uma linha no prompt da tarefa. Se ele exige autorização pedido a pedido e sem persistir,
 a rotina trata 2 e 3 como 1 até você mudar o próprio processo do repositório, por PR, para
-reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge a reconhece só para itens pequenos e não
-sensíveis; o resto para pronto para o seu merge.)
+reconhecer a linha. (No app de viabilidade, o `CLAUDE.md` § Merge a reconhece só para itens pequenos e médios
+não sensíveis; o resto para pronto para o seu merge.)
 
 ## 8. O seu dia a dia
 
