@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
-import { rotasEstudos } from './estudos.js';
+import { rotasEstudos, ordenarEstudosRecentes } from './estudos.js';
 
 // #909 — GET /estudos truncava em 200 (admin) e 500 (membro), e o membro fazia
 // um `buscar('estudos', id)` por estudo (N+1). Teste de rota, com um Express
@@ -17,6 +17,10 @@ import { rotasEstudos } from './estudos.js';
 class DadosFake {
   private tabelas = new Map<string, any[]>();
   chamadas = 0;
+  // Linhas que `varrerTudo` entregou por tabela (o "volume lido do banco").
+  lidas = new Map<string, number>();
+  // Chamadas de `varrerTudo` que passaram `ordenar` (desliga a proteção contra INSERT).
+  varridasComOrdenar: string[] = [];
 
   semear(tabela: string, linha: Record<string, any>) {
     if (!this.tabelas.has(tabela)) this.tabelas.set(tabela, []);
@@ -29,7 +33,8 @@ class DadosFake {
   ) {
     const filtros = opts.filtros ?? {};
     let linhas = (this.tabelas.get(tabela) ?? []).filter((l) =>
-      Object.entries(filtros).every(([k, v]) => l[k] === v));
+      // Valor em array numa chave de igualdade vira IN, como no SDK real.
+      Object.entries(filtros).every(([k, v]) => (Array.isArray(v) ? v.includes(l[k]) : l[k] === v)));
     if (opts.ordenar) {
       const c = opts.ordenar;
       const dir = opts.ordem === 'desc' ? -1 : 1;
@@ -47,14 +52,18 @@ class DadosFake {
     this.chamadas++;
     const linhas = this.filtrar(tabela, opts);
     const pagina = opts.pagina ?? 1;
-    const porPagina = opts.por_pagina ?? 20;
+    // Teto real do helper (500): `por_pagina: 100000` truncaria em 500.
+    const porPagina = Math.min(opts.por_pagina ?? 20, 500);
     return { dados: linhas.slice((pagina - 1) * porPagina, pagina * porPagina), total: linhas.length };
   }
 
   // Devolve o ARRAY completo (o verbo real pagina em laço até esgotar).
   async varrerTudo(tabela: string, opts: any = {}) {
     this.chamadas++;
-    return this.filtrar(tabela, opts);
+    if (opts.ordenar) this.varridasComOrdenar.push(tabela);
+    const linhas = this.filtrar(tabela, opts);
+    this.lidas.set(tabela, (this.lidas.get(tabela) ?? 0) + linhas.length);
+    return linhas;
   }
 }
 
@@ -63,6 +72,8 @@ function criarApp(dados: DadosFake, nivelApp: string) {
   app.use(express.json());
   app.use((req: any, _res, next) => {
     req.dados = dados;
+    // `req.arquivos` presente: exercita `anexarImagemPrincipal` (capas).
+    req.arquivos = { url: async (id: number) => `https://arquivos.test/${id}` };
     req.contexto = { nivelApp, usuario: { id: 7, nome: 'Teste' } };
     next();
   });
@@ -97,6 +108,10 @@ function semear(n: number) {
   });
   d.semear('estudo_membros', { estudo_id: n + 1, usuario_id: 99, funcao: 'editor' });
   d.semear('preliminar_produtos', { estudo_id: 1, nome: 'P' });
+  // Toda estudo (inclusive o alheio) tem capa: > 500 capas obrigam a varredura.
+  for (let i = 1; i <= n + 1; i++) {
+    d.semear('estudo_documentos', { estudo_id: i, categoria: 'imagem_principal', ordem: 1, documento: 1000 + i });
+  }
   return d;
 }
 
@@ -119,9 +134,18 @@ for (const nivel of ['admin', 'escrita'] as const) {
       // Mais recente primeiro.
       const criados = r.dados.map((e) => e.criado_em);
       assert.deepEqual(criados, [...criados].sort().reverse());
+      // Todas as capas chegam (mais de 500 capas: um teto de página truncaria).
+      assert.ok(r.dados.every((e) => e.imagem_principal_url === `https://arquivos.test/${1000 + e.id}`),
+        'capa ausente');
+      // `ordenar` no `varrerTudo` desligaria a proteção contra INSERT concorrente.
+      assert.ok(!d.varridasComOrdenar.includes('estudos'), '`varrerTudo(estudos)` com `ordenar`');
       assert.equal(r.dados.find((e) => e.id === 1).produtos.length, 1);
       if (nivel === 'admin') assert.ok(r.dados.every((e) => e._funcao === 'aprovador'));
-      else assert.ok(r.dados.every((e) => e.id !== N + 1), 'membro viu estudo alheio');
+      else {
+        assert.ok(r.dados.every((e) => e.id !== N + 1), 'membro viu estudo alheio');
+        // O membro lê a tabela filtrada por tipo/status (aqui, sem filtro: todos os estudos).
+        assert.equal(d.lidas.get('estudos'), N + 1);
+      }
     });
   });
 
@@ -154,4 +178,15 @@ test('#909 regras preservadas: leitor não vê rascunho/arquivado e os filtros v
     assert.deepEqual(f.dados.map((e: any) => e.id), [4]);
     assert.equal(f.total, 1);
   });
+});
+
+test('#909 ordenarEstudosRecentes: Date e texto, desempate por id desc, sem data por último', () => {
+  const r = ordenarEstudosRecentes([
+    { id: 1, criado_em: new Date('2026-03-01T00:00:00Z') },
+    { id: 2, criado_em: '2026-03-02 10:00:00+00' }, // não-ISO "T", mas parseável
+    { id: 3, criado_em: '2026-03-01T00:00:00.000Z' }, // empata com o id 1
+    { id: 4, criado_em: null },
+    { id: 5, criado_em: new Date('2026-01-01T00:00:00Z') },
+  ]);
+  assert.deepEqual(r.map((e) => e.id), [2, 3, 1, 5, 4]);
 });

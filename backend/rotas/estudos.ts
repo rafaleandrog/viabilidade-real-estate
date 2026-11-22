@@ -614,8 +614,8 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
     if (status) filtros.status = status;
     if (req.contexto?.nivelApp === 'admin') {
       // Admin de app enxerga todos os estudos.
-      // #909 — `varrerTudo`, não `listar` com `por_pagina: 200` (truncava).
-      const todos = await req.dados!.varrerTudo('estudos', { filtros, ordenar: 'criado_em', ordem: 'desc' });
+      // #909 — `varrerTudo` sem `ordenar` (desliga a proteção contra INSERT); ordena abaixo.
+      const todos = await req.dados!.varrerTudo('estudos', { filtros });
       estudos = (todos as any[]).map((e) => ({ ...e, _funcao: 'aprovador' }));
     } else {
       // Demais: apenas estudos onde é membro.
@@ -630,9 +630,10 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
         const efetiva = funcaoEfetivaDoMembro(String(m.funcao), req.contexto?.nivelApp);
         if (efetiva) funcaoPorEstudo.set(Number(m.estudo_id), efetiva);
       }
-      // #909 — UMA varredura de `estudos`, filtrada em memória pelos ids do
-      // membro (sem `buscar` por estudo; o SDK não tem filtro "id in [...]").
-      // tipo/status vão ao servidor em `filtros`; o resto da regra é a de antes.
+      // #909 — UMA varredura de `estudos` (tipo/status vão ao servidor em
+      // `filtros`), com a seleção pelos ids do membro em memória, sem `buscar`
+      // por estudo. O SDK aceita filtro em array (`id: [...]` vira `IN`); reduzir
+      // a leitura aos estudos do membro com ele é melhoria registrada à parte.
       const todos = funcaoPorEstudo.size === 0 ? [] : await req.dados!.varrerTudo('estudos', { filtros });
       estudos = [];
       for (const est of todos as any[]) {
@@ -642,11 +643,12 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
         if (funcao === 'leitor' && (est.status === 'rascunho' || est.status === 'arquivado')) continue;
         estudos.push({ ...est, _funcao: funcao });
       }
-      estudos.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)));
     }
+    estudos = ordenarEstudosRecentes(estudos);
 
     await anexarImagemPrincipal(req, estudos);
     await anexarProdutos(req, estudos);
+    // `total` é a contagem COMPLETA (a listagem não pagina), não o tamanho de uma página.
     res.json({ dados: estudos, total: estudos.length });
   } catch (e: any) {
     console.error('Erro em GET /estudos:', e);
@@ -1016,3 +1018,23 @@ rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => 
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
+
+/**
+ * #909 — estudos do mais recente para o mais antigo, em memória (a varredura
+ * fica na ordem `id asc` do `varrerTudo`, a única segura contra INSERT
+ * concorrente). Não presume `criado_em` em ISO string: aceita `Date` ou texto
+ * parseável (`Date.parse`); sem data válida, vai para o fim. Desempate por id
+ * decrescente. Pura; devolve cópia.
+ */
+export function ordenarEstudosRecentes<T extends { id?: unknown; criado_em?: unknown }>(estudos: T[]): T[] {
+  const instante = (v: unknown): number => {
+    const t = v instanceof Date ? v.getTime() : Date.parse(String(v ?? ''));
+    return Number.isFinite(t) ? t : -Infinity;
+  };
+  return [...estudos].sort((a, b) => {
+    const ta = instante(a.criado_em);
+    const tb = instante(b.criado_em);
+    if (ta !== tb) return tb > ta ? 1 : -1;
+    return Number(b.id) - Number(a.id);
+  });
+}
