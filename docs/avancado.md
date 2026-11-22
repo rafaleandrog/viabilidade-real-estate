@@ -239,6 +239,13 @@ uma linha assim, a rota devolve a existente (`200`, a de menor `id`) em vez de c
 de verdade responde `201`. É o que a aba Custos manda ao semear. Sem `"semeadura": true`, ou com
 qualquer outra combinação — inclusive a mesma categoria com subcategoria —, a rota cria sempre.
 
+Numa linha de custo **ancorada** — a uma fase do cronograma (`fase_ancora_id`) ou a um evento
+(`cronograma_evento` diferente de `customizado`) —, início e duração são calculados pela âncora. Um
+`PATCH …/custos/:cid` que envie `inicio_mes` ou `duracao_meses` sem trazer a âncora recebe **422**
+`CAMPO_TRAVADO` e nada é gravado; com a âncora no corpo, os dois são recalculados a partir dela e os
+valores enviados são ignorados. Para editar à mão, solte a âncora antes (`fase_ancora_id: null` ou
+`cronograma_evento: "customizado"`).
+
 **Estudo Avançado criado só pela API nasce sem as três linhas semeadas.** Quem as cria é a aba
 Custos, ao abrir um estudo editável; o servidor não as semeia no `POST /estudos`. Um cliente de API
 que crie o estudo e calcule sem abrir a tela precisa criar as três antes, com o `POST
