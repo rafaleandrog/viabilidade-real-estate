@@ -8,7 +8,7 @@ apelido: viab              # apelido do app no título das sessões: "[viab] #PR
 modo_sessao: nova_por_disparo  # cada disparo trabalha numa sessão nova; item grande ganha sessão dedicada
 orcamento_diario: 18       # teto de pontos por dia (pequeno = 1, médio = 2), somando os disparos
 max_prs_por_disparo: 2     # PRs implementados no máximo em cada disparo do Construtor
-max_prs_prontos_aguardando: 4  # PRs prontos esperando o Merge; passou disso, o Construtor não abre novo
+max_prs_prontos_aguardando: 4  # com este número esperando o Merge, o Construtor não abre PR novo
 release_pontos: 5          # pontos mergeados desde a última release que disparam a proposta
 release_dias: 7            # ou dias desde a última release, com ao menos uma mudança
 max_ideias_ia_dia: 3       # itens novos que a IA pode registrar por dia
