@@ -22,3 +22,7 @@ processo do `CLAUDE.md` e do `KIT.md` (quando existir); não os substitui. Em co
 6. **Pergunta ao dono vai na conversa**, completa e respondível ali. Arquivo e painel só registram.
 7. **Release, tag e `versao` do manifesto só quando o dono pede.** Nenhuma sessão as cria ou muda
    por conta própria.
+8. **Issue resolvida é issue fechada, por qualquer caminho.** Pedido de uma issue aberta que já está
+   inteiro na branch principal — por PR, commit, outra sessão, Sentinela ou qualquer outro meio —
+   fecha na hora, com a evidência no comentário. Só espera o que é parcial (comente o que falta) ou
+   cujo critério é teste na instância (vai ao painel como "testar e fechar").

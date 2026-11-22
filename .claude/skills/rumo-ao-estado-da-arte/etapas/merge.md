@@ -28,8 +28,19 @@ entra na lista "Aprovados, aguardando o seu merge".
    para "Aprovados, aguardando o seu merge", com o motivo, e o merge é do dono.
 5. Não passou (CI vermelho, bloqueante, conflito que não se resolve): tire o
    `pronto-para-merge`, explique no `Continuação:` e deixe para o Construtor.
-6. Mergeou: confira que a issue fechou, deixe o `Continuação:` e liste em "Feito sem perguntar"
+6. Mergeou: confira que fechou **toda** issue citada pelo PR e pelos commits dele fora de
+   `Sem-fechamento:` (aberta e entregue: feche agora, com a evidência), deixe o `Continuação:` e liste em "Feito sem perguntar"
    com o jeito de desfazer.
+
+## 2b. Varredura de issues entregues e abertas
+
+Depois dos merges, todo disparo: liste as issues abertas citadas por PRs mergeados e por commits da
+branch principal desde a varredura anterior (data e commit na seção "Varredura de issues
+entregues" do painel; sem registro, desde a última release). Para cada uma, confira no código
+se o pedido inteiro está entregue. Entregue: feche, com o PR ou commit e a evidência. Parcial:
+comente o que falta. Teste na instância como critério: "Para você testar e fechar". Atualize no
+painel a seção "Varredura de issues entregues": data, commit da branch principal até onde
+conferiu e o que fechou.
 
 ## 3. Release e painel
 

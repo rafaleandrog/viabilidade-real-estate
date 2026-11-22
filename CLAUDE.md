@@ -320,6 +320,23 @@ Quatro formas que falham **caladas** — sem erro, o PR mergeia, a issue fica ab
 Repita a keyword por issue: `closes #273, closes #274, closes #275`. **Depois de mergear, confira
 que a issue fechou** em vez de assumir.
 
+> 🔒 **Regra fixa do dono (2026-11-22), sem exceção de caminho: issue resolvida é issue fechada.**
+> Vale para toda sessão — da rotina, aberta à mão, criada por outra sessão — e para todo caminho de
+> entrega: PR com `Closes`, PR que só citou o número, commit direto, outra sessão, Sentinela, App do
+> Codex. Quem mergeia, ou quem percebe que o pedido de uma issue aberta já está na `main`, **fecha a
+> issue na mesma hora**, com um comentário que cita o PR ou commit e a evidência (arquivo:linha ou
+> teste), e `state_reason: completed`. Não existe "deixar para o dono fechar" nem "fecha depois":
+> issue entregue e aberta é defeito do processo.
+>
+> - **Só não fecha** o que ainda não foi entregue por inteiro: entrega parcial comenta o que falta
+>   (e o PR usa `Sem-fechamento:`); critério de aceite que É um teste na instância (Pinguim) espera
+>   esse teste — a issue vai ao painel como "testar e fechar", com o roteiro.
+> - **Conferência obrigatória depois de cada merge:** todo número citado no corpo do PR e nos
+>   commits dele que não esteja em `Sem-fechamento:` tem de estar fechado. Achou aberto, feche ou
+>   declare o que falta — nunca deixe calado.
+> - **Varredura:** a tarefa de Merge da rotina confere, todo dia, as issues abertas citadas por PRs
+>   mergeados e por commits da `main` desde a varredura anterior (`etapas/merge.md`).
+
 > **Por que esta seção existe:** em 2026-08-03 o autor tinha **53 issues abertas** descrevendo
 > trabalho já implementado e mergeado — as Rodadas 5 e 6 inteiras. Os commits citavam a issue como
 > `(#256)` ou `(FIN-04+05+06+07, #273-276)`. Na `main`, 6 commits usaram `Closes` e são exatamente
