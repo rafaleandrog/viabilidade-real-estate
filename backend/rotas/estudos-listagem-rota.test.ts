@@ -52,7 +52,7 @@ class DadosFake {
     this.chamadas++;
     const linhas = this.filtrar(tabela, opts);
     const pagina = opts.pagina ?? 1;
-    // Teto real do helper (500): `por_pagina: 100000` truncaria em 500.
+    // Teto de página do fake (500), para que `por_pagina` alto trunque em vez de esconder o defeito.
     const porPagina = Math.min(opts.por_pagina ?? 20, 500);
     return { dados: linhas.slice((pagina - 1) * porPagina, pagina * porPagina), total: linhas.length };
   }
@@ -138,7 +138,7 @@ for (const nivel of ['admin', 'escrita'] as const) {
       assert.ok(r.dados.every((e) => e.imagem_principal_url === `https://arquivos.test/${1000 + e.id}`),
         'capa ausente');
       // `ordenar` no `varrerTudo` desligaria a proteção contra INSERT concorrente.
-      assert.ok(!d.varridasComOrdenar.includes('estudos'), '`varrerTudo(estudos)` com `ordenar`');
+      assert.deepEqual(d.varridasComOrdenar, [], '`varrerTudo` com `ordenar`');
       assert.equal(r.dados.find((e) => e.id === 1).produtos.length, 1);
       if (nivel === 'admin') assert.ok(r.dados.every((e) => e._funcao === 'aprovador'));
       else {
@@ -189,4 +189,20 @@ test('#909 ordenarEstudosRecentes: Date e texto, desempate por id desc, sem data
     { id: 5, criado_em: new Date('2026-01-01T00:00:00Z') },
   ]);
   assert.deepEqual(r.map((e) => e.id), [2, 3, 1, 5, 4]);
+});
+
+test('#909 capa: menor `ordem` de cada estudo, desempate pelo menor id, sem `ordenar` na varredura', async () => {
+  const d = semear(2);
+  // Estudo 1: uma capa de ordem 0 inserida DEPOIS (id maior) vence a de ordem 1.
+  d.semear('estudo_documentos', { id: 50, estudo_id: 1, categoria: 'imagem_principal', ordem: 0, documento: 5000 });
+  // Estudo 2: duas capas de mesma ordem 0; vence a de menor id, mesmo inserida depois.
+  d.semear('estudo_documentos', { id: 61, estudo_id: 2, categoria: 'imagem_principal', ordem: 0, documento: 6100 });
+  d.semear('estudo_documentos', { id: 60, estudo_id: 2, categoria: 'imagem_principal', ordem: 0, documento: 6000 });
+  await comServidor(criarApp(d, 'admin'), async (base) => {
+    const r = await listar(base);
+    const url = (id: number) => r.dados.find((e) => e.id === id).imagem_principal_url;
+    assert.equal(url(1), 'https://arquivos.test/5000');
+    assert.equal(url(2), 'https://arquivos.test/6000');
+    assert.deepEqual(d.varridasComOrdenar, []);
+  });
 });

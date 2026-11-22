@@ -377,18 +377,17 @@ async function anexarImagemPrincipal(req: Request, estudos: any[]): Promise<void
   for (const e of estudos) e.imagem_principal_url = null;
   if (estudos.length === 0 || !req.arquivos) return;
   const ids = new Set(estudos.map((e) => Number(e.id)));
-  // #909 — `varrerTudo`, sem teto de página (antes `por_pagina: 500`).
-  const docs = await req.dados!.varrerTudo('estudo_documentos', {
-    filtros: { categoria: 'imagem_principal' }, ordenar: 'ordem', ordem: 'asc',
-  });
-  // Primeira imagem principal (menor ordem) de cada estudo da lista.
-  const arquivoPorEstudo = new Map<number, number>();
+  // #909 — `varrerTudo` sem teto de página e SEM `ordenar` (com a app no ar, só o
+  // `id asc` default protege a varredura); a capa de cada estudo é escolhida em
+  // memória: menor `ordem`, desempate pelo menor `id`.
+  const docs = await req.dados!.varrerTudo('estudo_documentos', { filtros: { categoria: 'imagem_principal' } });
+  const capa = new Map<number, any>();
   for (const d of docs as any[]) {
-    const eid = Number(d.estudo_id);
-    if (ids.has(eid) && !arquivoPorEstudo.has(eid) && d.documento != null) {
-      arquivoPorEstudo.set(eid, Number(d.documento));
-    }
+    const eid = Number(d.estudo_id), a = capa.get(eid), o = Number(d.ordem) || 0;
+    if (!ids.has(eid) || d.documento == null) continue;
+    if (!a || o < (Number(a.ordem) || 0) || (o === (Number(a.ordem) || 0) && Number(d.id) < Number(a.id))) capa.set(eid, d);
   }
+  const arquivoPorEstudo = new Map<number, number>([...capa].map(([eid, d]) => [eid, Number(d.documento)]));
   for (const e of estudos) {
     const arqId = arquivoPorEstudo.get(Number(e.id));
     if (arqId == null) continue;
@@ -614,7 +613,7 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
     if (status) filtros.status = status;
     if (req.contexto?.nivelApp === 'admin') {
       // Admin de app enxerga todos os estudos.
-      // #909 — `varrerTudo` sem `ordenar` (desliga a proteção contra INSERT); ordena abaixo.
+      // #909 — `varrerTudo` sem `ordenar` (passá-lo desligaria a proteção contra INSERT); ordena abaixo.
       const todos = await req.dados!.varrerTudo('estudos', { filtros });
       estudos = (todos as any[]).map((e) => ({ ...e, _funcao: 'aprovador' }));
     } else {
