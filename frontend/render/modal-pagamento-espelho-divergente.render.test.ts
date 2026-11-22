@@ -2,8 +2,8 @@
 //
 // O caso irmão (`modal-pagamento`) monta o mesmo modal com `componentes`
 // persistidos coerentes com o espelho; este monta com componentes que o espelho
-// não descreve. A única diferença entre os dois é a chave que decide o motor de recebíveis — e, portanto, o único bloco de layout novo
-// é o aviso `p.espelho-divergente`, declarado em `exigir`.
+// não descreve. A diferença é a coerência entre espelho e componentes; o bloco
+// de layout novo é o aviso `p.espelho-divergente`, declarado em `exigir`.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

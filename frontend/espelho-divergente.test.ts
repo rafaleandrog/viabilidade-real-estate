@@ -99,3 +99,34 @@ test('espelho divergente: plano de nascimento reaberto com outro cronograma devo
 test('espelho divergente: o caso da issue continua false com cronograma diferente', () => {
   assert.equal(espelhoDescreveComponentes(PLANO_DIVERGENTE(), CRONO_LONGO), false);
 });
+
+// Prazo e defasagem não dependem do cronograma: divergência neles também é
+// divergência, senão o Aplicar trocaria o valor gravado em silêncio.
+const PLANO_DA_TELA = (crono: any[]) => fluxoPagamentoParaSalvar(formularioPagamento({
+  entrada: [{ pct: 20, parcelas: 2, descontoPct: 0 }],
+  parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 12 }, { pct: 10, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }],
+  repasse: { apos_entrega_meses: 1, pct_banco: 60, carteira_parcelas: 120, carteira_carencia_meses: 0 },
+}), crono, AA);
+
+test('espelho divergente: prazo do componente diferente do espelho devolve false', () => {
+  const fp: any = PLANO_DA_TELA(CRONO);
+  const pf = fp.componentes.find((c: any) => c.tipo === 'prazo_fixo');
+  assert.ok(pf, 'o plano tem um prazo_fixo');
+  pf.prazoMeses = pf.prazoMeses + 12;
+  assert.equal(espelhoDescreveComponentes(fp, CRONO), false);
+});
+
+test('espelho divergente: defasagem do componente diferente do espelho devolve false', () => {
+  const fp: any = PLANO_DA_TELA(CRONO);
+  const pf = fp.componentes.find((c: any) => c.tipo === 'prazo_fixo');
+  pf.defasagemMeses = pf.defasagemMeses + 2;
+  assert.equal(espelhoDescreveComponentes(fp, CRONO), false);
+});
+
+test('espelho divergente: plano da tela com ao longo da obra e carteira, reaberto com outro cronograma, devolve true', () => {
+  const fp: any = PLANO_DA_TELA(CRONO);
+  const tipos = fp.componentes.map((c: any) => c.tipo);
+  assert.ok(tipos.includes('ate_marco') && tipos.includes('carteira_pos_marco'), `tipos: ${tipos}`);
+  assert.equal(espelhoDescreveComponentes(fp, [{ evento: 'obra', inicio_mes: 6, duracao_meses: 36 }]), true);
+  assert.equal(espelhoDescreveComponentes(fp, []), true);
+});

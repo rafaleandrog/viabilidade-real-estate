@@ -678,15 +678,17 @@ function estruturaConfere(
 }
 
 /**
- * Projeção da pergunta "o espelho descreve os componentes?": só os campos que o
- * espelho diz e que NÃO dependem do cronograma. `marcoMes`, `mesPagamento` e o
- * `prazoMeses` de "ao longo da obra" vêm do cronograma vigente, e um plano coerente
- * reaberto depois de o cronograma mudar não pode virar divergente por isso.
+ * Projeção da pergunta "o espelho descreve os componentes?": os campos do
+ * espelho MENOS as âncoras de calendário. `marcoMes` e `mesPagamento` vêm do
+ * cronograma vigente, e um plano coerente reaberto depois de o cronograma mudar
+ * não pode virar divergente por isso. Prazo, defasagem e carência não dependem
+ * do cronograma e ficam: divergência neles também descartaria dado no Aplicar.
  */
+const ANCORAS_DE_CALENDARIO: readonly string[] = ['marcoMes', 'mesPagamento'];
 function projecaoDeEstrutura(c: any): string {
   const norm = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 1e9) / 1e9 : v);
   return JSON.stringify(
-    ['tipo', 'participacaoPct', 'descontoPct', 'sinalPct', 'carenciaMeses']
+    CAMPOS_DO_ESPELHO.filter((k) => !ANCORAS_DE_CALENDARIO.includes(k))
       .map((k) => (c?.[k] === undefined ? null : norm(c[k]))),
   );
 }
