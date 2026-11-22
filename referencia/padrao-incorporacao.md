@@ -374,10 +374,10 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 >
 > - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:552`;
 > - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:208`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
-> quando `novo.nivel_analise === 'avancado'` (`:848-850`). Nenhuma rota promove.
+> quando `novo.nivel_analise === 'avancado'` (`:909`). Nenhuma rota promove.
 >
-> Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:336-340`) **não** listar
-> `nivel_analise`, mais `montarCopiaEstudo` (`:351-359`). O `if` de `:848` apenas **consome** o nível
+> Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:341-346`) **não** listar
+> `nivel_analise`, mais `montarCopiaEstudo` (`:356-364`). O `if` de `:909` apenas **consome** o nível
 > já preservado, para decidir se copia as tabelas do Avançado.
 >
 > Isso responde a pergunta que a #486 fazia sobre a permuta física dos estudos de Pinguim, e a
@@ -3250,16 +3250,29 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 
 ### Armadilhas mapeadas pela lista de bugs (2026-08-01)
 
-> Diferente das A1–A8 acima, **estas ainda NÃO estão resolvidas** — cada uma tem issue aberta. Elas
-> ficam aqui porque são o tipo de erro que se reintroduz sozinho.
+> Diferente das A1–A8 acima, estas nasceram **não resolvidas**, cada uma com issue aberta. Elas
+> ficam aqui porque são o tipo de erro que se reintroduz sozinho. A que já foi resolvida, no todo ou
+> em parte, diz isso na própria nota e continua no lugar pela história — hoje, a A9, resolvida em
+> parte.
 
-**A9 — Início e Duração não são campos simétricos em Custos.** A UI trava o Início em três casos
-(Construção, fase-âncora, evento fixo) e a Duração **só** em Construção
-(`frontend/tela-fluxo-custos.ts:724-757` vs `:758-780`). O backend faz o mesmo: devolve 422 para
-`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1955-1967`); a duração, que antes passava, hoje também
-trava (`resolverTravamentoCusto`, `:166-170`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
-Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescreve as duas grandezas.
-→ **#249**, validada por **#255**.
+**A9 — Início e Duração não são campos simétricos em Custos.** 🟡 **Resolvida na tela e no ramo do
+evento; aberta no ramo da fase-âncora da API.**
+
+- **Tela:** as colunas Início e Duração decidem pelo mesmo `regimeCronogramaLinha`
+  (`frontend/tela-fluxo-custos.ts:985` e `:1016`). Construção, fase-âncora e evento fixo mostram as
+  duas grandezas como calculadas, sem campo editável.
+- **API, linha ancorada num evento do cronograma:** `resolverTravamentoCusto`
+  (`backend/rotas/avancado.ts:157`) recebe a âncora do evento sempre, e o PATCH responde 422
+  `CAMPO_TRAVADO` (`:1986`) quando o corpo traz `inicio_mes` **ou** `duracao_meses` sem trazer a
+  âncora. Com um `cronograma_evento` diferente de `customizado` no corpo, mesmo repetindo o atual,
+  início e duração são recalculados a partir dele e os valores enviados são ignorados.
+- **API, linha ancorada numa fase — ainda aberta:** o ramo da fase só lê a âncora quando o corpo
+  troca `fase_ancora_id` (`:1963-1966`). Sem ela no corpo, a âncora chega `null` a
+  `resolverTravamentoCusto`, que não trava nada, e o PATCH **grava** `inicio_mes` e `duracao_meses`
+  enviados em silêncio; o 422 de `:1975` nunca dispara. Os valores gravados **ficam divergentes da
+  fase**: o reancoramento automático `reancorarCustos` (`:511`) só cobre linhas ancoradas em evento,
+  e a linha ancorada a uma fase tem `cronograma_evento = 'customizado'`, que ele pula. Só cliente de
+  API chega aqui: a tela não oferece o campo.
 
 **A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
