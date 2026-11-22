@@ -1,4 +1,4 @@
-// #905: a exportação (CSV e PDF da Proforma, PDF do Fluxo) mostra tipo e status
+// #905: a exportação mostra o tipo (CSV, PDF da Proforma e PDF do Fluxo) e o status (PDF da Proforma)
 // com os rótulos da tela, não os valores crus do banco.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
