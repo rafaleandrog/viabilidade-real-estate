@@ -242,9 +242,15 @@ qualquer outra combinação — inclusive a mesma categoria com subcategoria —
 **Estudo Avançado criado só pela API nasce sem as três linhas semeadas.** Quem as cria é a aba
 Custos, ao abrir um estudo editável; o servidor não as semeia no `POST /estudos`. Um cliente de API
 que crie o estudo e calcule sem abrir a tela precisa criar as três antes, com o `POST
-/estudos/:id/avancado/custos` acima e `"semeadura": true`: **Preço** em `terreno`, **Construção** em
-`obra` e **Corretagem de vendas** em `diretos`, em % do VGV. Sem elas o fluxo sai sem custo de
-terreno, de construção e de corretagem, e nada acusa a falta.
+/estudos/:id/avancado/custos` acima e os mesmos corpos que a aba manda:
+
+- `{"grupo": "terreno", "categoria": "Preço", "cronograma_evento": "customizado", "ordem": 0, "semeadura": true}`;
+- `{"grupo": "obra", "categoria": "Construção", "cronograma_evento": "obra", "ordem": 0, "semeadura": true}` —
+  o `cronograma_evento` `obra` é o que prende a Construção ao evento Obra; sem ele a linha nasce
+  `customizado`, no mês 0 e com duração de 1 mês, e o fluxo põe a obra inteira no início;
+- `{"grupo": "diretos", "categoria": "Corretagem de vendas", "orcamento_unidade": "pct_vgv", "cronograma_evento": "customizado", "ordem": 0, "semeadura": true}`.
+
+Sem elas o fluxo sai sem custo de terreno, de construção e de corretagem, e nada acusa a falta.
 
 O plano de pagamento de um grupo de receita (`fluxo_pagamento`) só gera juros de tabela, carteira de clientes e repasse
 quando está no formato canônico, a lista `componentes`. Por isso a API o normaliza na escrita: o grupo novo nasce com
