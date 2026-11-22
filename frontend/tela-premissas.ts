@@ -1,3 +1,4 @@
+import { motivoBloqueioTrocaModoArea, valorNoModoArea } from './cascata-modo-area.js';
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
@@ -489,6 +490,7 @@ export class ViabTelaPremissas extends LitElement {
     .area-seletor { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
     .area-seletor urbi-badge { cursor: pointer; flex: 0 0 auto; }
     .area-valor { width: 130px; }
+    .area-aviso-ancora { margin: 8px 0 0; color: var(--cor-texto-sec); font-size: 0.85rem; }
     /* Indicador de aproveitamento do coeficiente máximo (#569) — mesma faixa
        de KPIs do Resumo (.kpis), logo abaixo da cascata da Incorporação. */
     .kpis.aproveitamento { margin-top: 14px; }
@@ -1296,10 +1298,10 @@ export class ViabTelaPremissas extends LitElement {
   private _trocarModoArea(campo: string, novoModoSchema: string, linha: LinhaResolvida, ancora1: number, ancora2: number | null) {
     const modoAtual = this.form[`${campo}_modo`] ?? 'm2';
     if (novoModoSchema === modoAtual) return;
-    let novoValor: number;
-    if (novoModoSchema === 'm2') novoValor = linha.m2;
-    else if (novoModoSchema === 'pct_poligonal') novoValor = ancora1 > 0 ? (linha.m2 / ancora1) * 100 : 0;
-    else novoValor = ancora2 != null && ancora2 > 0 ? (linha.m2 / ancora2) * 100 : 0;
+    // #904: com a âncora em 0 a troca apagava o valor digitado. Bloqueada; o
+    // motivo aparece abaixo da tabela (`_renderTabelaAreasLoteamento`).
+    if (motivoBloqueioTrocaModoArea(modoAtual, novoModoSchema, ancora1, ancora2)) return;
+    const novoValor = valorNoModoArea(novoModoSchema, linha.m2, ancora1, ancora2);
     this._set(`${campo}_valor`, novoValor);
     this._set(`${campo}_modo`, novoModoSchema);
   }
@@ -1337,8 +1339,19 @@ export class ViabTelaPremissas extends LitElement {
           </tbody>
         </table>
       </div>
+      ${this._renderAvisoAncoraZero(ancora1, ancora2)}
       ${this._renderAvisoAreaNegativa(linhas)}
     `;
+  }
+
+  /** #904: o motivo do bloqueio da troca m² ↔ %, visível, quando uma âncora é 0. */
+  private _renderAvisoAncoraZero(ancora1: number, ancora2: number | null): TemplateResult {
+    const motivos = [
+      motivoBloqueioTrocaModoArea('m2', 'pct_poligonal', ancora1, ancora2),
+      motivoBloqueioTrocaModoArea('m2', 'pct_parcelavel', ancora1, ancora2),
+    ].filter((m): m is string => m != null);
+    if (motivos.length === 0) return html`${nothing}`;
+    return html`<p class="area-aviso-ancora">${motivos[0]}</p>`;
   }
 
   /**
@@ -1387,10 +1400,15 @@ export class ViabTelaPremissas extends LitElement {
     const sufixo = modoAtual === 'm2' ? 'm²' : '%';
     return html`
       <div class="area-seletor" role="group" aria-label=${`Unidade de ${l.label}`}>
-        ${opcoes.map((o) => html`
-          <urbi-badge cor="info" interativo ?ativo=${o.valor === modoAtual} class=${dis ? 'cu-badge-dis' : ''}
-            @click=${() => { if (!dis) this._trocarModoArea(campo, o.valor, l, ancora1, ancora2); }}
-          >${o.rotulo}</urbi-badge>`)}
+        ${opcoes.map((o) => {
+          const motivo = motivoBloqueioTrocaModoArea(modoAtual, o.valor, ancora1, ancora2);
+          const bloqueado = dis || motivo != null;
+          return html`
+          <urbi-badge cor="info" interativo ?ativo=${o.valor === modoAtual}
+            class=${bloqueado ? 'cu-badge-dis' : ''} title=${motivo ?? nothing}
+            @click=${() => { if (!bloqueado) this._trocarModoArea(campo, o.valor, l, ancora1, ancora2); }}
+          >${o.rotulo}</urbi-badge>`;
+        })}
         <viab-num class="area-valor" sufixo=${sufixo} casas-decimais="2" ?desabilitado=${dis}
           .valor=${this._num(`${campo}_valor`)}
           @urbi:input-numero-change=${(e: CustomEvent) => this._set(`${campo}_valor`, e.detail.valor ?? 0)}
