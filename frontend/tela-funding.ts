@@ -9,7 +9,7 @@ import {
   listarFundingOperacoes, criarFundingOperacao, atualizarFundingOperacao, removerFundingOperacao,
 } from './viabilidade-api.js';
 import { calcularFluxo, taxaDescontoOuPadrao, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
+import { dinheiroParaRotulo, impostoDoEstudoAvancado, mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao, indicadoresAntecipacao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
@@ -259,7 +259,7 @@ export class ViabFunding extends LitElement {
         linhasCusto: this.custos,
         curvas: curvas?.erro ? [] : (curvas.dados || []),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
-        ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        ret: impostoDoEstudoAvancado(params),
         // #473: default true preserva o comportamento histórico (VGV bruto).
         corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
         // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba

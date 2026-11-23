@@ -7,6 +7,7 @@ import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   CATEGORIA_CONSTRUCAO, CATEGORIA_MANUTENCAO_POS_OBRA, eConstrucao, regimeCronogramaLinha, LINHAS_OBRIGATORIAS, type LinhaObrigatoria,
   vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, totalConstrucaoCustos, type EventoCrono, type ContextoCusto,
+  impostoDoEstudoAvancado, type ImpostoReceita,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
@@ -287,9 +288,13 @@ export class ViabFluxoCustos extends LitElement {
   @state() private crono: EventoCrono[] = [];
   @state() private dataInicio: string | null = null;
   // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret). `ret`
-  // alimenta o cálculo (ctxCusto/FluxoConfig); `retForm` é o rascunho editável
-  // do controle em Custos → Financeiro (padrão rascunho + Salvar — #51/#252).
+  // é o estado salvo do controle; `retForm` é o rascunho editável em
+  // Custos → Financeiro (padrão rascunho + Salvar — #51/#252).
   private ret: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
+  // #834: o que alimenta o cálculo (ctxCusto/FluxoConfig) é o imposto já
+  // resolvido — RET ou imposto padrão do estudo —, nunca o `ret` acima: fora
+  // do RET ele deduziria zero.
+  private imposto: ImpostoReceita | undefined = undefined;
   @state() private retForm: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
   @state() private salvandoRet = false;
   // #473: base da Corretagem de vendas quanto à permuta física —
@@ -476,6 +481,7 @@ export class ViabFluxoCustos extends LitElement {
         this.ret = { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) };
         this.retForm = { ...this.ret };
       }
+      this.imposto = impostoDoEstudoAvancado(params);
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
       this.linhasReceita = linhas;
       // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts): além de
@@ -489,7 +495,7 @@ export class ViabFluxoCustos extends LitElement {
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
         receitaTotal: linhas.reduce(
-          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), this.ret), 0),
+          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), this.imposto), 0),
       };
       // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
       // custos já carregados. Editável apenas (#120).
@@ -656,7 +662,7 @@ export class ViabFluxoCustos extends LitElement {
       linhasCusto: this.custos,
       curvas: this.curvas,
       areaTerreno: this.ctxCusto.areaTerreno,
-      ret: this.ret,
+      ret: this.imposto,
       // #473: default true preserva o comportamento histórico (VGV bruto).
       corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
       // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba

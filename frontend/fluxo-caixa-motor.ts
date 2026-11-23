@@ -21,7 +21,7 @@ import {
   eCorretagem, eMarketing, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
   mesRepasse, ultimoMesFunding,
-  type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte,
+  type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte, type ImpostoReceita,
 } from './fluxo-shared.js';
 
 const n = (v: any): number => Number(v) || 0;
@@ -234,8 +234,8 @@ export interface FluxoConfig {
   linhasCusto: any[];              // { id, grupo, categoria, subcategoria, orcamento_*, curva_id, inicio_mes, duracao_meses }
   curvas?: any[];                  // avancado_curvas (lookup de curva_id → valores)
   areaTerreno: number;             // m² (Premissas)
-  // #346: RET é global do estudo (era por Grupo, `linhasReceita[i].fluxo_pagamento.ret`).
-  ret?: { ativo: boolean; pct: number };
+  // #834: imposto sobre a receita, RET ou padrão (`impostoDoEstudoAvancado`); nome por compatibilidade.
+  ret?: ImpostoReceita;
   /**
    * #473: base da Corretagem de vendas quanto à permuta física —
    * `estudos.corretagem_sobre_permuta_fisica`, só no Avançado. `true`
@@ -2243,14 +2243,14 @@ export function recebimentoBrutoMensal(
 }
 
 /**
- * #228: imposto mensal — RET, a ÚNICA entrada fiscal oficial do Avançado
- * (decisão do autor 2026-08-01; o regime da aba Financeiro é exclusivo do
- * Preliminar, `receitaLiquidaLinha` em fluxo-shared.ts). Zero sem RET ativo
- * — o default de todo estudo — o que preserva o Resultado de quem nunca
- * usou RET. Proporcional ao recebimento bruto do mesmo mês: como o % de RET
- * é constante, aplicá-lo por mês (linear) é matematicamente idêntico a
- * aplicá-lo por venda antes de distribuir no tempo — só muda ONDE a dedução
- * é contabilizada, nunca o Resultado final de quem usa RET.
+ * #228: imposto mensal sobre a receita — a ÚNICA entrada fiscal do Avançado.
+ * #834 (dono, 2026-11-22): RET (`ret_pct`) ou imposto padrão do estudo
+ * (`imposto_percentual`), resolvidos por `impostoDoEstudoAvancado`
+ * (`fluxo-shared.ts`); a conta é a mesma nos dois. Zero só sem imposto
+ * (`ret` ausente, falha de carga) ou com alíquota zero. Proporcional ao
+ * recebimento bruto do mesmo mês: como o % é constante, aplicá-lo por mês
+ * (linear) é matematicamente idêntico a aplicá-lo por venda antes de
+ * distribuir no tempo — só muda ONDE a dedução é contabilizada.
  *
  * #346: RET é GLOBAL do estudo (era por Grupo, `linha.fluxo_pagamento.ret`)
  * — o único parâmetro que decide é `ret`, passado explicitamente por quem
@@ -2264,7 +2264,7 @@ export function impostoMensal(
   // #585: OBRIGATÓRIO — a taxa de tabela do estudo (`estudos.juros_tabela_aa_padrao`,
   // aba Viabilidade → Financeiro). Omitir vira TS2554, não silêncio.
   jurosTabelaAaEstudo: number,
-  ret?: { ativo: boolean; pct: number } | null,
+  ret?: ImpostoReceita | null,
 ): number[] {
   const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal, jurosTabelaAaEstudo);
   if (!ret?.ativo) return bruto.map(() => 0);
@@ -2287,7 +2287,7 @@ export function recebimentoLiquidoMensal(
   // #585: OBRIGATÓRIO — a taxa de tabela do estudo (`estudos.juros_tabela_aa_padrao`,
   // aba Viabilidade → Financeiro). Omitir vira TS2554, não silêncio.
   jurosTabelaAaEstudo: number,
-  ret?: { ativo: boolean; pct: number } | null,
+  ret?: ImpostoReceita | null,
 ): number[] {
   const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal, jurosTabelaAaEstudo);
   const imposto = impostoMensal(linha, cronograma, prazoTotal, jurosTabelaAaEstudo, ret);
@@ -2306,7 +2306,7 @@ export function receitaMensalLinha(
   // #585: OBRIGATÓRIO — a taxa de tabela do estudo (`estudos.juros_tabela_aa_padrao`,
   // aba Viabilidade → Financeiro). Omitir vira TS2554, não silêncio.
   jurosTabelaAaEstudo: number,
-  ret?: { ativo: boolean; pct: number } | null,
+  ret?: ImpostoReceita | null,
 ): number[] {
   return recebimentoLiquidoMensal(linha, cronograma, prazoTotal, jurosTabelaAaEstudo, ret);
 }

@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct } from './viab-format.js';
-import { type EventoCrono } from './fluxo-shared.js';
+import { impostoDoEstudoAvancado, type EventoCrono } from './fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
   precoMedioM2Projeto, custoObraM2Projeto, vsoProjetoPct, compararProjetoMercado,
@@ -189,7 +189,7 @@ export class ViabTelaAnaliseMercado extends LitElement {
         curvas: curvas?.erro ? [] : (curvas.dados || []),
         areaTerreno: n(this.estudo?.terreno_manual_area) || n(this.estudo?.area_terreno_nucleo),
         // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
-        ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        ret: impostoDoEstudoAvancado(params),
         // #473: default true preserva o comportamento histórico (VGV bruto).
         corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
         // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba
