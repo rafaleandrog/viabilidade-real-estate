@@ -51,8 +51,6 @@ export const caso = {
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
-    'urbi-checkbox.label',
-    'urbi-checkbox.marcado',
     'urbi-tabela.colunas',
     'urbi-tabela.linhas',
     'urbi-tabela.mensagemVazio',
