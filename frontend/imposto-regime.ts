@@ -74,6 +74,19 @@ export function erroFormImposto(form: FormImposto): string | null {
 }
 
 /**
+ * Aviso para a alíquota inválida do regime que NÃO está à vista: o campo à
+ * vista parece válido, e sem o aviso o Salvar ficaria desabilitado sem motivo
+ * visível. `null` quando o regime oculto está válido.
+ */
+export function avisoRegimeOculto(form: FormImposto): string | null {
+  const oculto: RegimeImposto = form.regime === 'ret' ? 'padrao' : 'ret';
+  const pct = oculto === 'ret' ? form.retPct : form.padraoPct;
+  if (erroAliquotaImposto(pct) === null) return null;
+  const nome = oculto === 'ret' ? 'do RET' : 'do imposto padrão';
+  return `A alíquota ${nome} está fora de 0 a ${TETO_ALIQUOTA_IMPOSTO} %. Volte a esse regime e corrija-a para poder salvar.`;
+}
+
+/**
  * Colunas de `estudos` que o PATCH devolveu, para a tela do estudo atualizar o
  * seu `estudo` (eventos `viab:premissas-change`/`-salvas`). Sem isso, a aba
  * Viabilidade › Financeiro guardava o `imposto_percentual` antigo e o

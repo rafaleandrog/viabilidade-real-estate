@@ -77,7 +77,8 @@ O **imposto sobre a receita** tem dois regimes, escolhidos na sub-aba Financeiro
 campo **Imposto sobre a receita**: o **Imposto padrão do estudo** (a mesma alíquota que o Preliminar
 usa fora do RET, 7% por padrão) ou o **RET** (patrimônio de afetação, 4% por padrão). Ao lado vem a
 alíquota do regime escolhido, de 0 a 100%; trocar de regime não apaga a alíquota do outro, e o
-**Salvar** grava as duas. O fluxo sempre deduz a alíquota do regime escolhido da receita recebida,
+**Salvar** grava as duas — por isso ele fica desabilitado também quando a alíquota inválida é a do
+regime que não está à vista, e um aviso abaixo diz qual corrigir. O fluxo sempre deduz a alíquota do regime escolhido da receita recebida,
 mês a mês. A unidade da permuta física não gera recebido, então não paga imposto; a permuta
 financeira não reduz a base do imposto, porque a incorporadora recebe tudo e paga ao terrenista a
 parte dele. Com alíquota zero no regime escolhido, o fluxo sai sem imposto e a reconciliação avisa.

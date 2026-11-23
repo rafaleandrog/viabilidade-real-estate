@@ -39,6 +39,7 @@ import {
 } from '../frontend/funding-motor.js';
 import { proformaAvancado } from '../frontend/proforma-avancado.js';
 import { somaLegadoAplicavel } from './conferir-legado.js';
+import { vgvAlocacoes, vgvCatalogo } from './conferir-vgv.js';
 import {
   mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado, ePermutaFisica,
   impostoDoEstudoAvancado,
@@ -190,11 +191,11 @@ export async function conferir(id: number): Promise<Conferencia> {
   const conta = (rotulo: string, esperado: number, obtido: number, tol = 0.01) =>
     out.contas.push({ rotulo, esperado, obtido, delta: obtido - esperado, ok: Math.abs(obtido - esperado) <= tol });
 
-  // VGV do catálogo × VGV das linhas de receita × VGV do motor
-  const vgvCatalogo = d.tipologias.reduce((s: number, t: any) => s + n(t.quantidade) * n(t.area_privativa_m2) * n(t.preco_m2), 0);
-  const vgvLinhas = d.receitas.reduce((s: number, l: any) =>
-    s + (l.tipologias ?? []).reduce((a: number, t: any) => a + n(t.quantidade) * n(t.area_privativa_m2) * n(t.preco_m2), 0), 0);
-  conta('VGV Σ tipologias do catálogo → vgvTotal do motor', vgvCatalogo, calc.vgvTotal);
+  // VGV do catálogo × VGV das linhas de receita × VGV do motor. As contas somam
+  // área fechada + aberta e usam o preço da alocação (ver `conferir-vgv.ts`).
+  const vgvCatalogoTotal = vgvCatalogo(d.tipologias, d.receitas);
+  const vgvLinhas = vgvAlocacoes(d.receitas);
+  conta('VGV Σ tipologias do catálogo → vgvTotal do motor', vgvCatalogoTotal, calc.vgvTotal);
   conta('VGV Σ alocações nas linhas → vgvTotal do motor', vgvLinhas, calc.vgvTotal);
 
   // Unidades: catálogo × alocado. A permuta física sai de DENTRO das unidades
