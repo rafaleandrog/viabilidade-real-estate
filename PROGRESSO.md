@@ -4,6 +4,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
+
+- Pedido do autor, com captura: Infraestrutura em "% VGV", derivada de um custo em R$, aparecia
+  como `23,888888888…` ao receber o cursor. O `viab-num` já tinha teto de 2 casas em repouso, mas o
+  foco mostrava `String(v)`, a dízima inteira.
+- `textoCampoRepouso`/`textoCampoEdicao` (`frontend/viab-format.ts`) formatam os dois estados com
+  teto fixo `CASAS_MAX_CAMPO = 2`, qualquer que seja o `casas-decimais` do consumidor. O `viab-num`
+  passa a usá-las; o % ALV do catálogo deixa de pedir 4 casas.
+- Só exibição: o valor do campo segue exato, focar e sair sem digitar não emite evento, e o que se
+  digita não é cortado. Caso de render `campo-casas-decimais` mede o foco no DOM real; apagar o
+  conserto no componente deixa o caso vermelho com `166,66666666666669`.
+- Decimal persistido que chega como texto (o Lit não converte a propriedade; o Funding repassa o
+  valor cru) continua aparecendo: `numeroDoCampo` converte texto numérico válido antes de formatar.
+- `docs/formulas.md` § Estado de conformidade descreve a regra.
+
 ## 2026-11-23 — Imposto do Avançado, fatia 3 de 3: guias e aviso do regime oculto (fecha a issue 834)
 
 - Guias: `docs/formulas.md` ganha a seção **Imposto do Avançado** (alíquota do regime × recebido do

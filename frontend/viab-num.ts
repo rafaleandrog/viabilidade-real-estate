@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { parseNumeroBR } from './viab-format.js';
+import { parseNumeroBR, textoCampoEdicao, textoCampoRepouso } from './viab-format.js';
 
 // Input numérico com máscara pt-BR (bug #1): separador de milhar "." e decimal
 // ",". Espelha a API do `urbi-input-numero` (valor: number|null, label, sufixo,
@@ -103,20 +103,17 @@ export class ViabNum extends LitElement {
     .erro-msg { color: var(--cor-erro); font-size: 0.72rem; margin-top: 2px; }
   `;
 
-  private _fmtAgrupado(v: number | null): string {
-    if (v == null) return '';
-    return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: this.casasMinimas, maximumFractionDigits: this.casasDecimais,
-    }).format(v);
+  // Repouso e foco mostram no MÁXIMO 2 casas (`CASAS_MAX_CAMPO`), qualquer que
+  // seja `casas-decimais`: o teto é do app, não do consumidor. É só exibição —
+  // `valor` continua exato e só o que a pessoa digita o substitui (focar e
+  // sair sem digitar não emite evento). Com piso de casas (#177), o foco
+  // completa com zeros — "1,2" edita como "1,20".
+  private _fmtAgrupado(v: unknown): string {
+    return textoCampoRepouso(v, this.casasDecimais, this.casasMinimas);
   }
 
-  // Valor cru para edição: vírgula decimal, sem separador de milhar. Com piso
-  // de casas (#177), completa com zeros — "1,2" edita como "1,20" — para o
-  // campo não "perder" a formatação ao ganhar foco.
-  private _paraEdicao(v: number | null): string {
-    if (v == null) return '';
-    if (this.casasMinimas > 0) return v.toFixed(this.casasDecimais).replace('.', ',');
-    return String(v).replace('.', ',');
+  private _paraEdicao(v: unknown): string {
+    return textoCampoEdicao(v, this.casasDecimais, this.casasMinimas);
   }
 
   private _display(): string {

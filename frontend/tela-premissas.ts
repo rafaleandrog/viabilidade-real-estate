@@ -1079,7 +1079,7 @@ export class ViabTelaPremissas extends LitElement {
           </td>`;
         case 'pct': return html`
           <td class="num">
-            <viab-num sufixo="%" casas-decimais="4" ?desabilitado=${dis}
+            <viab-num sufixo="%" ?desabilitado=${dis}
               .valor=${pctAlvEfetivo(p, alv)}
               @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { pct_alv: e.detail.valor ?? 0 })}
             ></viab-num>
