@@ -1248,8 +1248,31 @@ async function removerFase(req: Request, res: Response): Promise<void> {
     const doGrupo = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { fase_id: fase.id } });
     if (!(await permutaCabeAposReducao(req, res, estudo.id, doGrupo.map((a: any) => Number(a.tipologia_id)),
       (a: any) => (Number(a.fase_id) === Number(fase.id) ? 0 : Number(a.unidades) || 0)))) return;
+    // #940 (decisão do dono: soltar): as linhas de custo presas a esta fase
+    // passam a `customizado` com o início e a duração que já tinham — o fluxo
+    // não muda de número na remoção. O schema declara `ao_deletar: "anular"`
+    // na âncora, mas isso só anula o id: o `cronograma_evento` e o resto ficam
+    // por conta da rota, e soltar aqui não depende de como a plataforma aplica a
+    // ação referencial (se ela anular também, o estado final é o mesmo). Soltas
+    // ANTES de apagar a fase: se algo falhar no meio, a fase continua lá e a
+    // linha solta é editável, em vez de presa a uma fase inexistente.
+    // `atualizarVarios` com o filtro da âncora: filtrar e gravar é um comando só,
+    // então uma linha que outro editor reancorou no meio do caminho já não casa
+    // e não é tocada (achado do App do Codex na revisão).
+    const presas = { estudo_id: estudo.id, fase_ancora_id: fase.id };
+    const soltar = { fase_ancora_id: null, cronograma_evento: 'customizado' };
+    const linhasSoltas = await req.dados!.atualizarVarios('avancado_linhas_custo', { filtros: presas }, soltar);
+    // A operação de funding aceita a mesma âncora. Se a âncora ficasse apontando
+    // para a fase apagada, todo PATCH dela responderia 400: `resolverInicio`
+    // (funding.ts) lê `dados.fase_ancora_id ?? atual.fase_ancora_id`, então até
+    // mandar `null` cairia nela. Solta igual, com o `inicio_mes` que já tinha.
+    const operacoesSoltas = await req.dados!.atualizarVarios('avancado_funding_operacoes', { filtros: presas }, soltar);
     await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      linhas_soltas: linhasSoltas,
+      operacoes_soltas: operacoesSoltas,
+    });
   } catch (e: any) {
     console.error('Erro ao remover (PATCH …/remover ou DELETE) /avancado/fases/:fid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
