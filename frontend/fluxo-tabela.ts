@@ -1,7 +1,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtR$Kpi, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { calcularVariacao } from './cenario-variacao.js';
+import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
 import { type FundingNoFluxo } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
@@ -114,6 +114,8 @@ export const estiloFluxoTabela = css`
   }
   .kpi-var.melhor { color: var(--cor-sucesso); }
   .kpi-var.pior { color: var(--cor-erro); }
+  /* Variação indefinida ("n/d"): neutra, e com o motivo no title. */
+  .kpi-var.kpi-nd { color: var(--cor-texto-sec); font-weight: 400; pointer-events: auto; }
   /* #456: linha de detalhe (% + mês) dos três KPIs derivados — neutra, ao
      contrário de .kpi-var, que carrega semântica de melhor/pior. */
   .kpi-info {
@@ -266,7 +268,8 @@ function varKpi(novo: number | null, base: number | null | undefined, maiorMelho
  * Os KPIs do fluxo, incluindo a Receita Bruta canônica (#237).
  *
  * `base` só é passada pela aba Cenários (#132): com ela, Resultado, TIR, VPL e
- * Exposição máxima ganham seta + variação % contra o cenário real. Payback é
+ * Exposição máxima ganham seta + variação % contra o cenário real (a exposição
+ * publica "n/d" quando o cenário real não tem exposição). Payback é
  * uma data, não um escalar comparável — fica sem indicador. Sem `base` o
  * componente renderiza exatamente como antes (aba Fluxo de Caixa e Resumo).
  */
@@ -274,15 +277,17 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   const resultado = resultadoDe(c);
   const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
   const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
-  // #353 (BUG7-45): exposição máxima é min(fluxoAcumulado), tipicamente
-  // negativa — mas o autor quer a leitura por MAGNITUDE (módulo): exposição
+  // #353 (BUG7-45): exposição máxima é min(fluxoAcumulado) com piso em
+  // zero (nunca positiva; 0 quando o acumulado nunca fica negativo) — mas o autor quer a leitura por MAGNITUDE (módulo): exposição
   // maior (mais dinheiro em risco) é PIOR, mesmo que numericamente mais
   // negativa. Por isso aqui, ao contrário dos outros KPIs, comparamos
   // Math.abs() e usamos maiorMelhor = false (magnitude subir é pior).
   const expMag = Math.abs(c.exposicaoMaxima);
   const expBaseMag = base ? Math.abs(base.exposicaoMaxima) : undefined;
   const expVariacao = expBaseMag !== undefined ? calcularVariacao(expMag, expBaseMag, false) : null;
-  const expVariante = expVariacao ? (expVariacao.melhor ? 'sucesso' : 'erro') : 'erro';
+  // Sem base de comparação, só pinta de erro quando HÁ exposição: com o piso em
+  // zero do motor, projeto sempre positivo mostra R$ 0, que não é alerta.
+  const expVariante = expVariacao ? (expVariacao.melhor ? 'sucesso' : 'erro') : (c.exposicaoMaxima < 0 ? 'erro' : '');
   // #456: os três indicadores de decisão que a EVI trata como KPI de primeira
   // classe e que o app só publicava na exportação — juros de clientes,
   // carteira máxima e o mês/%VGV da exposição. Nada editável, tudo derivado
@@ -322,7 +327,9 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
              suporia que já é pós-financiamento. -->
         <div class="rotulo">Exposição máxima (fluxo livre)</div>
         <div class="valor">${fmtR$Kpi(expMag)}</div>
-        ${varKpi(expMag, expBaseMag, false)}
+        ${base && exposicaoSemBase(base.exposicaoMaxima)
+          ? html`<span class="kpi-var kpi-nd" title=${MOTIVO_SEM_BASE} aria-label=${MOTIVO_SEM_BASE}>${TEXTO_VARIACAO_SEM_BASE}</span>`
+          : varKpi(expMag, expBaseMag, false)}
         <div class="kpi-info">${fmtPct(pctExp)} do VGV${mesTxt(c.mesExposicaoMaxima)}</div>
       </div>
       <div class="kpi-card">
