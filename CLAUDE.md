@@ -885,10 +885,11 @@ plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** 
 > atrás do SDK que a instância roda, e o catálogo de obsolescências que a lente e o
 > `urbi-empacotar` leem é o do pin. Em 2026-10-04 a obsolescência `identidade-imobiliario-antiga`
 > (SDK 93) foi avisada primeiro pela instância, sem que lente nem empacotador a conhecessem, com o
-> pin ainda em `57.0.0`. O pin subiu para **`93.0.0`** em 2026-11-23 (#906, decisão do autor): é a
-> primeira versão que documenta `req.modulos` no backend e conhece a identidade de módulo do
-> manifesto, e a instância roda a 100. Pin atrás da instância continua sendo ponto cego declarado,
-> não "metade fechada".
+> pin ainda em `57.0.0`. O pin subiu para **`93.0.0`** em 2026-11-23 (#906, decisão do autor):
+> `req.modulos` no backend já é documentado desde o 87, e o 93 é a versão cujo catálogo traz a
+> identidade de módulo que o manifesto declara (`identidade-imobiliario-antiga`). Segundo o autor,
+> a instância roda a 100. Pin atrás da instância continua sendo ponto cego declarado, não "metade
+> fechada".
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
@@ -988,10 +989,10 @@ no `main` do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/
 >
 > **O pin subiu de novo, de `57.0.0` para `93.0.0`, em 2026-11-23 (#906, decisão do autor).** O
 > motivo é o backend ler o módulo imobiliário: o `57.0.0` só documentava `req.nucleo`, do contrato
-> do núcleo em obsolescência, e o `req.modulos.<slug>` aparece documentado desde o 87. O 93 é o
-> menor salto que cobre isso e a identidade `urbiverso/modulos-urbiverso::imobiliario` do
-> manifesto. Medido: typecheck, testes, `urbi-empacotar` e a auditoria de obsolescência limpos antes
-> e depois, e o lockfile mudou só a entrada do SDK.
+> do núcleo em obsolescência, e o `req.modulos.<slug>` aparece documentado desde o 87. O 93 foi
+> escolhido por também trazer, no catálogo, a identidade `urbiverso/modulos-urbiverso::imobiliario`
+> do manifesto. Na implementação (PR 951), typecheck, testes, `urbi-empacotar` e a auditoria de
+> obsolescência saíram limpos antes e depois, e o lockfile mudou só a entrada do SDK.
 
 **Para mudanças de FRONTEND (a maioria):** o frontend **não importa o SDK**
 (usa o global `window.urbiVerso`), então valida-se 100% só com os pacotes públicos. Use o
