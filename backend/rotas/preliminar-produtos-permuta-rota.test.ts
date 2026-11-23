@@ -143,3 +143,25 @@ test('erroUnidadesPermutadas: puro — ausente passa, par inconsistente falha', 
   assert.match(erroUnidadesPermutadas({ unidades_permutadas: 6 }, { unidades: 5 })!, /não pode passar/);
   assert.match(erroUnidadesPermutadas({ unidades_permutadas: 1.5 })!, /inteiro/);
 });
+
+test('o teto é fail-closed: com permuta, `unidades` nula ou negativa no corpo é recusada', async () => {
+  const dados = new DadosFake();
+  const id = dados.semear(SEMENTE);
+  await comServidor(dados, async (base) => {
+    for (const un of [null, -3, 'x', 2.5]) {
+      const patch = await enviar(base, 'PATCH', `/estudos/1/preliminar/produtos/${id}`, { unidades: un, unidades_permutadas: 2 });
+      assert.equal(patch.status, 400, `PATCH unidades=${JSON.stringify(un)}: ${JSON.stringify(patch.corpo)}`);
+      const soUn = await enviar(base, 'PATCH', `/estudos/1/preliminar/produtos/${id}`, { unidades: un });
+      assert.equal(soUn.status, 400, `PATCH só unidades=${JSON.stringify(un)} com permuta gravada: ${JSON.stringify(soUn.corpo)}`);
+    }
+    const post = await enviar(base, 'POST', '/estudos/1/preliminar/produtos', { nome: 'X', unidades: null, unidades_permutadas: 1 });
+    assert.equal(post.status, 400, JSON.stringify(post.corpo));
+    assert.equal((await dados.buscar('preliminar_produtos', id)).unidades, 10, 'PATCH recusado não pode alterar');
+  });
+});
+
+test('erroUnidadesPermutadas: unidades nula/negativa com permuta falha; sem permuta passa', () => {
+  assert.match(erroUnidadesPermutadas({ unidades: null, unidades_permutadas: 1 })!, /unidades/);
+  assert.match(erroUnidadesPermutadas({ unidades: -1 }, { unidades_permutadas: 1 })!, /unidades/);
+  assert.equal(erroUnidadesPermutadas({ unidades: -1, unidades_permutadas: 0 }), null, 'sem permuta, a coerção numérica decide');
+});

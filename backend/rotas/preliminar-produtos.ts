@@ -59,13 +59,16 @@ export function erroUnidadesPermutadas(
     if (v === null || !Number.isInteger(v) || v < 0) return 'unidades_permutadas deve ser um número inteiro maior ou igual a 0';
     perm = v;
   }
-  let un = Number(atual.unidades) || 0;
+  let un: number | null = Number(atual.unidades) || 0;
   if (mudouUn) {
+    // Fail-closed: `unidades` nula, negativa ou ilegível no corpo não é "inválida
+    // para outro validador" quando há permuta — vira `null` e é recusada abaixo.
     const u = numeroEstrito(body.unidades);
-    // `unidades` inválida é recusada pela coerção numérica, com a mensagem dela.
-    if (u === null || u < 0) return null;
-    un = u;
+    un = u === null || u < 0 ? null : u;
   }
+  // Sem permuta, a `unidades` inválida segue sendo recusada pela coerção numérica.
+  if (perm <= 0) return null;
+  if (un === null || !Number.isInteger(un)) return 'unidades deve ser um número inteiro maior ou igual às unidades_permutadas';
   if (perm > un) return `unidades_permutadas (${perm}) não pode passar das unidades do produto (${un})`;
   return null;
 }

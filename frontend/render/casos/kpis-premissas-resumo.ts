@@ -8,8 +8,9 @@
 // caso prova a track para os três de uma vez.
 //
 // `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:863-871`)
-// e `vgv = área_média_m2 × preço_m2 × unidades` por produto — o `unidades`
-// se CANCELA na divisão, então `precoMedioUnidade = area_media_m2 ×
+// e, no modo por área, `vgv = área_média_m2 × preço_m2 × unidades` por produto
+// (o modo por unidade não tem esse cancelamento) — o `unidades` se CANCELA na
+// divisão, então `precoMedioUnidade = area_media_m2 ×
 // preco_venda_m2`, independente de quantas unidades o catálogo tiver. Por
 // isso `100 × 1.714.484 = 171.448.400,00` (mesmos dígitos do exemplo
 // literal da issue) sem precisar de um catálogo de 1 unidade só —

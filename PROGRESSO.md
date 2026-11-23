@@ -4,6 +4,18 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Permuta por produto: rodada de observações da revisão
+
+- A API recusa (400) `unidades_permutadas > 0` quando a `unidades` efetiva, do corpo ou da linha
+  gravada, é nula, negativa, fracionária ou ilegível: o teto agora é fail-closed, e não só quando
+  `unidades` chega válida. Sem permuta, a coerção numérica segue decidindo.
+- A regra de corte das permutadas no teto das unidades saiu do método da tela para função pura
+  exportada (`dadosEdicaoUnidadesPermutadas`), e um caso de render novo edita as duas colunas pelos
+  eventos do primitivo e lê o corpo dos PATCH: reverter o handler de Unidades ou o de Permutadas
+  deixava a suíte verde antes e agora a derruba.
+- Comentários corrigidos: endereço de `_editarCustoUnidade`/`_valorUnidade`, "Nove colunas" e o
+  cancelamento de `unidades` no preço médio, que vale só no modo por área.
+
 ## 2026-11-23 — Permuta física por produto do catálogo (Preliminar)
 
 - Quadro da base comum, tema 2, decisão do dono: a permuta física do Preliminar passa a poder ser
