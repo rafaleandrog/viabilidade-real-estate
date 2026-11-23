@@ -370,14 +370,13 @@ export interface FluxoCalc {
   tir: number | null;              // % a.a.
   paybackMes: number | null;       // índice 0-based no array mensal
   paybackData: string | null;      // "jul/2030"
-  exposicaoMaxima: number;         // min(fluxoAcumulado) — tipicamente negativo
+  exposicaoMaxima: number;         // min(fluxoAcumulado) com piso em zero — nunca positivo
   /**
    * #456: mês (0-based) em que `exposicaoMaxima` ocorre —
    * `fluxoAcumulado.indexOf(exposicaoMaxima)`. Único lugar que calcula isto:
    * `frontend/fluxo-graficos.ts` lia por conta própria antes desta issue; ler
-   * o campo em vez de recalcular evita a segunda fonte. `null` só quando o
-   * fluxo não tem meses (`prazo === 0`) — em todo estudo real o mínimo do
-   * array sempre está no próprio array.
+   * o campo em vez de recalcular evita a segunda fonte. `null` quando não há
+   * exposição (`exposicaoMaxima === 0`: fluxo sem meses ou acumulado sempre >= 0).
    */
   mesExposicaoMaxima: number | null;
   vgvPermutaFisica: number;        // #188 — VGV atribuído às unidades permutadas (informativo)
@@ -2591,7 +2590,7 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
   // caísse exatamente num fim de período. Mesma semântica, agora recalculada
   // contra a série JÁ agregada (`fluxoAcumuladoAgregado`, computada uma vez).
   const fluxoAcumuladoAgregado = ultimo(c.fluxoAcumulado);
-  const mesExposicaoMaximaAgregado = fluxoAcumuladoAgregado.length
+  const mesExposicaoMaximaAgregado = fluxoAcumuladoAgregado.length && c.exposicaoMaxima < 0
     ? fluxoAcumuladoAgregado.indexOf(c.exposicaoMaxima)
     : null;
   return {
@@ -3025,11 +3024,19 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   let acc = 0;
   for (const v of fluxoMensal) { acc = round2(acc + v); fluxoAcumulado.push(acc); }
 
-  const paybackMes = fluxoAcumulado.findIndex((v, i) => v >= 0 && fluxoMensal.slice(0, i + 1).some((x) => x < 0));
-  const exposicaoMaxima = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
+  // #910 — payback e exposição leem a MESMA série (o acumulado): payback é o
+  // primeiro mês com acumulado >= 0 depois de algum acumulado < 0; a exposição
+  // é o pior ponto do acumulado com piso em zero (nunca positiva, sem -0).
+  let ficouNegativo = false;
+  const paybackMes = fluxoAcumulado.findIndex((v) => {
+    if (v < 0) { ficouNegativo = true; return false; }
+    return ficouNegativo;
+  });
+  const menorAcumulado = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
+  const exposicaoMaxima = menorAcumulado < 0 ? menorAcumulado : 0;
   // #456: mesmo padrão de `mesCarteiraClientesMaxima` — a derivação mora no
   // motor, não na tela que a consome.
-  const mesExposicaoMaxima = fluxoAcumulado.length ? fluxoAcumulado.indexOf(exposicaoMaxima) : null;
+  const mesExposicaoMaxima = exposicaoMaxima < 0 ? fluxoAcumulado.indexOf(exposicaoMaxima) : null;
 
   // #188/#268 — VGV Total / VGV Permuta Física (sem caixa) / Receita Bruta
   // (VGV): grandezas informativas. A permuta física agora é medida pelas
