@@ -2155,10 +2155,10 @@ export async function duplicarDadosAvancado(dados: ExecutorDados, origId: number
   }
 
   // Fases + alocações (mapeando fase antiga → nova e tipologia antiga → nova).
-  const [fases, alocacoes] = await Promise.all([
-    varrerTudo(dados, 'avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
-    varrerTudo(dados, 'avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
-  ]);
+  // Sequencial de propósito: `dados` pode ser o `trx`, e o SDK não documenta
+  // consultas concorrentes dentro de uma transação.
+  const fases = await varrerTudo(dados, 'avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' });
+  const alocacoes = await varrerTudo(dados, 'avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' });
   // Alocações indexadas por fase ANTES do laço — o mesmo padrão que o GET de
   // fases já usa neste arquivo. Sem o índice, o laço interno varre TODAS as
   // alocações uma vez por fase, e a duplicação é O(fases × alocações).

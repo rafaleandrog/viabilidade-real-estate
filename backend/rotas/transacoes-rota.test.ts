@@ -116,6 +116,10 @@ function semearAvancado(banco: Banco) {
   });
   banco.semear('avancado_cronograma', { estudo_id: origId, evento: 'planejamento', inicio_mes: 0, duracao_meses: 3, travado_inicio: true, travado_duracao: false });
   banco.semear('avancado_fases', { estudo_id: origId, tipo: 'obra', nome: 'Fase 1', ordem: 0, inicio_mes: 0, duracao_meses: 12 });
+  // As duas escritas do duplicar que não são do Avançado: o vínculo com imóvel
+  // e uma tabela de FILHAS_SIMPLES. Sem seed, trocar `trx` por `req.dados` nelas passava.
+  banco.semear('estudo_imoveis', { estudo_id: origId, imovel_nucleo_id: 5000, tipo_imovel: 'lote' });
+  banco.semear('preliminar_produtos', { estudo_id: origId, nome: 'Produto 1', tipo: 'residencial', area_media_m2: 50, unidades: 1, preco_m2: 10000, ordem: 0 });
   return origId;
 }
 
@@ -123,6 +127,8 @@ const estaticoDaCopia = (banco: Banco) => ({
   estudos: banco.linhas('estudos').length,
   cronograma: banco.linhas('avancado_cronograma').length,
   fases: banco.linhas('avancado_fases').length,
+  imoveis: banco.linhas('estudo_imoveis').length,
+  produtos: banco.linhas('preliminar_produtos').length,
   membros: banco.linhas('estudo_membros').length,
 });
 
@@ -138,7 +144,7 @@ test('#837 duplicar: grava tudo pelo trx, numa única transação', async () => 
   assert.equal(banco.transacoes, 1, 'a duplicação deveria abrir exatamente uma transação');
   const fora = banco.escritas.filter((e) => e.exec !== 'trx');
   assert.deepEqual(fora, [], 'escrita da duplicação saiu pelo req.dados em vez do trx');
-  for (const t of ['estudos', 'avancado_cronograma', 'avancado_fases', 'estudo_membros']) {
+  for (const t of ['estudos', 'avancado_cronograma', 'avancado_fases', 'estudo_imoveis', 'preliminar_produtos', 'estudo_membros']) {
     assert.ok(banco.escritas.some((e) => e.tabela === t && e.exec === 'trx'), `nenhuma escrita em ${t} pelo trx`);
   }
 });
