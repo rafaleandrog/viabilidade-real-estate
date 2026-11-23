@@ -300,7 +300,9 @@ Trocar a unidade não muda o canônico. Nas Premissas do Preliminar, a troca gra
 o modo: a coluna por unidade é um valor histórico que só muda quando você digita. Nos Custos do
 Avançado, que têm uma coluna única de orçamento, a troca a regrava na unidade nova com o número que
 a tela mostra. Estudos antigos continuam legíveis: o valor ativo vira canônico na primeira edição
-deliberada.
+deliberada. Nas linhas em % do VGV do Avançado, depois da atualização do app que mudou a base do
+VGV para a vendável, o valor em R$ deixa de ser o congelado e passa a ser recalculado do
+percentual gravado sobre o VGV vendável; a tela volta a congelá-lo na próxima edição da linha.
 
 ## Precisão
 

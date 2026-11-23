@@ -10,7 +10,7 @@
 //
 // Decisão do dono (recalcular sobre a base nova): ANULAR o canônico dessas
 // linhas. Sem canônico, o motor resolve pelo percentual:
-//   · `resolverCustoTotal` cai no `switch` e calcula `(orcamento_valor / 100) × vgv`;
+//   · `resolverCustoTotal` cai no `switch` e calcula `(orcamento_valor / 100) × VGV vendável (ctx.vgvVendavel)`;
 //   · `corretagemMensal` e `distribuirProporcional` usam `orcamento_valor / 100`;
 //   · a permuta financeira usa `orcamento_valor` como pct.
 // A tela volta a congelar o canônico no próximo edit da linha.

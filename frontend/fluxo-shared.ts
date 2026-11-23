@@ -1209,7 +1209,9 @@ export function vgvVendidoVendavelMensal(
  * já resolvido; permuta física e financeira não entram lá (#268), e para elas o
  * canônico é a fonte — exceto na permuta FÍSICA, em que o backend zera os dois
  * campos de propósito (`backend/rotas/avancado.ts:1394-1397`), e aí não há
- * dinheiro nenhum a mostrar. Sem canônico, a coluna crua só é R$ quando a
+ * dinheiro nenhum a mostrar. Exceção: linha `pct_vgv` sem canônico, com
+ * contexto — o R$ é o percentual nominal × a base vendável do contexto.
+ * Sem canônico, a coluna crua só é R$ quando a
  * unidade é `rs`; nas demais devolve `null`, para o chamador não afirmar um
  * número que não sabe.
  */
