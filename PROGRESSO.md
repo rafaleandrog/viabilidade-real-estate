@@ -4,6 +4,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Base do % do VGV no Avançado, fatia 2 de 5: migração recalcula o R$ congelado
+
+- Decisão do dono: nas linhas de custo do Avançado em `% do VGV`, o R$ canônico congelado é
+  recalculado sobre a base nova (VGV vendável, que a fatia 1 põe no motor). Mecanismo: a migração
+  `043_pct_vgv_recalcula_base_vendavel.js` anula `orcamento_valor_canonico` só das linhas
+  `pct_vgv`; sem canônico, o motor resolve pelo percentual gravado em `orcamento_valor`
+  (`resolverCustoTotal`, `corretagemMensal`, `distribuirProporcional` e a permuta financeira).
+- Guarda fail-closed: não anula quando `orcamento_valor` não é decimal simples, está fora de
+  [0, 100] ou é 0 com canônico diferente de 0. Idempotente; as demais unidades ficam intactas.
+- `versao` do manifesto 0.1.41 → 0.1.42 (migração nova, regra do guard). O harness ganhou sete
+  linhas-semente, uma por ramo da guarda; apagar o `atualizar` da migração deixa a asserção vermelha.
+- Medição na Pinguim (só leitura, estudos Avançado 21, 22, 40 e 41): 24 linhas `pct_vgv`, todas já
+  com canônico nulo; efeito da migração nestes estudos: R$ 0. Entra junto com a fatia 1, senão o R$
+  recalculado usa a base antiga até ela entrar.
+
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 
 - Pedido do autor, com captura: Infraestrutura em "% VGV", derivada de um custo em R$, aparecia
