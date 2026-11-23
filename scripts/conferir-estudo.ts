@@ -38,6 +38,7 @@ import {
   type FundingCalc, type OperacaoFunding,
 } from '../frontend/funding-motor.js';
 import { proformaAvancado } from '../frontend/proforma-avancado.js';
+import { somaLegadoAplicavel } from './conferir-legado.js';
 import {
   mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado, ePermutaFisica,
   impostoDoEstudoAvancado,
@@ -422,16 +423,4 @@ if (ehEntrada) {
       imprimir(await conferir(id));
     }
   }
-}
-
-/**
- * Σ entrada + parcelas do formato LEGADO do plano de pagamento, ou `null` quando
- * a conta não se aplica: a fase tem `componentes` (o motor não lê o legado, que é
- * só o espelho da tela). No legado o repasse é o complemento, então a conferência
- * é Σ ≤ 100, não Σ = 100.
- */
-export function somaLegadoAplicavel(fluxoPagamento: any): number | null {
-  if (Array.isArray(fluxoPagamento?.componentes)) return null;
-  const soma = (xs: any) => (Array.isArray(xs) ? xs : []).reduce((a: number, e: any) => a + (Number(e?.pct) || 0), 0);
-  return soma(fluxoPagamento?.entrada) + soma(fluxoPagamento?.parcelas);
 }
