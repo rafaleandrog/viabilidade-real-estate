@@ -687,9 +687,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
     : (e.permuta_fisica_nr_modo === 'pct_area_venda'
       ? areaBasePermutaNaoResidencial * n(e.permuta_fisica_nr_pct) / 100
       : n(e.permuta_fisica_nr_area_m2));
-  const areaPermutaNaoResidencial = porProdNR
+  // Loteamento: o valor canônico residual (de quando era Incorporação) também é ignorado, como na permuta financeira NR.
+  const areaPermutaNaoResidencial = lot ? 0 : (porProdNR
     ? permutaProd.nao_residencial.areaM2 * fatorSens('permuta_fisica')
-    : canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada) * fatorSens('permuta_fisica');
+    : canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada) * fatorSens('permuta_fisica'));
   const areaPermutaFisica = areaPermutaResidencial + areaPermutaNaoResidencial;
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
