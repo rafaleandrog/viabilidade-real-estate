@@ -46,8 +46,8 @@ export class ViabFluxoCronograma extends LitElement {
   // clique em "Salvar cronograma": os eventos vão numa ÚNICA chamada em lote
   // (endpoint novo, backend/rotas/avancado.ts) — validação de todo o lote
   // antes de qualquer escrita, uma reancoragem só, um só toast. As fases são
-  // uma entidade separada sem endpoint em lote (não há transação disponível
-  // neste stack para uni-las de verdade às duas tabelas numa só chamada) —
+  // uma entidade separada sem endpoint em lote (o PATCH do cronograma é atômico
+  // no servidor, mas não alcança as fases, que ficam numa chamada à parte) —
   // continuam salvando uma PATCH por fase, mas só no clique, nunca por tecla.
   @state() private draftCrono: Record<string, { inicio_mes?: number; duracao_meses?: number }> = {};
   @state() private draftFases: Record<number, { nome?: string; inicio_mes?: number; duracao_meses?: number }> = {};
@@ -373,9 +373,9 @@ export class ViabFluxoCronograma extends LitElement {
   // #252: um clique salva TUDO. Eventos fixos vão numa única chamada em lote
   // (endpoint novo) — o backend valida o lote inteiro antes de escrever
   // qualquer coisa, então uma falha aqui não persiste nada e preserva o
-  // rascunho. Fases são uma tabela separada sem endpoint em lote (não há
-  // transação disponível neste stack para unir as duas numa só chamada
-  // atômica) — continuam uma PATCH por fase, mas só agora, não mais por
+  // rascunho. Fases são uma tabela separada sem endpoint em lote (o PATCH
+  // do cronograma já é atômico no servidor, mas as fases ficam fora dele, em
+  // chamada própria) — continuam uma PATCH por fase, mas só agora, não mais por
   // tecla; uma falha de fase não desfaz os eventos já salvos com sucesso.
   private async _salvarCronograma() {
     if (!this._sujo || this.salvandoCronograma) return;

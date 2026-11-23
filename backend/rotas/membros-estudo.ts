@@ -160,7 +160,7 @@ rotasMembrosEstudo.post('/estudos/:id/membros', async (req: Request, res: Respon
     }) ?? decidirNivelDoAlvo(await nivelDoAlvo(req, usuarioId), funcao);
     if (recusa) { erro(res, recusa.http, recusa.codigo, recusa.mensagem); return; }
 
-    const nova = await garantirMembro(req, estudoId, usuarioId, funcao);
+    const nova = await garantirMembro(req.dados!, estudoId, usuarioId, funcao);
     if (nova) await inscreverMembroEstudo(req, estudoId, usuarioId, nova);
     res.json({ ok: true, adicionado: nova !== null });
   } catch (e: any) {
