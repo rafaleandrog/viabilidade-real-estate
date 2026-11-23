@@ -284,3 +284,29 @@ test('#754 semZeroNegativo: só o sinal sai na faixa em que o R$ publica "0"; a 
   assert.equal(semZeroNegativo(5), 5);
   assert.equal(semZeroNegativo(NaN), 0);
 });
+
+import { CASAS_MAX_CAMPO, textoCampoEdicao, textoCampoRepouso } from './viab-format.js';
+
+test('campo de formulário: no máximo 2 casas em repouso e na edição, qualquer unidade', () => {
+  assert.equal(CASAS_MAX_CAMPO, 2);
+  const dizima = 215 / 9; // 23,888… — % VGV derivado de um R$
+  assert.equal(textoCampoRepouso(dizima, 2), '23,89');
+  assert.equal(textoCampoEdicao(dizima, 2), '23,89');
+  // Consumidor que pede mais casas não fura o teto.
+  assert.equal(textoCampoRepouso(33.3333, 4), '33,33');
+  assert.equal(textoCampoEdicao(33.3333, 4), '33,33');
+  // Repouso agrupa milhar; edição não (o parse trata "." como milhar).
+  assert.equal(textoCampoRepouso(1234567.891, 2), '1.234.567,89');
+  assert.equal(textoCampoEdicao(1234567.891, 2), '1234567,89');
+  assert.equal(parseNumeroBR(textoCampoEdicao(1234567.891, 2)), 1234567.89);
+  // Mínimo de casas (#177) e campo inteiro.
+  assert.equal(textoCampoEdicao(1.2, 2, 2), '1,20');
+  assert.equal(textoCampoRepouso(12, 2), '12');
+  assert.equal(textoCampoEdicao(6.4, 0), '6');
+  // Vazio, não-finito e zero negativo.
+  assert.equal(textoCampoRepouso(null, 2), '');
+  assert.equal(textoCampoEdicao(Number.NaN, 2), '');
+  assert.equal(textoCampoEdicao(-0.001, 2), '0');
+  assert.equal(textoCampoRepouso(-0.004, 2, 2), '0,00');
+  assert.equal(textoCampoEdicao(-12.345, 2), '-12,35');
+});

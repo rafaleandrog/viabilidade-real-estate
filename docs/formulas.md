@@ -343,6 +343,12 @@ casas, e cada função de formatação monetária é única entre tela e exporta
 Proforma, linha de custo sai sempre entre parênteses; linha de receita ou resultado, só quando o
 valor é de fato negativo.
 
+**Campos de formulário** mostram no máximo duas casas decimais, em qualquer unidade (R$, R$/m²,
+% VGV, m², % da área de venda), tanto em repouso quanto ao receber o cursor para edição. Quando o
+valor exibido é derivado de outra unidade — um % VGV que vem de um custo em R$, por exemplo — o
+campo mostra o arredondamento, e o cálculo segue com o valor exato. Clicar no campo e sair sem
+digitar não altera nada; só o número digitado substitui o valor guardado.
+
 ## Interpretações
 
 Onde a especificação original era ambígua, o app segue o protótipo e o bom senso: o custo do

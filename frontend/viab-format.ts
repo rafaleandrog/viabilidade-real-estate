@@ -288,3 +288,48 @@ export function escaparHtml(v: unknown): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+
+/**
+ * Teto de casas decimais que um CAMPO DE FORMULÁRIO (`viab-num`) mostra, em
+ * qualquer unidade (R$, R$/m², % VGV, m², % ALV…). Decisão do autor: o campo
+ * nunca exibe mais de 2 casas — nem em repouso, nem ao ganhar foco.
+ *
+ * É regra de EXIBIÇÃO. O valor que o campo carrega continua exato: um % VGV
+ * derivado de um R$ ou de um R$/m² (23,888…) aparece como "23,89", mas o motor
+ * segue com a dízima inteira. Só o que a pessoa DIGITA substitui o valor —
+ * focar e sair do campo sem digitar não grava nada.
+ */
+export const CASAS_MAX_CAMPO = 2;
+
+function casasDoCampo(casasDecimais: number, casasMinimas: number): { max: number; min: number } {
+  const max = Math.max(0, Math.min(Math.trunc(casasDecimais) || 0, CASAS_MAX_CAMPO));
+  const min = Math.max(0, Math.min(Math.trunc(casasMinimas) || 0, max));
+  return { max, min };
+}
+
+// Zero negativo pós-arredondamento (-0,001 → "-0") não é um valor: sai "0".
+function semZeroNegativoTexto(s: string): string {
+  return /^-[0,.]*$/.test(s) ? s.slice(1) : s;
+}
+
+/** Texto do campo em REPOUSO: agrupado (1.234,57), no máximo 2 casas. */
+export function textoCampoRepouso(v: number | null, casasDecimais: number, casasMinimas = 0): string {
+  if (v == null || !Number.isFinite(v)) return '';
+  const { max, min } = casasDoCampo(casasDecimais, casasMinimas);
+  return semZeroNegativoTexto(new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: min, maximumFractionDigits: max,
+  }).format(v));
+}
+
+/**
+ * Texto do campo ao GANHAR FOCO: sem separador de milhar (o `parseNumeroBR`
+ * trata "." como milhar e o descartaria), vírgula decimal, no máximo 2 casas.
+ * Antes o foco mostrava `String(v)` — a dízima inteira de um valor derivado.
+ */
+export function textoCampoEdicao(v: number | null, casasDecimais: number, casasMinimas = 0): string {
+  if (v == null || !Number.isFinite(v)) return '';
+  const { max, min } = casasDoCampo(casasDecimais, casasMinimas);
+  return semZeroNegativoTexto(new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: min, maximumFractionDigits: max, useGrouping: false,
+  }).format(v));
+}
