@@ -74,6 +74,9 @@ componentes em toda escrita e preserva taxa e sinal que o espelho legado não sa
 sub-objeto `ret` por linha pode existir em JSON antigo e está morto: a RET é global do estudo
 (`estudos.considerar_ret` e `estudos.ret_pct`), e nada lê o `ret` do blob.
 
+Quando o `componentes` gravado não bate com as linhas `entrada` e `parcelas` do mesmo plano, a resposta do
+`PATCH` da fase traz `espelho_divergente: true`; o plano é gravado como veio, e a tela o mostra só para leitura.
+
 Integridade: excluir uma tipologia com alocações é recusado (`422 TIPOLOGIA_EM_USO`); reduzir a
 `quantidade` do catálogo abaixo do já comprometido (alocações mais permuta física) é recusado
 (`422 SALDO_EXCEDIDO`); editar nome ou área da tipologia reflete ao vivo nas alocações, que guardam
