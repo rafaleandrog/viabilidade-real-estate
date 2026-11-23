@@ -38,7 +38,7 @@ import './viab-num.js';
 //    é lido pelo motor de fluxo para VPL/TIR).
 //  · `imposto_percentual` → visível aqui, mas SEMPRE DESABILITADO. Desde a #834
 //    é também o imposto padrão do Avançado (fora do RET o motor o deduz da
-//    receita recebida); o editor do Avançado vem na fatia 2 daquela issue.
+//    receita recebida); no Avançado, quem o edita é Custos › Financeiro.
 
 // Todos os campos numéricos (decimais + inteiros) — para coerção '' → null e
 // Number(...) no salvar.
@@ -269,8 +269,8 @@ export class ViabTelaFinanceiro extends LitElement {
             ? this._n('imposto_percentual', 'Imposto (se não RET)', '%', !impostoPercentualEditavel(nivel))
             : nothing}
         </div>
-        <p class="sec">No Avançado, é o imposto que o fluxo deduz da receita recebida quando o RET
-          não está marcado (Custos › Financeiro). No Preliminar, é o mesmo campo das Premissas.</p>
+        <p class="sec">No Avançado, é o imposto que o fluxo deduz da receita recebida quando o regime
+          é o imposto padrão; edite-o em Custos › Financeiro. No Preliminar, é o mesmo campo das Premissas.</p>
       </urbi-card>
 
       ${this.editavel

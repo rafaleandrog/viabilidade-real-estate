@@ -46,7 +46,7 @@ import {
 } from '../frontend/fluxo-shared.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarFunding, validarPermutaFisica, validarCustosDuplicados, validarReconciliacaoCamadas,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, validarReconciliacaoCamadas, validarImposto,
   permutaFisicaPorTipologia,
   type Divergencia,
 } from '../frontend/fluxo-invariantes.js';
@@ -180,6 +180,7 @@ export async function conferir(id: number): Promise<Conferencia> {
     ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada, undefined, d.custos),
     ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos, Number(estudo?.juros_tabela_aa_padrao) || 0),
     ...validarFluxoCalc(calc),
+    ...validarImposto(d.ret),
     ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal, undefined, receitaLiquida) : []),
     // #441: reconciliação Catálogo × Premissas.
     ...validarReconciliacaoCamadas(estudo, d.custos, d.tipologias),

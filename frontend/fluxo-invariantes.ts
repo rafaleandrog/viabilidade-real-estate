@@ -25,7 +25,7 @@ import {
 } from './fluxo-caixa-motor.js';
 import {
   absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo, ultimoMesFunding,
-  unidadesVendaveisTipologia, type AbsorcaoMensal, type EventoCrono,
+  unidadesVendaveisTipologia, type AbsorcaoMensal, type EventoCrono, type ImpostoReceita,
 } from './fluxo-shared.js';
 import type { FundingCalc } from './funding-motor.js';
 
@@ -1104,4 +1104,32 @@ export function unidadesNaoAlocadasPorTipologia(
     }
   }
   return out;
+}
+
+/**
+ * #834: estudo Avançado sem imposto declarado. O fluxo sai sem dedução de
+ * imposto quando a alíquota do regime escolhido é zero — regime padrão sem
+ * `imposto_percentual`, ou RET com alíquota 0. Não é erro de cálculo (o motor
+ * fez o que o estudo pediu), mas o resultado fica superestimado pela alíquota
+ * inteira, então vira alerta visível na lista de divergências.
+ *
+ * Imposto ausente (`undefined`: a rota dos parâmetros falhou) não alerta: o
+ * estudo não está sem imposto, a tela é que não conseguiu lê-lo.
+ */
+export function validarImposto(imposto: ImpostoReceita | null | undefined): Divergencia[] {
+  if (!imposto) return [];
+  const pct = Number(imposto.pct);
+  if (imposto.ativo && Number.isFinite(pct) && pct > 0) return [];
+  const ret = imposto.regime === 'ret';
+  return [{
+    codigo: 'IMPOSTO_ZERO',
+    severidade: 'alerta',
+    linha: ret ? 'RET' : 'Imposto padrão',
+    esperado: 0,
+    encontrado: 0,
+    diferenca: 0,
+    mensagem: ret
+      ? 'O RET está marcado com alíquota zero: o fluxo sai sem imposto sobre a receita. Informe a alíquota em Custos › Financeiro.'
+      : 'O estudo não declara alíquota de imposto: o fluxo sai sem imposto sobre a receita. Informe a alíquota do imposto padrão (ou marque o RET) em Custos › Financeiro.',
+  }];
 }

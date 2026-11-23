@@ -67,18 +67,20 @@ curva de absorção; três linhas não escolhem — a corretagem sai no mês da 
 entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
 consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
 
-As unidades em % diferem na base. **% da receita** é a receita líquida do imposto, sem juros; **% do
+As unidades em % diferem na base. **% da receita** é o VGV vendável (sem as unidades da permuta física) líquido do imposto, sem juros; **% do
 recebido** é o que de fato entra em caixa, com os juros de tabela — oferecido no marketing, na
 manutenção pós-obra, no marketing global, na gestão e no Outro dos custos diretos e indiretos. **% da obra** é o grupo Obras inteiro, outorga
 e contingência inclusas; **% da construção** é só construção, decoração e gestão da obra — oferecido
 em Projetos. As bases estão em [Fórmulas](formulas).
 
-O **imposto sobre a receita** tem dois regimes, e o fluxo sempre deduz um deles da receita
-recebida, mês a mês. Com o **RET** marcado (sub-aba Financeiro dos Custos), vale a alíquota do RET,
-4% por padrão. Sem o RET, vale o **imposto padrão** do estudo: a alíquota do campo **Imposto (se não
-RET)**, a mesma que o Preliminar usa fora do RET (7% por padrão), mostrada em Viabilidade →
-Financeiro. Desmarcar o RET não zera o imposto; o fluxo só fica sem imposto quando a alíquota
-declarada é zero.
+O **imposto sobre a receita** tem dois regimes, escolhidos na sub-aba Financeiro dos Custos, no
+campo **Imposto sobre a receita**: o **Imposto padrão do estudo** (a mesma alíquota que o Preliminar
+usa fora do RET, 7% por padrão) ou o **RET** (patrimônio de afetação, 4% por padrão). Ao lado vem a
+alíquota do regime escolhido, de 0 a 100%; trocar de regime não apaga a alíquota do outro, e o
+**Salvar** grava as duas. O fluxo sempre deduz a alíquota do regime escolhido da receita recebida,
+mês a mês. A unidade da permuta física não gera recebido, então não paga imposto; a permuta
+financeira não reduz a base do imposto, porque a incorporadora recebe tudo e paga ao terrenista a
+parte dele. Com alíquota zero no regime escolhido, o fluxo sai sem imposto e a reconciliação avisa.
 
 Três linhas são **semeadas**: ao abrir um estudo editável, a aba Custos cria o **Preço** no Terreno,
 a **Construção** nas Obras e a **Corretagem de vendas** nos Diretos (em % do VGV) que ainda não
@@ -103,7 +105,7 @@ reconciliação.
 | Sub-aba | O que se informa |
 |---|---|
 | **Receitas** | A **absorção de vendas** — quanto do estoque se vende em cada mês, em percentual acumulado, a partir de uma curva que pode ser substituída — e o **fluxo de pagamento** de cada safra de vendas: **Sinal**, **Nº parcelas**, o que é pago **Ao longo da obra**, o **Desconto**, o **Resíduo sem prazo** (o que o parcelamento ao longo da obra não alcança: caixa imediato, o padrão, ou rolando para o repasse) e o **Saldo de chaves** — o que restar após entrada e parcelamento, dividido entre o **Repasse bancário** (% do saldo, pago de uma vez no 1º mês após o fim da obra) e a **carteira própria** (o restante, financiado direto ao comprador em **Nº parcelas** mensais após uma **Carência (meses)** contada da entrega). |
-| **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL; `0` é uma taxa válida e não desconta nada, de modo que o VPL iguala a soma do fluxo; estudo sem taxa gravada usa 12% a.a.) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota do **Imposto (se não RET)** aparece aqui só para leitura; é ela que o fluxo deduz da receita quando o RET não está marcado. |
+| **Financeiro** | Os parâmetros financeiros do estudo: a **Taxa de desconto p/ VP** (usada no VPL; `0` é uma taxa válida e não desconta nada, de modo que o VPL iguala a soma do fluxo; estudo sem taxa gravada usa 12% a.a.) e os **Juros de tabela** padrão aplicados às parcelas. A alíquota do **Imposto (se não RET)** aparece aqui só para leitura; ela é editada em Custos › Financeiro e é a que o fluxo deduz da receita quando o regime é o imposto padrão. |
 
 A **Absorção de vendas** de cada Grupo distribui o percentual vendido em até quatro períodos que vêm
 do Cronograma: **Pré-lançamento** (quando o estudo tem essa fase), **Lançamento**, **Durante a
@@ -175,7 +177,8 @@ repassar fica fora desta última, porque capitaliza até o repasse, e a carteira
 parcelamentos com 1º vencimento dois ou mais meses depois da venda (o parcelamento periódico do
 legado) só entram nela a partir do 1º vencimento, porque até ali também capitalizam. Cada aviso aparece uma vez por
 componente, na primeira safra em que acontece, e um aviso numa safra não esconde os das safras
-seguintes.
+seguintes. Ela também avisa o estudo **sem imposto declarado**: o regime escolhido com alíquota
+zero deixa o resultado superestimado pela alíquota inteira.
 
 ### Comparar com a planilha EVI
 

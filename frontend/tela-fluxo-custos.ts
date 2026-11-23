@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
+import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtNum } from './viab-format.js';
@@ -15,7 +15,12 @@ import {
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
   listarFasesAvancado, listarTipologiasCatalogo, atualizarEstudo,
 } from './viabilidade-api.js';
-import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { calcularFluxo, vgvVendavelPorLinha, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
+import {
+  OPCOES_REGIME_IMPOSTO, aliquotaDoRegime, dadosEstudoDoImpostoSalvo, erroAliquotaImposto, erroFormImposto,
+  formImpostoAlterado, formImpostoDeParametros,
+  patchImpostoAvancado, rotuloAliquotaImposto, type FormImposto, type RegimeImposto,
+} from './imposto-regime.js';
 import { converterUnidade, dadosDaTrocaDeUnidade, numeroDaColuna, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import './viab-num.js';
 
@@ -287,16 +292,16 @@ export class ViabFluxoCustos extends LitElement {
   @state() private fasesCronograma: any[] = [];
   @state() private crono: EventoCrono[] = [];
   @state() private dataInicio: string | null = null;
-  // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret). `ret`
-  // é o estado salvo do controle; `retForm` é o rascunho editável em
-  // Custos → Financeiro (padrão rascunho + Salvar — #51/#252).
-  private ret: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
+  // #834: regime do imposto (RET ou imposto padrão do estudo), global do
+  // estudo. `impostoSalvo` é o estado gravado; `impostoForm` é o rascunho
+  // editável em Custos → Financeiro (padrão rascunho + Salvar — #51/#252).
+  private impostoSalvo: FormImposto = { regime: 'padrao', retPct: 4, padraoPct: 0 };
   // #834: o que alimenta o cálculo (ctxCusto/FluxoConfig) é o imposto já
   // resolvido — RET ou imposto padrão do estudo —, nunca o `ret` acima: fora
   // do RET ele deduziria zero.
   private imposto: ImpostoReceita | undefined = undefined;
-  @state() private retForm: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
-  @state() private salvandoRet = false;
+  @state() private impostoForm: FormImposto = { regime: 'padrao', retPct: 4, padraoPct: 0 };
+  @state() private salvandoImposto = false;
   // #473: base da Corretagem de vendas quanto à permuta física —
   // `estudos.corretagem_sobre_permuta_fisica`, salva na hora do toggle (sem
   // rascunho: é um booleano isolado, não precisa do padrão Salvar do RET).
@@ -349,7 +354,23 @@ export class ViabFluxoCustos extends LitElement {
   // Contexto sem as bases que dependem de outros custos (`totalObra`,
   // `totalConstrucao`) — o ponto de partida das duas.
   private _ctxBase(): ContextoCusto {
-    return { ...this.ctxCusto, receitaRecebida: this._receitaRecebida() };
+    return { ...this.ctxCusto, receitaTotal: this._receitaTotal(), receitaRecebida: this._receitaRecebida() };
+  }
+
+  // Base de `% Receita`: o VGV VENDÁVEL de cada linha (a permuta física fica
+  // fora, como no motor — `vgvVendavelPorLinha`) líquido do imposto que o
+  // motor aplica (`this.imposto`, RET ou padrão). Antes a tela usava o VGV
+  // total e, com permuta física, mostrava um custo maior que o do fluxo.
+  private _memoReceitaTotal: { chave: unknown[]; valor: number } | null = null;
+  private _receitaTotal(): number {
+    const chave = [this.custos, this.linhasReceita, this.imposto];
+    if (this._memoReceitaTotal && this._memoReceitaTotal.chave.every((v, i) => v === chave[i])) return this._memoReceitaTotal.valor;
+    const vendavel = vgvVendavelPorLinha(this.linhasReceita, this.custos);
+    const vgvVendavelDe = (i: number): number => vendavel[i] ?? 0;
+    const valor = this.linhasReceita.reduce(
+      (s: number, _l: any, i: number) => s + receitaLiquidaLinha(vgvVendavelDe(i), this.imposto), 0);
+    this._memoReceitaTotal = { chave, valor };
+    return valor;
   }
 
   // Contexto completo incluindo totalObra e totalConstrucao (usado no
@@ -387,7 +408,7 @@ export class ViabFluxoCustos extends LitElement {
       border-radius: 0 0 8px 8px;
     }
     .rodape-custo .espaco { flex: 1; }
-    /* #346: RET, único controle global exibido dentro do grupo Financeiro. */
+    /* #834: regime do imposto, único controle global exibido dentro do grupo Financeiro. */
     .ret-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .total-rotulo { color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
     .total-valor { font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
@@ -447,6 +468,30 @@ export class ViabFluxoCustos extends LitElement {
     .avanco-tabela th:first-child, .avanco-tabela td:first-child { text-align: left; font-weight: 600; }
   `];
 
+  // #834: as cinco sub-abas de Custos são instâncias vivas ao mesmo tempo (uma
+  // por slot do `urbi-abas`, `tela-avancado.ts`), e cada uma carrega o imposto
+  // uma vez só. Quando a sub-aba Financeiro salva o regime, ela sobe as colunas
+  // gravadas para a tela do estudo, que devolve o `estudo` novo a TODAS as
+  // instâncias — e é aqui que as irmãs o aplicam, senão a base `% Receita` e a
+  // conversão R$ ↔ % delas seguiriam com o imposto antigo (achado do App do
+  // Codex na revisão do PR 948).
+  willUpdate(changed: PropertyValues) {
+    if (changed.has('estudo') && this.carregado) this._impostoDoEstudo();
+  }
+
+  private _impostoDoEstudo() {
+    const e = this.estudo;
+    if (!e || !('considerar_ret' in e)) return;
+    const colunas = { considerar_ret: e.considerar_ret === true, ret_pct: e.ret_pct, imposto_percentual: e.imposto_percentual };
+    const salvo = formImpostoDeParametros(colunas);
+    if (!formImpostoAlterado(salvo, this.impostoSalvo)) return;
+    // Rascunho com edição pendente nesta instância não é atropelado.
+    const pendente = formImpostoAlterado(this.impostoForm, this.impostoSalvo);
+    this.impostoSalvo = salvo;
+    if (!pendente) this.impostoForm = { ...salvo };
+    this.imposto = impostoDoEstudoAvancado(colunas);
+  }
+
   updated() {
     if (this.estudo?.id && !this.carregado) {
       this.carregado = true;
@@ -478,24 +523,20 @@ export class ViabFluxoCustos extends LitElement {
       if (!params?.erro) {
         this.dataInicio = params.data_inicio_projeto ?? null;
         this.taxaDesconto = Number(params.taxa_desconto_aa ?? 12);
-        this.ret = { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) };
-        this.retForm = { ...this.ret };
+        this.impostoSalvo = formImpostoDeParametros(params);
+        this.impostoForm = { ...this.impostoSalvo };
       }
       this.imposto = impostoDoEstudoAvancado(params);
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
       this.linhasReceita = linhas;
-      // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts): além de
-      // área/VGV, calcula a RECEITA total (líquida do único imposto oficial do
-      // Avançado — RET, global desde a #346, antes por Grupo, #228) para que a
-      // coluna Resultado de linhas em `% Receita` bata exatamente com o que o
-      // motor computa (antes, sem `receitaTotal`, o cálculo caía no fallback
-      // VGV e divergia do fluxo de caixa — issue #118).
+      // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts). A
+      // RECEITA total (base de `% Receita`) não mora aqui: ela depende das
+      // linhas de permuta física, que mudam sem recarregar, e é calculada por
+      // `_receitaTotal()` a cada leitura do contexto (#834, issue #118).
       this.ctxCusto = {
         areaPrivativaTotal: areaPrivativaTotalLinhas(linhas),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
-        receitaTotal: linhas.reduce(
-          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), this.imposto), 0),
       };
       // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
       // custos já carregados. Editável apenas (#120).
@@ -539,7 +580,7 @@ export class ViabFluxoCustos extends LitElement {
             title="Em breve">Importar Planilha</urbi-botao>
         </div>
 
-        ${g.id === 'financeiro' ? this._renderRet() : nothing}
+        ${g.id === 'financeiro' ? this._renderImposto() : nothing}
         ${g.id === 'diretos' ? this._renderCorretagemPermutaFisica() : nothing}
 
         <urbi-tabela
@@ -564,28 +605,36 @@ export class ViabFluxoCustos extends LitElement {
     `;
   }
 
-  // #346: RET (Regime Especial de Tributação) — controle global do estudo,
-  // movido de Receitas → Fluxo de pagamento → Definições para cá (a única
-  // entrada fiscal com efeito real no motor, `fluxo-shared.ts`). Rascunho +
-  // Salvar (A4/#51/#252): `viab-num` não tem estado próprio de "sujo", então
-  // sem rascunho o valor voltaria ao salvo a cada re-render.
-  private _renderRet(): TemplateResult {
+  // #834: regime do imposto sobre a receita — controle global do estudo
+  // (`estudos.considerar_ret` escolhe; `ret_pct` ou `imposto_percentual` é a
+  // alíquota). Rascunho + Salvar (A4/#51/#252): `viab-num` não tem estado
+  // próprio de "sujo", então sem rascunho o valor voltaria ao salvo a cada
+  // re-render. O texto só fala em RET quando o regime é RET.
+  private _renderImposto(): TemplateResult {
     const dis = !this.editavel;
+    const f = this.impostoForm;
+    const erro = erroAliquotaImposto(aliquotaDoRegime(f));
+    const erroForm = erroFormImposto(f);
     return html`
       <div class="ret-box">
-        <urbi-checkbox
-          label="RET (Regime Especial de Tributação — patrimônio de afetação)"
+        <urbi-select
+          label="Imposto sobre a receita"
           ?desabilitado=${dis}
-          ?marcado=${this.retForm.ativo}
-          @urbi:checkbox-change=${(e: CustomEvent) => { this.retForm = { ...this.retForm, ativo: e.detail.marcado }; }}
-        ></urbi-checkbox>
-        ${this.retForm.ativo ? html`
-          <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${this.retForm.pct}
-            @urbi:input-numero-change=${(e: CustomEvent) => { this.retForm = { ...this.retForm, pct: e.detail.valor ?? 0 }; }}
-          ></viab-num>` : nothing}
+          .valor=${f.regime}
+          .opcoes=${OPCOES_REGIME_IMPOSTO}
+          @urbi:select-change=${(e: CustomEvent) => { this.impostoForm = { ...this.impostoForm, regime: e.detail.valor as RegimeImposto }; }}
+        ></urbi-select>
+        <viab-num label=${rotuloAliquotaImposto(f.regime)} sufixo="%" casas-minimas="2" ?desabilitado=${dis}
+          .valor=${aliquotaDoRegime(f)} erro=${erro ?? ''}
+          @urbi:input-numero-change=${(e: CustomEvent) => {
+            const v = e.detail.valor ?? 0;
+            this.impostoForm = f.regime === 'ret' ? { ...this.impostoForm, retPct: v } : { ...this.impostoForm, padraoPct: v };
+          }}
+        ></viab-num>
         ${!dis ? html`
-          <urbi-botao variante="secundario" pequeno ?carregando=${this.salvandoRet}
-            @click=${this._salvarRet}>Salvar</urbi-botao>` : nothing}
+          <urbi-botao variante="secundario" pequeno ?carregando=${this.salvandoImposto}
+            ?desabilitado=${!!erroForm || !formImpostoAlterado(this.impostoForm, this.impostoSalvo)}
+            @click=${this._salvarImposto}>Salvar</urbi-botao>` : nothing}
       </div>
     `;
   }
@@ -1084,25 +1133,30 @@ export class ViabFluxoCustos extends LitElement {
     if (Object.keys(patch).length) await this._salvar(c, patch);
   }
 
-  // #346: RET é controle global do estudo (estudos.considerar_ret/ret_pct) —
-  // salva via /avancado/parametros, o mesmo endpoint de data_inicio_projeto/
+  // #834: regime e alíquotas do imposto — controle global do estudo, salvo via
+  // /avancado/parametros, o mesmo endpoint de data_inicio_projeto/
   // taxa_desconto_aa. Recarrega tudo depois, como `_salvarParametros` faz em
-  // tela-fluxo-cronograma.ts, para `ctxCusto.receitaTotal` e o Fluxo de Avanço
+  // tela-fluxo-cronograma.ts, para a base `% Receita` e o Fluxo de Avanço
   // da Obra (`_calcObra`) refletirem o novo valor na hora.
-  private async _salvarRet() {
-    this.salvandoRet = true;
+  private async _salvarImposto() {
+    if (erroFormImposto(this.impostoForm)) return;
+    this.salvandoImposto = true;
     try {
-      const res = await atualizarParametrosAvancado(this.estudo.id, {
-        considerar_ret: this.retForm.ativo,
-        ret_pct: this.retForm.pct,
-      });
+      const res = await atualizarParametrosAvancado(this.estudo.id, patchImpostoAvancado(this.impostoForm));
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // As colunas gravadas sobem para a tela do estudo, pelo mesmo canal da aba
+      // Financeiro: sem isso ela guardava o `imposto_percentual` antigo e o
+      // regravava no próximo Salvar dela (achado da revisão do PR 948).
+      const dados = dadosEstudoDoImpostoSalvo(res);
+      this.estudo = { ...this.estudo, ...dados };
+      this.dispatchEvent(new CustomEvent('viab:premissas-change', { detail: { dados }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent('viab:premissas-salvas', { detail: { dados }, bubbles: true, composed: true }));
       await this._carregar();
-      urbiVerso.notificar('RET salvo.', 'sucesso');
+      urbiVerso.notificar('Imposto salvo.', 'sucesso');
     } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar RET', 'erro');
+      urbiVerso.notificar(e?.message || 'Erro ao salvar o imposto', 'erro');
     } finally {
-      this.salvandoRet = false;
+      this.salvandoImposto = false;
     }
   }
 
@@ -1157,7 +1211,7 @@ export class ViabFluxoCustos extends LitElement {
       areaPrivativa: this.ctxCusto.areaPrivativaTotal,
       areaTerreno: this.ctxCusto.areaTerreno,
       vgv: this.ctxCusto.vgvTotal,
-      receita: this.ctxCusto.receitaTotal ?? this.ctxCusto.vgvTotal,
+      receita: this._receitaTotal(),
       // #514: mesma base que o motor usa para `pct_obra`.
       obra: this._totalObra(excluirId),
       recebido: this._receitaRecebida(),

@@ -3237,3 +3237,34 @@ export function tirBissecaoFluxo(fluxoMensal: number[]): number | null {
   if (!(Math.abs(npv(r)) <= 1e-6 * e)) return null; // intervalo esgotado sem raiz de fato
   return (Math.pow(1 + r, 12) - 1) * 100;
 }
+
+/**
+ * VGV VENDÁVEL de cada linha de receita, na ordem das linhas: a unidade da
+ * permuta física é entregue, não vendida, e fica fora — a mesma conta que
+ * `calcularFluxo` faz com `vgvVendavelLinhaMotor`. Exportada para a tela de
+ * Custos não ter uma segunda conta: ela usava o VGV total e, com permuta
+ * física, mostrava um custo `% da receita` maior que o do fluxo (#834).
+ */
+export function vgvVendavelPorLinha(linhasReceita: any[], linhasCusto: any[]): number[] {
+  const reservas = reservarPermutasFisicas(linhasReceita ?? [], linhasCusto ?? []);
+  return (linhasReceita ?? []).map((l: any, li: number) =>
+    (l.tipologias ?? []).reduce((total: number, t: any, ti: number) => {
+      const unidades = reservas.usaFonteNova
+        ? (reservas.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0) : undefined;
+      return total + vgvVendavelTipologia(t, unidades);
+    }, 0));
+}
+
+/**
+ * Base dos custos em `% da receita` (`ContextoCusto.receitaTotal`): o VGV
+ * vendável de cada linha, líquido do imposto sobre a receita (RET ou imposto
+ * padrão, #834). É o número que `calcularFluxo` aplica às linhas `pct_receita`.
+ */
+export function receitaTotalBaseCusto(
+  linhasReceita: any[],
+  linhasCusto: any[],
+  imposto: ImpostoReceita | null | undefined,
+): number {
+  return vgvVendavelPorLinha(linhasReceita, linhasCusto)
+    .reduce((s, vgv) => s + receitaLiquidaLinha(vgv, imposto), 0);
+}

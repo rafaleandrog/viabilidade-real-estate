@@ -4,6 +4,23 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Imposto do Avançado, fatia 2 de 3: regime na tela, alerta e base % da receita (issue 834)
+
+- Custos › Financeiro troca o checkbox do RET por um seletor **Imposto sobre a receita** (imposto
+  padrão do estudo ou RET) e a alíquota do regime escolhido, de 0 a 100 %. O Salvar grava o regime
+  e as duas alíquotas pelo `PATCH /avancado/parametros`, que passou a aceitar `imposto_percentual`
+  pelo parser estrito (`aliquotaImpostoDoCorpo`, teto `TETO_ALIQUOTA_IMPOSTO`). Fora do RET o
+  controle não fala em RET. Lógica pura em `frontend/imposto-regime.ts`.
+- Alerta `IMPOSTO_ZERO` (`validarImposto`, `fluxo-invariantes.ts`) na reconciliação do Fluxo de
+  Caixa e no `conferir-estudo`, quando o regime escolhido tem alíquota zero.
+- Decisão do dono (23/11): a base do RET fica sobre o recebido. Conferência das contas com permuta
+  física e financeira nos quatro Avançados vivos da Pinguim: 48 conferências, todas fecham (maior
+  Δ R$ 0,31, arredondamento mensal). Registro na issue.
+- A conferência achou um desvio de tela: com permuta física, a base `% da receita` da tela de Custos
+  usava o VGV total (o fluxo usa o vendável). Agora a tela usa `vgvVendavelPorLinha` do motor,
+  recalculada a cada leitura do contexto. Resultado e fluxo não mudam.
+- Fica para a fatia 3: o restante do guia, e o `Closes`.
+
 ## 2026-11-22 — Imposto do Avançado em dois regimes, fatia 1 de 3: motor e fiação (issue 834)
 
 - Decisão do dono: o Avançado tem **imposto padrão** (a alíquota `imposto_percentual` do estudo,
@@ -22,6 +39,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   está no PR, para decisão do dono.
 - Fica para as fatias seguintes: o seletor de regime e a alíquota editável na tela, o alerta de
   imposto zero na lista de divergências, e o restante do guia.
+
 ## 2026-11-22 — Exposição máxima com piso em zero e payback pelo acumulado (item da issue #910)
 
 - `exposicaoMaxima` passa a ser o menor acumulado com piso em zero (nunca positiva, sem `-0`) e
