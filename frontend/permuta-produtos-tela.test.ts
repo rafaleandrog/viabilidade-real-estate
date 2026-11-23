@@ -1,17 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { colunasProduto, colunasProdutoTabela, dadosEdicaoUnidades } from './tela-premissas.js';
+import { colunasProduto, dadosEdicaoUnidades } from './tela-premissas.js';
 
-// A tabela do catálogo ganha "Unidades permutadas" logo depois de "Unidades";
-// `colunasProduto` (a lista base) segue como estava.
-test('colunasProdutoTabela: Unidades permutadas entra depois de Unidades, nos dois tipos', () => {
+// A tabela do catálogo ganha "Unidades permutadas" logo depois de "Unidades", nos dois tipos.
+test('colunasProduto: Unidades permutadas entra depois de Unidades', () => {
   for (const lot of [true, false]) {
-    const chaves = colunasProdutoTabela(lot).map((c) => c.chave);
-    assert.deepEqual(chaves, ['nome', 'tipo', 'pct', 'unidades', 'unidadesPermutadas', 'areaTotal', 'area', 'preco', 'vgv']);
-    assert.deepEqual(colunasProduto(lot).map((c) => c.chave), chaves.filter((c) => c !== 'unidadesPermutadas'));
-    const col = colunasProdutoTabela(lot).find((c) => c.chave === 'unidadesPermutadas')!;
-    assert.equal(col.rotulo, 'Unidades permutadas');
-    assert.equal(col.classe, 'p-uperm');
+    const cols = colunasProduto(lot);
+    const i = cols.findIndex((c) => c.chave === 'unidades');
+    assert.equal(cols[i + 1].chave, 'unidadesPermutadas');
+    assert.equal(cols[i + 1].rotulo, 'Unidades permutadas');
+    assert.equal(cols[i + 1].classe, 'p-uperm');
   }
 });
 

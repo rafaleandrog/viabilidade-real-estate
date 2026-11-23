@@ -21,14 +21,10 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 // — mesma posição da coluna no `schema.json` e no grid da tela.
 // #781/#784: `pct_alv` (participação na base do estudo: ALV no Loteamento, áreas
 // privativas fechadas na Incorporação) entra logo depois de `tipo`.
-export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
-
-// Permuta física por produto: unidades do produto entregues em permuta. Lista
-// À PARTE de `CAMPOS` (que fixa a forma original do catálogo) e somada a ela em
-// `CAMPOS_GRAVAVEIS` — é esta a lista que POST, PATCH e a duplicação do estudo
-// leem, então a coluna não pode ficar fora de nenhum dos três.
-export const CAMPOS_PERMUTA = ['unidades_permutadas'];
-export const CAMPOS_GRAVAVEIS = [...CAMPOS, ...CAMPOS_PERMUTA];
+// `unidades_permutadas`: unidades do produto entregues em permuta física (a
+// permuta por produto do Preliminar). POST, PATCH e a duplicação do estudo leem
+// esta lista, então a coluna não pode ficar fora de nenhum dos três.
+export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'unidades_permutadas', 'ordem'];
 
 // #812 — os valores válidos de `tipo` vêm do `schema.json`, não de lista escrita
 // à mão: o shell recusa o que não está em `opcoes`, e sem a checagem aqui a
@@ -157,7 +153,7 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
 
     const existentes = await req.dados!.listar('preliminar_produtos', { filtros: { estudo_id: estudoId }, por_pagina: 500 });
     const dados: Record<string, any> = { estudo_id: estudoId, nome: '', ordem: existentes.total };
-    for (const campo of CAMPOS_GRAVAVEIS) {
+    for (const campo of CAMPOS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (!coagirNumericosOuResponder(res, dados)) return;
@@ -186,7 +182,7 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
     if (msgPerm) { erro(res, 400, 'UNIDADES_PERMUTADAS_INVALIDAS', msgPerm); return; }
 
     const dados: Record<string, any> = {};
-    for (const campo of CAMPOS_GRAVAVEIS) {
+    for (const campo of CAMPOS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }

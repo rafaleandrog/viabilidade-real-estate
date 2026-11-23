@@ -23,7 +23,7 @@ import {
   LIMITE_NOME_ESTUDO,
 } from '../../frontend/estudo-status.js';
 import { duplicarDadosAvancado } from './avancado.js';
-import { CAMPOS as CAMPOS_PRODUTO, CAMPOS_PERMUTA as CAMPOS_PERMUTA_PRODUTO } from './preliminar-produtos.js';
+import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
 import { areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
 import { validarProdutosParaSubmissao } from '../../frontend/produtos-submissao.js';
@@ -466,16 +466,11 @@ export function montarCopiasFilhas(
 // #838 — sem limite de página: a cópia lê cada filha com `varrerTudo`, como a
 // #634 fez nas tabelas do Avançado. Um `por_pagina` fixo truncava em silêncio
 // (o catálogo acima de 500 produtos saía com VGV diferente do original).
-//
-// `extras`: colunas copiadas além de `campos`. O catálogo de Produtos leva aqui a
-// permuta por produto (`CAMPOS_PERMUTA`): `campos` segue igual à lista-base da
-// rota (`CAMPOS`), como o teste de paridade da #609 exige, e a duplicação não
-// perde a permuta declarada.
-export const FILHAS_SIMPLES: { tabela: string; campos: string[]; extras?: string[] }[] = [
+export const FILHAS_SIMPLES: { tabela: string; campos: string[] }[] = [
   // O catálogo de Produtos é a ÚNICA fonte de VGV desde a #563: sem ele a
   // cópia nasce em ESTADO VAZIO carregando todas as premissas do original —
   // o P1 que abriu esta issue.
-  { tabela: 'preliminar_produtos', campos: CAMPOS_PRODUTO, extras: CAMPOS_PERMUTA_PRODUTO },
+  { tabela: 'preliminar_produtos', campos: CAMPOS_PRODUTO },
   // Análise de mercado e apelo comercial: uma linha por estudo, toda ela dado
   // do estudo (premissas de mercado coletadas e os scores/laudo).
   {
@@ -898,9 +893,9 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // esse, e não o `null`, o defeito que a #714 tentou resolver.
       // `omitirValoresNulos` segue aplicado pelo motivo revisado em
       // `./duplicar-utils.ts` — não por causa daquele erro.
-      for (const { tabela, campos, extras } of FILHAS_SIMPLES) {
+      for (const { tabela, campos } of FILHAS_SIMPLES) {
         const linhas = await trx.varrerTudo(tabela, { filtros: { estudo_id: estudoId } });
-        for (const copiaFilha of montarCopiasFilhas(linhas as any[], Number(criado.id), [...campos, ...(extras ?? [])])) {
+        for (const copiaFilha of montarCopiasFilhas(linhas as any[], Number(criado.id), campos)) {
           await trx.criar(tabela, coagirNumericosOuLancar(tabela, omitirValoresNulos(copiaFilha)));
         }
       }

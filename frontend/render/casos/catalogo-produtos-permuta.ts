@@ -1,7 +1,7 @@
 // Caso de render: permuta física POR PRODUTO — a coluna "Unidades permutadas" do
 // catálogo de Produtos (`frontend/tela-premissas.ts:_linhaProduto`).
 //
-// Mede FIAÇÃO, não cálculo: `colunasProdutoTabela` e o motor podem estar certos
+// Mede FIAÇÃO, não cálculo: `colunasProduto` e o motor podem estar certos
 // e o template não desenhar a célula. Apagar o `case 'unidadesPermutadas'` do
 // template derruba o `exigir` abaixo e deixa a suíte de lógica pura verde.
 //

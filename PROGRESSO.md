@@ -19,10 +19,10 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Preço médio por unidade desconta as unidades permutadas só no modo por produto; o memo
   `valorPermutaFisica` é a soma do VGV efetivo das categorias quando alguma é por produto.
 - Backend: `unidades_permutadas` validado (inteiro 0 ≤ x ≤ unidades, fail-closed; `400
-  UNIDADES_PERMUTADAS_INVALIDAS`) e copiado na duplicação do estudo. `CAMPOS` ficou intacta: a lista
-  gravável é `CAMPOS_GRAVAVEIS`, porque um teste existente trava a forma de `CAMPOS`.
-- Tela: coluna "Unidades permutadas" (`colunasProdutoTabela`, sobre `colunasProduto` intacta pelo
-  mesmo motivo). Dois casos de render: a coluna, e o estado desabilitado da aba Permutas.
+  UNIDADES_PERMUTADAS_INVALIDAS`) e copiado na duplicação do estudo, que herda a coluna de `CAMPOS`.
+  Dois testes existentes que fixavam a lista de colunas foram atualizados com autorização do dono.
+- Tela: coluna "Unidades permutadas" em `colunasProduto`. Dois casos de render: a coluna, e o estado
+  desabilitado da aba Permutas.
 - Medido na Pinguim (só leitura), Preliminar com a permuta equivalente à do Avançado par: o 39 vai de
   VGV 209.250.000 para 210.000.000 e resultado +573.900; o 38, de VGV 139.704.323 para 139.797.039
   e resultado +75.285.

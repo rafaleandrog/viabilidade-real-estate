@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
-import { rotasPreliminarProdutos, erroUnidadesPermutadas, CAMPOS, CAMPOS_GRAVAVEIS } from './preliminar-produtos.js';
+import { rotasPreliminarProdutos, erroUnidadesPermutadas, CAMPOS } from './preliminar-produtos.js';
 import { FILHAS_SIMPLES } from './estudos.js';
 import esquema from '../../schema.json';
 
@@ -65,15 +65,14 @@ async function enviar(base: string, metodo: 'POST' | 'PATCH', caminho: string, c
 
 const SEMENTE = { estudo_id: 1, nome: 'P', tipo: 'residencial', unidades: 10, unidades_permutadas: 2, ordem: 0 };
 
-test('schema: unidades_permutadas é inteiro com padrão 0, e a forma original de CAMPOS não mudou', () => {
+test('schema: unidades_permutadas é inteiro com padrão 0 e está em CAMPOS (a lista de POST, PATCH e duplicação)', () => {
   assert.deepEqual(COLUNAS.unidades_permutadas, { tipo: 'inteiro', padrao: 0 });
-  assert.deepEqual(CAMPOS, ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem']);
-  assert.deepEqual(CAMPOS_GRAVAVEIS, [...CAMPOS, 'unidades_permutadas']);
+  assert.ok(CAMPOS.includes('unidades_permutadas'));
 });
 
 test('duplicar estudo: a coluna entra na lista de campos copiados do catálogo', () => {
   const filha = FILHAS_SIMPLES.find((f) => f.tabela === 'preliminar_produtos')!;
-  assert.ok([...filha.campos, ...(filha.extras ?? [])].includes('unidades_permutadas'), 'a cópia do estudo perderia a permuta por produto');
+  assert.ok(filha.campos.includes('unidades_permutadas'), 'a cópia do estudo perderia a permuta por produto');
 });
 
 test('POST e PATCH gravam e devolvem unidades_permutadas (e a string decimal estrita vira número)', async () => {

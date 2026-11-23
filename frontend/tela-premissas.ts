@@ -182,27 +182,11 @@ export function colunasProduto(lot: boolean): ColunaProduto[] {
     { chave: 'tipo', rotulo: 'Tipo', classe: 'p-tipo' },
     { chave: 'pct', rotulo: `% da ${rotuloBaseProdutos(lot ? 'loteamento' : 'incorporacao')}`, classe: 'p-pct', num: true },
     { chave: 'unidades', rotulo: 'Unidades', classe: 'p-un', num: true },
+    { chave: 'unidadesPermutadas', rotulo: 'Unidades permutadas', classe: 'p-uperm', num: true },
     { chave: 'areaTotal', rotulo: 'Área total', classe: 'p-atotal', num: true },
     { chave: 'area', rotulo: lot ? 'Área média do lote' : 'Área média', classe: 'p-amedia', num: true },
     { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
     { chave: 'vgv', rotulo: 'VGV', classe: 'p-vgv', num: true },
-  ];
-}
-
-/**
- * As colunas que a TABELA desenha: as de `colunasProduto` mais "Unidades
- * permutadas", logo depois de "Unidades" — a permuta física declarada por
- * produto (`permuta-produtos.ts`). `colunasProduto` segue sendo a lista base do
- * cadastro; a coluna nova entra aqui, e é desta lista que saem colgroup,
- * cabeçalho, corpo e total.
- */
-export function colunasProdutoTabela(lot: boolean): ColunaProduto[] {
-  const base = colunasProduto(lot);
-  const i = base.findIndex((c) => c.chave === 'unidades');
-  return [
-    ...base.slice(0, i + 1),
-    { chave: 'unidadesPermutadas', rotulo: 'Unidades permutadas', classe: 'p-uperm', num: true },
-    ...base.slice(i + 1),
   ];
 }
 
@@ -1057,7 +1041,7 @@ export class ViabTelaPremissas extends LitElement {
     const efetivos = produtosDoEstudo(this._entradaProforma());
     const { vgv, unidades } = totalProdutos(efetivos);
     // Uma lista só governa colgroup, cabeçalho, corpo e total — ver `colunasProduto`.
-    const colunas = colunasProdutoTabela(lot);
+    const colunas = colunasProduto(lot);
     const somaPct = somaPctAlv(this.produtos, alv);
     const areaTotal = this.produtos.reduce((t, x) => t + areaTotalDaLinha(x, alv), 0);
     const totalPorColuna = (chave: string): TemplateResult => {
