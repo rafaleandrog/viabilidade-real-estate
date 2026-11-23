@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
-  type EventoCrono, type PeriodoAgregado,
+  impostoDoEstudoAvancado, type EventoCrono, type PeriodoAgregado, type ImpostoReceita,
 } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, inteiroExibido, semZeroNegativo, negativoContabil } from './viab-format.js';
 import {
@@ -208,7 +208,7 @@ export class ViabFluxoVer extends LitElement {
   private dados: {
     receitas: any[]; custos: any[]; curvas: any[];
     tipologias: any[]; crono: EventoCrono[]; dataInicio: string | null; taxa: number;
-    ret: { ativo: boolean; pct: number };
+    ret: ImpostoReceita | undefined;
   } | null = null;
   private carregado = false;
 
@@ -366,8 +366,8 @@ export class ViabFluxoVer extends LitElement {
         crono: crono?.erro ? [] : (crono.dados || []),
         dataInicio: params?.erro ? null : (params.data_inicio_projeto ?? null),
         taxa: params?.erro ? 12 : Number(params.taxa_desconto_aa ?? 12),
-        // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
-        ret: params?.erro ? { ativo: false, pct: 4 } : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #834: imposto sobre a receita (RET ou imposto padrão do estudo).
+        ret: impostoDoEstudoAvancado(params),
       };
       this._recalcular();
     } catch (e: any) {

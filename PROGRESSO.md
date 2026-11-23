@@ -4,6 +4,24 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-22 — Imposto do Avançado em dois regimes, fatia 1 de 3: motor e fiação (issue 834)
+
+- Decisão do dono: o Avançado tem **imposto padrão** (a alíquota `imposto_percentual` do estudo,
+  a mesma do Preliminar fora do RET) ou **RET** (`ret_pct`, padrão 4 %). Sai o "sem RET = imposto
+  zero". O regime continua escolhido por `considerar_ret`; nenhuma coluna nova, nenhuma migração.
+- `impostoDoEstudoAvancado` (`frontend/fluxo-shared.ts`) é a única tradução dos parâmetros do
+  estudo para o imposto que o motor aplica. As sete telas que montam `FluxoConfig` e o
+  `conferir-estudo` passam por ela; a tela de Custos separa o rascunho do controle RET (`ret`) do
+  imposto que vai ao motor e à base `% da receita` (`imposto`). A trava de fiação é
+  `frontend/imposto-avancado.test.ts`, por inventário das telas.
+- `GET`/`PATCH /estudos/:id/avancado/parametros` devolvem `imposto_percentual`.
+- A conta do motor não mudou: o mesmo percentual sobre a receita recebida, mês a mês. Estudo com
+  RET mantém exatamente o número de antes. Estudo sem RET passa a deduzir a alíquota padrão.
+- Medido na Pinguim (só leitura): os quatro Avançados vivos (21, 22, 40, 41) estão com RET, e
+  nenhum número deles muda. A base do RET ficou "sobre o recebido"; a diferença para "sobre o VGV"
+  está no PR, para decisão do dono.
+- Fica para as fatias seguintes: o seletor de regime e a alíquota editável na tela, o alerta de
+  imposto zero na lista de divergências, e o restante do guia.
 ## 2026-11-22 — Exposição máxima com piso em zero e payback pelo acumulado (item da issue #910)
 
 - `exposicaoMaxima` passa a ser o menor acumulado com piso em zero (nunca positiva, sem `-0`) e
