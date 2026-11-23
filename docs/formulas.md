@@ -78,7 +78,7 @@ permuta pelas premissas de preço por m² por uso.
 
 Imposto (a alíquota do RET, parâmetro do app, quando o estudo está **Sujeito a RET**; senão a
 alíquota digitada), corretagem, marketing e as permutas financeiras — cada uma em % do VGV da sua
-categoria na Incorporação; no Loteamento só a residencial existe, sobre o VGV único.
+categoria na Incorporação (no Avançado, % do VGV vendável, sem a permuta física); no Loteamento só a residencial existe, sobre o VGV único.
 
 ```text
 Receita líquida = VGV − deduções

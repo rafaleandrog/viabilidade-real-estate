@@ -673,7 +673,12 @@ export function fimJanelaAbsorcao(abs: AbsorcaoMensal): number {
 export interface ContextoCusto {
   areaPrivativaTotal: number; // soma de área × qtd de todas as tipologias
   areaTerreno: number;        // m² do terreno (Premissas)
-  vgvTotal: number;           // VGV somado das linhas de receita
+  vgvTotal: number;           // VGV somado das linhas de receita (potencial, antes da permuta física)
+  /** VGV VENDÁVEL: potencial menos a permuta física, em precisão plena — a
+   * mesma grandeza que o motor publica como `vgvVendavel`. É a base de
+   * `pct_vgv`. Obrigatório de propósito: quem monta o contexto e esquece vira
+   * erro de compilação, não um % calculado sobre a base errada. */
+  vgvVendavel: number;
   receitaTotal?: number;      // receita líquida (VGL) — para pct_receita
   totalObra?: number;         // total do grupo Obra (excl. linhas pct_obra) — para pct_obra
   /** Receita RECEBIDA: Σ do recebimento bruto, com juros de tabela — a mesma
@@ -682,13 +687,6 @@ export interface ContextoCusto {
   /** Custo de construção: linhas das categorias de `CATEGORIAS_BASE_CONSTRUCAO`,
    * em qualquer grupo — ver `totalConstrucaoCustos`. Base de `pct_constr`. */
   totalConstrucao?: number;
-  /**
-   * #473: base da Corretagem de vendas quanto à permuta física. `true`
-   * (default — preserva todo estudo existente) = VGV BRUTO, permuta física
-   * inclusa; `false` = VGV VENDÁVEL, exclui a permuta física. Escolha do
-   * estudo (`estudos.corretagem_sobre_permuta_fisica`), só no Avançado.
-   */
-  corretagemSobrePermutaFisica?: boolean;
 }
 
 /** Área privativa total ((área fechada + área aberta) × quantidade) de todas
@@ -727,7 +725,7 @@ export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
   switch (custo?.orcamento_unidade) {
     case 'rs_m2_priv': return valor * n(ctx.areaPrivativaTotal);
     case 'rs_m2_terreno': return valor * n(ctx.areaTerreno);
-    case 'pct_vgv': return (valor / 100) * n(ctx.vgvTotal);
+    case 'pct_vgv': return (valor / 100) * n(ctx.vgvVendavel);
     case 'pct_receita': return (valor / 100) * n(ctx.receitaTotal ?? ctx.vgvTotal);
     case 'pct_obra': return (valor / 100) * n(ctx.totalObra);
     case 'pct_recebido': return (valor / 100) * n(ctx.receitaRecebida);

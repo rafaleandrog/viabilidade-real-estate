@@ -231,7 +231,6 @@ export class ViabTelaCenarios extends LitElement {
         // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
         ret: impostoDoEstudoAvancado(params),
         // #473: default true preserva o comportamento histórico (VGV bruto).
-        corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
         // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba
         // Viabilidade → Financeiro (`estudos.juros_tabela_aa_padrao`). Campo
         // OBRIGATORIO de `FluxoConfig`: parar de passa-lo vira TS2741, nao silencio.

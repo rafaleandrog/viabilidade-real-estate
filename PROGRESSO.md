@@ -4,6 +4,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Avançado: `% do VGV` e corretagem sobre o VGV vendável (fatia 1 de 5)
+
+- Decisão do dono: `% do VGV` do Avançado passa a incidir sobre o VGV vendável (potencial menos a
+  permuta física). `ContextoCusto.vgvVendavel` é obrigatório (esquecer vira erro de compilação) e
+  `resolverCustoTotal` em `pct_vgv` o lê; o motor o monta como Σ do vendável das linhas e a tela de
+  Custos o recalcula a cada leitura (`vgvVendavelTotalBase`), inclusive na conversão de unidade.
+- A corretagem usa sempre o vendável: `corretagemSobrePermutaFisica` saiu de `FluxoConfig`,
+  `ContextoCusto` e de todos os chamadores, e o controle saiu da tela de Custos. A coluna
+  `estudos.corretagem_sobre_permuta_fisica` fica no schema sem leitor (os scripts de formulário
+  Python só a escrevem; não mudaram).
+- Linhas com `orcamento_valor_canonico` congelado não mudam de R$ nesta fatia; a migração que as
+  reconcilia é a fatia seguinte.
+- Citações `arquivo:linha` de `fluxo-caixa-motor.ts` em docs/referência renumeradas.
+
+---
+
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 
 - Pedido do autor, com captura: Infraestrutura em "% VGV", derivada de um custo em R$, aparecia

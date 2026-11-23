@@ -60,12 +60,12 @@ const totalDaLinha = (c: ReturnType<typeof fluxo>, id: number) => {
 };
 
 test('resolverCustoTotal: pct_recebido aplica sobre a receita recebida; pct_constr sobre o custo de construção', () => {
-  const ctx = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 100, receitaRecebida: 2_000_000, totalConstrucao: 101_760_000 };
+  const ctx = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 100, vgvVendavel: 100, receitaRecebida: 2_000_000, totalConstrucao: 101_760_000 };
   assert.equal(resolverCustoTotal({ orcamento_valor: 1, orcamento_unidade: 'pct_recebido' }, ctx), 20_000);
   assert.ok(perto(resolverCustoTotal({ orcamento_valor: 1.6, orcamento_unidade: 'pct_constr' }, ctx), 1_628_160));
   // Sem a base no contexto, o custo é zero — nunca cai no VGV de tabela, que é
   // exatamente a base errada que a unidade existe para não usar.
-  assert.equal(resolverCustoTotal({ orcamento_valor: 1, orcamento_unidade: 'pct_recebido' }, { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 100 }), 0);
+  assert.equal(resolverCustoTotal({ orcamento_valor: 1, orcamento_unidade: 'pct_recebido' }, { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 100, vgvVendavel: 100 }), 0);
 });
 
 test('totalConstrucaoCustos: Construção + Decoração + Gestão da obra; fora Outorga, Contingência e linhas pct_constr', () => {
@@ -80,7 +80,7 @@ test('totalConstrucaoCustos: Construção + Decoração + Gestão da obra; fora 
     custo(7, 'diretos', 'Projetos', 'rs', 3_000_000),
   ];
   const totalObra = 96_000_000 + 500_000 + 1_000_000 + 2_000_000; // pct_obra fora; pct_constr resolve 0 sem base
-  const ctx = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, totalObra };
+  const ctx = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, vgvVendavel: 0, totalObra };
   const gestao = totalObra * 0.06;
   assert.ok(perto(totalConstrucaoCustos(custos, ctx), 96_000_000 + 500_000 + gestao));
   // `excluirId` tira a linha que está sendo convertida.

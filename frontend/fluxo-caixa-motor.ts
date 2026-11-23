@@ -237,13 +237,6 @@ export interface FluxoConfig {
   // #834: imposto sobre a receita, RET ou padrão (`impostoDoEstudoAvancado`); nome por compatibilidade.
   ret?: ImpostoReceita;
   /**
-   * #473: base da Corretagem de vendas quanto à permuta física —
-   * `estudos.corretagem_sobre_permuta_fisica`, só no Avançado. `true`
-   * (default — nenhum estudo existente muda de número) = VGV bruto, permuta
-   * física inclusa; `false` = VGV vendável, exclui a permuta física.
-   */
-  corretagemSobrePermutaFisica?: boolean;
-  /**
    * #585: a taxa de tabela do ESTUDO, em % a.a. — `estudos.juros_tabela_aa_padrao`,
    * digitada na aba Viabilidade → Financeiro. **Obrigatória de propósito**: é
    * a única fonte da taxa desde a #585, e um campo opcional aqui deixaria a
@@ -351,10 +344,8 @@ function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
 // de contratação (`vendaBrutaContratadaMensal`) usa VGV VENDÁVEL — o corpo da
 // #227 pedia uma função única para as duas, e a distinção "bruto" × "vendável"
 // ficou explícita no NOME das funções: `vgvVendidoBrutoMensal` (permuta física
-// inclusa, default — nenhum estudo existente muda) e `vgvVendidoVendavelMensal`
-// (exclui a permuta física, mesma base de `vendaBrutaContratadaMensal`).
-// `corretagemMensal` escolhe entre as duas por `ContextoCusto.corretagemSobrePermutaFisica`
-// — chave do estudo (`estudos.corretagem_sobre_permuta_fisica`, só no Avançado).
+// inclusa) e `vgvVendidoVendavelMensal` (exclui a permuta física, mesma base de
+// `vendaBrutaContratadaMensal`). `corretagemMensal` usa sempre a segunda.
 // O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` continua na base
 // bruta histórica — a #473 não estende a chave a ele (fora de escopo).
 
@@ -2335,11 +2326,10 @@ export function receitaMensalLinha(
  * vezes se as duas ficassem ativas ao mesmo tempo (o defeito do EVI-008).
  * Esta linha de custo é a única fonte oficial.
  *
- * #473: a base é ESCOLHA DO ESTUDO — `ctx.corretagemSobrePermutaFisica`
- * (default `true`, undefined incluso, para preservar todo estudo existente).
- * `true` usa `vgvVendidoBrutoMensal` (comportamento histórico, permuta física
- * inclusa); `false` usa `vgvVendidoVendavelMensal` (exclui a permuta física,
- * alinhando a corretagem à mesma base de `vendaBrutaContratadaMensal`).
+ * A base é sempre o VGV VENDÁVEL (`vgvVendidoVendavelMensal`: exclui a permuta
+ * física, a mesma base de `vendaBrutaContratadaMensal`): a corretagem não paga
+ * comissão sobre unidade que não é vendida. O percentual derivado de um
+ * canônico congelado usa a mesma base (`ctx.vgvVendavel`).
  */
 export function corretagemMensal(
   custo: any,
@@ -2348,10 +2338,7 @@ export function corretagemMensal(
   prazoTotal: number,
   ctx: ContextoCusto,
 ): number[] {
-  const vgvBrutoNaCorretagem = ctx.corretagemSobrePermutaFisica !== false;
-  const vendas = vgvBrutoNaCorretagem
-    ? vgvVendidoBrutoMensal(linhasReceita, cronograma, prazoTotal)
-    : vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal);
+  const vendas = vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal);
   const somaVendas = vendas.reduce((s, v) => s + v, 0);
   if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
 
@@ -2365,12 +2352,12 @@ export function corretagemMensal(
     // flag, só o calendário mudava — a capacidade inteira desta issue ficava
     // muda para toda linha já editada uma vez pela tela (achado do Codex,
     // PR #545 rodada 1). A correção: deriva o PERCENTUAL efetivo do
-    // canônico sobre o VGV BRUTO total (`ctx.vgvTotal`, a mesma base que
-    // `converterUnidade` usou para congelar o R$ em `_editarOrcamento`), e
-    // aplica esse percentual sobre a base ESCOLHIDA (`vendas`) — nunca o R$
+    // canônico sobre o VGV VENDÁVEL (`ctx.vgvVendavel`, a mesma base que
+    // `converterUnidade` usa para a conversão na tela de Custos), e
+    // aplica esse percentual sobre a base mensal (`vendas`) — nunca o R$
     // congelado direto. Sem canônico, cai no percentual digitado cru.
     const pct = custo?.orcamento_valor_canonico !== null && custo?.orcamento_valor_canonico !== undefined
-      ? (ctx.vgvTotal > 0 ? resolverCustoTotal(custo, ctx) / ctx.vgvTotal : 0)
+      ? (ctx.vgvVendavel > 0 ? resolverCustoTotal(custo, ctx) / ctx.vgvVendavel : 0)
       : n(custo?.orcamento_valor) / 100;
     return vendas.map((v) => v * pct);
   }
@@ -2806,7 +2793,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     areaPrivativaTotal: areaPrivativaTotalLinhas(linhasReceita),
     areaTerreno: n(config.areaTerreno),
     vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
-    corretagemSobrePermutaFisica: config.corretagemSobrePermutaFisica,
+    vgvVendavel: linhasReceita.reduce((s, l, i) => s + vgvVendavelLinhaMotor(l, i), 0),
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
     (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), config.ret), 0);
@@ -2982,7 +2969,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     if ((c.orcamento_unidade || 'rs') === 'pct_vgv') {
       // Quando existe canônico, o percentual é somente a representação dele.
       const pct = c.orcamento_valor_canonico !== null && c.orcamento_valor_canonico !== undefined
-        ? (ctxCusto.vgvTotal > 0 ? resolverCustoTotal(c, ctxCusto) / ctxCusto.vgvTotal * 100 : 0)
+        ? (ctxCusto.vgvVendavel > 0 ? resolverCustoTotal(c, ctxCusto) / ctxCusto.vgvVendavel * 100 : 0)
         : n(c.orcamento_valor);
       const deduzImposto = c.permuta_financeira_deduzir_imposto === true;
       const deduzCorretagem = c.permuta_financeira_deduzir_corretagem === true;
@@ -3259,6 +3246,16 @@ export function vgvVendavelPorLinha(linhasReceita: any[], linhasCusto: any[]): n
         ? (reservas.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0) : undefined;
       return total + vgvVendavelTipologia(t, unidades);
     }, 0));
+}
+
+/**
+ * VGV VENDÁVEL total (Σ de `vgvVendavelPorLinha`): a base de `pct_vgv`
+ * (`ContextoCusto.vgvVendavel`) para quem monta o contexto fora de
+ * `calcularFluxo` — a tela de Custos, em que as linhas de permuta física mudam
+ * sem recarregar. Mesma conta do motor, não uma cópia da regra.
+ */
+export function vgvVendavelTotalBase(linhasReceita: any[], linhasCusto: any[]): number {
+  return vgvVendavelPorLinha(linhasReceita, linhasCusto).reduce((s, v) => s + v, 0);
 }
 
 /**
