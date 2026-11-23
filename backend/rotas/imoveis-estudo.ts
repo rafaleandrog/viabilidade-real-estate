@@ -72,6 +72,12 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
       return;
     }
 
+    // O imóvel tem de existir no módulo imobiliário. Falha fechada: sem helper ou
+    // com o módulo falhando, não vincula. Vem depois das regras locais (permissão,
+    // status, id, tipo, gleba única e duplicado), logo antes de gravar.
+    const conferido = await conferirImovelNoModulo(req.modulos?.imobiliario, tipoImovel, imovelNucleoId);
+    if (!conferido.ok) { erro(res, conferido.http, conferido.codigo, conferido.mensagem); return; }
+
     const criado = await req.dados!.criar('estudo_imoveis', {
       estudo_id: estudoId,
       imovel_nucleo_id: imovelNucleoId,
@@ -118,3 +124,36 @@ async function desvincularImovel(req: Request, res: Response): Promise<void> {
 // O DELETE fica como alias (admin e clientes antigos); as guardas são as mesmas.
 rotasImoveisEstudo.patch('/estudos/:id/imoveis/:vinculoId/remover', desvincularImovel);
 rotasImoveisEstudo.delete('/estudos/:id/imoveis/:vinculoId', desvincularImovel);
+
+// Confere, pelo helper do módulo imobiliário (`req.modulos.imobiliario`), que o imóvel
+// existe. Não usa `instanceof` nem importa o SDK: o erro de flag se reconhece pelo
+// `name`, que atravessa o bundle.
+type HelperImobiliario = {
+  buscarPorChave(tabela: string, camposChave: readonly string[], valores: ReadonlyArray<Record<string, any>>):
+    Promise<{ achados: Map<string, Record<string, any>> }>;
+};
+export type ConferenciaImovel = { ok: true } | { ok: false; http: number; codigo: string; mensagem: string };
+
+export async function conferirImovelNoModulo(
+  helper: HelperImobiliario | undefined,
+  tipoImovel: 'gleba' | 'lote',
+  imovelId: number,
+): Promise<ConferenciaImovel> {
+  if (!helper) {
+    return { ok: false, http: 502, codigo: 'MODULO_INDISPONIVEL', mensagem: 'Módulo imobiliário indisponível; o imóvel não foi vinculado' };
+  }
+  const tabela = tipoImovel === 'gleba' ? 'glebas' : 'lotes';
+  try {
+    const { achados } = await helper.buscarPorChave(tabela, ['id'], [{ id: imovelId }]);
+    if (!achados || achados.size === 0) {
+      return { ok: false, http: 404, codigo: 'IMOVEL_NAO_ENCONTRADO', mensagem: 'Imóvel não encontrado no módulo imobiliário' };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    if (e && e.name === 'ErroFlagNucleoApp' && Number.isInteger(e.status) && e.status >= 400 && e.status < 600) {
+      return { ok: false, http: e.status, codigo: String(e.codigo ?? 'NUCLEO_FLAG_NEGADA'), mensagem: String(e.message ?? 'Acesso ao módulo imobiliário negado') };
+    }
+    console.error('Falha ao consultar o módulo imobiliário:', e);
+    return { ok: false, http: 502, codigo: 'MODULO_FALHOU', mensagem: 'Falha ao consultar o módulo imobiliário; o imóvel não foi vinculado' };
+  }
+}
