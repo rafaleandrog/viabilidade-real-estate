@@ -228,10 +228,13 @@ export async function conferir(id: number): Promise<Conferencia> {
     if (Array.isArray(comp)) {
       conta(`Σ participacaoPct "${l.nome}"`, 100, comp.reduce((a: number, c: any) => a + n(c.participacaoPct), 0));
     }
-    // Σ do legado (entrada + parcelas), que é o que a UI ainda edita
-    const ent = (l.fluxo_pagamento?.entrada ?? []).reduce((a: number, e: any) => a + n(e.pct), 0);
-    const par = (l.fluxo_pagamento?.parcelas ?? []).reduce((a: number, e: any) => a + n(e.pct), 0);
-    conta(`Σ legado entrada+parcelas "${l.nome}"`, 100, ent + par);
+    // Σ do legado (entrada + parcelas): só vale para a fase SEM `componentes`.
+    // Com `componentes`, o motor não lê o legado (é só o espelho da tela) e a
+    // conferência que importa é a Σ participacaoPct acima. No legado, o repasse
+    // é o complemento (100 − entrada − parcelas): a conta é que ele não fique
+    // negativo, ou seja, entrada + parcelas ≤ 100 — e não que somem 100.
+    const legado = somaLegadoAplicavel(l.fluxo_pagamento);
+    if (legado !== null) conta(`Σ legado entrada+parcelas ≤ 100 "${l.nome}"`, Math.min(legado, 100), legado);
   }
 
   // Custos: Σ das séries por linha vs Σ da série mensal consolidada
@@ -419,4 +422,16 @@ if (ehEntrada) {
       imprimir(await conferir(id));
     }
   }
+}
+
+/**
+ * Σ entrada + parcelas do formato LEGADO do plano de pagamento, ou `null` quando
+ * a conta não se aplica: a fase tem `componentes` (o motor não lê o legado, que é
+ * só o espelho da tela). No legado o repasse é o complemento, então a conferência
+ * é Σ ≤ 100, não Σ = 100.
+ */
+export function somaLegadoAplicavel(fluxoPagamento: any): number | null {
+  if (Array.isArray(fluxoPagamento?.componentes)) return null;
+  const soma = (xs: any) => (Array.isArray(xs) ? xs : []).reduce((a: number, e: any) => a + (Number(e?.pct) || 0), 0);
+  return soma(fluxoPagamento?.entrada) + soma(fluxoPagamento?.parcelas);
 }
