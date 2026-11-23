@@ -265,9 +265,9 @@ Imposto do mês = recebimento bruto do mês (com juros de tabela) × alíquota d
 ```
 
 A unidade da permuta física não gera recebimento, então não entra na base. A permuta financeira não
-reduz a base: ela é calculada depois, sobre o recebido menos o que a linha escolhe deduzir (o
-imposto, a corretagem ou os dois). O resultado fecha como recebido − imposto − permuta financeira −
-custos.
+reduz a base: ela é calculada depois. Em % do VGV, ela incide sobre o recebido menos o que a linha
+escolhe deduzir (o imposto, a corretagem ou os dois); em valor fixo, o total é rateado pelo
+recebido, sem dedução. O resultado fecha como recebido − imposto − permuta financeira − custos.
 
 ## Bases dos custos em % do Avançado
 

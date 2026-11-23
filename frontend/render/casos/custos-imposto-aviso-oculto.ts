@@ -27,7 +27,7 @@ export const caso = {
     'urbi-tabela.colunas',
     'urbi-tabela.linhas',
     'urbi-tabela.mensagemVazio',
-  ],
+  ] as string[],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-fluxo-custos');
     forcarEstado(el, {

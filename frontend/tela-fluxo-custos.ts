@@ -636,7 +636,7 @@ export class ViabFluxoCustos extends LitElement {
             ?desabilitado=${!!erroForm || !formImpostoAlterado(this.impostoForm, this.impostoSalvo)}
             @click=${this._salvarImposto}>Salvar</urbi-botao>` : nothing}
       </div>
-      ${!dis && avisoRegimeOculto(f) ? html`<p class="sec aviso-imposto">${avisoRegimeOculto(f)}</p>` : nothing}
+      ${!dis && avisoRegimeOculto(f) ? html`<urbi-banner class="aviso-imposto" variante="alerta">${avisoRegimeOculto(f)}</urbi-banner>` : nothing}
     `;
   }
 
