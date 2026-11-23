@@ -110,6 +110,11 @@ legível não muda ao renomear: é a identidade estável do estudo.
   Arquivado exige `aprovador` (`403` para o `editor`). A exceção são os imóveis: vincular e
   desvincular exigem `editor` ou acima e só acontecem em Rascunho (`422 IMOVEL_TRAVADO` nos demais
   status).
+  Depois dessas conferências, vincular exige que o imóvel exista no módulo imobiliário (gleba no
+  Loteamento, lote na Incorporação): se não existir, a resposta é `404 IMOVEL_NAO_ENCONTRADO`; se o
+  módulo estiver indisponível ou falhar, `502` (`MODULO_INDISPONIVEL` ou `MODULO_FALHOU`), e em ambos
+  os casos nada é vinculado. Se o administrador não ligou a leitura de imóveis, a resposta é o erro
+  de flag do módulo.
 - A permissão é conferida antes do status. Quem não é membro (nem `admin` do app) recebe o mesmo
   `403` com qualquer status do estudo, inclusive ao vincular ou desvincular imóvel e ao excluir o
   estudo; o `leitor` também, nessas três ações. A resposta nunca revela o status de um estudo de

@@ -22,8 +22,8 @@ importers:
         specifier: ^20.0.0
         version: 20.19.43
       '@urbiverso/sdk':
-        specifier: 57.0.0
-        version: 57.0.0(@types/express@4.17.25)(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(express@4.22.2)(lit@3.3.3)
+        specifier: 93.0.0
+        version: 93.0.0(@types/express@4.17.25)(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(express@4.22.2)(lit@3.3.3)
       esbuild:
         specifier: ^0.24.0
         version: 0.24.2
@@ -491,8 +491,8 @@ packages:
     resolution: {integrity: sha512-+rmdgPA+EXkNgKYvHvFfhrs35utXbwaC5PGpDquSXcoXQDKUA5UjV0LmTucG/4JXkM31BTu4TilHtrN8IVBe8w==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@urbiverso/sdk@57.0.0':
-    resolution: {integrity: sha512-OYwz5Y4gHu44lghUuDGbXG4M6BzFHXy7dmlegl8tFfLTsx0DbSJcIU9V7cy1/Ls2QE6OtXLm2C1KUJAUOb5uyw==, tarball: https://npm.pkg.github.com/download/@urbiverso/sdk/57.0.0/00a57341473275d99b8608cfceda5e8ec82dc62e}
+  '@urbiverso/sdk@93.0.0':
+    resolution: {integrity: sha512-ZSvDZxzsTdgZV6Zbj6jPqLAehnP8Sh1sKDFRon9f9v9Rl2hlHcyHERK1hZB+GwzCASgvsXaPdRXC+JxLHGtspg==, tarball: https://npm.pkg.github.com/download/@urbiverso/sdk/93.0.0/790f399f6f30ea1e1e7d0eeeee384f67b2338c96}
     hasBin: true
     peerDependencies:
       '@types/express': ^4.17.21
@@ -1455,7 +1455,7 @@ snapshots:
       '@typescript-eslint/types': 8.69.0
       eslint-visitor-keys: 5.0.1
 
-  '@urbiverso/sdk@57.0.0(@types/express@4.17.25)(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(express@4.22.2)(lit@3.3.3)':
+  '@urbiverso/sdk@93.0.0(@types/express@4.17.25)(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(express@4.22.2)(lit@3.3.3)':
     dependencies:
       '@types/express': 4.17.25
       '@typescript-eslint/parser': 8.69.0(eslint@9.39.5)(typescript@5.9.3)
