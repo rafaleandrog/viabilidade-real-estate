@@ -59,8 +59,10 @@ test('início tardio: critério relativo não aceita taxa absurda', () => {
 });
 
 test('fluxo longo (estouro de potência no extremo inferior) ainda acha a raiz', () => {
-  const f = aporteMaisRetornos(1_000_000, 3_000, 150);
+  // 110 retornos pequenos: o Newton desiste (era `null` na main) e a bisseção
+  // precisa subir o limite inferior, porque (1 − 0,999)^−111 não é finito.
+  const f = aporteMaisRetornos(1_000_000, 100, 110);
   const t = tirFluxo(f);
-  assert.ok(t !== null && t < 0);
+  assert.ok(t !== null && t < 0, `veio ${t}`);
   assert.ok(vplRelativo(f, t!) < 1e-6);
 });

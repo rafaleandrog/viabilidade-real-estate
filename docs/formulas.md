@@ -190,9 +190,9 @@ restante (`100 − participação da carteira`) é recebido à vista no mês da 
   funding. São visões diferentes de propósito.
 - **Investimento total e ROI** são a mesma fórmula do Preliminar, somando todo o custo do motor.
 - **TIR.** Calculada sobre o fluxo mensal desalavancado, pelo método de Newton-Raphson. Quando ele
-  não converge, o cálculo busca a raiz por bisseção sobre a taxa mensal. Só há TIR quando o VPL muda
-  de sinal entre −99,9% e 1000% ao mês; com várias trocas de sinal no fluxo pode haver mais de uma
-  raiz, e vale a primeira encontrada. Em prejuízo grande a TIR sai negativa.
+  não converge, o cálculo busca a raiz por bisseção sobre a taxa mensal, entre −99,9% e 1000% ao
+  mês, e só a acha se o VPL mudar de sinal nesse intervalo. Com várias trocas de sinal no fluxo pode
+  haver mais de uma raiz, e o cálculo devolve uma delas. Em prejuízo grande a TIR sai negativa.
 
 ### Conversão para a planilha EVI
 

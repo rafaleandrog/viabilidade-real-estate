@@ -2512,8 +2512,8 @@ export function vplFluxo(fluxoMensal: number[], taxaAa: number): number {
 }
 
 /**
- * TIR anual (%) por Newton-Raphson sobre a taxa mensal.
- * Retorna null se o fluxo não muda de sinal ou se não convergir.
+ * TIR anual (%) por Newton-Raphson sobre a taxa mensal, com bisseção se ele não convergir.
+ * Retorna null se o fluxo não muda de sinal ou se nenhum dos dois achar a raiz.
  */
 export function tirFluxo(fluxoMensal: number[]): number | null {
   const temPos = fluxoMensal.some((v) => v > 0);
