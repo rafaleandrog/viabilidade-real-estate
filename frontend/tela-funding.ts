@@ -313,13 +313,16 @@ export class ViabFunding extends LitElement {
   // #442: este rótulo lia `orcamento_valor` cru — a mesma coluna que a issue
   // mostrou congelada. A decisão mora em `dinheiroParaRotulo`, pura e testada.
   private _rotuloValor(custo: any): string {
-    // Contexto só com o que o `% do VGV` lê: a base é a que o motor publica em
-    // `calc` (a mesma que `resolverCustoTotal` aplica nas linhas do motor).
-    const ctx = this.calc
-      ? ({
+    // Contexto tipado e completo nos campos obrigatórios. Só `pct_vgv` chega à
+    // conta aqui (ver `dinheiroParaRotulo`), e ela lê a base vendável; as áreas
+    // não entram nessa unidade e ficam em zero. É o valor NOMINAL (% × base de
+    // `pct_vgv`) que o rótulo mostra — para a permuta financeira o motor aplica
+    // o % sobre o recebimento com deduções, e este rótulo não afirma essa conta.
+    const ctx: ContextoCusto | undefined = this.calc
+      ? {
         areaPrivativaTotal: 0, areaTerreno: 0,
         vgvTotal: this.calc.vgvTotal, vgvVendavel: this.calc.vgvVendavel,
-      } as ContextoCusto)
+      }
       : undefined;
     const v = dinheiroParaRotulo(custo, this.calc?.linhasCusto ?? [], ctx);
     return v === null ? '—' : fmtR$(v);

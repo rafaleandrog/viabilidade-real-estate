@@ -1216,7 +1216,7 @@ export function vgvVendidoVendavelMensal(
 export function dinheiroParaRotulo(
   custo: any,
   calcLinhas: Array<{ id: any; total: number }>,
-  ctx?: ContextoCusto,
+  ctx: ContextoCusto | undefined,
 ): number | null {
   const doMotor = (calcLinhas ?? []).find((l) => l.id === custo?.id);
   if (doMotor) return doMotor.total;
@@ -1226,8 +1226,10 @@ export function dinheiroParaRotulo(
   }
   const bruto = custo?.orcamento_valor;
   // Linha em % do VGV sem canônico (o que a migração deixa) e fora do motor:
-  // com o contexto, o R$ sai pela MESMA conta do motor (`resolverCustoTotal`),
-  // não por uma cópia da regra. Sem contexto, não afirma número.
+  // com o contexto, o R$ é o valor NOMINAL (% × base de `pct_vgv`), o mesmo que
+  // o canônico dava antes da migração. Para a permuta financeira o motor aplica
+  // o % sobre o recebimento com deduções; o rótulo não afirma essa conta.
+  // Sem contexto, não afirma número.
   if (ctx && custo?.orcamento_unidade === 'pct_vgv'
     && bruto !== null && bruto !== undefined && bruto !== '' && Number.isFinite(Number(bruto))) {
     return resolverCustoTotal(custo, ctx);

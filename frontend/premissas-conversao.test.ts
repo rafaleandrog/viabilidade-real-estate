@@ -423,23 +423,23 @@ test('#514/#590 (achado de revisão, PR #643): toda chamada de _ctxConversao() p
 
 test('#442 rótulo: prefere o total do motor', () => {
   const custo = { id: 7, orcamento_unidade: 'rs', orcamento_valor: '0.24', orcamento_valor_canonico: '411476.16' };
-  assert.equal(dinheiroParaRotulo(custo, [{ id: 7, total: 411_476.16 }]), 411_476.16);
+  assert.equal(dinheiroParaRotulo(custo, [{ id: 7, total: 411_476.16 }], undefined), 411_476.16);
 });
 
 test('#442 rótulo: fora do motor (permuta), cai no canônico', () => {
   const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: '8572420' };
-  assert.equal(dinheiroParaRotulo(custo, []), 8_572_420);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), 8_572_420);
 });
 
 test('#442 rótulo: sem canônico e em unidade derivada, NÃO afirma número', () => {
   // Antes deste PR o rótulo dizia "R$ 5,00" para uma linha de 5% do VGV.
   const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: null };
-  assert.equal(dinheiroParaRotulo(custo, []), null);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), null);
 });
 
-test('#442 rótulo: % do VGV sem canônico (pós-migração) resolve o R$ pelo contexto, a mesma conta do motor', () => {
+test('#442 rótulo: % do VGV sem canônico (pós-migração) resolve o R$ nominal sobre a base vendável do contexto', () => {
   const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: null };
-  const ctxVgv = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 200_000_000 };
+  const ctxVgv = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 200_000_000, vgvVendavel: 200_000_000 };
   assert.equal(dinheiroParaRotulo(custo, [], ctxVgv), 10_000_000);
   assert.equal(dinheiroParaRotulo(custo, [], ctxVgv), resolverCustoTotal(custo, ctxVgv));
   // Unidade que não é % do VGV continua sem afirmar número, mesmo com contexto.
@@ -459,12 +459,12 @@ test('#442 rótulo: a tela de Funding passa o contexto ao rótulo (fiação)', (
 test('#442 rótulo: permuta física tem os dois campos nulos, e não há dinheiro a mostrar', () => {
   // `backend/rotas/avancado.ts:1394-1397` zera os dois de propósito.
   const custo = { id: 3, orcamento_unidade: 'rs', orcamento_valor: null, orcamento_valor_canonico: null };
-  assert.equal(dinheiroParaRotulo(custo, []), null);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), null);
 });
 
 test('#442 rótulo: linha rs legada, sem canônico, ainda é R$', () => {
   const custo = { id: 4, orcamento_unidade: 'rs', orcamento_valor: '300000', orcamento_valor_canonico: null };
-  assert.equal(dinheiroParaRotulo(custo, []), 300_000);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), 300_000);
 });
 
 test('#442 canônico derivado de linha legada é arredondado — é dinheiro (C7)', () => {
