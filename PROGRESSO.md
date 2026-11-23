@@ -22,6 +22,14 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   está no PR, para decisão do dono.
 - Fica para as fatias seguintes: o seletor de regime e a alíquota editável na tela, o alerta de
   imposto zero na lista de divergências, e o restante do guia.
+## 2026-11-22 — Exposição máxima com piso em zero e payback pelo acumulado (item da issue #910)
+
+- `exposicaoMaxima` passa a ser o menor acumulado com piso em zero (nunca positiva, sem `-0`) e
+  `mesExposicaoMaxima` é `null` quando não há exposição, também na série agregada. `paybackMes` é o
+  primeiro mês com acumulado >= 0 depois de algum acumulado < 0 (antes olhava o sinal do fluxo
+  mensal); sem trecho negativo ou sem recuperação, `null` ("—"). O KPI "Exposição máxima" do
+  Resumo só usa a variante de erro quando há exposição. Testes em `frontend/exposicao-payback.test.ts`;
+  definição nos guias `formulas` e `avancado`.
 
 ## 2026-11-16 — Rascunho das Premissas sobrevive à troca de página (item U2 do índice #858)
 

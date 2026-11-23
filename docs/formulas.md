@@ -209,6 +209,21 @@ da planilha olha o caixa depois do funding, só a partir do lançamento. Tomar o
 acumulado vem do primeiro mês, e os custos anteriores ao lançamento continuam dentro dele. Uma
 diferença que sobrar depois disso vem do calendário dos custos, não da definição.
 
+### Exposição máxima e payback
+
+Duas grandezas lidas do **Fluxo de Caixa Acumulado livre** (antes do funding):
+
+```text
+Exposição máxima = menor valor do acumulado, com piso em zero
+Payback          = primeiro mês em que o acumulado volta a ≥ 0, depois de ter ficado negativo
+```
+
+A exposição máxima é o pior ponto do caixa acumulado e nunca é positiva: um projeto cujo acumulado
+fica sempre em zero ou acima mostra exposição **0**, sem mês de ocorrência. O payback só existe
+quando o acumulado chegou a ficar negativo e depois se recuperou; sem trecho negativo, ou se o
+acumulado nunca volta a zero, o app mostra **—**. A conferência é sempre pela série acumulada, não
+pelo sinal do fluxo de cada mês.
+
 ### O fecho de três linhas
 
 A tabela fecha com três leituras do mesmo projeto, cada uma com a sua base — a base acompanha a
