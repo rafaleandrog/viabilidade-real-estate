@@ -353,7 +353,7 @@ digitar não altera nada; só o número digitado substitui o valor guardado.
 
 O mesmo projeto, estudado nos dois níveis com os mesmos custos de obra, fecha nas mesmas bases.
 Esta seção lista, tema a tema, a base que cada nível usa. As diferenças que restam vêm do tempo
-(o Avançado tem juros de tabela e desconto comercial; o Preliminar não) e do controle de deduções
+(o Avançado tem juros de tabela e desconto comercial; o Preliminar não), do horizonte do fluxo (no Avançado, o recebido e a corretagem contam só o que cai dentro do horizonte; o Preliminar incide sobre o VGV vendável inteiro) e do controle de deduções
 da permuta financeira, que só o Avançado tem.
 
 | Tema | Base |
@@ -379,7 +379,7 @@ Custo em % do VGV = VGV vendável × %
   (só na Incorporação), infraestrutura (só no Loteamento, no modo % do VGV) e Projetos (quando em
   % do VGV). A gestão da construção não entra aqui: incide sobre o custo de obras.
 - **Avançado:** marketing, manutenção pós-obra, stand de vendas, gestão e outros indiretos,
-  contingência, outorga, Projetos e as linhas Outro dos grupos Terreno, Obra, Diretos e Indiretos.
+  contingência, outorga, Projetos, os custos Financeiro (juros de financiamento, taxas bancárias, estruturação de dívida, investidores e Outro) e as linhas Outro dos grupos Terreno, Obra, Diretos e Indiretos.
   Incorporação e registro em % do VGV é, no Avançado, uma linha Outro do grupo Terreno: a categoria
   Registro só aceita R$ e R$/m². A gestão da obra é em % Obra.
 
@@ -391,7 +391,7 @@ A permuta física vale o preço da unidade que de fato é entregue.
 - **Preliminar:** o produto do catálogo com unidades permutadas, com o preço dele. Quando a categoria
   não indica produto, o Preliminar usa a área permutada com o preço médio da categoria no catálogo.
   Sem catálogo, a Incorporação usa a premissa de preço por m² e o Loteamento vale zero, como descrito em
-  "Deduções da receita".
+  "VGV".
 
 ### Projetos
 
@@ -427,7 +427,7 @@ física, estudado nos dois níveis:
 | Marketing (2% do VGV) | R$ 4.200.000 | R$ 4.200.000 |
 | Corretagem (5%) | R$ 10.500.000 | R$ 10.500.000 |
 
-Marketing e corretagem saem iguais ao centavo, porque as duas bases são o VGV vendável e a permuta
+O exemplo pressupõe a venda inteira dentro do horizonte do fluxo. Marketing e corretagem saem iguais ao centavo, porque as duas bases são o VGV vendável e a permuta
 é valorada pelo preço do lote entregue. No Avançado, o imposto e a permuta financeira incidem sobre
 o recebido, que traz os juros de tabela; o Preliminar não os tem.
 
