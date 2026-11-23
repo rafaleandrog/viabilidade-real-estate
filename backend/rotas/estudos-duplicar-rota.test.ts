@@ -103,6 +103,24 @@ class DadosFake {
   async remover(tabela: string, id: number, _atorId?: number) {
     return this.atualizar(tabela, id, { removido_em: new Date().toISOString() });
   }
+
+  // Mesmo contrato de `req.dados.transaction` do SDK: roda o callback com o
+  // executor e, se ele lançar, desfaz as escritas feitas dentro (ROLLBACK) e
+  // relança. Snapshot do estado antes, restaurado no catch.
+  async transaction<T>(cb: (trx: DadosFake) => Promise<T>): Promise<T> {
+    const copia = new Map<string, Map<number, any>>();
+    for (const [nome, tab] of this.tabelas) {
+      copia.set(nome, new Map([...tab].map(([id, l]) => [id, { ...l }])));
+    }
+    const proximoId = this.proximoId;
+    try {
+      return await cb(this);
+    } catch (e) {
+      this.tabelas = copia;
+      this.proximoId = proximoId;
+      throw e;
+    }
+  }
 }
 
 function criarApp(dados: DadosFake) {
