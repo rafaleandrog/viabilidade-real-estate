@@ -332,8 +332,8 @@ export function unidadesVendaveisLinha(tipologias: any[]): number {
 
 /**
  * Receita líquida de uma linha, para fins de BASE DE CUSTO (`pct_receita`) —
- * VGV menos o único imposto oficial do Avançado: RET (#228, decisão do autor
- * 2026-08-01 — o regime da aba Financeiro, `regime_tributario`/`aliquota_*`,
+ * VGV menos o imposto sobre a receita do Avançado (RET ou imposto padrão,
+ * #834; o regime da aba Financeiro, `regime_tributario`/`aliquota_*`,
  * é exclusivo do Preliminar e não é lido pelo motor do Avançado). Substitui
  * `vglLinha` (removida): a comissão NUNCA deduz aqui — ela já é a linha de
  * custo obrigatória "Corretagem de vendas" (#227); deduzi-la também da
@@ -345,7 +345,7 @@ export function unidadesVendaveisLinha(tipologias: any[]): number {
  * valor para toda linha de receita. O parâmetro passou a ser o RET já
  * resolvido, não mais o `fluxo_pagamento` de onde extraí-lo.
  */
-export function receitaLiquidaLinha(vgv: number, ret: { ativo: boolean; pct: number } | null | undefined): number {
+export function receitaLiquidaLinha(vgv: number, ret: ImpostoReceita | null | undefined): number {
   if (!ret?.ativo) return vgv;
   return vgv * (1 - n(ret.pct) / 100);
 }
@@ -1300,4 +1300,53 @@ function semSubcategoria(subcategoria: unknown): boolean {
 export function eSemeaduraObrigatoria(linha: any): boolean {
   const doGrupo = LINHAS_OBRIGATORIAS[linha?.grupo] ?? [];
   return semSubcategoria(linha?.subcategoria) && doGrupo.some((o) => o.categoria === linha?.categoria);
+}
+
+/**
+ * Imposto sobre a receita do estudo Avançado, já resolvido para o motor.
+ *
+ * #834 (decisão do dono, 2026-11-22): o Avançado tem DOIS regimes, e nenhum
+ * deles é "sem imposto":
+ *  · `ret`    — RET (patrimônio de afetação), alíquota `estudos.ret_pct`
+ *               (padrão 4 %);
+ *  · `padrao` — o imposto padrão do estudo, alíquota `estudos.imposto_percentual`
+ *               (a mesma coluna que o Preliminar usa fora do RET).
+ * O regime é escolhido por `estudos.considerar_ret`. A base é a mesma nos
+ * dois: a receita recebida, mês a mês (`impostoMensal` em
+ * `fluxo-caixa-motor.ts`). O nome do campo do motor (`FluxoConfig.ret`) ficou
+ * por compatibilidade — ele carrega o imposto de qualquer um dos regimes.
+ *
+ * `ativo` só é `false` em estado legado ou montado à mão; o resolvedor abaixo
+ * devolve sempre `ativo: true`. `regime` ausente é lido como `ret`.
+ */
+export interface ImpostoReceita {
+  ativo: boolean;
+  pct: number;
+  regime?: 'ret' | 'padrao';
+}
+
+/** Percentual lido da rota: número finito ≥ 0, senão o substituto. */
+function pctOu(v: unknown, substituto: number): number {
+  if (v === null || v === undefined || v === '') return substituto;
+  const x = Number(v);
+  return Number.isFinite(x) && x >= 0 ? x : substituto;
+}
+
+/**
+ * #834: a ÚNICA tradução de `GET /estudos/:id/avancado/parametros` para o
+ * imposto que o motor aplica. Toda tela que monta `FluxoConfig` chama esta
+ * função — nenhuma remonta `{ ativo, pct }` à mão, senão uma delas volta a
+ * zerar o imposto fora do RET (a trava é `imposto-avancado.test.ts`).
+ *
+ * Rota com erro (ou sem resposta) → `undefined`: o motor não deduz nada, o
+ * mesmo comportamento de antes para a falha de carga. Fora do RET sem
+ * alíquota gravada → alíquota 0 (não se inventa um padrão aqui: o padrão da
+ * coluna vive no `schema.json`).
+ */
+export function impostoDoEstudoAvancado(params: any): ImpostoReceita | undefined {
+  if (!params || params.erro || params._http) return undefined;
+  if (params.considerar_ret === true) {
+    return { regime: 'ret', ativo: true, pct: pctOu(params.ret_pct, 4) };
+  }
+  return { regime: 'padrao', ativo: true, pct: pctOu(params.imposto_percentual, 0) };
 }

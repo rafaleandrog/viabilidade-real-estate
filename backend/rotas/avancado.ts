@@ -541,6 +541,7 @@ rotasAvancado.get('/estudos/:id/avancado/parametros', async (req: Request, res: 
       // agora é global, mesma leitura em qualquer tela que precise dele.
       considerar_ret: estudo.considerar_ret === true,
       ret_pct: estudo.ret_pct !== null && estudo.ret_pct !== undefined ? Number(estudo.ret_pct) : 4,
+      imposto_percentual: impostoPercentualDaRota(estudo.imposto_percentual),
     });
   } catch (e: any) {
     console.error('Erro em GET /avancado/parametros:', e);
@@ -604,6 +605,7 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
       tem_pre_lancamento: atualizado.tem_pre_lancamento !== false,
       considerar_ret: atualizado.considerar_ret === true,
       ret_pct: Number(atualizado.ret_pct ?? 4),
+      imposto_percentual: impostoPercentualDaRota(atualizado.imposto_percentual),
     });
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/parametros:', e);
@@ -2426,4 +2428,18 @@ export function respostaFaseComAviso(
   return espelhoDescreveComponentes(fluxoPagamento, cronograma as any)
     ? atualizada
     : { ...atualizada, espelho_divergente: true };
+}
+
+/**
+ * #834: alíquota do imposto padrão do estudo (`estudos.imposto_percentual`),
+ * devolvida pelos parâmetros do Avançado porque, fora do RET, é ela que o
+ * motor deduz da receita recebida (`impostoDoEstudoAvancado` em
+ * `frontend/fluxo-shared.ts`). Ausente ou ilegível → `null`, nunca um padrão
+ * inventado aqui: o padrão da coluna vive no `schema.json`, e quem decide o
+ * que fazer com o `null` é o resolvedor do frontend.
+ */
+export function impostoPercentualDaRota(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const t = typeof v === 'string' ? numeroEstrito(v) : (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return t;
 }
