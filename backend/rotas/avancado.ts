@@ -707,9 +707,7 @@ rotasAvancado.patch('/estudos/:id/avancado/cronograma', async (req: Request, res
     // UMA VEZ para o cronograma inteiro (não uma vez por evento do lote).
     const recalculado = recalcularTravados(linhas);
     const custosReancorados = await req.dados!.transaction(async (trx) => {
-      await salvarCronograma(trx, estudo.id, recalculado, ids);
-      return reancorarCustos(trx, estudo.id, recalculado);
-    });
+      await salvarCronograma(trx, estudo.id, recalculado, ids); return reancorarCustos(trx, estudo.id, recalculado); });
     res.json({ dados: recalculado, custos_reancorados: custosReancorados });
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/cronograma:', e);
