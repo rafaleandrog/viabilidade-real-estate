@@ -334,7 +334,7 @@ export function montarPatchEstudo(
   if ('falha' in coagido) {
     return { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: coagido.falha.mensagem };
   }
-  return { dados: coagido.dados };
+  return { dados: { ...coagido.dados, ...limpezaAoTrocarTipo(estudo?.tipo_empreendimento, coagido.dados.tipo_empreendimento) } };
 }
 
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
@@ -760,7 +760,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
       && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')
       && (dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao') // só o destino validado: typo não converte nada
       && dados.tipo_empreendimento !== tipoOrigem;
-    const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
+    const limpezaAdiada = trocaDeTipo ? separarLimpezaAdiada(dados) : {}; const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     if (trocaDeTipo) {
       // Cada produto convertido guarda o estado ANTERIOR para a compensação: se um
       // update falhar no meio, os já convertidos voltam ao que eram (com o `pct_alv`
@@ -774,7 +774,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
           const orig = (produtos as any[]).find((p) => Number(p.id) === a.id);
           await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
           convertidos.push({ id: a.id, antes: { area_media_m2: orig?.area_media_m2 ?? null, pct_alv: orig?.pct_alv ?? null } });
-        }
+        } if (Object.keys(limpezaAdiada).length > 0) { const limpo = await req.dados!.atualizar('estudos', estudoId, limpezaAdiada); if (atualizado && limpo) Object.assign(atualizado, limpo); }
       } catch (e) {
         for (const c of convertidos) {
           try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
@@ -1036,4 +1036,39 @@ export function ordenarEstudosRecentes<T extends { id?: unknown; criado_em?: unk
     if (ta !== tb) return tb > ta ? 1 : -1;
     return Number(b.id) - Number(a.id);
   });
+}
+
+// A semântica residencial/não residencial das permutas é da Incorporação; o
+// Loteamento só edita a permuta residencial. Um rascunho que já foi
+// Incorporação pode carregar permuta financeira não residencial que o
+// Loteamento não tem campo para editar nem remover — ao trocar para Loteamento
+// ela é zerada pelo patch do estudo (o motor já a ignora lá); na troca do
+// Preliminar, depois da conversão dos produtos (ver `separarLimpezaAdiada`).
+export const CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL = [
+  'permuta_financeira_nao_residencial_pct',
+  'permuta_financeira_nao_residencial_modo',
+  'permuta_financeira_nao_residencial_valor',
+  'permuta_financeira_nao_residencial_valor_canonico',
+] as const;
+
+export function limpezaAoTrocarTipo(tipoOrigem: unknown, tipoDestino: unknown): Record<string, unknown> {
+  if (tipoDestino !== 'loteamento' || tipoOrigem !== 'incorporacao') return {};
+  return {
+    permuta_financeira_nao_residencial_pct: 0,
+    permuta_financeira_nao_residencial_modo: 'pct_vgv',
+    permuta_financeira_nao_residencial_valor: null,
+    permuta_financeira_nao_residencial_valor_canonico: null,
+  };
+}
+
+// Na troca de tipo com conversão de produtos, a limpeza sai do patch principal e
+// só é gravada depois de a conversão dar certo: se ela falhar, a compensação
+// devolve o tipo e os campos nunca foram zerados (sem dado perdido no caminho de
+// erro). Remove as chaves de `dados` e as devolve.
+export function separarLimpezaAdiada(dados: Record<string, any>): Record<string, unknown> {
+  const r: Record<string, unknown> = {};
+  for (const c of CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL) {
+    if (c in dados) { r[c] = dados[c]; delete dados[c]; }
+  }
+  return r;
 }

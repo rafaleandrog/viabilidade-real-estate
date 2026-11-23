@@ -5,7 +5,7 @@ import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria, pctPosChavesDerivado } from '../../frontend/fluxo-shared.js';
 import { erroComponentePagamento, erroDestinoSaldoChaves } from '../../frontend/fluxo-pagamento-contrato.js';
-import { fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
+import { espelhoDescreveComponentes, fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
 import { normalizarLinhasPagamento } from '../../frontend/fluxo-caixa-motor.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
@@ -1217,11 +1217,13 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
       if (invalido) { erro(res, 400, 'ABSORCAO_INVALIDA', invalido); return; }
       dados.absorcao = absorcaoComPosChavesDerivado(req.body.absorcao);
     }
+    let linhasDoCronograma: LinhaCronograma[] = [];
     if (req.body.fluxo_pagamento !== undefined) {
       const invalido = validarFluxoPagamento(req.body.fluxo_pagamento);
       if (invalido) { erro(res, 400, 'FLUXO_PAGAMENTO_INVALIDO', invalido); return; }
+      linhasDoCronograma = (await lerCronograma(req, estudo)).linhas;
       const canonico = fluxoPagamentoCanonico(
-        req.body.fluxo_pagamento, (await lerCronograma(req, estudo)).linhas, Number(estudo.juros_tabela_aa_padrao) || 0,
+        req.body.fluxo_pagamento, linhasDoCronograma, Number(estudo.juros_tabela_aa_padrao) || 0,
       );
       // O plano CONVERTIDO passa pela mesma validação que o canônico enviado passaria: entrada + parcelas acima de 100%
       // zeram o repasse e geram componentes que somam mais que 100 — o que a rota recusaria se viesse como `componentes`.
@@ -1231,7 +1233,7 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     const atualizada = await req.dados!.atualizar('avancado_fases', fase.id, dados);
-    res.json(atualizada);
+    res.json(respostaFaseComAviso(atualizada, dados.fluxo_pagamento, linhasDoCronograma));
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/fases/:fid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
@@ -2410,6 +2412,22 @@ export function absorcaoComPosChavesDerivado(a: any): any {
     ? origem.map((b: any) => (b?.evento === 'pos_obra' ? { ...b, pct } : b))
     : [...origem, { evento: 'pos_obra', pct }];
   return { ...a, blocos };
+}
+
+/**
+ * A resposta do PATCH da fase. Quando o plano gravado tem o espelho legado (`entrada`/`parcelas`) contando
+ * outra história que os `componentes`, a resposta leva `espelho_divergente: true` — nada é recusado; o
+ * aviso existe porque a tela trata esse plano como somente canônico. Sem plano no corpo, nada a avisar.
+ */
+export function respostaFaseComAviso(
+  atualizada: any,
+  fluxoPagamento: any,
+  cronograma: { evento: string; inicio_mes: number; duracao_meses: number }[],
+): any {
+  if (fluxoPagamento === undefined || fluxoPagamento === null) return atualizada;
+  return espelhoDescreveComponentes(fluxoPagamento, cronograma as any)
+    ? atualizada
+    : { ...atualizada, espelho_divergente: true };
 }
 
 /**

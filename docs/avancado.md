@@ -276,6 +276,12 @@ quando está no formato canônico, a lista `componentes`. Por isso a API o norma
 `componentes`, e um `PATCH …/fases/:fid` cujo `fluxo_pagamento` traga só `entrada` e `parcelas` é convertido para `componentes` com a
 taxa de tabela do estudo (`juros_tabela_aa_padrao`). Quando `componentes` já vem no corpo, é gravado como veio.
 
+Quando o `componentes` do corpo não bate com as linhas `entrada` e `parcelas` que vêm junto (por exemplo, componentes de 10%,
+20% e 70% com entrada e parcelamento de 50% cada), o plano é gravado como veio e a resposta traz `espelho_divergente: true`;
+nada é recusado. No modal **Fluxo de pagamento**, um plano assim aparece só para leitura: um aviso diz que o cálculo usa os
+componentes gravados, as linhas de entrada, parcelamento e saldo de chaves ficam desabilitadas e **Aplicar** mantém o plano
+como está, sem descartar componentes. Isso vale só para o plano gravado pela API com esse descompasso; um plano criado pela tela não é tratado assim, mesmo depois de o Cronograma mudar. Para editar um plano divergente, monte-o de novo pela API com linhas coerentes.
+
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.
 
