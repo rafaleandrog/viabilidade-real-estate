@@ -4,6 +4,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Imposto do Avançado, fatia 3 de 3: guias e aviso do regime oculto (fecha a issue 834)
+
+- Guias: `docs/formulas.md` ganha a seção **Imposto do Avançado** (alíquota do regime × recebido do
+  mês; permuta física fora da base; permuta financeira calculada depois, sem reduzir a base);
+  `docs/modelo-de-dados.md` cita as três colunas do imposto (`considerar_ret`, `ret_pct`,
+  `imposto_percentual`); `docs/administracao.md` deixa claro que o parâmetro **Alíquota do RET** é
+  do Preliminar e que o imposto do Avançado se edita em Custos › Financeiro; `docs/avancado.md`
+  descreve o aviso abaixo.
+- Tela: com a alíquota inválida no regime que não está à vista, a caixa do imposto mostra um aviso
+  (`avisoRegimeOculto`) dizendo qual corrigir — antes o Salvar só ficava desabilitado, sem motivo.
+- Ficam fora, registrados no painel: a corrida entre a carga inicial de uma sub-aba de Custos e o
+  `estudo` atualizado que chega durante ela; a propagação de custos editados entre as sub-abas
+  irmãs (defeito anterior, de toda base que depende de custos de outro grupo); e o registro, em PR
+  de processo, das retiradas de achado das revisões do PR 948.
+
 ## 2026-11-23 — Imposto do Avançado, fatia 2 de 3: regime na tela, alerta e base % da receita (issue 834)
 
 - Custos › Financeiro troca o checkbox do RET por um seletor **Imposto sobre a receita** (imposto
