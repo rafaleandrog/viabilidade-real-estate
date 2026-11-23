@@ -886,8 +886,8 @@ plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** 
 > `urbi-empacotar` leem é o do pin. Em 2026-10-04 a obsolescência `identidade-imobiliario-antiga`
 > (SDK 93) foi avisada primeiro pela instância, sem que lente nem empacotador a conhecessem, com o
 > pin ainda em `57.0.0`. O pin subiu para **`93.0.0`** em 2026-11-23 (#906, decisão do autor):
-> `req.modulos` no backend já é documentado desde o 87, e o 93 é a versão cujo catálogo traz a
-> identidade de módulo que o manifesto declara (`identidade-imobiliario-antiga`). Segundo o autor,
+> `req.modulos` no backend já é documentado desde o 87, e o 93 foi escolhido por também trazer, no
+> catálogo, a identidade `urbiverso/modulos-urbiverso::imobiliario` do manifesto. Segundo o autor,
 > a instância roda a 100. Pin atrás da instância continua sendo ponto cego declarado, não "metade
 > fechada".
 
