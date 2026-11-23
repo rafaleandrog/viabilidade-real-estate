@@ -6,7 +6,7 @@ Este arquivo é lido automaticamente pelo Claude Code ao iniciar qualquer sessã
 
 ## Contexto do projeto
 
-App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell UrbiVerso (SDK `@urbiverso/sdk 57.0.0`). Dois tipos de estudo: **Preliminar** (análise estática) e **Avançado** (fluxo de caixa temporal). Frontend em Lit com web components `urbi-*`. Backend em `backend/rotas.js`, self-contained.
+App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell UrbiVerso (SDK `@urbiverso/sdk 93.0.0`). Dois tipos de estudo: **Preliminar** (análise estática) e **Avançado** (fluxo de caixa temporal). Frontend em Lit com web components `urbi-*`. Backend em `backend/rotas.js`, self-contained.
 
 **Fontes de verdade:**
 - `PROGRESSO.md` — estado atual, o que foi feito, pendências
@@ -854,8 +854,8 @@ Nenhuma das duas roda no `validar-frontend.sh`, de propósito: não são valida�
 **A camada de contratos roda INTEIRA desde 2026-09-04.** O pacote está no disco depois do
 `validar-frontend.sh` — que é o único dos dois que instala; o `validar-backend.sh` aborta se ele não
 tiver rodado antes (§ Validação) —, e a superfície que a skill lê é
-`node_modules/@urbiverso/sdk/**docs/**`. Com o pin em **`57.0.0`** o bundle traz `docs/` (32
-arquivos) **e** `obsolescencias.json` (7 chaves).
+`node_modules/@urbiverso/sdk/**docs/**`. Com o pin em **`93.0.0`** o bundle traz `docs/` (36
+arquivos) **e** `obsolescencias.json` (9 chaves).
 
 > ⚠️ **Até 2026-09-04 esta seção dizia o contrário, e a causa era o pin.** Com `0.50.3` o bundle
 > trazia só `README.md`, `package.json` e `dist/` — sem `docs/`, sem `obsolescencias.json` —, então
@@ -867,8 +867,8 @@ arquivos) **e** `obsolescencias.json` (7 chaves).
 
 | Lente de contrato | Superfície | Estado |
 |---|---|---|
-| props de primitivo `urbi-*` | `dist/index.d.ts` (68 `declare class Urbi*`) | ✅ **executável agora** |
-| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ✅ **executável desde 2026-09-04** (pin `57.0.0`) |
+| props de primitivo `urbi-*` | `dist/index.d.ts` (85 `declare class Urbi*`) | ✅ **executável agora** |
+| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ✅ **executável desde 2026-09-04** (pin hoje em `93.0.0`) |
 | `shell_min` vs. o que a instância roda | — | pergunta ao autor, nunca ao registry |
 
 Com as duas lentes executáveis, a atestação **pode** sair `contratos=ok` — mas só quando as duas de
@@ -881,11 +881,15 @@ plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** 
 > era **a versão fixada**, e que subir o pin seria "o caminho para fechar a outra metade" — isso
 > caiu em 2026-09-04, quando o pin subiu para `57.0.0`. As duas lentes de contrato são
 > executáveis, e o que sobra é a disciplina de só publicar `contratos=ok` quando as duas tiverem
-> rodado de fato. **Mas executável contra o SDK FIXADO, não contra o da instância**: o pin
-> (`57.0.0`) fica atrás do SDK que a instância roda, e o catálogo de obsolescências que a lente e o
+> rodado de fato. **Mas executável contra o SDK FIXADO, não contra o da instância**: o pin fica
+> atrás do SDK que a instância roda, e o catálogo de obsolescências que a lente e o
 > `urbi-empacotar` leem é o do pin. Em 2026-10-04 a obsolescência `identidade-imobiliario-antiga`
-> (SDK 93) foi avisada primeiro pela instância, sem que lente nem empacotador a conhecessem. Pin
-> atrás da instância é ponto cego declarado, não "metade fechada".
+> (SDK 93) foi avisada primeiro pela instância, sem que lente nem empacotador a conhecessem, com o
+> pin ainda em `57.0.0`. O pin subiu para **`93.0.0`** em 2026-11-23 (#906, decisão do autor):
+> `req.modulos` no backend já é documentado desde o 87, e o 93 foi escolhido por também trazer, no
+> catálogo, a identidade `urbiverso/modulos-urbiverso::imobiliario` do manifesto. Segundo o autor,
+> a instância roda a 100. Pin atrás da instância continua sendo ponto cego declarado, não "metade
+> fechada".
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
@@ -971,7 +975,7 @@ Consequências que valem em toda sessão com token:
 - **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
   primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
 
-⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`57.0.0`**, exato,
+⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`93.0.0`**, exato,
 sem circunflexo. Conferir prop numa versão diferente da fixada é a mesma classe de erro que conferir
 no `main` do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/sdk/`, não o que o
 `npm view` devolve.
@@ -982,6 +986,13 @@ no `main` do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/
 > repondo a chave obsoleta `inicial` de propósito: empacotava limpo. Foi por isso que nem o
 > empacotamento nem a revisão avisaram antes de a app cair inteira. Com o `57.0.0` as duas lentes
 > de contrato passam a ser executáveis.
+>
+> **O pin subiu de novo, de `57.0.0` para `93.0.0`, em 2026-11-23 (#906, decisão do autor).** O
+> motivo é o backend ler o módulo imobiliário: o `57.0.0` só documentava `req.nucleo`, do contrato
+> do núcleo em obsolescência, e o `req.modulos.<slug>` aparece documentado desde o 87. O 93 foi
+> escolhido por também trazer, no catálogo, a identidade `urbiverso/modulos-urbiverso::imobiliario`
+> do manifesto. Na implementação (PR 951), typecheck, testes, `urbi-empacotar` e a auditoria de
+> obsolescência saíram limpos antes e depois, e o lockfile mudou só a entrada do SDK.
 
 **Para mudanças de FRONTEND (a maioria):** o frontend **não importa o SDK**
 (usa o global `window.urbiVerso`), então valida-se 100% só com os pacotes públicos. Use o
@@ -1096,7 +1107,7 @@ barra os dois erros simétricos de versionamento: migração nova **sem** bump d
 > **não dá erro, só não faz nada** — leia antes de presumir.
 >
 > **Essa fonte existe aqui desde 2026-09-03** — o `validar-frontend.sh` põe o SDK no disco (§ Validação),
-> e a versão é a que o `package.json` fixa (hoje `57.0.0`), que é justamente a autoridade certa.
+> e a versão é a que o `package.json` fixa (hoje `93.0.0`), que é justamente a autoridade certa.
 >
 > A alternativa antiga — ler `ui/src/urbi-<nome>.ts` no monorepo — **deixou de ter desculpa**. Ela
 > continua permitida (§ O monorepo é só leitura) e continua medindo a referência errada: o `main`
