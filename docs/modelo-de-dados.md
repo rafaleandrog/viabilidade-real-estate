@@ -174,7 +174,7 @@ glebas e lotes vêm de `imoveis`; `parcelamentos` exclui do seletor de terreno d
 lotes de parcelamento em regularização fundiária ou vinculado a um setor habitacional e tira da aba
 Terrenos do Painel os lotes de regularização (o lote herda isso pelo parcelamento). O consumo segue o contrato de módulos da plataforma: o shell provê as rotas
 `modulos/imobiliario/*` do app e o frontend as chama pelo cliente de módulo, com os caminhos
-relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`). O app não consulta o
+relativos ao módulo (`/glebas`, `/lotes`, `/parcelamentos`, `/imoveis/:id`); o backend só confere, ao vincular, que o imóvel existe no módulo. O app não consulta o
 banco do módulo: guarda o id e o tipo do imóvel como referência lógica, sem FK, e a área somada no
 próprio estudo (abaixo). A permissão é ligada pelo
 administrador da instância, na aba Núcleo do app; sem ela os endpoints respondem 403 e

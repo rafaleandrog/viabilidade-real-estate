@@ -61,11 +61,6 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
       return;
     }
 
-    // O imóvel tem de existir no módulo imobiliário. Falha fechada: sem helper ou
-    // com o módulo falhando, não vincula. Vem depois de permissão, status, id e tipo.
-    const conferido = await conferirImovelNoModulo(req.modulos?.imobiliario, tipoImovel, imovelNucleoId);
-    if (!conferido.ok) { erro(res, conferido.http, conferido.codigo, conferido.mensagem); return; }
-
     // Loteamento: no máximo 1 gleba.
     const existentes = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
     if (estudo.tipo_empreendimento === 'loteamento' && existentes.total >= 1) {
@@ -76,6 +71,12 @@ rotasImoveisEstudo.post('/estudos/:id/imoveis', async (req: Request, res: Respon
       erro(res, 409, 'IMOVEL_DUPLICADO', 'Este imóvel já está vinculado ao estudo');
       return;
     }
+
+    // O imóvel tem de existir no módulo imobiliário. Falha fechada: sem helper ou
+    // com o módulo falhando, não vincula. Vem depois das regras locais (permissão,
+    // status, id, tipo, gleba única e duplicado), logo antes de gravar.
+    const conferido = await conferirImovelNoModulo(req.modulos?.imobiliario, tipoImovel, imovelNucleoId);
+    if (!conferido.ok) { erro(res, conferido.http, conferido.codigo, conferido.mensagem); return; }
 
     const criado = await req.dados!.criar('estudo_imoveis', {
       estudo_id: estudoId,

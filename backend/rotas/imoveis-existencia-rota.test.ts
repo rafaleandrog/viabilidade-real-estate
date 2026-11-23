@@ -143,3 +143,21 @@ test('ordem: quem não é membro recebe 403 e o módulo nem é consultado; fora 
   assert.equal(t.status, 422); assert.equal(t.j.codigo, 'IMOVEL_TRAVADO');
   assert.equal(chamadas.length, 0);
 });
+
+test('ordem: as regras locais vêm antes do módulo — duplicado (409), gleba única (422), id (400) e tipo (422) sem consultar', async () => {
+  const chamadas: Array<{ tabela: string; campos: readonly string[]; valores: any[] }> = [];
+  const dados = new DadosFake(); const e = estudo(dados);
+  dados.semear('estudo_imoveis', { estudo_id: e, imovel_nucleo_id: 77, tipo_imovel: 'lote' });
+  const dup = await post(dados, modulo([], chamadas), 26, e, { imovel_nucleo_id: 77 });
+  assert.equal(dup.status, 409, JSON.stringify(dup.j));
+  const lot = estudo(dados, 'loteamento');
+  dados.semear('estudo_imoveis', { estudo_id: lot, imovel_nucleo_id: 5, tipo_imovel: 'gleba' });
+  const unica = await post(dados, modulo([], chamadas), 26, lot, { imovel_nucleo_id: 6 });
+  assert.equal(unica.status, 422, JSON.stringify(unica.j));
+  assert.equal(unica.j.codigo, 'GLEBA_UNICA');
+  const inv = await post(dados, modulo([], chamadas), 26, e, { imovel_nucleo_id: 'x' });
+  assert.equal(inv.status, 400);
+  const tipo = await post(dados, modulo([], chamadas), 26, e, { imovel_nucleo_id: 8, tipo_imovel: 'gleba' });
+  assert.equal(tipo.status, 422);
+  assert.equal(chamadas.length, 0, 'o módulo não pode ser consultado antes das regras locais');
+});
