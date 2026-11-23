@@ -255,6 +255,20 @@ dívida negativo, dívida que não zera no horizonte e caixa acumulado negativo 
 **funding nunca integra a Receita bruta (VGV)**: liberações e aportes aparecem só no bloco de
 funding, e o repasse continua sendo recebimento do cliente.
 
+## Imposto do Avançado
+
+O imposto do Avançado incide sobre a receita **recebida**, mês a mês, com a alíquota do regime
+escolhido em Custos › Financeiro: o **imposto padrão** do estudo ou o **RET**.
+
+```text
+Imposto do mês = recebimento bruto do mês (com juros de tabela) × alíquota do regime
+```
+
+A unidade da permuta física não gera recebimento, então não entra na base. A permuta financeira não
+reduz a base: ela é calculada depois, sobre o recebido menos o que a linha escolhe deduzir (o
+imposto, a corretagem ou os dois). O resultado fecha como recebido − imposto − permuta financeira −
+custos.
+
 ## Bases dos custos em % do Avançado
 
 Nos Custos do Avançado, cada unidade percentual aplica o % sobre uma base própria:

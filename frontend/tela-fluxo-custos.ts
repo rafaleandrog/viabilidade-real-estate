@@ -17,7 +17,7 @@ import {
 } from './viabilidade-api.js';
 import { calcularFluxo, vgvVendavelPorLinha, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
-  OPCOES_REGIME_IMPOSTO, aliquotaDoRegime, dadosEstudoDoImpostoSalvo, erroAliquotaImposto, erroFormImposto,
+  OPCOES_REGIME_IMPOSTO, aliquotaDoRegime, avisoRegimeOculto, dadosEstudoDoImpostoSalvo, erroAliquotaImposto, erroFormImposto,
   formImpostoAlterado, formImpostoDeParametros,
   patchImpostoAvancado, rotuloAliquotaImposto, type FormImposto, type RegimeImposto,
 } from './imposto-regime.js';
@@ -636,6 +636,7 @@ export class ViabFluxoCustos extends LitElement {
             ?desabilitado=${!!erroForm || !formImpostoAlterado(this.impostoForm, this.impostoSalvo)}
             @click=${this._salvarImposto}>Salvar</urbi-botao>` : nothing}
       </div>
+      ${!dis && avisoRegimeOculto(f) ? html`<p class="sec aviso-imposto">${avisoRegimeOculto(f)}</p>` : nothing}
     `;
   }
 

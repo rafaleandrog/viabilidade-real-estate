@@ -81,7 +81,7 @@ próxima execução da rotina ou da manutenção), sem reinstalar.
 
 | Parâmetro | Padrão | Onde é usado |
 |---|---|---|
-| **Alíquota do RET** | 4 % | a alíquota fixa aplicada na Proforma quando o estudo está **Sujeito a RET**; lida ao abrir Premissas, Resultado e Gráficos |
+| **Alíquota do RET** | 4 % | a alíquota fixa aplicada na Proforma do Preliminar quando o estudo está **Sujeito a RET**; lida ao abrir Premissas, Resultado e Gráficos. O Avançado não a usa: a alíquota do RET dele é a do próprio estudo, em Custos › Financeiro |
 | **Prazo de arquivamento** | 30 dias | dias sem movimentação (exceto Aprovado) até a manutenção arquivar o estudo |
 | **Máximo de itens por região** | 10 | teto de itens guardados por região a cada coleta diária |
 | **Alíquota padrão de imposto** (não RET) | 7 % | declarado e devolvido por `GET /config`; nenhuma tela o lê hoje |
@@ -91,8 +91,8 @@ próxima execução da rotina ou da manutenção), sem reinstalar.
 
 Os quatro últimos existem no manifesto, mas o app ainda não os consome: os campos de imposto,
 corretagem, marketing e gestão de um estudo novo nascem com o padrão do modelo de dados (7 %, 5 %,
-1 % e 1,25 %), e é lá que o editor os altera. Sobrescrever esses quatro parâmetros não muda estudo
-nenhum.
+1 % e 1,25 %), e é lá que o editor os altera — nas Premissas do Preliminar; no Avançado, o imposto
+fica em Custos › Financeiro. Sobrescrever esses quatro parâmetros não muda estudo nenhum.
 
 ### Benchmarks
 
