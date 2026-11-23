@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { varrerTudo } from './varrer-tudo.js';
-import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus } from '../permissoes-estudo.js';
+import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus, type ExecutorDados } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
 import { eSemeaduraObrigatoria, pctPosChavesDerivado } from '../../frontend/fluxo-shared.js';
@@ -490,7 +490,7 @@ export async function lerCronograma(req: Request, estudo: { id: number; tem_pre_
 
 /** Persiste (upsert) as 5 linhas do cronograma e retorna o estado final. */
 async function salvarCronograma(
-  req: Request,
+  dados: ExecutorDados,
   estudoId: number,
   linhas: LinhaCronograma[],
   ids: Map<string, number>,
@@ -503,20 +503,20 @@ async function salvarCronograma(
       travado_inicio: linha.travado_inicio,
       travado_duracao: linha.travado_duracao,
     };
-    if (id) await req.dados!.atualizar('avancado_cronograma', id, valores);
-    else await req.dados!.criar('avancado_cronograma', { estudo_id: estudoId, evento: linha.evento, ...valores });
+    if (id) await dados.atualizar('avancado_cronograma', id, valores);
+    else await dados.criar('avancado_cronograma', { estudo_id: estudoId, evento: linha.evento, ...valores });
   }
 }
 
 /** Reancora as linhas de custo presas a eventos do cronograma recém-alterado. */
-async function reancorarCustos(req: Request, estudoId: number, cronograma: LinhaCronograma[]): Promise<number> {
-  const r = await req.dados!.listar('avancado_linhas_custo', { filtros: { estudo_id: estudoId }, por_pagina: 500 });
+async function reancorarCustos(dados: ExecutorDados, estudoId: number, cronograma: LinhaCronograma[]): Promise<number> {
+  const r = await dados.listar('avancado_linhas_custo', { filtros: { estudo_id: estudoId }, por_pagina: 500 });
   let alteradas = 0;
   for (const custo of r.dados) {
     const ancora = ancorarLinhaCusto(String(custo.cronograma_evento), cronograma);
     if (!ancora) continue;
     if (Number(custo.inicio_mes) !== ancora.inicio_mes || Number(custo.duracao_meses) !== ancora.duracao_meses) {
-      await req.dados!.atualizar('avancado_linhas_custo', custo.id, ancora);
+      await dados.atualizar('avancado_linhas_custo', custo.id, ancora);
       alteradas++;
     }
   }
@@ -662,12 +662,12 @@ export function aplicarDeltaEvento(
  * alterados numa ÚNICA chamada, em vez de um PATCH por evento (que reancorava
  * custos e emitia um toast a cada um).
  *
- * Atomicidade de VALIDAÇÃO, não de banco (não há transação disponível aqui —
- * ver CLAUDE.md do monorepo, apps segregadas por conta só usam `req.dados`):
- * todo delta do lote é validado contra o cronograma lido UMA vez, antes de
- * qualquer escrita — se um evento falhar, nada é persistido, nenhum é. Só
- * depois de todos passarem é que `recalcularTravados`/`salvarCronograma`/
- * `reancorarCustos` rodam, cada um exatamente UMA vez para o lote inteiro.
+ * Atomicidade em duas camadas: todo delta do lote é validado contra o
+ * cronograma lido UMA vez, antes de qualquer escrita (um evento inválido
+ * recusa o lote inteiro, sem tocar o banco), e a gravação — `salvarCronograma`
+ * + `reancorarCustos`, cada um UMA vez para o lote — roda numa única transação
+ * (`req.dados!.transaction`): se uma escrita falhar, o cronograma e os custos
+ * voltam juntos ao estado anterior.
  */
 rotasAvancado.patch('/estudos/:id/avancado/cronograma', async (req: Request, res: Response) => {
   try {
@@ -704,8 +704,10 @@ rotasAvancado.patch('/estudos/:id/avancado/cronograma', async (req: Request, res
     // Fase 2: todos os deltas validaram — recalcula, persiste e reancora
     // UMA VEZ para o cronograma inteiro (não uma vez por evento do lote).
     const recalculado = recalcularTravados(linhas);
-    await salvarCronograma(req, estudo.id, recalculado, ids);
-    const custosReancorados = await reancorarCustos(req, estudo.id, recalculado);
+    const custosReancorados = await req.dados!.transaction(async (trx) => {
+      await salvarCronograma(trx, estudo.id, recalculado, ids);
+      return reancorarCustos(trx, estudo.id, recalculado);
+    });
     res.json({ dados: recalculado, custos_reancorados: custosReancorados });
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/cronograma:', e);
@@ -2109,15 +2111,15 @@ const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
 // shell 0.55.22, `null` em coluna opcional é aceito e pulado antes da checagem
 // de tipo. `omitirValoresNulos` continua aqui pelo motivo revisado em
 // `./duplicar-utils.ts`, não por causa daquele erro.
-export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {
+export async function duplicarDadosAvancado(dados: ExecutorDados, origId: number, novoId: number): Promise<void> {
   // Cronograma (5 eventos FIXOS por estudo — `avancado_cronograma` nunca tem
   // mais linhas que isso, então `por_pagina: 10` não é o defeito da #634:
   // não há "página 2" possível aqui).
-  const crono = await req.dados!.listar('avancado_cronograma', {
+  const crono = await dados.listar('avancado_cronograma', {
     filtros: { estudo_id: origId }, por_pagina: 10,
   });
   for (const linha of crono.dados) {
-    await req.dados!.criar('avancado_cronograma', coagirNumericosOuLancar('avancado_cronograma', omitirValoresNulos({
+    await dados.criar('avancado_cronograma', coagirNumericosOuLancar('avancado_cronograma', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(linha, CAMPOS_CRONOGRAMA),
     })));
   }
@@ -2141,12 +2143,12 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // referência manda continua valendo, mas o fato que a ilustrava mudou.
   //
   // Catálogo de tipologias (nível estudo) — mapeando id antigo → novo.
-  const tipologias = await varrerTudo(req.dados!, 'avancado_tipologias', {
+  const tipologias = await varrerTudo(dados, 'avancado_tipologias', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   const mapaTipologia = new Map<number, number>();
   for (const tip of tipologias) {
-    const nova = await req.dados!.criar('avancado_tipologias', coagirNumericosOuLancar('avancado_tipologias', omitirValoresNulos({
+    const nova = await dados.criar('avancado_tipologias', coagirNumericosOuLancar('avancado_tipologias', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(tip, CAMPOS_TIPOLOGIA),
     })));
     mapaTipologia.set(Number(tip.id), Number(nova.id));
@@ -2154,8 +2156,8 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
 
   // Fases + alocações (mapeando fase antiga → nova e tipologia antiga → nova).
   const [fases, alocacoes] = await Promise.all([
-    varrerTudo(req.dados!, 'avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
-    varrerTudo(req.dados!, 'avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
+    varrerTudo(dados, 'avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
+    varrerTudo(dados, 'avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
   ]);
   // Alocações indexadas por fase ANTES do laço — o mesmo padrão que o GET de
   // fases já usa neste arquivo. Sem o índice, o laço interno varre TODAS as
@@ -2176,14 +2178,14 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
 
   const mapaFase = new Map<number, number>();
   for (const fase of fases) {
-    const nova = await req.dados!.criar('avancado_fases', coagirNumericosOuLancar('avancado_fases', omitirValoresNulos({
+    const nova = await dados.criar('avancado_fases', coagirNumericosOuLancar('avancado_fases', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(fase, CAMPOS_FASE_COPIA),
     })));
     mapaFase.set(Number(fase.id), Number(nova.id));
     for (const aloc of alocacoesPorFase.get(Number(fase.id)) ?? []) {
       const novaTipologia = mapaTipologia.get(Number(aloc.tipologia_id));
       if (!novaTipologia) continue; // tipologia órfã (não deveria ocorrer)
-      await req.dados!.criar('avancado_alocacoes', coagirNumericosOuLancar('avancado_alocacoes', omitirValoresNulos({
+      await dados.criar('avancado_alocacoes', coagirNumericosOuLancar('avancado_alocacoes', omitirValoresNulos({
         estudo_id: novoId, fase_id: nova.id, tipologia_id: novaTipologia,
         ...extrairCampos(aloc, CAMPOS_ALOCACAO_COPIA),
       })));
@@ -2200,7 +2202,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // as 500 lidas, então uma operação de funding cujo `custo_linha_ids`
   // incluísse uma linha além da página 1 tratava esse id como órfão e o
   // descartava, mesmo a linha existindo no original.
-  const custos = await varrerTudo(req.dados!, 'avancado_linhas_custo', {
+  const custos = await varrerTudo(dados, 'avancado_linhas_custo', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   const mapaCusto = new Map<number, number>();
@@ -2217,7 +2219,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     if (custo.permuta_tipologia_id !== null && custo.permuta_tipologia_id !== undefined) {
       copia.permuta_tipologia_id = mapaTipologia.get(Number(custo.permuta_tipologia_id)) ?? null;
     }
-    const nova = await req.dados!.criar('avancado_linhas_custo', coagirNumericosOuLancar('avancado_linhas_custo', omitirValoresNulos(copia)));
+    const nova = await dados.criar('avancado_linhas_custo', coagirNumericosOuLancar('avancado_linhas_custo', omitirValoresNulos(copia)));
     mapaCusto.set(Number(custo.id), Number(nova.id));
   }
 
@@ -2228,7 +2230,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // Dois remapeamentos, pelo mesmo motivo dos de cima: `fase_ancora_id` (a
   // fase que ancora o aporte) e `custo_linha_ids` (a base do financiamento à
   // produção, uma lista de ids em JSON).
-  const operacoes = await varrerTudo(req.dados!, 'avancado_funding_operacoes', {
+  const operacoes = await varrerTudo(dados, 'avancado_funding_operacoes', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   for (const op of operacoes) {
@@ -2239,15 +2241,15 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     if (op.custo_linha_ids !== null && op.custo_linha_ids !== undefined) {
       copia.custo_linha_ids = remapearCustoLinhaIds(op.custo_linha_ids, mapaCusto);
     }
-    await req.dados!.criar('avancado_funding_operacoes', coagirNumericosOuLancar('avancado_funding_operacoes', omitirValoresNulos(copia)));
+    await dados.criar('avancado_funding_operacoes', coagirNumericosOuLancar('avancado_funding_operacoes', omitirValoresNulos(copia)));
   }
 
   // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
-  const cenarios = await varrerTudo(req.dados!, 'avancado_cenarios', {
+  const cenarios = await varrerTudo(dados, 'avancado_cenarios', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   for (const cen of cenarios) {
-    await req.dados!.criar('avancado_cenarios', coagirNumericosOuLancar('avancado_cenarios', omitirValoresNulos({
+    await dados.criar('avancado_cenarios', coagirNumericosOuLancar('avancado_cenarios', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(cen, CAMPOS_CENARIO),
     })));
   }
