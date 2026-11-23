@@ -4,6 +4,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Permuta física por produto do catálogo (Preliminar)
+
+- Quadro da base comum, tema 2, decisão do dono: a permuta física do Preliminar passa a poder ser
+  declarada por produto, como o Avançado faz com as unidades reservadas de cada tipologia. Coluna
+  nova `preliminar_produtos.unidades_permutadas` (inteiro, padrão 0), sem migração (não há dado a
+  transformar) e sem bump da `versao`, pela regra do repositório.
+- Motor (`calcularProforma`): se algum produto de uma categoria tem unidades permutadas, a permuta
+  daquela categoria vem do catálogo (m² = Σ unidades × área; VGV = Σ unidades × área × preço do
+  produto, sobre o catálogo já estressado) e os campos por área dela são ignorados. Sem nenhum
+  produto permutado, o caminho por área é o de antes. O cap por categoria, o `moeda` e as
+  identidades por categoria seguem. Regra pura em `frontend/permuta-produtos.ts`, lida também pela
+  aba Permutas, que desabilita os campos por área da categoria por produto e diz onde editar.
+- Preço médio por unidade desconta as unidades permutadas só no modo por produto; o memo
+  `valorPermutaFisica` é a soma do VGV efetivo das categorias quando alguma é por produto.
+- Backend: `unidades_permutadas` validado (inteiro 0 ≤ x ≤ unidades, fail-closed; `400
+  UNIDADES_PERMUTADAS_INVALIDAS`) e copiado na duplicação do estudo. `CAMPOS` ficou intacta: a lista
+  gravável é `CAMPOS_GRAVAVEIS`, porque um teste existente trava a forma de `CAMPOS`.
+- Tela: coluna "Unidades permutadas" (`colunasProdutoTabela`, sobre `colunasProduto` intacta pelo
+  mesmo motivo). Dois casos de render: a coluna, e o estado desabilitado da aba Permutas.
+- Medido na Pinguim (só leitura), Preliminar com a permuta equivalente à do Avançado par: o 39 vai de
+  VGV 209.250.000 para 210.000.000 e resultado +573.900; o 38, de VGV 139.704.323 para 139.797.039
+  e resultado +75.285.
+
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 
 - Pedido do autor, com captura: Infraestrutura em "% VGV", derivada de um custo em R$, aparecia

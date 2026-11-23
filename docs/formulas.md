@@ -56,8 +56,13 @@ Duas regras governam essa fonte:
   tabela, KPI nem gráfico, e nenhuma despesa em % do VGV produz valor. O banner de preço sugerido
   de Premissas pede o cadastro dos produtos em vez de dizer "inatingível". Não há fallback para os campos antigos de área × preço da
   linha do estudo — eles não têm entrada em tela.
+- **A permuta física de cada categoria tem dois modos.** Por área (padrão): m² em valor ou em % da
+  área da categoria, valorados pelo **preço médio da categoria**. Por produto: se algum produto da
+  categoria tem unidades permutadas no catálogo, a permuta é `Σ unidades permutadas × área × preço
+  do produto` (m² = `Σ unidades permutadas × área`) e os campos por área daquela categoria são
+  ignorados. O fator de sensibilidade de permuta incide uma vez sobre os dois.
 - **A permuta física é capada no VGV bruto da própria categoria.** A permuta pedida de cada tipo
-  (`área entregue × preço médio daquele tipo`) é cortada quando vale mais que o VGV bruto daquele
+  (`área entregue × preço médio daquele tipo`, ou a soma dos produtos no modo por produto) é cortada quando vale mais que o VGV bruto daquele
   tipo; cada categoria capa sozinha, sem corte proporcional entre as duas. O VGV da categoria
   capada para em zero, nunca negativo, e a Proforma avisa o excedente. A permuta que sai no
   resultado é a **efetiva**, e as identidades `VGV R + permuta R = VGV bruto R` (idem NR) fecham.
@@ -70,7 +75,7 @@ os m² entregues pelo preço médio daquele tipo; a financeira em `% VGV` incide
 tipo. **No Loteamento as permutas não têm categorias**: o catálogo inteiro é tratado como residencial
 para elas (a tela de Permutas só expõe os controles residenciais) — o Tipo de cada produto
 separa só o número de unidades e o preço médio por unidade, este sobre o VGV bruto do tipo —, e a permuta física valora pelo preço médio do
-catálogo — mas a base do `% área venda` continua sendo a área vendável da cascata. No Loteamento
+catálogo (ou pelo preço de cada produto, no modo por produto) — mas a base do `% área venda` continua sendo a área vendável da cascata. No Loteamento
 sem catálogo efetivo a permuta física vale zero; a Incorporação sem catálogo ainda valora a
 permuta pelas premissas de preço por m² por uso.
 

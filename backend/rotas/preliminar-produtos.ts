@@ -23,6 +23,13 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
 // privativas fechadas na Incorporação) entra logo depois de `tipo`.
 export const CAMPOS = ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
 
+// Permuta física por produto: unidades do produto entregues em permuta. Lista
+// À PARTE de `CAMPOS` (que fixa a forma original do catálogo) e somada a ela em
+// `CAMPOS_GRAVAVEIS` — é esta a lista que POST, PATCH e a duplicação do estudo
+// leem, então a coluna não pode ficar fora de nenhum dos três.
+export const CAMPOS_PERMUTA = ['unidades_permutadas'];
+export const CAMPOS_GRAVAVEIS = [...CAMPOS, ...CAMPOS_PERMUTA];
+
 // #812 — os valores válidos de `tipo` vêm do `schema.json`, não de lista escrita
 // à mão: o shell recusa o que não está em `opcoes`, e sem a checagem aqui a
 // recusa do CLIENTE voltava como `500 ERRO_INTERNO` pelo `catch` genérico.
@@ -36,8 +43,40 @@ export function erroTipoProduto(body: Record<string, any>): string | null {
 }
 
 /**
+ * `unidades_permutadas`: inteiro entre 0 e as `unidades` do produto. Parser
+ * único (`numeroEstrito`), fail-closed — texto, `''`, `'1e3'`, negativo, fração
+ * e `null` são recusados, não coagidos. O teto vale sobre o PAR efetivo: o que
+ * veio no corpo, completado pelo que já está gravado (`atual`) — baixar
+ * `unidades` abaixo do que já está permutado também é recusado, e a tela manda
+ * os dois juntos. Devolve a mensagem do erro, ou `null` quando está válido.
+ */
+export function erroUnidadesPermutadas(
+  body: Record<string, any>,
+  atual: { unidades?: unknown; unidades_permutadas?: unknown } = {},
+): string | null {
+  const mudouPerm = body.unidades_permutadas !== undefined;
+  const mudouUn = body.unidades !== undefined;
+  if (!mudouPerm && !mudouUn) return null;
+  let perm = Number(atual.unidades_permutadas) || 0;
+  if (mudouPerm) {
+    const v = numeroEstrito(body.unidades_permutadas);
+    if (v === null || !Number.isInteger(v) || v < 0) return 'unidades_permutadas deve ser um número inteiro maior ou igual a 0';
+    perm = v;
+  }
+  let un = Number(atual.unidades) || 0;
+  if (mudouUn) {
+    const u = numeroEstrito(body.unidades);
+    // `unidades` inválida é recusada pela coerção numérica, com a mensagem dela.
+    if (u === null || u < 0) return null;
+    un = u;
+  }
+  if (perm > un) return `unidades_permutadas (${perm}) não pode passar das unidades do produto (${un})`;
+  return null;
+}
+
+/**
  * Coage os campos numéricos declarados (`area_media_m2`, `preco_venda_m2`,
- * `unidades`, `ordem`, `pct_alv`) pelo parser único; lixo vira 400
+ * `unidades`, `ordem`, `pct_alv`, `unidades_permutadas`) pelo parser único; lixo vira 400
  * `CAMPO_INVALIDO` em vez de 500. Muta `dados` e devolve `false` se respondeu.
  */
 function coagirNumericosOuResponder(res: Response, dados: Record<string, any>): boolean {
@@ -113,10 +152,12 @@ rotasPreliminarProdutos.post('/estudos/:id/preliminar/produtos', async (req: Req
     if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
     const msgTipo = erroTipoProduto(req.body);
     if (msgTipo) { erro(res, 400, 'TIPO_INVALIDO', msgTipo); return; }
+    const msgPerm = erroUnidadesPermutadas(req.body);
+    if (msgPerm) { erro(res, 400, 'UNIDADES_PERMUTADAS_INVALIDAS', msgPerm); return; }
 
     const existentes = await req.dados!.listar('preliminar_produtos', { filtros: { estudo_id: estudoId }, por_pagina: 500 });
     const dados: Record<string, any> = { estudo_id: estudoId, nome: '', ordem: existentes.total };
-    for (const campo of CAMPOS) {
+    for (const campo of CAMPOS_GRAVAVEIS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (!coagirNumericosOuResponder(res, dados)) return;
@@ -141,9 +182,11 @@ rotasPreliminarProdutos.patch('/estudos/:id/preliminar/produtos/:pid', async (re
     if (msgPct) { erro(res, 400, 'PCT_ALV_INVALIDO', msgPct); return; }
     const msgTipo = erroTipoProduto(req.body);
     if (msgTipo) { erro(res, 400, 'TIPO_INVALIDO', msgTipo); return; }
+    const msgPerm = erroUnidadesPermutadas(req.body, p);
+    if (msgPerm) { erro(res, 400, 'UNIDADES_PERMUTADAS_INVALIDAS', msgPerm); return; }
 
     const dados: Record<string, any> = {};
-    for (const campo of CAMPOS) {
+    for (const campo of CAMPOS_GRAVAVEIS) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }

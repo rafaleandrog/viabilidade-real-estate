@@ -8,10 +8,11 @@ import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
-import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, baseProdutosM2, produtosDoEstudo, type ProformaInput, type Proforma } from './proforma.js';
+import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, baseProdutosM2, produtosDoEstudo, permutaFisicaPorProdutosDoEstudo, type ProformaInput, type Proforma } from './proforma.js';
 import { rotuloPermutaFinanceira } from './rotulos-permuta.js';
 import { alocacaoAlv, areaMediaDaLinha, areaTotalDaLinha, pctAlvEfetivo, rotuloBaseProdutos, somaPctAlv, validarSomaPctAlv } from './produtos-alv.js';
 import { validarProdutosParaSubmissao } from './produtos-submissao.js';
+import { unidadesPermutadasDoProduto } from './permuta-produtos.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, trocaBadgePremissas, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -186,6 +187,35 @@ export function colunasProduto(lot: boolean): ColunaProduto[] {
     { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
     { chave: 'vgv', rotulo: 'VGV', classe: 'p-vgv', num: true },
   ];
+}
+
+/**
+ * As colunas que a TABELA desenha: as de `colunasProduto` mais "Unidades
+ * permutadas", logo depois de "Unidades" — a permuta física declarada por
+ * produto (`permuta-produtos.ts`). `colunasProduto` segue sendo a lista base do
+ * cadastro; a coluna nova entra aqui, e é desta lista que saem colgroup,
+ * cabeçalho, corpo e total.
+ */
+export function colunasProdutoTabela(lot: boolean): ColunaProduto[] {
+  const base = colunasProduto(lot);
+  const i = base.findIndex((c) => c.chave === 'unidades');
+  return [
+    ...base.slice(0, i + 1),
+    { chave: 'unidadesPermutadas', rotulo: 'Unidades permutadas', classe: 'p-uperm', num: true },
+    ...base.slice(i + 1),
+  ];
+}
+
+/**
+ * O que gravar ao editar `unidades` de um produto: se a nova quantidade fica
+ * abaixo do que já está permutado, as `unidades_permutadas` descem junto — a API
+ * recusa o par inconsistente (permutadas > unidades), e a edição de `unidades`
+ * não pode morrer por um valor que o usuário nem está olhando.
+ */
+export function dadosEdicaoUnidades(p: { unidades_permutadas?: unknown }, unidades: number | null): Record<string, any> {
+  const permutadas = Number(p.unidades_permutadas) || 0;
+  const novas = unidades ?? 0;
+  return permutadas > novas ? { unidades, unidades_permutadas: Math.max(0, novas) } : { unidades };
 }
 
 /**
@@ -500,6 +530,7 @@ export class ViabTelaPremissas extends LitElement {
        KPIs do indicador de aproveitamento, logo abaixo da tabela de Produtos. */
     .kpis.area-alocada { margin-top: 14px; }
     urbi-banner.aviso-area-alocada { display: block; margin-top: 12px; }
+    urbi-banner.aviso-permuta-produto { display: block; margin: 0 0 12px; }
 
     /* Catálogo de Produtos (#315) — mesmo padrão de tabela dinâmica de
        tela-empreendimento-tipologias.ts: colgroup de larguras fixas, edição
@@ -512,17 +543,18 @@ export class ViabTelaPremissas extends LitElement {
     }
     table.prod th.num, table.prod td.num { text-align: right; }
     table.prod td { padding: 6px 8px; border-bottom: 1px solid var(--cor-borda-sutil); font-size: var(--texto-corpo, 0.8125rem); }
-    /* Oito colunas (#781, #784), duas delas calculadas. */
-    table.prod col.p-nome { width: 14%; } table.prod col.p-tipo { width: 12%; }
-    table.prod col.p-pct { width: 11%; } table.prod col.p-un { width: 10%; }
-    table.prod col.p-atotal { width: 13%; } table.prod col.p-amedia { width: 12%; }
-    table.prod col.p-preco { width: 14%; } table.prod col.p-vgv { width: 14%; }
+    /* Nove colunas (#781, #784, permuta por produto), duas delas calculadas. */
+    table.prod col.p-nome { width: 12%; } table.prod col.p-tipo { width: 11%; }
+    table.prod col.p-pct { width: 10%; } table.prod col.p-un { width: 8%; }
+    table.prod col.p-uperm { width: 10%; }
+    table.prod col.p-atotal { width: 11%; } table.prod col.p-amedia { width: 11%; }
+    table.prod col.p-preco { width: 13%; } table.prod col.p-vgv { width: 14%; }
     col.p-acao { width: 60px; }
     /* Oito colunas não cabem em 600px sem espremer os inputs: a tabela
        tem largura mínima e a rolagem horizontal fica no contêiner,
        nunca no documento. */
     .prod-rolagem { overflow-x: auto; }
-    table.prod { min-width: 980px; }
+    table.prod { min-width: 1060px; }
     table.prod td.calc { color: var(--cor-texto-sec); }
     table.prod td.nome urbi-input { width: 100%; }
     table.prod td.tipo urbi-select { width: 100%; }
@@ -778,6 +810,8 @@ export class ViabTelaPremissas extends LitElement {
     // campos que as duas tabelas editam.
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
     const dis = !this.editavel;
+    // Categorias com a permuta física declarada POR PRODUTO (aba Produtos): os campos por área delas ficam desabilitados.
+    const permutaProd = permutaFisicaPorProdutosDoEstudo(this._entradaProforma());
     this._obrigCache = camposObrigatorios(this.form, this.estudo.tipo_empreendimento);
 
     return html`
@@ -880,10 +914,11 @@ export class ViabTelaPremissas extends LitElement {
         <urbi-card titulo="Permutas">
           <div class="secao grupo grupo-a">
             <h4>Permuta física</h4>
+            ${this._renderAvisoPermutaPorProduto(permutaProd, lot)}
             <div class="grid">
               ${lot
-                ? this._custoUnidade(PERMUTA_UNIDADE, dis)
-                : html`${this._custoUnidade(PERMUTA_FIS_R, dis)}${this._custoUnidade(PERMUTA_FIS_NR, dis)}`}
+                ? this._custoUnidade(PERMUTA_UNIDADE, dis || permutaProd.residencial.ativa)
+                : html`${this._custoUnidade(PERMUTA_FIS_R, dis || permutaProd.residencial.ativa)}${this._custoUnidade(PERMUTA_FIS_NR, dis || permutaProd.nao_residencial.ativa)}`}
             </div>
           </div>
 
@@ -900,6 +935,25 @@ export class ViabTelaPremissas extends LitElement {
         </urbi-card>
       ` : nothing}
     `;
+  }
+
+  // Aviso da aba Permutas quando a permuta física de uma categoria vem do
+  // catálogo: os campos por área dela ficam desabilitados (a Proforma os ignora)
+  // e o texto diz onde editar. Nada é mostrado enquanto nenhum produto permuta.
+  private _renderAvisoPermutaPorProduto(
+    pp: ReturnType<typeof permutaFisicaPorProdutosDoEstudo>, lot: boolean,
+  ): TemplateResult {
+    const categorias = [
+      { chave: 'residencial', rotulo: lot ? 'A permuta física' : 'A permuta física residencial', p: pp.residencial },
+      { chave: 'nao_residencial', rotulo: 'A permuta física não residencial', p: pp.nao_residencial },
+    ].filter((c) => c.p.ativa);
+    if (categorias.length === 0) return html``;
+    return html`${categorias.map((c) => html`
+      <urbi-banner class="aviso-permuta-produto" variante="info">
+        ${c.rotulo} vem do catálogo de produtos: ${fmtNum(c.p.unidades, 0)} unidade(s), ${fmtM2(c.p.areaM2)},
+        valoradas pelo preço de cada produto. Para alterar, edite "Unidades permutadas" na aba Produtos;
+        os campos abaixo ficam desabilitados e não entram no cálculo.
+      </urbi-banner>`)}`;
   }
 
   // Rodapé de formulário (erro geral + banner de "não salvo" + botão Salvar)
@@ -1003,7 +1057,7 @@ export class ViabTelaPremissas extends LitElement {
     const efetivos = produtosDoEstudo(this._entradaProforma());
     const { vgv, unidades } = totalProdutos(efetivos);
     // Uma lista só governa colgroup, cabeçalho, corpo e total — ver `colunasProduto`.
-    const colunas = colunasProduto(lot);
+    const colunas = colunasProdutoTabela(lot);
     const somaPct = somaPctAlv(this.produtos, alv);
     const areaTotal = this.produtos.reduce((t, x) => t + areaTotalDaLinha(x, alv), 0);
     const totalPorColuna = (chave: string): TemplateResult => {
@@ -1011,6 +1065,7 @@ export class ViabTelaPremissas extends LitElement {
         case 'nome': return html`<td>Total</td>`;
         case 'pct': return html`<td class="num">${fmtPctAlv(somaPct)}</td>`;
         case 'unidades': return html`<td class="num">${fmtNum(unidades, 0)}</td>`;
+        case 'unidadesPermutadas': return html`<td class="num">${fmtNum(this.produtos.reduce((t, x) => t + unidadesPermutadasDoProduto(x), 0), 0)}</td>`;
         case 'areaTotal': return html`<td class="num">${fmtM2(areaTotal)}</td>`;
         case 'area': return html`<td class="num">${unidades > 0 ? fmtM2(areaTotal / unidades) : '—'}</td>`;
         case 'vgv': return html`<td class="num">${fmtR$(vgv)}</td>`;
@@ -1097,7 +1152,14 @@ export class ViabTelaPremissas extends LitElement {
           <td class="num">
             <viab-num casas-decimais="0" ?desabilitado=${dis}
               .valor=${numOuNulo(p.unidades)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { unidades: e.detail.valor })}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, dadosEdicaoUnidades(p, e.detail.valor))}
+            ></viab-num>
+          </td>`;
+        case 'unidadesPermutadas': return html`
+          <td class="num">
+            <viab-num class="u-permutadas" casas-decimais="0" ?desabilitado=${dis}
+              .valor=${numOuNulo(p.unidades_permutadas) ?? 0}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._editarUnidadesPermutadas(p, e.detail.valor)}
             ></viab-num>
           </td>`;
         case 'vgv': return html`<td class="num vgv-calc">${fmtR$(vgvLinha)}</td>`;
@@ -1148,6 +1210,15 @@ export class ViabTelaPremissas extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro ao criar produto', 'erro');
     }
   };
+
+  // Permutadas nunca passam das unidades do produto: a API recusa o excedente, e
+  // aqui ele é cortado no teto (com aviso) em vez de virar uma mensagem de erro.
+  private _editarUnidadesPermutadas(p: any, valor: number | null): void {
+    const teto = Math.max(0, Number(p.unidades) || 0);
+    const pedido = Math.max(0, Math.round(valor ?? 0));
+    if (pedido > teto) urbiVerso.notificar(`Unidades permutadas limitadas às ${teto} unidades do produto.`, 'alerta');
+    void this._salvarProduto(p, { unidades_permutadas: Math.min(pedido, teto) });
+  }
 
   private async _salvarProduto(p: any, dados: Record<string, any>) {
     try {
