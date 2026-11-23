@@ -38,6 +38,7 @@ import {
   type FundingCalc, type OperacaoFunding,
 } from '../frontend/funding-motor.js';
 import { proformaAvancado } from '../frontend/proforma-avancado.js';
+import { somaLegadoAplicavel } from './conferir-legado.js';
 import {
   mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado, ePermutaFisica,
   impostoDoEstudoAvancado,
@@ -229,10 +230,13 @@ export async function conferir(id: number): Promise<Conferencia> {
     if (Array.isArray(comp)) {
       conta(`Σ participacaoPct "${l.nome}"`, 100, comp.reduce((a: number, c: any) => a + n(c.participacaoPct), 0));
     }
-    // Σ do legado (entrada + parcelas), que é o que a UI ainda edita
-    const ent = (l.fluxo_pagamento?.entrada ?? []).reduce((a: number, e: any) => a + n(e.pct), 0);
-    const par = (l.fluxo_pagamento?.parcelas ?? []).reduce((a: number, e: any) => a + n(e.pct), 0);
-    conta(`Σ legado entrada+parcelas "${l.nome}"`, 100, ent + par);
+    // Σ do legado (entrada + parcelas): só vale para a fase SEM `componentes`.
+    // Com `componentes`, o motor não lê o legado (é só o espelho da tela) e a
+    // conferência que importa é a Σ participacaoPct acima. No legado, o repasse
+    // é o complemento (100 − entrada − parcelas): a conta é que ele não fique
+    // negativo, ou seja, entrada + parcelas ≤ 100 — e não que somem 100.
+    const legado = somaLegadoAplicavel(l.fluxo_pagamento);
+    if (legado !== null) conta(`Σ legado entrada+parcelas ≤ 100 "${l.nome}"`, Math.min(legado, 100), legado);
   }
 
   // Custos: Σ das séries por linha vs Σ da série mensal consolidada

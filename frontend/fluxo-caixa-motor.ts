@@ -2512,8 +2512,8 @@ export function vplFluxo(fluxoMensal: number[], taxaAa: number): number {
 }
 
 /**
- * TIR anual (%) por Newton-Raphson sobre a taxa mensal.
- * Retorna null se o fluxo não muda de sinal ou se não convergir.
+ * TIR anual (%) por Newton-Raphson sobre a taxa mensal, com bisseção se ele não convergir.
+ * Retorna null se o fluxo não muda de sinal ou se nenhum dos dois achar a raiz.
  */
 export function tirFluxo(fluxoMensal: number[]): number | null {
   const temPos = fluxoMensal.some((v) => v > 0);
@@ -2528,13 +2528,13 @@ export function tirFluxo(fluxoMensal: number[]): number | null {
     const f = npv(r);
     if (Math.abs(f) < 1e-7) break;
     const d = dnpv(r);
-    if (!Number.isFinite(d) || Math.abs(d) < 1e-12) return null;
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-12) return tirBissecaoFluxo(fluxoMensal);
     const novo = r - f / d;
-    if (!Number.isFinite(novo) || novo <= -0.999) return null;
+    if (!Number.isFinite(novo) || novo <= -0.999) return tirBissecaoFluxo(fluxoMensal);
     if (Math.abs(novo - r) < 1e-10) { r = novo; break; }
     r = novo;
   }
-  if (Math.abs(npv(r)) > 1e-3) return null; // não convergiu
+  if (Math.abs(npv(r)) > 1e-3) return tirBissecaoFluxo(fluxoMensal); // não convergiu
   return (Math.pow(1 + r, 12) - 1) * 100;
 }
 
@@ -3205,6 +3205,37 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     linhasReceita: linhasReceitaFinal,
     linhasCusto: calcCustos,
   };
+}
+
+/**
+ * Fallback da `tirFluxo` quando o Newton-Raphson não converge: bisseção sobre a taxa
+ * mensal em (−0,999; 10). Só há TIR se o VPL muda de sinal nas pontas; com várias trocas de
+ * sinal no fluxo pode haver mais de uma raiz e vale a que a bisseção encontra. Usa o mesmo
+ * VPL (desconto a partir de i+1). O critério de parada é relativo à escala do fluxo
+ * DESCONTADO à taxa testada (Σ|cf|/(1+r)^(i+1)) — um critério absoluto aceitaria taxa
+ * absurda quando o fluxo começa tarde, porque o VPL fica minúsculo em taxa alta.
+ */
+export function tirBissecaoFluxo(fluxoMensal: number[]): number | null {
+  const npv = (r: number) => fluxoMensal.reduce((s, cf, i) => s + cf / Math.pow(1 + r, i + 1), 0);
+  const escala = (r: number) => fluxoMensal.reduce((s, cf, i) => s + Math.abs(cf) / Math.pow(1 + r, i + 1), 0);
+  let lo = -0.999;
+  let hi = 10;
+  // Em fluxos longos, (1+r)^-N estoura no extremo inferior: sobe o limite até o VPL ser finito.
+  while (!Number.isFinite(npv(lo)) && lo < hi) lo = -1 + (lo + 1) * 2;
+  let flo = npv(lo);
+  const fhi = npv(hi);
+  if (!Number.isFinite(flo) || !Number.isFinite(fhi) || flo === 0 || fhi === 0 || Math.sign(flo) === Math.sign(fhi)) return null;
+  let r = lo;
+  for (let iter = 0; iter < 200; iter++) {
+    r = (lo + hi) / 2;
+    const f = npv(r);
+    if (!Number.isFinite(f)) return null;
+    if (Math.abs(f) < 1e-7 * escala(r) || hi - lo < 1e-12) break;
+    if (Math.sign(f) === Math.sign(flo)) { lo = r; flo = f; } else { hi = r; }
+  }
+  const e = escala(r);
+  if (!(Math.abs(npv(r)) <= 1e-6 * e)) return null; // intervalo esgotado sem raiz de fato
+  return (Math.pow(1 + r, 12) - 1) * 100;
 }
 
 /**
