@@ -60,3 +60,18 @@ export function fmtVariacao(pct: number): string {
   }).format(Math.abs(pct));
   return `${pct < 0 ? '-' : '+'}${abs}%`;
 }
+
+/**
+ * Texto da variação de exposição máxima quando o cenário de referência não tem
+ * exposição: o piso em zero do motor faz a base valer 0, não há denominador, e a
+ * tela publica "n/d" no lugar de deixar a célula em branco (decisão do dono).
+ */
+export const TEXTO_VARIACAO_SEM_BASE = 'n/d';
+
+/** O motivo do "n/d", no `title` e no `aria-label` de quem o publica. */
+export const MOTIVO_SEM_BASE = 'O cenário real não tem exposição: não há base para a variação';
+
+/** A exposição de referência é zero (abaixo de meio centavo): a variação não se define. */
+export function exposicaoSemBase(base: number | null | undefined): boolean {
+  return base != null && Number.isFinite(base) && Math.abs(base) < 0.005;
+}

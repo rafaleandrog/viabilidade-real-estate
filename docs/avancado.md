@@ -132,6 +132,8 @@ presente dessas parcelas à taxa de desconto. As regras de cada tipo estão em [
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
 | **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
 
+**Exposição máxima e payback.** A **exposição máxima** é o pior ponto do fluxo acumulado livre, com piso em zero: um projeto cujo acumulado fica sempre em zero ou acima mostra **0**, e o mês da exposição não aparece. O **payback** é o primeiro mês em que o acumulado volta a ser maior ou igual a zero depois de ter ficado negativo; sem trecho negativo, ou se o acumulado nunca se recupera, o app mostra **—**. As duas grandezas leem a mesma série, a do Fluxo de Caixa Acumulado livre.
+
 A **carteira de clientes** é o saldo a receber das vendas já contratadas, somado safra a safra
 (cada mês de venda decai isolado, com a sua taxa e o seu principal): ela sobe com as parcelas da
 tabela e o saldo a repassar e zera no último vencimento de cada safra; o pico é a **carteira
@@ -178,7 +180,7 @@ a tabela traz o caminho para chegar ao número da planilha. A conversão do VPL 
 | Indicador | No app | Na planilha | Para comparar |
 |---|---|---|---|
 | **Resultado** | Desalavancado: não deduz os juros do financiamento à produção. A linha informativa **Serviço da dívida do funding** é o total das saídas de todas as operações de funding (principal, juros e retorno), não só os juros; o valor dos juros está no **Total de juros** do resumo do Financiamento à produção, na página Funding. | Deduz esses juros no Resultado. | Subtraia do Resultado do app o **Total de juros** do financiamento à produção. |
-| **Exposição máxima** | O pior ponto do fluxo acumulado **livre** (desalavancado), em todo o período — inclusive nos meses anteriores ao lançamento. | O pior ponto do caixa **alavancado**, só nos meses a partir do lançamento. | Na tabela mensal da sub-aba Fluxo de Caixa, leia o menor valor da linha **Fluxo de Caixa Acumulado** (a última linha da tabela, depois do funding) a partir do mês do lançamento. Os KPIs e gráficos de fluxo livre não servem para esta comparação. |
+| **Exposição máxima** | O pior ponto do fluxo acumulado **livre** (desalavancado), com piso em zero, em todo o período — inclusive nos meses anteriores ao lançamento. | O pior ponto do caixa **alavancado**, só nos meses a partir do lançamento. | Na tabela mensal da sub-aba Fluxo de Caixa, leia o menor valor da linha **Fluxo de Caixa Acumulado** (a última linha da tabela, depois do funding) a partir do mês do lançamento. Os KPIs e gráficos de fluxo livre não servem para esta comparação. |
 | **VPL** | O início do planejamento é o mês de índice 0: o fluxo do mês de índice `i` é descontado `(1 + tm)^(i + 1)`. | A origem do tempo é o lançamento (mês 0). | Multiplique o VPL do app por `(1 + tm)^(n + 1)`, com `n` o número de meses entre o início do planejamento e o lançamento. A **TIR** não depende da origem. |
 | **Séries mensais** | O VPL total e por linha, sem a série de FC descontado mês a mês. Não há um endividamento total consolidado de todas as operações de funding; para o financiamento à produção, o resumo da página Funding traz o **Pico do saldo devedor** e o mês em que ocorre. | **FC descontado** mês a mês e **Endividamento total**. | Para um estudo cuja única dívida é o financiamento à produção, leia o **Pico do saldo devedor** na página Funding; fora disso não há equivalente. |
 
@@ -201,7 +203,8 @@ Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do
 variação de TIR, VPL e exposição máxima contra o cenário real, com o gráfico **Fluxo acumulado —
 cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é fixo: ele cobre o
 fluxo acumulado da base e o de todas as posições dos dois controles, então mover um controle move
-a curva, não a escala, e a ordem de grandeza da variação fica visível. Os cenários ficam salvos no
+a curva, não a escala, e a ordem de grandeza da variação fica visível. Quando o cenário real não tem
+exposição (exposição máxima 0), a variação da exposição aparece como **n/d**. Os cenários ficam salvos no
 estudo. Salvar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
 análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação continua
 disponível, sem os botões **Salvar cenário** e **Remover**.
@@ -265,6 +268,12 @@ O plano de pagamento de um grupo de receita (`fluxo_pagamento`) só gera juros d
 quando está no formato canônico, a lista `componentes`. Por isso a API o normaliza na escrita: o grupo novo nasce com
 `componentes`, e um `PATCH …/fases/:fid` cujo `fluxo_pagamento` traga só `entrada` e `parcelas` é convertido para `componentes` com a
 taxa de tabela do estudo (`juros_tabela_aa_padrao`). Quando `componentes` já vem no corpo, é gravado como veio.
+
+Quando o `componentes` do corpo não bate com as linhas `entrada` e `parcelas` que vêm junto (por exemplo, componentes de 10%,
+20% e 70% com entrada e parcelamento de 50% cada), o plano é gravado como veio e a resposta traz `espelho_divergente: true`;
+nada é recusado. No modal **Fluxo de pagamento**, um plano assim aparece só para leitura: um aviso diz que o cálculo usa os
+componentes gravados, as linhas de entrada, parcelamento e saldo de chaves ficam desabilitadas e **Aplicar** mantém o plano
+como está, sem descartar componentes. Isso vale só para o plano gravado pela API com esse descompasso; um plano criado pela tela não é tratado assim, mesmo depois de o Cronograma mudar. Para editar um plano divergente, monte-o de novo pela API com linhas coerentes.
 
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.
