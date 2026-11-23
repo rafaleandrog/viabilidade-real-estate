@@ -702,10 +702,10 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
   assert.equal(linha.duracao, 40 - 12 + 1);
 });
 
-// #473: a base da Corretagem quanto à permuta física é escolha do estudo.
+// #473: a base da Corretagem é o VGV vendável (sem escolha do estudo).
 // VGV total 100M (100 un. × 50m² × 20.000); 30 unidades permutadas
 // fisicamente (VGV permutado 30M) → vendável 70M. Corretagem 4%.
-test('#473: default (undefined) preserva o comportamento histórico — corretagem sobre o VGV BRUTO, permuta física inclusa', () => {
+test('#473: a corretagem incide sobre o VGV VENDÁVEL, permuta física fora (sem escolha do estudo)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     jurosTabelaAaEstudo: 0,
@@ -723,17 +723,14 @@ test('#473: default (undefined) preserva o comportamento histórico — corretag
       },
     ],
     areaTerreno: 0,
-    // corretagemSobrePermutaFisica OMITIDO de propósito — é o caso real de
-    // todo estudo existente antes da #473 (a coluna nasce mas o config não a
-    // manda explicitamente até a tela carregar).
   };
   const r = calcularFluxo(config);
   const corretagem = r.linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
-  // 4% de 100M (bruto) — a permuta física NÃO reduz a base, como antes da #473.
-  assert.ok(perto(corretagem.total, 4_000_000, 1));
+  // 4% de 70M (vendável) — a permuta física reduz a base.
+  assert.ok(perto(corretagem.total, 2_800_000, 1));
 });
 
-test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a permuta física', () => {
+test('#473: a diferença entre a base bruta e a vendável é a corretagem da permuta física', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     jurosTabelaAaEstudo: 0,
@@ -751,7 +748,6 @@ test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a 
       },
     ],
     areaTerreno: 0,
-    corretagemSobrePermutaFisica: false,
   };
   const r = calcularFluxo(config);
   const corretagem = r.linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
@@ -764,31 +760,6 @@ test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a 
   assert.ok(perto(4_000_000 - corretagem.total, 1_200_000, 1));
 });
 
-test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao default (paridade)', () => {
-  const base = (flag: boolean | undefined): FluxoConfig => ({
-    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
-    jurosTabelaAaEstudo: 0,
-    linhasReceita: [{
-      id: 1, nome: 'Vendas',
-      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
-      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
-      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
-    }],
-    linhasCusto: [
-      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
-      {
-        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
-        permuta_tipologia_id: 1, permuta_quantidade: 30,
-      },
-    ],
-    areaTerreno: 0,
-    ...(flag === undefined ? {} : { corretagemSobrePermutaFisica: flag }),
-  });
-  const semFlag = calcularFluxo(base(undefined)).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
-  const comTrue = calcularFluxo(base(true)).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
-  assert.equal(semFlag.total, comTrue.total);
-});
-
 // #473 — achado do Codex (PR #545, rodada 1): quando `orcamento_valor_canonico`
 // está persistido (o caso comum — toda edição pela tela grava o R$ congelado
 // junto, `tela-fluxo-custos.ts:_editarOrcamento`), a base ESCOLHIDA tinha de
@@ -796,8 +767,8 @@ test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao defau
 // acima (VGV 100M, 30 unidades permutadas → vendável 70M), mas com
 // `orcamento_valor_canonico` no lugar de `orcamento_valor` puro — o caminho
 // que TODA linha de custo editada uma vez pela tela usa de fato.
-test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage à base (não só o calendário)', () => {
-  const base = (flag: boolean | undefined): FluxoConfig => ({
+test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem é o R$ congelado e a base é a vendável', () => {
+  const base = (canonico: number): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     jurosTabelaAaEstudo: 0,
     linhasReceita: [{
@@ -807,11 +778,9 @@ test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage 
       fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
     }],
     linhasCusto: [
-      // canônico = 4% do VGV bruto (100M) no momento em que foi digitado —
-      // o valor R$ FIXO que `_editarOrcamento` grava junto do percentual.
       {
         id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas',
-        orcamento_valor: 4, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 4_000_000,
+        orcamento_valor: 4, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: canonico,
       },
       {
         id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
@@ -819,18 +788,11 @@ test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage 
       },
     ],
     areaTerreno: 0,
-    ...(flag === undefined ? {} : { corretagemSobrePermutaFisica: flag }),
   });
   const achar = (c: FluxoConfig) => calcularFluxo(c).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
-
-  const bruta = achar(base(true));
-  assert.ok(perto(bruta.total, 4_000_000, 1), `esperado 4.000.000 (bruto), veio ${bruta.total}`);
-
-  const vendavel = achar(base(false));
-  // Mutação: SEM a correção, isto continuaria batendo 4.000.000 (o R$
-  // congelado redistribuído por peso, sem mudar o total).
-  assert.ok(perto(vendavel.total, 2_800_000, 1), `esperado 2.800.000 (vendável), veio ${vendavel.total}`);
-  assert.notEqual(vendavel.total, bruta.total, 'a base tem de mudar o TOTAL, não só o calendário');
+  // 2.800.000 = 4% do vendável (70M); o canônico é o R$ e o % derivado usa o vendável.
+  assert.ok(perto(achar(base(2_800_000)).total, 2_800_000, 1));
+  assert.ok(perto(achar(base(4_000_000)).total, 4_000_000, 1));
 });
 
 // 5c. Corretagem sem vendas no horizonte não gera desembolso (#121)
@@ -2137,7 +2099,10 @@ test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () =
     assert.ok(perto(r.recebimentoBrutoMensal[mes] ?? 0, esperado, 1),
       `G.2 mês ${mes}: esperado ${esperado}, obtido ${r.recebimentoBrutoMensal[mes]}`);
   }
-  assert.ok(perto(r.repasseMensal[25], 0.70 * CALLIANDRA_G2.baseContratada, 0.10));
+  // #824: o repasse é o último componente e fica com o RESTO de cada safra
+  // (2.378.978,36 − 356.846,75 − 356.846,75 = 1.665.284,86, não 1.665.284,85):
+  // 12 safras somam 19.983.418,32 — Δ R$ 0,117 do oráculo, que antes era 0,003.
+  assert.ok(perto(r.repasseMensal[25], 0.70 * CALLIANDRA_G2.baseContratada, 0.15));
   assert.equal(r.receitaPorComponenteMensal.repasse[25], r.repasseMensal[25]);
   assert.equal(r.carteiraPorComponenteMensal.saldoARepassar[25], 0);
   assert.equal(soma(r.jurosMensal), 0);

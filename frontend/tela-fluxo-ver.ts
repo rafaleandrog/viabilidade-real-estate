@@ -5,6 +5,7 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
   impostoDoEstudoAvancado, type EventoCrono, type PeriodoAgregado, type ImpostoReceita,
 } from './fluxo-shared.js';
+import { visaoInvestidor } from './visao-investidor.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, inteiroExibido, semZeroNegativo, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
@@ -395,8 +396,6 @@ export class ViabFluxoVer extends LitElement {
       curvas: d.curvas,
       areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
       ret: d.ret,
-      // #473: default true preserva o comportamento histórico (VGV bruto).
-      corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
       // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba
       // Viabilidade → Financeiro (`estudos.juros_tabela_aa_padrao`). Campo
       // OBRIGATORIO de `FluxoConfig`: parar de passa-lo vira TS2741, nao silencio.
@@ -720,6 +719,7 @@ export class ViabFluxoVer extends LitElement {
               igual ao Livre.`}</p>
       </urbi-card>
       ${this._renderRetornoPorParte()}
+      ${this._renderVisaoInvestidor()}
       ${this._renderControles()}
       <div class="graficos">
         <urbi-card titulo="Contratação, Receita Bruta, Carteira e Repasse — ${titulo}">
@@ -795,6 +795,61 @@ export class ViabFluxoVer extends LitElement {
             ? html` O filtro de fase <strong>${this.faseFiltro}</strong> não afeta este card: ele é
                 sempre do projeto inteiro.`
             : nothing}</p>
+      </urbi-card>
+    `;
+  }
+
+  /**
+   * Visão do investidor: Equity Multiple, Yield e LTV. Sempre do PROJETO
+   * INTEIRO (`calcProjeto`/`fundingCalcProjeto`), como os dois cards vizinhos:
+   * com filtro de fase `calc` descreve só a fase (receita recortada, custo
+   * inteiro) e os indicadores mudariam por causa de um controle de exibição.
+   * Nenhuma fórmula nasce aqui — vem toda de `visaoInvestidor`.
+   */
+  private _renderVisaoInvestidor(): TemplateResult {
+    const cProjeto = this.calcProjeto ?? this.calc;
+    const v = visaoInvestidor({
+      funding: this.fundingCalcProjeto,
+      fluxoLivreMensal: cProjeto?.fluxoMensal ?? [],
+      exposicaoMaxima: cProjeto?.exposicaoMaxima ?? 0,
+      vgvTotal: cProjeto?.vgvTotal ?? 0,
+    });
+    const cel = (txt: string | null) => txt === null
+      ? html`<td class="num vazio">—</td>`
+      : html`<td class="num">${txt}</td>`;
+    return html`
+      <urbi-card titulo="Visão do investidor">
+        <table class="proforma visao-investidor">
+          <tbody>
+            <tr class="n0 vi-equity-multiple">
+              <td>Equity Multiple</td>
+              ${cel(v.equityMultiple === null ? null : `${fmtNum(v.equityMultiple, 2)}×`)}
+            </tr>
+            <tr class="n0 vi-yield">
+              <td>Yield a.a. (sobre a exposição máxima)</td>
+              ${cel(v.yieldPct === null ? null : fmtPct(v.yieldPct))}
+            </tr>
+            ${v.ltvs.length === 0
+              ? html`<tr class="n0 vi-ltv"><td>LTV</td>${cel(null)}</tr>`
+              : v.ltvs.map((l) => html`
+                  <tr class="n0 vi-ltv">
+                    <td>LTV — ${l.nome} (${l.tipo === 'divida' ? 'Dívida' : 'Financiamento à produção'})</td>
+                    ${cel(l.ltvPct === null ? null : fmtPct(l.ltvPct))}
+                  </tr>`)}
+          </tbody>
+        </table>
+        <p class="sec">
+          <strong>Equity Multiple</strong> = retorno total pago ao equity ÷ aportes de equity
+          (1,00× é empatar; "—" sem equity). <strong>Yield</strong> = Fluxo de Caixa Livre médio por
+          ano, do início do estudo ao último mês com fluxo livre, ÷ exposição máxima — o app não modela o capital próprio do incorporador, então o
+          denominador é o caixa que o projeto de fato precisou ("—" quando o acumulado nunca fica
+          negativo). <strong>LTV</strong> = principal liberado de cada dívida ÷ VGV potencial
+          ("—" sem dívida ou com VGV potencial zero).
+          ${this.faseFiltro
+            ? html`O filtro de fase <strong>${this.faseFiltro}</strong> está ligado e <strong>não afeta
+                este card</strong>: ele é sempre do projeto inteiro.`
+            : nothing}
+        </p>
       </urbi-card>
     `;
   }

@@ -368,7 +368,7 @@ test('absorcaoMensal distribuído espalha 4 períodos (pós-obra derivado, #108)
 });
 
 test('resolverCustoTotal converte cada unidade de orçamento para R$', () => {
-  const ctx = { areaPrivativaTotal: 20_000, areaTerreno: 50_000, vgvTotal: 100_000_000, receitaTotal: 90_000_000 };
+  const ctx = { areaPrivativaTotal: 20_000, areaTerreno: 50_000, vgvTotal: 100_000_000, vgvVendavel: 100_000_000, receitaTotal: 90_000_000 };
   assert.equal(resolverCustoTotal({ orcamento_valor: 1_000_000, orcamento_unidade: 'rs' }, ctx), 1_000_000);
   assert.equal(resolverCustoTotal({ orcamento_valor: 4800, orcamento_unidade: 'rs_m2_priv' }, ctx), 96_000_000);
   assert.equal(resolverCustoTotal({ orcamento_valor: 200, orcamento_unidade: 'rs_m2_terreno' }, ctx), 10_000_000);
@@ -379,7 +379,7 @@ test('resolverCustoTotal converte cada unidade de orçamento para R$', () => {
 });
 
 test('#259: custo canônico em R$ prevalece sobre a unidade apenas exibida', () => {
-  const ctx = { areaPrivativaTotal: 20_000, areaTerreno: 10_000, vgvTotal: 82_713_401.37 };
+  const ctx = { areaPrivativaTotal: 20_000, areaTerreno: 10_000, vgvTotal: 82_713_401.37, vgvVendavel: 82_713_401.37 };
   const custo = {
     // Representação arredondada que antes causaria desvio ao voltar para R$.
     orcamento_valor: 12.09, orcamento_unidade: 'pct_vgv',

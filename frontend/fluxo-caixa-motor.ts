@@ -237,13 +237,6 @@ export interface FluxoConfig {
   // #834: imposto sobre a receita, RET ou padrão (`impostoDoEstudoAvancado`); nome por compatibilidade.
   ret?: ImpostoReceita;
   /**
-   * #473: base da Corretagem de vendas quanto à permuta física —
-   * `estudos.corretagem_sobre_permuta_fisica`, só no Avançado. `true`
-   * (default — nenhum estudo existente muda de número) = VGV bruto, permuta
-   * física inclusa; `false` = VGV vendável, exclui a permuta física.
-   */
-  corretagemSobrePermutaFisica?: boolean;
-  /**
    * #585: a taxa de tabela do ESTUDO, em % a.a. — `estudos.juros_tabela_aa_padrao`,
    * digitada na aba Viabilidade → Financeiro. **Obrigatória de propósito**: é
    * a única fonte da taxa desde a #585, e um campo opcional aqui deixaria a
@@ -351,12 +344,10 @@ function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
 // de contratação (`vendaBrutaContratadaMensal`) usa VGV VENDÁVEL — o corpo da
 // #227 pedia uma função única para as duas, e a distinção "bruto" × "vendável"
 // ficou explícita no NOME das funções: `vgvVendidoBrutoMensal` (permuta física
-// inclusa, default — nenhum estudo existente muda) e `vgvVendidoVendavelMensal`
-// (exclui a permuta física, mesma base de `vendaBrutaContratadaMensal`).
-// `corretagemMensal` escolhe entre as duas por `ContextoCusto.corretagemSobrePermutaFisica`
-// — chave do estudo (`estudos.corretagem_sobre_permuta_fisica`, só no Avançado).
-// O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` continua na base
-// bruta histórica — a #473 não estende a chave a ele (fora de escopo).
+// inclusa) e `vgvVendidoVendavelMensal` (exclui a permuta física, mesma base de
+// `vendaBrutaContratadaMensal`). `corretagemMensal` usa sempre a segunda.
+// O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` segue na base
+// bruta (fora do escopo da base vendável).
 
 export interface FluxoCalc {
   prazo: number;
@@ -702,11 +693,13 @@ export function descontoComercialMensal(
     const residuoAteMarco: ResiduoAteMarco = linha?.fluxo_pagamento?.residuoAteMarco ?? 'imediato';
     for (let safra = 0; safra < bruto.length; safra++) {
       if (bruto[safra] <= 0) continue;
-      for (const c of componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco)) {
+      const efetivos = componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco);
+      const partes = partesDaSafra(efetivos, bruto[safra]);
+      efetivos.forEach((c, i) => {
         if (c.tipo === 'imediato' && c.descontoPct > 0) {
-          saida[safra] += bruto[safra] * (c.participacaoPct / 100) * (c.descontoPct / 100);
+          saida[safra] += partes[i] * (c.descontoPct / 100);
         }
-      }
+      });
     }
     return saida.map(round2);
   }
@@ -1208,6 +1201,41 @@ export interface PagamentoSafra {
 }
 
 /**
+ * #824: as PARTES de uma safra — o valor contratado repartido entre os
+ * componentes sem perder (nem criar) centavo. Cada componente com participação
+ * > 0 recebe `round2(valorContratado × pct/100)`, exceto o ÚLTIMO deles, que
+ * fica com o RESTO: `round2(valorContratado × Σpct/100) − Σ(partes
+ * anteriores)`. Com Σpct = 100 a soma das partes é exatamente o valor
+ * contratado da safra a 2 casas. Sem isto, cada componente arredondava a sua
+ * fatia sozinho e uma safra de centavos ímpares repartida 50/50 virava duas
+ * metades de meio centavo que arredondam para cima (+R$ 0,01 por safra).
+ * Componente com participação ≤ 0 recebe 0 e nunca o resto.
+ */
+export function partesDaSafra(
+  componentes: ComponentePagamento[],
+  valorContratado: number,
+): number[] {
+  const partes = new Array<number>(componentes.length).fill(0);
+  let ultimo = -1;
+  let somaPct = 0;
+  componentes.forEach((c, i) => {
+    if (c.participacaoPct > 0) { ultimo = i; somaPct += c.participacaoPct; }
+  });
+  if (ultimo < 0) return partes;
+  let anteriores = 0;
+  for (let i = 0; i < componentes.length; i++) {
+    if (componentes[i].participacaoPct <= 0) continue;
+    if (i === ultimo) {
+      partes[i] = round2(round2(valorContratado * (somaPct / 100)) - anteriores);
+    } else {
+      partes[i] = round2(valorContratado * (componentes[i].participacaoPct / 100));
+      anteriores = round2(anteriores + partes[i]);
+    }
+  }
+  return partes;
+}
+
+/**
  * #232: pagamentos de um componente `prazo_fixo` para a safra iniciada em
  * `safra`, sobre `valorContratado` do mês (líquido de desconto, #227).
  *
@@ -1223,8 +1251,10 @@ export function pagamentosPrazoFixo(
   c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   if (valor <= 0) return [];
   // O plano de uma safra também é monetário (C7): sinal e principal já
   // nascem em centavos. As 36 PMTs podem deixar um resíduo de arredondamento;
@@ -1266,8 +1296,10 @@ export function pagamentosAteMarco(
   c: Extract<ComponentePagamento, { tipo: 'ate_marco' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   if (valor <= 0) return [];
   const sinal = round2(valor * (c.sinalPct / 100));
   const principal = round2(valor - sinal);
@@ -1314,8 +1346,10 @@ export function pagamentosConcentrado(
   c: Extract<ComponentePagamento, { tipo: 'concentrado' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const principal = round2(valorContratado * (c.participacaoPct / 100));
+  const principal = parte;
   if (principal <= 0) return [];
   if (c.mesPagamento < safra) {
     throw new Error(
@@ -1356,8 +1390,10 @@ export function pagamentosCarteiraPosMarco(
   c: Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const principal = round2(valorContratado * (c.participacaoPct / 100));
+  const principal = parte;
   if (principal <= 0) return [];
   const primeiro = primeiroVencimentoCarteira(c, safra);
   // Sem `round2` aqui, de propósito: o capitalizado é intermediário da PMT, e
@@ -1381,10 +1417,11 @@ function pagamentosParcelados(
   c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' | 'ate_marco' | 'carteira_pos_marco' }>,
   safra: number,
   valorContratado: number,
+  parte: number,
 ): PagamentoSafra[] {
-  if (c.tipo === 'prazo_fixo') return pagamentosPrazoFixo(c, safra, valorContratado);
-  if (c.tipo === 'ate_marco') return pagamentosAteMarco(c, safra, valorContratado);
-  return pagamentosCarteiraPosMarco(c, safra, valorContratado);
+  if (c.tipo === 'prazo_fixo') return pagamentosPrazoFixo(c, safra, valorContratado, parte);
+  if (c.tipo === 'ate_marco') return pagamentosAteMarco(c, safra, valorContratado, parte);
+  return pagamentosCarteiraPosMarco(c, safra, valorContratado, parte);
 }
 
 /** O sinal do componente parcelado — a carteira própria não tem sinal. */
@@ -1442,13 +1479,15 @@ export function carteiraSaldoSafra(
   c: ComponentePagamento,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): SaldoSafra[] {
   if (c.tipo === 'imediato') return [];
 
   if (c.tipo === 'concentrado') {
-    const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
+    const pagamentos = pagamentosConcentrado(c, safra, valorContratado, parte);
     if (pagamentos.length === 0) return [];
-    const principal = round2(valorContratado * (c.participacaoPct / 100));
+    const principal = parte;
     // Repasse no próprio mês da safra: pago e liquidado em `s`, sem saldo.
     if (c.mesPagamento === safra) return [{ safra, mes: safra, saldo: 0 }];
     const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
@@ -1460,10 +1499,10 @@ export function carteiraSaldoSafra(
     return out;
   }
 
-  const pagamentos = pagamentosParcelados(c, safra, valorContratado);
+  const pagamentos = pagamentosParcelados(c, safra, valorContratado, parte);
   if (pagamentos.length === 0) return [];
 
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   const sinal = round2(valor * (sinalPctDe(c) / 100));
   const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
@@ -1524,21 +1563,23 @@ export function jurosSafra(
   c: ComponentePagamento,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): number {
   if (c.tipo === 'imediato') return 0;
   if (c.taxaMensal === 0) return 0;
 
   if (c.tipo === 'concentrado') {
-    const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
+    const pagamentos = pagamentosConcentrado(c, safra, valorContratado, parte);
     if (pagamentos.length === 0) return 0;
-    const principal = round2(valorContratado * (c.participacaoPct / 100));
+    const principal = parte;
     return round2(pagamentos[0].valor - principal);
   }
 
-  const pagamentos = pagamentosParcelados(c, safra, valorContratado);
+  const pagamentos = pagamentosParcelados(c, safra, valorContratado, parte);
   if (pagamentos.length === 0) return 0;
 
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   const sinal = round2(valor * (sinalPctDe(c) / 100));
   const principal = round2(valor - sinal);
   const totalParcelas = round2(pagamentos
@@ -1562,20 +1603,21 @@ export function receitaBrutaSafra(
   safra: number,
   valorContratado: number,
 ): number {
+  const partes = partesDaSafra(componentes, valorContratado);
   if (componentes.every((c) => c.tipo === 'imediato' || c.taxaMensal === 0)) {
     const descontos = componentes
-      .filter((c): c is Extract<ComponentePagamento, { tipo: 'imediato' }> => c.tipo === 'imediato')
-      .reduce((total, c) => total + valorContratado * (c.participacaoPct / 100) * (c.descontoPct / 100), 0);
+      .reduce((total, c, i) => (c.tipo === 'imediato' ? total + partes[i] * (c.descontoPct / 100) : total), 0);
     return round2(valorContratado - descontos);
   }
   let total = 0;
-  for (const c of componentes) {
+  for (let i = 0; i < componentes.length; i++) {
+    const c = componentes[i];
     if (c.tipo === 'imediato') {
-      total += valorContratado * (c.participacaoPct / 100) * (1 - c.descontoPct / 100);
+      total += partes[i] * (1 - c.descontoPct / 100);
     } else if (c.tipo === 'concentrado') {
-      total += pagamentosConcentrado(c, safra, valorContratado).reduce((s, p) => s + p.valor, 0);
+      total += pagamentosConcentrado(c, safra, valorContratado, partes[i]).reduce((s, p) => s + p.valor, 0);
     } else {
-      const pagamentos = pagamentosParcelados(c, safra, valorContratado);
+      const pagamentos = pagamentosParcelados(c, safra, valorContratado, partes[i]);
       total += pagamentos.reduce((s, p) => s + p.valor, 0);
     }
   }
@@ -1803,16 +1845,16 @@ function pagamentosComponenteSafra(
   componente: ComponentePagamento,
   safra: number,
   valorContratado: number,
+  parte: number,
 ): PagamentoSafra[] {
   if (componente.tipo === 'imediato') {
-    const valor = round2(valorContratado * (componente.participacaoPct / 100)
-      * (1 - componente.descontoPct / 100));
+    const valor = round2(parte * (1 - componente.descontoPct / 100));
     return valor > 0 ? [{ safra, mes: safra, tipo: 'parcela', valor }] : [];
   }
-  if (componente.tipo === 'prazo_fixo') return pagamentosPrazoFixo(componente, safra, valorContratado);
-  if (componente.tipo === 'ate_marco') return pagamentosAteMarco(componente, safra, valorContratado);
-  if (componente.tipo === 'carteira_pos_marco') return pagamentosCarteiraPosMarco(componente, safra, valorContratado);
-  return pagamentosConcentrado(componente, safra, valorContratado);
+  if (componente.tipo === 'prazo_fixo') return pagamentosPrazoFixo(componente, safra, valorContratado, parte);
+  if (componente.tipo === 'ate_marco') return pagamentosAteMarco(componente, safra, valorContratado, parte);
+  if (componente.tipo === 'carteira_pos_marco') return pagamentosCarteiraPosMarco(componente, safra, valorContratado, parte);
+  return pagamentosConcentrado(componente, safra, valorContratado, parte);
 }
 
 /**
@@ -1859,7 +1901,9 @@ export function calcularRecebiveisComponentes(
     if (contratacao.valorContratado <= 0) continue;
     const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega, residuoAteMarco);
     const aposChaves = ehVendaAposChaves(contratacao.safra, mesEntrega);
-    for (const componente of efetivos) {
+    const partes = partesDaSafra(efetivos, contratacao.valorContratado);
+    for (const [idx, componente] of efetivos.entries()) {
+      const parte = partes[idx];
       // Repasse antecipado para a venda (`componentesEfetivosSafra`): entra à
       // vista, fora da série de repasse e da carteira a repassar.
       const antecipado = componente.tipo === 'concentrado' && componente.antecipadoParaVenda === true;
@@ -1872,12 +1916,12 @@ export function calcularRecebiveisComponentes(
         ? 'tabelaCurta' : componente.tipo === 'ate_marco'
           ? 'tabelaLongaObra' : componente.tipo === 'carteira_pos_marco'
             ? 'carteiraPropria' : componente.tipo === 'concentrado' && !antecipado ? 'saldoARepassar' : null;
-      const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado);
-      const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado);
+      const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado, parte);
+      const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado, parte);
       const pagamentosComJuros = pagamentos.filter((p) => p.tipo !== 'sinal');
       const saldos = componente.tipo === 'imediato'
         ? new Map<number, number>()
-        : new Map(carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)
+        : new Map(carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado, parte)
           .map((p) => [p.mes, p.saldo]));
       let jurosAlocados = 0;
       // #789: a parcela que vence no próprio mês da contratação (defasagem 0)
@@ -1936,7 +1980,7 @@ export function calcularRecebiveisComponentes(
       }
 
       if (componente.tipo !== 'imediato') {
-        for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
+        for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado, parte)) {
           deposita(carteira, ponto.mes, ponto.saldo);
           if (chaveCarteira) deposita(carteiraPorComponenteMensal[chaveCarteira], ponto.mes, ponto.saldo);
         }
@@ -2009,13 +2053,14 @@ export function consolidarCarteiraClientes(
 
   for (const contratacao of contratacoes) {
     const efetivos = componentesEfetivosSafra(componentes, contratacao.safra, mesEntrega);
-    for (const componente of efetivos) {
+    const partes = partesDaSafra(efetivos, contratacao.valorContratado);
+    for (const [idx, componente] of efetivos.entries()) {
       if (componente.tipo === 'imediato') continue;
       const campo: keyof Parcial = componente.tipo === 'prazo_fixo'
         ? 'prazoFixo'
         : componente.tipo === 'ate_marco' ? 'ateMarco'
           : componente.tipo === 'carteira_pos_marco' ? 'carteiraPropria' : 'concentrado';
-      for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
+      for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado, partes[idx])) {
         const atual = porMes.get(ponto.mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0, carteiraPropria: 0 };
         atual[campo] = round2(atual[campo] + ponto.saldo);
         porMes.set(ponto.mes, atual);
@@ -2328,18 +2373,17 @@ export function receitaMensalLinha(
  * resolvido é rateado proporcionalmente ao VGV vendido no mês. Sem vendas no
  * horizonte, não há corretagem a pagar.
  *
- * #227/#228 — base única de corretagem (decisão do autor, 2026-08-01):
- * **bruto/VGV**, exatamente esta linha de custo obrigatória em `pct_vgv`. A
+ * Base única de corretagem: o **VGV vendável** (sem a permuta física),
+ * exatamente esta linha de custo obrigatória em `pct_vgv`. A
  * dedução concorrente que existia em `vglLinha` (comissão `destacada`, que
  * reduzia o recebível) foi REMOVIDA pela #228 — contaria a corretagem duas
  * vezes se as duas ficassem ativas ao mesmo tempo (o defeito do EVI-008).
  * Esta linha de custo é a única fonte oficial.
  *
- * #473: a base é ESCOLHA DO ESTUDO — `ctx.corretagemSobrePermutaFisica`
- * (default `true`, undefined incluso, para preservar todo estudo existente).
- * `true` usa `vgvVendidoBrutoMensal` (comportamento histórico, permuta física
- * inclusa); `false` usa `vgvVendidoVendavelMensal` (exclui a permuta física,
- * alinhando a corretagem à mesma base de `vendaBrutaContratadaMensal`).
+ * A base é sempre o VGV VENDÁVEL (`vgvVendidoVendavelMensal`: exclui a permuta
+ * física, a mesma base de `vendaBrutaContratadaMensal`): a corretagem não paga
+ * comissão sobre unidade que não é vendida. O percentual derivado de um
+ * canônico congelado usa a mesma base (`ctx.vgvVendavel`).
  */
 export function corretagemMensal(
   custo: any,
@@ -2348,29 +2392,19 @@ export function corretagemMensal(
   prazoTotal: number,
   ctx: ContextoCusto,
 ): number[] {
-  const vgvBrutoNaCorretagem = ctx.corretagemSobrePermutaFisica !== false;
-  const vendas = vgvBrutoNaCorretagem
-    ? vgvVendidoBrutoMensal(linhasReceita, cronograma, prazoTotal)
-    : vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal);
+  const vendas = vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal);
   const somaVendas = vendas.reduce((s, v) => s + v, 0);
   if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
 
   if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
-    // #473: mesmo com `orcamento_valor_canonico` persistido — o caso comum,
-    // já que toda edição do valor pela tela (`_editarOrcamento`,
-    // `tela-fluxo-custos.ts`) grava o R$ congelado junto — o TOTAL da
-    // corretagem tem de reagir à base escolhida. Antes desta correção, um
-    // canônico presente pulava direto para `resolverCustoTotal` e
-    // redistribuía o R$ FIXO por `vendas`: a soma da linha não mudava com o
-    // flag, só o calendário mudava — a capacidade inteira desta issue ficava
-    // muda para toda linha já editada uma vez pela tela (achado do Codex,
-    // PR #545 rodada 1). A correção: deriva o PERCENTUAL efetivo do
-    // canônico sobre o VGV BRUTO total (`ctx.vgvTotal`, a mesma base que
-    // `converterUnidade` usou para congelar o R$ em `_editarOrcamento`), e
-    // aplica esse percentual sobre a base ESCOLHIDA (`vendas`) — nunca o R$
-    // congelado direto. Sem canônico, cai no percentual digitado cru.
+    // Com `orcamento_valor_canonico` persistido (o caso comum: toda edição do
+    // valor pela tela grava o R$ congelado junto), o % efetivo sai do
+    // canônico sobre o VGV VENDÁVEL (`ctx.vgvVendavel`, a mesma base que
+    // `converterUnidade` usa na tela de Custos) e é aplicado à base mensal
+    // de vendas vendáveis (`vendas`) — nunca o R$ congelado direto. Sem
+    // canônico, cai no percentual digitado cru.
     const pct = custo?.orcamento_valor_canonico !== null && custo?.orcamento_valor_canonico !== undefined
-      ? (ctx.vgvTotal > 0 ? resolverCustoTotal(custo, ctx) / ctx.vgvTotal : 0)
+      ? (ctx.vgvVendavel > 0 ? resolverCustoTotal(custo, ctx) / ctx.vgvVendavel : 0)
       : n(custo?.orcamento_valor) / 100;
     return vendas.map((v) => v * pct);
   }
@@ -2806,7 +2840,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     areaPrivativaTotal: areaPrivativaTotalLinhas(linhasReceita),
     areaTerreno: n(config.areaTerreno),
     vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
-    corretagemSobrePermutaFisica: config.corretagemSobrePermutaFisica,
+    vgvVendavel: linhasReceita.reduce((s, l, i) => s + vgvVendavelLinhaMotor(l, i), 0),
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
     (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), config.ret), 0);
@@ -2912,8 +2946,8 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // Preço do Terreno em `unit_delivery`/`sales_revenue` (#194): sem
     // cronograma próprio, distribuído proporcionalmente a um peso mensal —
     // `sales_revenue` acompanha o VGV VENDIDO BRUTO (igual à base histórica
-    // da Corretagem, absorção das vendas — #473 não muda esta linha: é fora
-    // de escopo, só a Corretagem tem a chave de base configurável);
+    // da Corretagem antiga, absorção das vendas — esta linha segue na base
+    // bruta; a base vendável vale para `pct_vgv` e a Corretagem);
     // `unit_delivery` acompanha a RECEITA EM CAIXA (entrada + parcelas +
     // repasse na entrega das unidades). `fixo` (padrão) cai no caminho normal
     // abaixo, igual às demais linhas de Terreno.
@@ -2982,7 +3016,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     if ((c.orcamento_unidade || 'rs') === 'pct_vgv') {
       // Quando existe canônico, o percentual é somente a representação dele.
       const pct = c.orcamento_valor_canonico !== null && c.orcamento_valor_canonico !== undefined
-        ? (ctxCusto.vgvTotal > 0 ? resolverCustoTotal(c, ctxCusto) / ctxCusto.vgvTotal * 100 : 0)
+        ? (ctxCusto.vgvVendavel > 0 ? resolverCustoTotal(c, ctxCusto) / ctxCusto.vgvVendavel * 100 : 0)
         : n(c.orcamento_valor);
       const deduzImposto = c.permuta_financeira_deduzir_imposto === true;
       const deduzCorretagem = c.permuta_financeira_deduzir_corretagem === true;
@@ -3158,7 +3192,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // `(1 + tm)^(i+1)` — os dois produzem fração de centavo com facilidade.
     //
     // ⚠️ **Quantizado aqui, NÃO na origem, e a diferença é de escopo.**
-    // `ctxCusto.vgvTotal` continua com precisão plena, e é ele que alimenta o
+    // `ctxCusto.vgvVendavel` continua com precisão plena, e é ele que alimenta o
     // rateio dos custos em `pct_vgv` (`resolverCustoTotal`). Arredondar lá
     // moveria o resultado de todo estudo existente, e isso é decisão do autor,
     // não desta issue — é também o que o contrato manda, porque representações
@@ -3168,7 +3202,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // `receitaTotal` e `pct_receita`. **É falso, e foi medido:**
     // `ctxCusto.receitaTotal` vem do VGV VENDÁVEL por linha
     // (`receitaLiquidaLinha(vgvVendavelLinhaMotor(...))`), não de
-    // `ctxCusto.vgvTotal`. Só `pct_vgv` o consome.)
+    // `ctxCusto.vgvTotal`. `pct_vgv` consome `ctxCusto.vgvVendavel`.)
     //
     // Hoje o dano era contido por acidente, porque todo consumidor formata com
     // `fmtR$`. Vira dano real no dia em que algo ler o campo direto: exportação,
@@ -3259,6 +3293,16 @@ export function vgvVendavelPorLinha(linhasReceita: any[], linhasCusto: any[]): n
         ? (reservas.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0) : undefined;
       return total + vgvVendavelTipologia(t, unidades);
     }, 0));
+}
+
+/**
+ * VGV VENDÁVEL total (Σ de `vgvVendavelPorLinha`): a base de `pct_vgv`
+ * (`ContextoCusto.vgvVendavel`) para quem monta o contexto fora de
+ * `calcularFluxo` — a tela de Custos, em que as linhas de permuta física mudam
+ * sem recarregar. Mesma conta do motor, não uma cópia da regra.
+ */
+export function vgvVendavelTotalBase(linhasReceita: any[], linhasCusto: any[]): number {
+  return vgvVendavelPorLinha(linhasReceita, linhasCusto).reduce((s, v) => s + v, 0);
 }
 
 /**

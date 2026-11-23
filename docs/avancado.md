@@ -67,7 +67,10 @@ curva de absorção; três linhas não escolhem — a corretagem sai no mês da 
 entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
 consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
 
-As unidades em % diferem na base. **% da receita** é o VGV vendável (sem as unidades da permuta física) líquido do imposto, sem juros; **% do
+As unidades em % diferem na base. **% do VGV** incide sobre o VGV **vendável** — o VGV potencial
+menos as unidades da permuta física, que são entregues e não vendidas —, e a **corretagem** de vendas
+usa sempre essa mesma base: não existe controle para cobrá-la também sobre a permuta física.
+**% da receita** é o VGV vendável (sem as unidades da permuta física) líquido do imposto, sem juros; **% do
 recebido** é o que de fato entra em caixa, com os juros de tabela — oferecido no marketing, na
 manutenção pós-obra, no marketing global, na gestão e no Outro dos custos diretos e indiretos. **% da obra** é o grupo Obras inteiro, outorga
 e contingência inclusas; **% da construção** é só construção, decoração e gestão da obra — oferecido
@@ -140,7 +143,9 @@ presente dessas parcelas à taxa de desconto. As regras de cada tipo estão em [
 |---|---|
 | **Fluxo de Caixa** | Os KPIs do fluxo, a tabela mensal ou anual de todas as entradas e saídas (com as operações de funding dentro dela), a reconciliação com os avisos de consistência e a tabela da permuta física. Exporta em **CSV** e **PDF** na visão escolhida. |
 | **Proforma** | A Proforma do Avançado: as séries mensais somadas na hierarquia de linhas do Preliminar, com os custos itemizados pelo nome dado em Custos e agrupados em blocos canônicos; a coluna R$ sai em inteiros. |
-| **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma). |
+| **Análise Financeira** | O quadro **Fluxo de Caixa Livre × Fluxo de Caixa** e os gráficos **Contratação, Receita Bruta, Carteira e Repasse**, **Fluxo de Caixa** e **Fluxo de Caixa Acumulado**; **TIR a.a.**, **VPL** à taxa de desconto e **Payback** do projeto, calculados sobre o Fluxo de Caixa Livre (antes do funding); o **ROI do projeto**; e o **Retorno por parte** (o que cabe a cada operação de funding, com o **MOIC** de cada uma); e a **Visão do investidor** (Equity Multiple, Yield e LTV, sempre do projeto inteiro, mesmo com filtro de fase). |
+
+**Visão do investidor.** Três indicadores, todos do projeto inteiro e sem valores em R$. **Equity Multiple** é o retorno total pago ao equity ÷ os aportes de equity (1,00× é empatar; **—** sem equity). **Yield a.a.** é o Fluxo de Caixa Livre médio por ano, do início do estudo ao último mês com fluxo livre, ÷ a exposição máxima: o app não modela o capital próprio do incorporador, então o denominador é o caixa que o projeto de fato precisou (**—** quando o acumulado nunca fica negativo). **LTV** é o principal liberado de cada dívida ÷ o VGV potencial, uma linha por dívida ou financiamento à produção (**—** sem dívida, ou quando o VGV potencial é zero). Veja também [Funding](funding).
 
 **Exposição máxima e payback.** A **exposição máxima** é o pior ponto do fluxo acumulado livre, com piso em zero: um projeto cujo acumulado fica sempre em zero ou acima mostra **0**, e o mês da exposição não aparece. O **payback** é o primeiro mês em que o acumulado volta a ser maior ou igual a zero depois de ter ficado negativo; sem trecho negativo, ou se o acumulado nunca se recupera, o app mostra **—**. As duas grandezas leem a mesma série, a do Fluxo de Caixa Acumulado livre.
 
