@@ -576,19 +576,16 @@ rotasEstudos.post('/estudos', async (req: Request, res: Response) => {
     }
     Object.assign(dados, coagidoCriacao.dados);
 
-    const estudo = await req.dados!.criar('estudos', dados);
-
     // Criador vira editor do estudo. Sem membro o estudo é inalcançável para
-    // quem não é admin do app (não há atalho de "estudo sem membros"), então uma
-    // falha aqui desfaz a criação, como o `POST /duplicar` já faz com o clone.
-    let funcao: Awaited<ReturnType<typeof garantirMembro>>;
-    try {
-      funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');
-    } catch (e) {
-      try { await req.dados!.remover('estudos', estudo.id, req.contexto!.usuario.id); }
-      catch (e2) { console.error('Falha ao desfazer o estudo sem membro', estudo.id, e2); }
-      throw e;
-    }
+    // quem não é admin do app (não há atalho de "estudo sem membros"), então a
+    // criação e o vínculo do criador gravam na MESMA transação: se o vínculo
+    // falhar, o estudo some junto (ROLLBACK), sem compensação por `remover`.
+    // A inscrição em eventos é efeito colateral e sai DEPOIS do commit.
+    const { estudo, funcao } = await req.dados!.transaction(async (trx) => {
+      const criado = await trx.criar('estudos', dados);
+      const papel = await garantirMembro(trx, criado.id, req.contexto!.usuario.id, 'editor');
+      return { estudo: criado, funcao: papel };
+    });
     if (funcao) await inscreverMembroEstudo(req, estudo.id, req.contexto!.usuario.id, funcao);
 
     await publicarEvento(req, 'estudo_criado', payloadEstudoCriado(estudo, req.contexto!.usuario.nome));
@@ -865,19 +862,20 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
     copia.autor_id = req.contexto!.usuario.id;
     Object.assign(copia, ident);
 
-    const novo = await req.dados!.criar('estudos', copia);
+    // Estudo novo, filhas, dados do Avançado e o vínculo do criador gravam numa
+    // ÚNICA transação: se qualquer estrutura falhar, o ROLLBACK desfaz tudo e
+    // não sobra clone pela metade (sem imóveis/Avançado, ou sem o criador como
+    // editor — inacessível). A inscrição em eventos sai DEPOIS do commit.
+    const { novo, funcao } = await req.dados!.transaction(async (trx) => {
+      const criado = await trx.criar('estudos', copia);
 
-    // Sem transação no req.dados: se qualquer estrutura filha falhar, o clone
-    // ficaria parcial (estudo sem imóveis/Avançado, ou sem o criador como
-    // editor — inacessível). Compensa-se removendo o estudo recém-criado.
-    try {
       // Copiar imóveis vinculados.
       // #838 — `varrerTudo`: com `por_pagina: 100` um estudo com mais de 100
       // imóveis vinculados perdia, em silêncio, tudo além da página 1.
-      const imoveis = await req.dados!.varrerTudo('estudo_imoveis', { filtros: { estudo_id: estudoId } });
+      const imoveis = await trx.varrerTudo('estudo_imoveis', { filtros: { estudo_id: estudoId } });
       for (const im of imoveis as any[]) {
-        await req.dados!.criar('estudo_imoveis', coagirNumericosOuLancar('estudo_imoveis', omitirValoresNulos({
-          estudo_id: novo.id,
+        await trx.criar('estudo_imoveis', coagirNumericosOuLancar('estudo_imoveis', omitirValoresNulos({
+          estudo_id: criado.id,
           imovel_nucleo_id: im.imovel_nucleo_id,
           tipo_imovel: im.tipo_imovel,
         })));
@@ -886,7 +884,7 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // #609 — as estruturas filhas de remapeamento simples (catálogo de
       // Produtos, análise de mercado, apelo comercial). Ver `FILHAS_SIMPLES`
       // para a lista, os campos de cada uma e o que ficou de fora, com o
-      // motivo. Dentro do try/catch de propósito: falhar aqui remove o estudo
+      // motivo. Dentro da transação de propósito: falhar aqui desfaz o estudo
       // recém-criado, em vez de deixar um clone pela metade.
       //
       // As linhas copiadas vêm do Postgres, então toda coluna `decimal` chega
@@ -896,25 +894,22 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // `omitirValoresNulos` segue aplicado pelo motivo revisado em
       // `./duplicar-utils.ts` — não por causa daquele erro.
       for (const { tabela, campos } of FILHAS_SIMPLES) {
-        const linhas = await req.dados!.varrerTudo(tabela, { filtros: { estudo_id: estudoId } });
-        for (const copiaFilha of montarCopiasFilhas(linhas as any[], Number(novo.id), campos)) {
-          await req.dados!.criar(tabela, coagirNumericosOuLancar(tabela, omitirValoresNulos(copiaFilha)));
+        const linhas = await trx.varrerTudo(tabela, { filtros: { estudo_id: estudoId } });
+        for (const copiaFilha of montarCopiasFilhas(linhas as any[], Number(criado.id), campos)) {
+          await trx.criar(tabela, coagirNumericosOuLancar(tabela, omitirValoresNulos(copiaFilha)));
         }
       }
 
       // Estudo Avançado: cronograma, tipologias, fases + alocações, custos,
       // cenários e (desde a #609) as operações de funding.
-      if (novo.nivel_analise === 'avancado') {
-        await duplicarDadosAvancado(req, estudoId, Number(novo.id));
+      if (criado.nivel_analise === 'avancado') {
+        await duplicarDadosAvancado(trx, estudoId, Number(criado.id));
       }
 
-      const funcao = await garantirMembro(req, novo.id, req.contexto!.usuario.id, 'editor');
-      if (funcao) await inscreverMembroEstudo(req, novo.id, req.contexto!.usuario.id, funcao);
-    } catch (falha) {
-      try { await req.dados!.remover('estudos', Number(novo.id), req.contexto!.usuario.id); }
-      catch { /* best-effort: não mascarar o erro original com o da limpeza */ }
-      throw falha;
-    }
+      const papel = await garantirMembro(trx, criado.id, req.contexto!.usuario.id, 'editor');
+      return { novo: criado, funcao: papel };
+    });
+    if (funcao) await inscreverMembroEstudo(req, novo.id, req.contexto!.usuario.id, funcao);
 
     await publicarEvento(req, 'estudo_criado', payloadEstudoCriado(novo, req.contexto!.usuario.nome));
     res.status(201).json(novo);

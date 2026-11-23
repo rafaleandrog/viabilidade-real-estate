@@ -95,8 +95,10 @@ só unidades e preço.
 ## O que a duplicação de estudo copia
 
 `POST /estudos/:id/duplicar` cria o estudo novo com as colunas de `estudos` (menos as geradas pelo
-shell) e depois copia as estruturas filhas. Se qualquer filha falhar, o estudo recém-criado é
-removido — não há transação, e um clone pela metade é pior que nenhum.
+shell) e depois copia as estruturas filhas e vincula o criador como editor, tudo numa única
+transação: se qualquer passo falhar, nada é gravado, e um clone pela metade é pior que nenhum.
+`POST /estudos` grava o estudo e o vínculo do criador do mesmo jeito, e o salvamento do
+cronograma do Avançado grava o cronograma e a reancoragem dos custos numa só transação.
 
 | Estrutura | Copiada | Como |
 |---|---|---|

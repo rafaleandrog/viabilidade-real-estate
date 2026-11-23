@@ -525,16 +525,20 @@ test('#609 a rota de duplicar PERCORRE FILHAS_SIMPLES e chama montarCopiasFilhas
     /of montarCopiasFilhas\(/.test(FONTE_ESTUDOS),
     'estudos.ts declara montarCopiasFilhas mas não a CHAMA no laço das filhas.',
   );
-  // A cópia tem que ficar DENTRO do try/catch compensatório (critério 2 da
-  // issue): o laço aparece depois do `try {` e antes do `catch (falha)`.
-  // Âncoras que sobrevivem à remoção dos comentários: a criação do estudo novo
-  // (última linha ANTES do try) e o `catch (falha)` que o compensa.
+  // A cópia tem que ficar DENTRO da transação da rota (critério 2 da issue):
+  // o laço aparece depois do `transaction(` que abre a unidade atômica e antes
+  // do `garantirMembro(trx` que a fecha. Âncoras que sobrevivem à remoção dos
+  // comentários: a abertura da transação (`criar('estudos', copia)` dentro
+  // dela) e o vínculo do criador, última escrita do callback.
   const posCriarEstudo = FONTE_ESTUDOS.indexOf("criar('estudos', copia)");
-  const posCatch = FONTE_ESTUDOS.indexOf('catch (falha)');
+  const posTransacao = FONTE_ESTUDOS.lastIndexOf('transaction(async (trx)', posCriarEstudo);
+  const posRotaDuplicar = FONTE_ESTUDOS.indexOf("'/estudos/:id/duplicar'");
+  const posFimTransacao = FONTE_ESTUDOS.indexOf("garantirMembro(trx, criado.id", posCriarEstudo);
   const posLaco = FONTE_ESTUDOS.search(/for \(const \{[^}]*\} of FILHAS_SIMPLES\)/);
-  assert.ok(posCriarEstudo !== -1 && posCatch !== -1, 'as âncoras do try/catch mudaram de forma');
-  assert.ok(posLaco > posCriarEstudo && posLaco < posCatch,
-    'a cópia das filhas saiu do try/catch que remove o estudo novo quando uma estrutura filha falha');
+  assert.ok(posCriarEstudo !== -1 && posFimTransacao !== -1, 'as âncoras da transação mudaram de forma');
+  assert.ok(posTransacao > posRotaDuplicar && posRotaDuplicar !== -1, 'a criação do estudo novo saiu do callback de transaction(');
+  assert.ok(posLaco > posCriarEstudo && posLaco < posFimTransacao,
+    'a cópia das filhas saiu da transação que desfaz o estudo novo quando uma estrutura filha falha');
 });
 
 const FONTE_AVANCADO = semComentarios(
