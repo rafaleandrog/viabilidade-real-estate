@@ -843,7 +843,7 @@ export class ViabFluxoVer extends LitElement {
         <p class="sec">
           <strong>Equity Multiple</strong> = retorno total pago ao equity ÷ aportes de equity
           (1,00× é empatar; "—" sem equity). <strong>Yield</strong> = Fluxo de Caixa Livre médio por
-          ano ÷ exposição máxima — o app não modela o capital próprio do incorporador, então o
+          ano, do início do estudo ao último mês com fluxo livre, ÷ exposição máxima — o app não modela o capital próprio do incorporador, então o
           denominador é o caixa que o projeto de fato precisou ("—" quando o acumulado nunca fica
           negativo). <strong>LTV</strong> = principal liberado de cada dívida ÷ VGV potencial
           ("—" sem dívida).

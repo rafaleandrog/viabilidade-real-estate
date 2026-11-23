@@ -148,9 +148,9 @@ a partir de um mês posterior, os meses anteriores já satisfazem essa condiçã
 
 Na Análise Financeira do Avançado, o card **Visão do investidor** resume o projeto inteiro em três
 indicadores: **Equity Multiple** (retorno total pago ao equity ÷ aportes de equity; 1,00× é empatar,
-**—** sem equity), **Yield a.a.** (Fluxo de Caixa Livre médio por ano ÷ exposição máxima, já que o
+**—** sem equity), **Yield a.a.** (Fluxo de Caixa Livre médio por ano, do início do estudo ao último mês com fluxo livre, ÷ exposição máxima, já que o
 app não modela o capital próprio do incorporador; **—** quando o acumulado nunca fica negativo) e
-**LTV** (principal liberado de cada dívida ÷ VGV potencial; **—** sem dívida). Detalhes em
+**LTV** (principal liberado de cada dívida ÷ VGV potencial; **—** sem dívida ou com VGV potencial zero). Detalhes em
 [Estudo Avançado](avancado).
 
 ## Instruções para não humanos

@@ -72,3 +72,23 @@ test('funding null: ltvs vazio, multiple null, yield ainda calculado', () => {
   assert.equal(v.equityMultiple, null);
   assert.equal(v.yieldPct, 120);
 });
+
+test('yield ignora zeros no fim (quitação do funding não alonga a duração)', () => {
+  const base = Array(24).fill(25);
+  const estendida = [...base, ...Array(12).fill(0)];
+  const a = visaoInvestidor({ funding: null, fluxoLivreMensal: base, exposicaoMaxima: -1000, vgvTotal: 0 });
+  const b = visaoInvestidor({ funding: null, fluxoLivreMensal: estendida, exposicaoMaxima: -1000, vgvTotal: 0 });
+  assert.equal(b.yieldPct, a.yieldPct);
+  assert.equal(b.yieldPct, 30);
+});
+
+test('fluxo livre todo zerado => yield null', () => {
+  const v = visaoInvestidor({ funding: null, fluxoLivreMensal: Array(12).fill(0), exposicaoMaxima: -1000, vgvTotal: 0 });
+  assert.equal(v.yieldPct, null);
+});
+
+test('aporte de equity > 0 com retorno 0 => multiple 0, não null', () => {
+  const f = fc(serie('equity', 'A', [100], [0]));
+  const v = visaoInvestidor({ funding: f, fluxoLivreMensal: [], exposicaoMaxima: 0, vgvTotal: 0 });
+  assert.equal(v.equityMultiple, 0);
+});

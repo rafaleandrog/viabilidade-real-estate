@@ -6,6 +6,10 @@
 //   exposição máxima de caixa como denominador (o capital que o projeto de fato
 //   precisou) e, como numerador, o Fluxo de Caixa Livre — desalavancado, a mesma
 //   base da TIR/VPL/Payback.
+// - A duração do Yield é o horizonte OPERACIONAL do fluxo livre: do mês 0 até o
+//   último mês com fluxo livre ≠ 0. O motor estende o horizonte até a quitação
+//   do funding, o que acrescenta zeros no fim; contá-los faria criar ou alongar
+//   uma dívida reduzir o Yield, contra a base desalavancada.
 // - Equity é allowlist (`tipo === 'equity'`); antecipação de recebíveis nunca
 //   entra em nada aqui.
 // - Denominador ≤ 0 devolve `null`, NUNCA 0%: zero seria um resultado falso.
@@ -48,7 +52,8 @@ export function visaoInvestidor(entrada: EntradaVisaoInvestidor): VisaoInvestido
   // Agregado (Σ ÷ Σ), não média dos múltiplos de cada equity.
   const equityMultiple = aportesEquity > 0 ? retornoEquity / aportesEquity : null;
 
-  const meses = entrada.fluxoLivreMensal.length;
+  let meses = entrada.fluxoLivreMensal.length;
+  while (meses > 0 && entrada.fluxoLivreMensal[meses - 1] === 0) meses--;
   const exposicao = Math.abs(entrada.exposicaoMaxima);
   // O motor entrega exposição ≤ 0 (piso em zero): 0 significa que não há base.
   const yieldPct =
