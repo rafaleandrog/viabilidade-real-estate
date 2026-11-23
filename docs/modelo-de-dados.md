@@ -123,7 +123,7 @@ Quatro colunas guardam id de outra linha sem FK no banco, cada uma por um motivo
 
 | Coluna | Por quê |
 |---|---|
-| `estudo_imoveis.imovel_nucleo_id` | o alvo vive no Núcleo, fora do schema do app |
+| `estudo_imoveis.imovel_nucleo_id` | o alvo vive no Núcleo, fora do schema do app; ao vincular, a rota confere no módulo imobiliário que o imóvel existe (`404 IMOVEL_NAO_ENCONTRADO` se não existir, `502` se o módulo não responder) |
 | `lote_parametros.imovel_nucleo_id` | idem — e é o que garante que o dado de um lote não seja confundido com o de outro |
 | `estudos.permuta_fisica_produto_id` | quebra do ciclo com `preliminar_produtos` (abaixo) |
 | `estudos.permuta_fisica_nr_produto_id` | idem |
