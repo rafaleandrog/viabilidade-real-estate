@@ -131,7 +131,9 @@ test('#824 fiação: último componente imediato com desconto recebe a parte do 
     fluxo_pagamento: { componentes: comps },
   };
   const desc = descontoComercialMensal(linha, CRONO, 60, 0);
-  assert.equal(centavos(soma(desc)), 500); // 5,00 (isolada: 5,01)
+  // 10% de 50,00 = 5,00; a fatia isolada daria 5,001, que também arredonda a 5,00 —
+  // quem separa o desconto da fatia isolada é o caso de 60%, mais abaixo.
+  assert.equal(centavos(soma(desc)), 500);
   // Σ principal + desconto = contratado
   assert.equal(centavos(soma(r.principalRecebidoMensal)) + centavos(soma(desc)), centavos(CT));
 });
@@ -191,4 +193,24 @@ test('#824 fiação: a alocação de juros da carteira parte do saldo da parte d
     37.97, 34.98, 31.95, 28.9, 25.81, 22.7, 19.55, 16.37, 13.16, 9.92, 6.65, 3.35,
   ];
   assert.deepEqual(r.jurosMensal.slice(13, 37).map(centavos), esperado.map(centavos));
+});
+
+test('#824 fiação: carteira do concentrado por último começa na parte do resto', () => {
+  const comps: ComponentePagamento[] = [
+    { tipo: 'prazo_fixo', participacaoPct: 50, sinalPct: 0, prazoMeses: 3, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
+    { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 30, taxaMensal: 0 },
+  ];
+  const r = calcularRecebiveisComponentes(comps, [{ safra: 12, valorContratado: CT }], 40, 80);
+  // o prazo fixo sobe a 50,01; o concentrado (último) fica com 50,00 (isolada: 50,01)
+  assert.equal(centavos(r.carteiraPorComponenteMensal.saldoARepassar[12]), 5000);
+  assert.equal(centavos(r.carteiraMensal[12]), 10001);
+});
+
+test('#824 fiação: ate_marco por último recebe a parte do resto', () => {
+  const comps: ComponentePagamento[] = [
+    { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 30, taxaMensal: 0 },
+    { tipo: 'ate_marco', participacaoPct: 50, sinalPct: 0, marcoMes: 20, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
+  ];
+  const r = calcularRecebiveisComponentes(comps, [{ safra: 12, valorContratado: CT }], 40, 80);
+  assert.equal(centavos(soma(r.principalRecebidoMensal)), centavos(CT));
 });
