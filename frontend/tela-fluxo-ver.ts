@@ -846,7 +846,7 @@ export class ViabFluxoVer extends LitElement {
           ano, do início do estudo ao último mês com fluxo livre, ÷ exposição máxima — o app não modela o capital próprio do incorporador, então o
           denominador é o caixa que o projeto de fato precisou ("—" quando o acumulado nunca fica
           negativo). <strong>LTV</strong> = principal liberado de cada dívida ÷ VGV potencial
-          ("—" sem dívida).
+          ("—" sem dívida ou com VGV potencial zero).
           ${this.faseFiltro
             ? html`O filtro de fase <strong>${this.faseFiltro}</strong> está ligado e <strong>não afeta
                 este card</strong>: ele é sempre do projeto inteiro.`
