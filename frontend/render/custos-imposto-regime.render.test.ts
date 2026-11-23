@@ -49,4 +49,10 @@ test('#834 Custos › Financeiro: regime do imposto vem da rota, troca e salva c
     `tela ${m!.receitaTotalTela} × motor ${m!.receitaTotalMotor}` + relato(a));
   assert.ok(Math.abs(m!.receitaTotalMotor - 7_461_600) <= 0.01, `motor ${m!.receitaTotalMotor}` + relato(a));
   assert.ok(m!.receitaTotalTela! < m!.receitaTotalVgvTotal, `a tela usou o VGV total: ${m!.receitaTotalTela}` + relato(a));
+
+  // A sub-aba irmã (Terreno) está viva junto; depois do Salvar (RET 4 %), o
+  // `estudo` atualizado chega a ela e a base dela segue: 8 × R$ 1.000.000 × 0,96.
+  assert.ok(m!.irmaAntes !== undefined && Math.abs(m!.irmaAntes - 7_461_600) <= 0.01, `irmã antes ${m!.irmaAntes}` + relato(a));
+  assert.ok(m!.irmaDepois !== undefined && Math.abs(m!.irmaDepois - 7_680_000) <= 0.01,
+    `a sub-aba irmã ficou com o imposto antigo: ${m!.irmaDepois}` + relato(a));
 });

@@ -11,7 +11,10 @@
 //    (`viab:premissas-change`/`-salvas`) — senão a aba Viabilidade ›
 //    Financeiro regravava o valor antigo;
 //  · a base `% Receita` da tela (`_ctx().receitaTotal`) é a mesma do motor
-//    com permuta física — o VGV vendável, não o total.
+//    com permuta física — o VGV vendável, não o total;
+//  · a sub-aba IRMÃ (Terreno), viva ao mesmo tempo, passa a usar o imposto
+//    novo quando a tela do estudo devolve o `estudo` atualizado — o ouvinte de
+//    `viab:premissas-change` abaixo faz o papel de `tela-estudo.ts`.
 //
 // O estado vem pela API simulada (`urbiVerso.api`), e o `estudo` TEM `id`:
 // é o `_carregar()` real que monta o rascunho a partir da rota.
@@ -73,11 +76,14 @@ export interface MedidaImpostoRegime {
   salvarDesabilitadoValido: boolean;
   eventos: { tipo: string; dados: unknown }[];
   receitaTotalTela: number | undefined;
+  irmaAntes: number | undefined;
+  irmaDepois: number | undefined;
   receitaTotalMotor: number;
   receitaTotalVgvTotal: number;
 }
 
 const patches: unknown[] = [];
+let paramsAtuais: Record<string, unknown> = { ...PARAMS };
 const eventos: { tipo: string; dados: unknown }[] = [];
 
 export const caso = {
@@ -107,9 +113,10 @@ export const caso = {
         if (metodo === 'PATCH') {
           const corpo = JSON.parse(opts?.body ?? '{}');
           patches.push(corpo);
-          return { ...PARAMS, ...corpo };
+          paramsAtuais = { ...paramsAtuais, ...corpo };
+          return paramsAtuais;
         }
-        return PARAMS;
+        return paramsAtuais;
       }
       if (metodo !== 'GET') return {};
       if (rota.endsWith('/avancado/custos')) return { dados: CUSTOS };
@@ -117,19 +124,30 @@ export const caso = {
       if (rota.endsWith('/avancado/cronograma')) return { dados: CRONO };
       return { dados: [] };
     };
+    // O `estudo` traz as colunas de imposto, como a linha de `estudos` real.
+    const estudo = {
+      id: 1, nivel_analise: 'avancado', tipo_empreendimento: 'loteamento', juros_tabela_aa_padrao: 0,
+      considerar_ret: false, ret_pct: '4.00', imposto_percentual: '6.73',
+    };
     const el = document.createElement('viab-fluxo-custos');
-    forcarEstado(el, {
-      estudo: { id: 1, nivel_analise: 'avancado', tipo_empreendimento: 'loteamento', juros_tabela_aa_padrao: 0 },
-      editavel: true,
-      grupo: 'financeiro',
-    });
+    forcarEstado(el, { estudo, editavel: true, grupo: 'financeiro' });
+    const irma = document.createElement('viab-fluxo-custos');
+    irma.classList.add('irma');
+    forcarEstado(irma, { estudo, editavel: true, grupo: 'terreno' });
     for (const tipo of ['viab:premissas-change', 'viab:premissas-salvas']) {
       raiz.addEventListener(tipo, (e: Event) => eventos.push({ tipo, dados: (e as CustomEvent).detail?.dados }));
     }
+    // O papel de `tela-estudo.ts`: o `estudo` atualizado desce a TODAS as instâncias.
+    raiz.addEventListener('viab:premissas-change', (e: Event) => {
+      const dados = (e as CustomEvent).detail?.dados ?? {};
+      for (const t of raiz.querySelectorAll('viab-fluxo-custos')) (t as any).estudo = { ...(t as any).estudo, ...dados };
+    });
     raiz.appendChild(el);
-    for (let i = 0; i < 4; i++) {
+    raiz.appendChild(irma);
+    for (let i = 0; i < 6; i++) {
       await new Promise((r) => setTimeout(r, 0));
       await (el as any).updateComplete;
+      await (irma as any).updateComplete;
     }
   },
   async medir(raiz: HTMLElement): Promise<MedidaImpostoRegime> {
@@ -143,6 +161,8 @@ export const caso = {
     const rotuloInicial = String(num()?.label ?? '');
     const aliquotaInicial = num()?.valor;
     const receitaTotalTela: number | undefined = tela._ctx().receitaTotal;
+    const irma = raiz.querySelector('viab-fluxo-custos.irma')! as any;
+    const irmaAntes: number | undefined = irma._ctx().receitaTotal;
     const textoCaixaInicial = [
       caixa()?.textContent ?? '', rotuloInicial,
       String(select()?.label ?? ''),
@@ -173,10 +193,12 @@ export const caso = {
     await regime('ret');
     const salvarDesabilitadoValido = botao().hasAttribute('desabilitado');
     botao().click();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       await new Promise((r) => setTimeout(r, 0));
       await tela.updateComplete;
+      await irma.updateComplete;
     }
+    const irmaDepois: number | undefined = irma._ctx().receitaTotal;
 
     const imposto = impostoDoEstudoAvancado(PARAMS);
     const calc = calcularFluxo({
@@ -193,6 +215,8 @@ export const caso = {
       salvarDesabilitadoValido,
       eventos,
       receitaTotalTela,
+      irmaAntes,
+      irmaDepois,
       receitaTotalMotor: (linhaPctReceita?.total ?? 0) / 0.01,
       receitaTotalVgvTotal: vgvLinha(RECEITA.tipologias) * (1 - 0.0673),
     };

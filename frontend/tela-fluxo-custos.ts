@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
+import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtNum } from './viab-format.js';
@@ -467,6 +467,30 @@ export class ViabFluxoCustos extends LitElement {
     }
     .avanco-tabela th:first-child, .avanco-tabela td:first-child { text-align: left; font-weight: 600; }
   `];
+
+  // #834: as cinco sub-abas de Custos são instâncias vivas ao mesmo tempo (uma
+  // por slot do `urbi-abas`, `tela-avancado.ts`), e cada uma carrega o imposto
+  // uma vez só. Quando a sub-aba Financeiro salva o regime, ela sobe as colunas
+  // gravadas para a tela do estudo, que devolve o `estudo` novo a TODAS as
+  // instâncias — e é aqui que as irmãs o aplicam, senão a base `% Receita` e a
+  // conversão R$ ↔ % delas seguiriam com o imposto antigo (achado do App do
+  // Codex na revisão do PR 948).
+  willUpdate(changed: PropertyValues) {
+    if (changed.has('estudo') && this.carregado) this._impostoDoEstudo();
+  }
+
+  private _impostoDoEstudo() {
+    const e = this.estudo;
+    if (!e || !('considerar_ret' in e)) return;
+    const colunas = { considerar_ret: e.considerar_ret === true, ret_pct: e.ret_pct, imposto_percentual: e.imposto_percentual };
+    const salvo = formImpostoDeParametros(colunas);
+    if (!formImpostoAlterado(salvo, this.impostoSalvo)) return;
+    // Rascunho com edição pendente nesta instância não é atropelado.
+    const pendente = formImpostoAlterado(this.impostoForm, this.impostoSalvo);
+    this.impostoSalvo = salvo;
+    if (!pendente) this.impostoForm = { ...salvo };
+    this.imposto = impostoDoEstudoAvancado(colunas);
+  }
 
   updated() {
     if (this.estudo?.id && !this.carregado) {
