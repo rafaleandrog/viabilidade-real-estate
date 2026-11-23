@@ -346,8 +346,8 @@ function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
 // ficou explícita no NOME das funções: `vgvVendidoBrutoMensal` (permuta física
 // inclusa) e `vgvVendidoVendavelMensal` (exclui a permuta física, mesma base de
 // `vendaBrutaContratadaMensal`). `corretagemMensal` usa sempre a segunda.
-// O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` continua na base
-// bruta histórica — a #473 não estende a chave a ele (fora de escopo).
+// O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` segue na base
+// bruta (fora do escopo da base vendável).
 
 export interface FluxoCalc {
   prazo: number;
@@ -2319,8 +2319,8 @@ export function receitaMensalLinha(
  * resolvido é rateado proporcionalmente ao VGV vendido no mês. Sem vendas no
  * horizonte, não há corretagem a pagar.
  *
- * #227/#228 — base única de corretagem (decisão do autor, 2026-08-01):
- * **bruto/VGV**, exatamente esta linha de custo obrigatória em `pct_vgv`. A
+ * Base única de corretagem: o **VGV vendável** (sem a permuta física),
+ * exatamente esta linha de custo obrigatória em `pct_vgv`. A
  * dedução concorrente que existia em `vglLinha` (comissão `destacada`, que
  * reduzia o recebível) foi REMOVIDA pela #228 — contaria a corretagem duas
  * vezes se as duas ficassem ativas ao mesmo tempo (o defeito do EVI-008).
@@ -2899,8 +2899,8 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // Preço do Terreno em `unit_delivery`/`sales_revenue` (#194): sem
     // cronograma próprio, distribuído proporcionalmente a um peso mensal —
     // `sales_revenue` acompanha o VGV VENDIDO BRUTO (igual à base histórica
-    // da Corretagem, absorção das vendas — #473 não muda esta linha: é fora
-    // de escopo, só a Corretagem tem a chave de base configurável);
+    // da Corretagem antiga, absorção das vendas — esta linha segue na base
+    // bruta; a base vendável vale para `pct_vgv` e a Corretagem);
     // `unit_delivery` acompanha a RECEITA EM CAIXA (entrada + parcelas +
     // repasse na entrega das unidades). `fixo` (padrão) cai no caminho normal
     // abaixo, igual às demais linhas de Terreno.
@@ -3145,7 +3145,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // `(1 + tm)^(i+1)` — os dois produzem fração de centavo com facilidade.
     //
     // ⚠️ **Quantizado aqui, NÃO na origem, e a diferença é de escopo.**
-    // `ctxCusto.vgvTotal` continua com precisão plena, e é ele que alimenta o
+    // `ctxCusto.vgvVendavel` continua com precisão plena, e é ele que alimenta o
     // rateio dos custos em `pct_vgv` (`resolverCustoTotal`). Arredondar lá
     // moveria o resultado de todo estudo existente, e isso é decisão do autor,
     // não desta issue — é também o que o contrato manda, porque representações
@@ -3155,7 +3155,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // `receitaTotal` e `pct_receita`. **É falso, e foi medido:**
     // `ctxCusto.receitaTotal` vem do VGV VENDÁVEL por linha
     // (`receitaLiquidaLinha(vgvVendavelLinhaMotor(...))`), não de
-    // `ctxCusto.vgvTotal`. Só `pct_vgv` o consome.)
+    // `ctxCusto.vgvTotal`. `pct_vgv` consome `ctxCusto.vgvVendavel`.)
     //
     // Hoje o dano era contido por acidente, porque todo consumidor formata com
     // `fmtR$`. Vira dano real no dia em que algo ler o campo direto: exportação,

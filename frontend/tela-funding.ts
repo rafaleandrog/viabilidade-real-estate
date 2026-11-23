@@ -260,7 +260,6 @@ export class ViabFunding extends LitElement {
         curvas: curvas?.erro ? [] : (curvas.dados || []),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         ret: impostoDoEstudoAvancado(params),
-        // #473: default true preserva o comportamento histórico (VGV bruto).
         // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba
         // Viabilidade → Financeiro (`estudos.juros_tabela_aa_padrao`). Campo
         // OBRIGATORIO de `FluxoConfig`: parar de passa-lo vira TS2741, nao silencio.

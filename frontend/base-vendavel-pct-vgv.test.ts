@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { calcularFluxo, vgvVendavelTotalBase, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { resolverCustoTotal } from './fluxo-shared.js';
+import { converterUnidade, type ConvUnidade } from './premissas-conversao.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Avançado: `% do VGV` e a corretagem incidem sobre o VGV VENDÁVEL (potencial
@@ -77,6 +78,53 @@ test('vgvVendavelTotalBase (tela de Custos) coincide com o vgvVendavel do motor'
   const motor = calcularFluxo(config(custos)).vgvVendavel;
   assert.ok(perto(vgvVendavelTotalBase(RECEITA, custos), motor));
   assert.ok(perto(vgvVendavelTotalBase(RECEITA, []), 100_000_000));
+});
+
+const FINANCEIRA = {
+  id: 7, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+  orcamento_valor: 5, orcamento_unidade: 'pct_vgv',
+};
+
+test('permuta financeira em pct_vgv sem canônico: dedução = % gravado × receita de caixa', () => {
+  // Estado depois da migração que anula o canônico: 5% × 70M de caixa = 3.500.000.
+  const r = calcularFluxo(config([FINANCEIRA, PERMUTA]));
+  assert.ok(perto(r.permutaFinanceiraTotal, 3_500_000), `veio ${r.permutaFinanceiraTotal}`);
+});
+
+test('permuta financeira em pct_vgv com canônico congelado: transitório (% derivado = canônico ÷ vendável)', () => {
+  // Transitório documentado: 5.000.000 ÷ 70M = 7,142857% × 70M de caixa = 5.000.000
+  // (com o denominador bruto seria 5% × 70M = 3.500.000). Some quando a migração
+  // anula o canônico; por isso esta base só entra junto com ela.
+  const r = calcularFluxo(config([{ ...FINANCEIRA, orcamento_valor_canonico: 5_000_000 }, PERMUTA]));
+  assert.ok(perto(r.permutaFinanceiraTotal, 5_000_000), `veio ${r.permutaFinanceiraTotal}`);
+});
+
+test('vendável zero (permuta física de 100%): o % derivado não vira NaN nem Infinity', () => {
+  const total100 = { ...PERMUTA, permuta_quantidade: 100 };
+  const r = calcularFluxo(config([
+    { ...FINANCEIRA, orcamento_valor_canonico: 5_000_000 },
+    { id: 1, grupo: 'diretos', categoria: 'Marketing', orcamento_valor: 2, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 1_000_000 },
+    total100,
+  ]));
+  assert.ok(perto(r.vgvVendavel, 0));
+  assert.ok(Number.isFinite(r.permutaFinanceiraTotal), `veio ${r.permutaFinanceiraTotal}`);
+  assert.equal(r.permutaFinanceiraTotal, 0);
+  assert.ok(Number.isFinite(totalDe(r, 'Marketing')));
+  // A auditoria da base oposta é onde o NaN aparecia sem o guard.
+  const linha = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+  assert.ok(Number.isFinite(linha.permutaAlternativa!.total), `veio ${linha.permutaAlternativa!.total}`);
+});
+
+test('conversão de unidade da tela de Custos: R$ → % VGV usa a base vendável', () => {
+  const custos = [PERMUTA];
+  const pctVgv: ConvUnidade = { tipo: 'pct', link: 'vgv' };
+  const rs: ConvUnidade = { tipo: 'identidade' } as ConvUnidade;
+  const vendavel = vgvVendavelTotalBase(RECEITA, custos);
+  const pct = converterUnidade(rs, pctVgv, 2_800_000, { vgv: vendavel } as any);
+  assert.ok(pct !== null && perto(pct, 4, 1e-9), `veio ${pct}`);
+  // Com o VGV potencial (100M) seria 2,8%.
+  const bruto = converterUnidade(rs, pctVgv, 2_800_000, { vgv: 100_000_000 } as any);
+  assert.ok(bruto !== null && perto(bruto, 2.8, 1e-9));
 });
 
 // ── Fiação da tela ──────────────────────────────────────────────────────────

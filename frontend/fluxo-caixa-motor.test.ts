@@ -702,7 +702,7 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
   assert.equal(linha.duracao, 40 - 12 + 1);
 });
 
-// #473: a base da Corretagem quanto à permuta física é escolha do estudo.
+// #473: a base da Corretagem é o VGV vendável (sem escolha do estudo).
 // VGV total 100M (100 un. × 50m² × 20.000); 30 unidades permutadas
 // fisicamente (VGV permutado 30M) → vendável 70M. Corretagem 4%.
 test('#473: a corretagem incide sobre o VGV VENDÁVEL, permuta física fora (sem escolha do estudo)', () => {

@@ -150,7 +150,6 @@ export async function conferir(id: number): Promise<Conferencia> {
     ret: d.ret,
     // #585: a taxa de tabela é GLOBAL do estudo (aba Viabilidade → Financeiro).
     jurosTabelaAaEstudo: Number(estudo?.juros_tabela_aa_padrao) || 0,
-    // #473: default true preserva o comportamento histórico (VGV bruto).
     // #446: o horizonte precisa cobrir a quitação das operações, senão a série
     // é cortada e `saldoFinal` exibe um saldo truncado.
     operacoesFunding: ops,

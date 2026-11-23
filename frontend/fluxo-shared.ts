@@ -1172,9 +1172,8 @@ function vgvVendidoMensalPor(
 
 /**
  * VGV BRUTO vendido mês a mês — inclui a fatia de permuta física (`vgvLinha`,
- * a tipologia inteira). Base histórica da Corretagem (#227/#228, decisão do
- * autor de 2026-08-01) e do Preço do Terreno em `distribuicao_modo:
- * 'sales_revenue'` (#194) — nenhum dos dois muda de comportamento com a #473.
+ * a tipologia inteira). Base do Preço do Terreno em `distribuicao_modo:
+ * 'sales_revenue'`; a Corretagem e o `pct_vgv` usam a base vendável.
  */
 export function vgvVendidoBrutoMensal(
   linhasReceita: any[],
@@ -1186,9 +1185,8 @@ export function vgvVendidoBrutoMensal(
 
 /**
  * VGV VENDÁVEL vendido mês a mês — exclui a fatia de permuta física
- * (`vgvVendavelLinha`, #195), a mesma base de `vendaBrutaContratadaMensal`
- * (baixa de estoque). #473: alternativa de base da Corretagem, escolhida por
- * `estudos.corretagem_sobre_permuta_fisica = false`.
+ * (`vgvVendavelLinha`), a mesma base de `vendaBrutaContratadaMensal` (baixa de
+ * estoque). Base única da Corretagem.
  */
 export function vgvVendidoVendavelMensal(
   linhasReceita: any[],

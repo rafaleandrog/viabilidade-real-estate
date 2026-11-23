@@ -13,7 +13,7 @@ import {
   urbiVerso,
   buscarParametrosAvancado, atualizarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
-  listarFasesAvancado, listarTipologiasCatalogo, atualizarEstudo,
+  listarFasesAvancado, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
 import { calcularFluxo, vgvVendavelPorLinha, vgvVendavelTotalBase, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
