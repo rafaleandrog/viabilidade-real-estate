@@ -2505,6 +2505,11 @@ export function receitaLiquidaDeProformaMensal(
 // Indicadores financeiros
 // ─────────────────────────────────────────────────────────────────
 
+/** Escala do fluxo descontado à taxa mensal `r`: Σ|cf|/(1+r)^(i+1). Base do critério relativo de TIR. */
+function escalaDescontada(fluxoMensal: number[], r: number): number {
+  return fluxoMensal.reduce((s, cf, i) => s + Math.abs(cf) / Math.pow(1 + r, i + 1), 0);
+}
+
 /** VPL de um fluxo mensal à taxa anual dada (desconto mensal equivalente). */
 export function vplFluxo(fluxoMensal: number[], taxaAa: number): number {
   const tm = Math.pow(1 + n(taxaAa) / 100, 1 / 12) - 1;
@@ -2514,6 +2519,7 @@ export function vplFluxo(fluxoMensal: number[], taxaAa: number): number {
 /**
  * TIR anual (%) por Newton-Raphson sobre a taxa mensal, com bisseção se ele não convergir.
  * Retorna null se o fluxo não muda de sinal ou se nenhum dos dois achar a raiz.
+ * O aceite do Newton usa o mesmo critério relativo da bisseção (`escalaDescontada`).
  */
 export function tirFluxo(fluxoMensal: number[]): number | null {
   const temPos = fluxoMensal.some((v) => v > 0);
@@ -2534,7 +2540,7 @@ export function tirFluxo(fluxoMensal: number[]): number | null {
     if (Math.abs(novo - r) < 1e-10) { r = novo; break; }
     r = novo;
   }
-  if (Math.abs(npv(r)) > 1e-3) return tirBissecaoFluxo(fluxoMensal); // não convergiu
+  if (!(Math.abs(npv(r)) <= 1e-6 * escalaDescontada(fluxoMensal, r))) return tirBissecaoFluxo(fluxoMensal); // não convergiu
   return (Math.pow(1 + r, 12) - 1) * 100;
 }
 
@@ -3217,7 +3223,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
  */
 export function tirBissecaoFluxo(fluxoMensal: number[]): number | null {
   const npv = (r: number) => fluxoMensal.reduce((s, cf, i) => s + cf / Math.pow(1 + r, i + 1), 0);
-  const escala = (r: number) => fluxoMensal.reduce((s, cf, i) => s + Math.abs(cf) / Math.pow(1 + r, i + 1), 0);
+  const escala = (r: number) => escalaDescontada(fluxoMensal, r);
   let lo = -0.999;
   let hi = 10;
   // Em fluxos longos, (1+r)^-N estoura no extremo inferior: sobe o limite até o VPL ser finito.
