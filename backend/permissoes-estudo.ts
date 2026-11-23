@@ -60,7 +60,7 @@ export async function resolverPermissaoEstudo(
 // age como membro/editor". Ele era a ponte para estudos anteriores à tabela de
 // membros — esses, se ainda existirem numa instância, passam a ser só do admin
 // do app. Hoje todo estudo nasce com o criador como editor (`POST /estudos` e
-// `POST /duplicar` chamam `garantirMembro`, e desfazem a criação se falhar), e
+// `POST /duplicar` chamam `garantirMembro` na MESMA transação da criação), e
 // o atalho era alcançado quando alguém ESVAZIAVA o estudo — e aí virava porta: qualquer usuário com
 // escrita se incluía como aprovador e aprovava. Estudo sem membros agora é só do
 // admin do app, que re-adiciona quem precisar.
@@ -98,21 +98,30 @@ export async function exigirAprovador(
 }
 
 /**
+ * O executor de dados que as escritas recebem: `req.dados` ou o `trx` de
+ * `req.dados.transaction(...)`. É o mesmo tipo (`HelperDados` do SDK) — o alias
+ * existe para que o parâmetro seja OBRIGATÓRIO nos helpers de escrita e quem o
+ * omitir, ou passar o `req`, não compile.
+ */
+export type ExecutorDados = NonNullable<Request['dados']>;
+
+/**
  * Adiciona o usuário como membro do estudo com a função dada, se ainda não for.
  * Idempotente: retorna a função recém-criada, ou null se já era membro.
+ * Grava pelo `dados` recebido; dentro de uma transação, passe o `trx`.
  */
 export async function garantirMembro(
-  req: Request,
+  dados: ExecutorDados,
   estudoId: number,
   usuarioId: number,
   funcao: 'leitor' | 'editor' | 'aprovador',
 ): Promise<'leitor' | 'editor' | 'aprovador' | null> {
-  const existente = await req.dados!.listar('estudo_membros', {
+  const existente = await dados.listar('estudo_membros', {
     filtros: { estudo_id: estudoId, usuario_id: usuarioId },
     por_pagina: 1,
   });
   if (existente.dados.length > 0) return null;
-  await req.dados!.criar('estudo_membros', { estudo_id: estudoId, usuario_id: usuarioId, funcao });
+  await dados.criar('estudo_membros', { estudo_id: estudoId, usuario_id: usuarioId, funcao });
   return funcao;
 }
 
