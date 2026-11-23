@@ -693,11 +693,13 @@ export function descontoComercialMensal(
     const residuoAteMarco: ResiduoAteMarco = linha?.fluxo_pagamento?.residuoAteMarco ?? 'imediato';
     for (let safra = 0; safra < bruto.length; safra++) {
       if (bruto[safra] <= 0) continue;
-      for (const c of componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco)) {
+      const efetivos = componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco);
+      const partes = partesDaSafra(efetivos, bruto[safra]);
+      efetivos.forEach((c, i) => {
         if (c.tipo === 'imediato' && c.descontoPct > 0) {
-          saida[safra] += bruto[safra] * (c.participacaoPct / 100) * (c.descontoPct / 100);
+          saida[safra] += partes[i] * (c.descontoPct / 100);
         }
-      }
+      });
     }
     return saida.map(round2);
   }
@@ -1199,6 +1201,41 @@ export interface PagamentoSafra {
 }
 
 /**
+ * #824: as PARTES de uma safra — o valor contratado repartido entre os
+ * componentes sem perder (nem criar) centavo. Cada componente com participação
+ * > 0 recebe `round2(valorContratado × pct/100)`, exceto o ÚLTIMO deles, que
+ * fica com o RESTO: `round2(valorContratado × Σpct/100) − Σ(partes
+ * anteriores)`. Com Σpct = 100 a soma das partes é exatamente o valor
+ * contratado da safra a 2 casas. Sem isto, cada componente arredondava a sua
+ * fatia sozinho e uma safra de centavos ímpares repartida 50/50 virava duas
+ * metades de meio centavo que arredondam para cima (+R$ 0,01 por safra).
+ * Componente com participação ≤ 0 recebe 0 e nunca o resto.
+ */
+export function partesDaSafra(
+  componentes: ComponentePagamento[],
+  valorContratado: number,
+): number[] {
+  const partes = new Array<number>(componentes.length).fill(0);
+  let ultimo = -1;
+  let somaPct = 0;
+  componentes.forEach((c, i) => {
+    if (c.participacaoPct > 0) { ultimo = i; somaPct += c.participacaoPct; }
+  });
+  if (ultimo < 0) return partes;
+  let anteriores = 0;
+  for (let i = 0; i < componentes.length; i++) {
+    if (componentes[i].participacaoPct <= 0) continue;
+    if (i === ultimo) {
+      partes[i] = round2(round2(valorContratado * (somaPct / 100)) - anteriores);
+    } else {
+      partes[i] = round2(valorContratado * (componentes[i].participacaoPct / 100));
+      anteriores = round2(anteriores + partes[i]);
+    }
+  }
+  return partes;
+}
+
+/**
  * #232: pagamentos de um componente `prazo_fixo` para a safra iniciada em
  * `safra`, sobre `valorContratado` do mês (líquido de desconto, #227).
  *
@@ -1214,8 +1251,10 @@ export function pagamentosPrazoFixo(
   c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   if (valor <= 0) return [];
   // O plano de uma safra também é monetário (C7): sinal e principal já
   // nascem em centavos. As 36 PMTs podem deixar um resíduo de arredondamento;
@@ -1257,8 +1296,10 @@ export function pagamentosAteMarco(
   c: Extract<ComponentePagamento, { tipo: 'ate_marco' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   if (valor <= 0) return [];
   const sinal = round2(valor * (c.sinalPct / 100));
   const principal = round2(valor - sinal);
@@ -1305,8 +1346,10 @@ export function pagamentosConcentrado(
   c: Extract<ComponentePagamento, { tipo: 'concentrado' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const principal = round2(valorContratado * (c.participacaoPct / 100));
+  const principal = parte;
   if (principal <= 0) return [];
   if (c.mesPagamento < safra) {
     throw new Error(
@@ -1347,8 +1390,10 @@ export function pagamentosCarteiraPosMarco(
   c: Extract<ComponentePagamento, { tipo: 'carteira_pos_marco' }>,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): PagamentoSafra[] {
-  const principal = round2(valorContratado * (c.participacaoPct / 100));
+  const principal = parte;
   if (principal <= 0) return [];
   const primeiro = primeiroVencimentoCarteira(c, safra);
   // Sem `round2` aqui, de propósito: o capitalizado é intermediário da PMT, e
@@ -1372,10 +1417,11 @@ function pagamentosParcelados(
   c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' | 'ate_marco' | 'carteira_pos_marco' }>,
   safra: number,
   valorContratado: number,
+  parte: number,
 ): PagamentoSafra[] {
-  if (c.tipo === 'prazo_fixo') return pagamentosPrazoFixo(c, safra, valorContratado);
-  if (c.tipo === 'ate_marco') return pagamentosAteMarco(c, safra, valorContratado);
-  return pagamentosCarteiraPosMarco(c, safra, valorContratado);
+  if (c.tipo === 'prazo_fixo') return pagamentosPrazoFixo(c, safra, valorContratado, parte);
+  if (c.tipo === 'ate_marco') return pagamentosAteMarco(c, safra, valorContratado, parte);
+  return pagamentosCarteiraPosMarco(c, safra, valorContratado, parte);
 }
 
 /** O sinal do componente parcelado — a carteira própria não tem sinal. */
@@ -1433,13 +1479,15 @@ export function carteiraSaldoSafra(
   c: ComponentePagamento,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): SaldoSafra[] {
   if (c.tipo === 'imediato') return [];
 
   if (c.tipo === 'concentrado') {
-    const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
+    const pagamentos = pagamentosConcentrado(c, safra, valorContratado, parte);
     if (pagamentos.length === 0) return [];
-    const principal = round2(valorContratado * (c.participacaoPct / 100));
+    const principal = parte;
     // Repasse no próprio mês da safra: pago e liquidado em `s`, sem saldo.
     if (c.mesPagamento === safra) return [{ safra, mes: safra, saldo: 0 }];
     const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
@@ -1451,10 +1499,10 @@ export function carteiraSaldoSafra(
     return out;
   }
 
-  const pagamentos = pagamentosParcelados(c, safra, valorContratado);
+  const pagamentos = pagamentosParcelados(c, safra, valorContratado, parte);
   if (pagamentos.length === 0) return [];
 
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   const sinal = round2(valor * (sinalPctDe(c) / 100));
   const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
@@ -1515,21 +1563,23 @@ export function jurosSafra(
   c: ComponentePagamento,
   safra: number,
   valorContratado: number,
+  /** #824: parte já resolvida por `partesDaSafra`; sem ela, a fatia isolada. */
+  parte: number = round2(valorContratado * (c.participacaoPct / 100)),
 ): number {
   if (c.tipo === 'imediato') return 0;
   if (c.taxaMensal === 0) return 0;
 
   if (c.tipo === 'concentrado') {
-    const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
+    const pagamentos = pagamentosConcentrado(c, safra, valorContratado, parte);
     if (pagamentos.length === 0) return 0;
-    const principal = round2(valorContratado * (c.participacaoPct / 100));
+    const principal = parte;
     return round2(pagamentos[0].valor - principal);
   }
 
-  const pagamentos = pagamentosParcelados(c, safra, valorContratado);
+  const pagamentos = pagamentosParcelados(c, safra, valorContratado, parte);
   if (pagamentos.length === 0) return 0;
 
-  const valor = valorContratado * (c.participacaoPct / 100);
+  const valor = parte;
   const sinal = round2(valor * (sinalPctDe(c) / 100));
   const principal = round2(valor - sinal);
   const totalParcelas = round2(pagamentos
@@ -1553,20 +1603,21 @@ export function receitaBrutaSafra(
   safra: number,
   valorContratado: number,
 ): number {
+  const partes = partesDaSafra(componentes, valorContratado);
   if (componentes.every((c) => c.tipo === 'imediato' || c.taxaMensal === 0)) {
     const descontos = componentes
-      .filter((c): c is Extract<ComponentePagamento, { tipo: 'imediato' }> => c.tipo === 'imediato')
-      .reduce((total, c) => total + valorContratado * (c.participacaoPct / 100) * (c.descontoPct / 100), 0);
+      .reduce((total, c, i) => (c.tipo === 'imediato' ? total + partes[i] * (c.descontoPct / 100) : total), 0);
     return round2(valorContratado - descontos);
   }
   let total = 0;
-  for (const c of componentes) {
+  for (let i = 0; i < componentes.length; i++) {
+    const c = componentes[i];
     if (c.tipo === 'imediato') {
-      total += valorContratado * (c.participacaoPct / 100) * (1 - c.descontoPct / 100);
+      total += partes[i] * (1 - c.descontoPct / 100);
     } else if (c.tipo === 'concentrado') {
-      total += pagamentosConcentrado(c, safra, valorContratado).reduce((s, p) => s + p.valor, 0);
+      total += pagamentosConcentrado(c, safra, valorContratado, partes[i]).reduce((s, p) => s + p.valor, 0);
     } else {
-      const pagamentos = pagamentosParcelados(c, safra, valorContratado);
+      const pagamentos = pagamentosParcelados(c, safra, valorContratado, partes[i]);
       total += pagamentos.reduce((s, p) => s + p.valor, 0);
     }
   }
@@ -1794,16 +1845,16 @@ function pagamentosComponenteSafra(
   componente: ComponentePagamento,
   safra: number,
   valorContratado: number,
+  parte: number,
 ): PagamentoSafra[] {
   if (componente.tipo === 'imediato') {
-    const valor = round2(valorContratado * (componente.participacaoPct / 100)
-      * (1 - componente.descontoPct / 100));
+    const valor = round2(parte * (1 - componente.descontoPct / 100));
     return valor > 0 ? [{ safra, mes: safra, tipo: 'parcela', valor }] : [];
   }
-  if (componente.tipo === 'prazo_fixo') return pagamentosPrazoFixo(componente, safra, valorContratado);
-  if (componente.tipo === 'ate_marco') return pagamentosAteMarco(componente, safra, valorContratado);
-  if (componente.tipo === 'carteira_pos_marco') return pagamentosCarteiraPosMarco(componente, safra, valorContratado);
-  return pagamentosConcentrado(componente, safra, valorContratado);
+  if (componente.tipo === 'prazo_fixo') return pagamentosPrazoFixo(componente, safra, valorContratado, parte);
+  if (componente.tipo === 'ate_marco') return pagamentosAteMarco(componente, safra, valorContratado, parte);
+  if (componente.tipo === 'carteira_pos_marco') return pagamentosCarteiraPosMarco(componente, safra, valorContratado, parte);
+  return pagamentosConcentrado(componente, safra, valorContratado, parte);
 }
 
 /**
@@ -1850,7 +1901,9 @@ export function calcularRecebiveisComponentes(
     if (contratacao.valorContratado <= 0) continue;
     const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega, residuoAteMarco);
     const aposChaves = ehVendaAposChaves(contratacao.safra, mesEntrega);
-    for (const componente of efetivos) {
+    const partes = partesDaSafra(efetivos, contratacao.valorContratado);
+    for (const [idx, componente] of efetivos.entries()) {
+      const parte = partes[idx];
       // Repasse antecipado para a venda (`componentesEfetivosSafra`): entra à
       // vista, fora da série de repasse e da carteira a repassar.
       const antecipado = componente.tipo === 'concentrado' && componente.antecipadoParaVenda === true;
@@ -1863,12 +1916,12 @@ export function calcularRecebiveisComponentes(
         ? 'tabelaCurta' : componente.tipo === 'ate_marco'
           ? 'tabelaLongaObra' : componente.tipo === 'carteira_pos_marco'
             ? 'carteiraPropria' : componente.tipo === 'concentrado' && !antecipado ? 'saldoARepassar' : null;
-      const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado);
-      const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado);
+      const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado, parte);
+      const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado, parte);
       const pagamentosComJuros = pagamentos.filter((p) => p.tipo !== 'sinal');
       const saldos = componente.tipo === 'imediato'
         ? new Map<number, number>()
-        : new Map(carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)
+        : new Map(carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado, parte)
           .map((p) => [p.mes, p.saldo]));
       let jurosAlocados = 0;
       // #789: a parcela que vence no próprio mês da contratação (defasagem 0)
@@ -1927,7 +1980,7 @@ export function calcularRecebiveisComponentes(
       }
 
       if (componente.tipo !== 'imediato') {
-        for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
+        for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado, parte)) {
           deposita(carteira, ponto.mes, ponto.saldo);
           if (chaveCarteira) deposita(carteiraPorComponenteMensal[chaveCarteira], ponto.mes, ponto.saldo);
         }
@@ -2000,13 +2053,14 @@ export function consolidarCarteiraClientes(
 
   for (const contratacao of contratacoes) {
     const efetivos = componentesEfetivosSafra(componentes, contratacao.safra, mesEntrega);
-    for (const componente of efetivos) {
+    const partes = partesDaSafra(efetivos, contratacao.valorContratado);
+    for (const [idx, componente] of efetivos.entries()) {
       if (componente.tipo === 'imediato') continue;
       const campo: keyof Parcial = componente.tipo === 'prazo_fixo'
         ? 'prazoFixo'
         : componente.tipo === 'ate_marco' ? 'ateMarco'
           : componente.tipo === 'carteira_pos_marco' ? 'carteiraPropria' : 'concentrado';
-      for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
+      for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado, partes[idx])) {
         const atual = porMes.get(ponto.mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0, carteiraPropria: 0 };
         atual[campo] = round2(atual[campo] + ponto.saldo);
         porMes.set(ponto.mes, atual);
