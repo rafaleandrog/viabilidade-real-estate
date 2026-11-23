@@ -245,7 +245,7 @@ test('#442 ir PARA rs dispensa a grandeza — o canônico já é R$', () => {
 // os anteriores paravam em `camposDaTrocaDeUnidade` e nunca chegavam ao motor.
 
 test('#442 critério 3: o motor lê o MESMO dinheiro antes e depois da troca', () => {
-  const ctxMotor = { areaPrivativaTotal: 4_000, areaTerreno: 2_500, vgvTotal: 171_448_400 };
+  const ctxMotor = { areaPrivativaTotal: 4_000, areaTerreno: 2_500, vgvTotal: 171_448_400, vgvVendavel: 171_448_400 };
   const antes = { orcamento_unidade: 'pct_vgv', orcamento_valor: 0.24, orcamento_valor_canonico: 411_476.16 };
   const depois = {
     ...antes,
@@ -364,7 +364,7 @@ test('#514 ida e volta: digitar 10 sob "% Obra" grava R$ 5.000.000, e resolverCu
   assert.equal(canonico, 5_000_000);
   const total = resolverCustoTotal(
     { orcamento_unidade: 'pct_obra', orcamento_valor: 10, orcamento_valor_canonico: canonico },
-    { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, totalObra: 50_000_000 },
+    { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, vgvVendavel: 0, totalObra: 50_000_000 },
   );
   assert.equal(total, 5_000_000);
 });

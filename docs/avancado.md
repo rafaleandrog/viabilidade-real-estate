@@ -67,7 +67,10 @@ curva de absorção; três linhas não escolhem — a corretagem sai no mês da 
 entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
 consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
 
-As unidades em % diferem na base. **% da receita** é o VGV vendável (sem as unidades da permuta física) líquido do imposto, sem juros; **% do
+As unidades em % diferem na base. **% do VGV** incide sobre o VGV **vendável** — o VGV potencial
+menos as unidades da permuta física, que são entregues e não vendidas —, e a **corretagem** de vendas
+usa sempre essa mesma base: não existe controle para cobrá-la também sobre a permuta física.
+**% da receita** é o VGV vendável (sem as unidades da permuta física) líquido do imposto, sem juros; **% do
 recebido** é o que de fato entra em caixa, com os juros de tabela — oferecido no marketing, na
 manutenção pós-obra, no marketing global, na gestão e no Outro dos custos diretos e indiretos. **% da obra** é o grupo Obras inteiro, outorga
 e contingência inclusas; **% da construção** é só construção, decoração e gestão da obra — oferecido
