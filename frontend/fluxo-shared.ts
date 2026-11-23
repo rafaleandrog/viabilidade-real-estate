@@ -1350,3 +1350,6 @@ export function impostoDoEstudoAvancado(params: any): ImpostoReceita | undefined
   }
   return { regime: 'padrao', ativo: true, pct: pctOu(params.imposto_percentual, 0) };
 }
+
+/** #834: teto de uma alíquota de imposto sobre a receita, em %. O piso é 0. */
+export const TETO_ALIQUOTA_IMPOSTO = 100;
