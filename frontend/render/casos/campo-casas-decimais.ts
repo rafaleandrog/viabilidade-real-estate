@@ -28,6 +28,8 @@ export interface MedidaCasasCampo {
   repousoDepoisDeDigitar: string;
   focoCasas4: string;
   repousoCasas4: string;
+  repousoTexto: string;
+  focoTexto: string;
 }
 
 export const caso = {
@@ -117,7 +119,20 @@ export const caso = {
     await largo.updateComplete;
     const focoCasas4 = inL.value;
 
+    // Decimal persistido que chega como TEXTO (o Lit não converte a
+    // propriedade): o campo não pode abrir vazio.
+    const texto = document.createElement('viab-num') as any;
+    texto.valor = '1500000.456';
+    raiz.appendChild(texto);
+    await texto.updateComplete;
+    const inT = texto.shadowRoot!.querySelector('input') as HTMLInputElement;
+    const repousoTexto = inT.value;
+    inT.dispatchEvent(new FocusEvent('focus'));
+    await texto.updateComplete;
+    const focoTexto = inT.value;
+
     return {
+      repousoTexto, focoTexto,
       repouso, foco, depoisDoBlur, eventoSemDigitar, canonicoDepois,
       digitado, valorEmitido, repousoDepoisDeDigitar, focoCasas4, repousoCasas4,
     };

@@ -36,4 +36,8 @@ test('viab-num: valor derivado mostra no máximo 2 casas em repouso e no foco, e
   // `casas-decimais` acima de 2 não fura o teto.
   assert.equal(m!.repousoCasas4, '33,33', relato(a));
   assert.equal(m!.focoCasas4, '33,33', relato(a));
+
+  // Decimal persistido que chega como texto continua aparecendo.
+  assert.equal(m!.repousoTexto, '1.500.000,46', relato(a));
+  assert.equal(m!.focoTexto, '1500000,46', relato(a));
 });

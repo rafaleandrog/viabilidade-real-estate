@@ -309,4 +309,11 @@ test('campo de formulário: no máximo 2 casas em repouso e na edição, qualque
   assert.equal(textoCampoEdicao(-0.001, 2), '0');
   assert.equal(textoCampoRepouso(-0.004, 2, 2), '0,00');
   assert.equal(textoCampoEdicao(-12.345, 2), '-12,35');
+  // Decimal persistido chega do banco como texto (Funding repassa o valor cru).
+  assert.equal(textoCampoRepouso('1500000.00', 2), '1.500.000');
+  assert.equal(textoCampoEdicao('1500000.00', 2), '1500000');
+  assert.equal(textoCampoEdicao('12.3456', 2), '12,35');
+  assert.equal(textoCampoRepouso('', 2), '');
+  assert.equal(textoCampoRepouso('abc', 2), '');
+  assert.equal(textoCampoRepouso(undefined, 2), '');
 });

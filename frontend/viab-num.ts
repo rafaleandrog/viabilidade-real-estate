@@ -108,11 +108,11 @@ export class ViabNum extends LitElement {
   // `valor` continua exato e só o que a pessoa digita o substitui (focar e
   // sair sem digitar não emite evento). Com piso de casas (#177), o foco
   // completa com zeros — "1,2" edita como "1,20".
-  private _fmtAgrupado(v: number | null): string {
+  private _fmtAgrupado(v: unknown): string {
     return textoCampoRepouso(v, this.casasDecimais, this.casasMinimas);
   }
 
-  private _paraEdicao(v: number | null): string {
+  private _paraEdicao(v: unknown): string {
     return textoCampoEdicao(v, this.casasDecimais, this.casasMinimas);
   }
 

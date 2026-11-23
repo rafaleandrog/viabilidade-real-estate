@@ -307,14 +307,31 @@ function casasDoCampo(casasDecimais: number, casasMinimas: number): { max: numbe
   return { max, min };
 }
 
+/**
+ * O número que o campo vai exibir. O `valor` de um `viab-num` chega como o
+ * consumidor o repassa, e o Lit não converte o tipo quando a PROPRIEDADE é
+ * atribuída (o `type: Number` só vale para atributo): decimal persistido pode
+ * vir do banco como texto (`"1500000.00"`, ponto decimal). Texto numérico
+ * válido vira número; vazio, `null` e o resto ficam sem número.
+ */
+function numeroDoCampo(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 // Zero negativo pós-arredondamento (-0,001 → "-0") não é um valor: sai "0".
 function semZeroNegativoTexto(s: string): string {
   return /^-[0,.]*$/.test(s) ? s.slice(1) : s;
 }
 
 /** Texto do campo em REPOUSO: agrupado (1.234,57), no máximo 2 casas. */
-export function textoCampoRepouso(v: number | null, casasDecimais: number, casasMinimas = 0): string {
-  if (v == null || !Number.isFinite(v)) return '';
+export function textoCampoRepouso(valor: unknown, casasDecimais: number, casasMinimas = 0): string {
+  const v = numeroDoCampo(valor);
+  if (v == null) return '';
   const { max, min } = casasDoCampo(casasDecimais, casasMinimas);
   return semZeroNegativoTexto(new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: min, maximumFractionDigits: max,
@@ -324,10 +341,12 @@ export function textoCampoRepouso(v: number | null, casasDecimais: number, casas
 /**
  * Texto do campo ao GANHAR FOCO: sem separador de milhar (o `parseNumeroBR`
  * trata "." como milhar e o descartaria), vírgula decimal, no máximo 2 casas.
- * Antes o foco mostrava `String(v)` — a dízima inteira de um valor derivado.
+ * Antes, nos campos sem `casas-minimas`, o foco mostrava `String(v)` — a
+ * dízima inteira de um valor derivado.
  */
-export function textoCampoEdicao(v: number | null, casasDecimais: number, casasMinimas = 0): string {
-  if (v == null || !Number.isFinite(v)) return '';
+export function textoCampoEdicao(valor: unknown, casasDecimais: number, casasMinimas = 0): string {
+  const v = numeroDoCampo(valor);
+  if (v == null) return '';
   const { max, min } = casasDoCampo(casasDecimais, casasMinimas);
   return semZeroNegativoTexto(new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: min, maximumFractionDigits: max, useGrouping: false,

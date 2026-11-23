@@ -15,6 +15,8 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Só exibição: o valor do campo segue exato, focar e sair sem digitar não emite evento, e o que se
   digita não é cortado. Caso de render `campo-casas-decimais` mede o foco no DOM real; apagar o
   conserto no componente deixa o caso vermelho com `166,66666666666669`.
+- Decimal persistido que chega como texto (o Lit não converte a propriedade; o Funding repassa o
+  valor cru) continua aparecendo: `numeroDoCampo` converte texto numérico válido antes de formatar.
 - `docs/formulas.md` § Estado de conformidade descreve a regra.
 
 ## 2026-11-23 — Imposto do Avançado, fatia 3 de 3: guias e aviso do regime oculto (fecha a issue 834)
