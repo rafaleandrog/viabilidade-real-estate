@@ -25,7 +25,7 @@ import {
   type FundingCalc, type FundingNoFluxo, type OperacaoFunding, type SerieOperacao,
 } from './funding-motor.js';
 import {
-  validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita, validarReconciliacaoCamadas,
+  validarFluxoCalc, validarImposto, validarProduto, validarContratacao, validarSafrasReceita, validarReconciliacaoCamadas,
   validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
   permutaFisicaDerivadaCatalogo, TOLERANCIA_PADRAO,
   type Divergencia, type PermutaFisicaTipologia,
@@ -497,6 +497,7 @@ export class ViabFluxoVer extends LitElement {
         Number(this.estudo?.juros_tabela_aa_padrao) || 0,
       ),
       ...validarFluxoCalc(this.calc),
+      ...validarImposto(d.ret),
       // #441: reconciliação Catálogo × Premissas — só emite algo em estudo
       // `nivel_analise === 'avancado'`.
       ...validarReconciliacaoCamadas(this.estudo, d.custos, d.tipologias),

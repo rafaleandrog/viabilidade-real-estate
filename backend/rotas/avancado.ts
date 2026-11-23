@@ -3,7 +3,7 @@ import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador, leituraBloqueadaPorStatus, type ExecutorDados } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
-import { eSemeaduraObrigatoria, pctPosChavesDerivado } from '../../frontend/fluxo-shared.js';
+import { eSemeaduraObrigatoria, pctPosChavesDerivado, TETO_ALIQUOTA_IMPOSTO } from '../../frontend/fluxo-shared.js';
 import { erroComponentePagamento, erroDestinoSaldoChaves } from '../../frontend/fluxo-pagamento-contrato.js';
 import { espelhoDescreveComponentes, fluxoPagamentoParaSalvar, planoDeNascimento } from '../../frontend/fluxo-pagamento-editor.js';
 import { normalizarLinhasPagamento } from '../../frontend/fluxo-caixa-motor.js';
@@ -591,6 +591,7 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
       }
       dados.ret_pct = t;
     }
+    if (req.body.imposto_percentual !== undefined && (dados.imposto_percentual = aliquotaImpostoDoCorpo(req.body.imposto_percentual)) === null) { erro(res, 400, 'IMPOSTO_PCT_INVALIDO', `imposto_percentual deve ser um percentual entre 0 e ${TETO_ALIQUOTA_IMPOSTO}`); return; }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
 
     const atualizado = await req.dados!.atualizar('estudos', estudo.id, dados);
@@ -2442,4 +2443,16 @@ export function impostoPercentualDaRota(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const t = typeof v === 'string' ? numeroEstrito(v) : (typeof v === 'number' && Number.isFinite(v) ? v : null);
   return t;
+}
+
+/**
+ * #834: `imposto_percentual` no PATCH dos parâmetros do Avançado — a alíquota
+ * do imposto padrão, que o motor deduz da receita recebida fora do RET. Parser
+ * único (`numeroEstrito`, armadilha 14): número entre 0 e o teto, ou `null`
+ * para o handler recusar. `null` no corpo também é recusado: o regime padrão
+ * sem alíquota é "imposto zero", e quem quer zero manda `0`.
+ */
+export function aliquotaImpostoDoCorpo(v: unknown): number | null {
+  const t = numeroEstrito(v);
+  return t === null || t < 0 || t > TETO_ALIQUOTA_IMPOSTO ? null : t;
 }
