@@ -65,6 +65,32 @@ export function erroAliquotaImposto(v: unknown): string | null {
 }
 
 /**
+ * Erro do rascunho inteiro: as DUAS alíquotas são gravadas, então uma inválida
+ * no regime que não está à vista também barra o Salvar (senão o PATCH volta
+ * 400 e a tela só mostra o aviso).
+ */
+export function erroFormImposto(form: FormImposto): string | null {
+  return erroAliquotaImposto(form.padraoPct) ?? erroAliquotaImposto(form.retPct);
+}
+
+/**
+ * Colunas de `estudos` que o PATCH devolveu, para a tela do estudo atualizar o
+ * seu `estudo` (eventos `viab:premissas-change`/`-salvas`). Sem isso, a aba
+ * Viabilidade › Financeiro guardava o `imposto_percentual` antigo e o
+ * regravava no próximo Salvar dela.
+ */
+export function dadosEstudoDoImpostoSalvo(res: any): {
+  considerar_ret: boolean; ret_pct: number; imposto_percentual: number | null;
+} {
+  return {
+    considerar_ret: res?.considerar_ret === true,
+    ret_pct: Number(res?.ret_pct),
+    imposto_percentual: res?.imposto_percentual === null || res?.imposto_percentual === undefined
+      ? null : Number(res.imposto_percentual),
+  };
+}
+
+/**
  * O corpo do `PATCH /estudos/:id/avancado/parametros`. Grava as duas
  * alíquotas sempre: quem troca de regime e volta encontra o valor que deixou.
  */

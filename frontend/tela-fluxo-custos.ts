@@ -17,7 +17,8 @@ import {
 } from './viabilidade-api.js';
 import { calcularFluxo, vgvVendavelPorLinha, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
-  OPCOES_REGIME_IMPOSTO, aliquotaDoRegime, erroAliquotaImposto, formImpostoAlterado, formImpostoDeParametros,
+  OPCOES_REGIME_IMPOSTO, aliquotaDoRegime, dadosEstudoDoImpostoSalvo, erroAliquotaImposto, erroFormImposto,
+  formImpostoAlterado, formImpostoDeParametros,
   patchImpostoAvancado, rotuloAliquotaImposto, type FormImposto, type RegimeImposto,
 } from './imposto-regime.js';
 import { converterUnidade, dadosDaTrocaDeUnidade, numeroDaColuna, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
@@ -589,6 +590,7 @@ export class ViabFluxoCustos extends LitElement {
     const dis = !this.editavel;
     const f = this.impostoForm;
     const erro = erroAliquotaImposto(aliquotaDoRegime(f));
+    const erroForm = erroFormImposto(f);
     return html`
       <div class="ret-box">
         <urbi-select
@@ -607,7 +609,7 @@ export class ViabFluxoCustos extends LitElement {
         ></viab-num>
         ${!dis ? html`
           <urbi-botao variante="secundario" pequeno ?carregando=${this.salvandoImposto}
-            ?desabilitado=${!!erro || !formImpostoAlterado(this.impostoForm, this.impostoSalvo)}
+            ?desabilitado=${!!erroForm || !formImpostoAlterado(this.impostoForm, this.impostoSalvo)}
             @click=${this._salvarImposto}>Salvar</urbi-botao>` : nothing}
       </div>
     `;
@@ -1113,11 +1115,18 @@ export class ViabFluxoCustos extends LitElement {
   // tela-fluxo-cronograma.ts, para a base `% Receita` e o Fluxo de Avanço
   // da Obra (`_calcObra`) refletirem o novo valor na hora.
   private async _salvarImposto() {
-    if (erroAliquotaImposto(aliquotaDoRegime(this.impostoForm))) return;
+    if (erroFormImposto(this.impostoForm)) return;
     this.salvandoImposto = true;
     try {
       const res = await atualizarParametrosAvancado(this.estudo.id, patchImpostoAvancado(this.impostoForm));
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // As colunas gravadas sobem para a tela do estudo, pelo mesmo canal da aba
+      // Financeiro: sem isso ela guardava o `imposto_percentual` antigo e o
+      // regravava no próximo Salvar dela (achado da revisão do PR 948).
+      const dados = dadosEstudoDoImpostoSalvo(res);
+      this.estudo = { ...this.estudo, ...dados };
+      this.dispatchEvent(new CustomEvent('viab:premissas-change', { detail: { dados }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent('viab:premissas-salvas', { detail: { dados }, bubbles: true, composed: true }));
       await this._carregar();
       urbiVerso.notificar('Imposto salvo.', 'sucesso');
     } catch (e: any) {

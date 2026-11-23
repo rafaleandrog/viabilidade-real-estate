@@ -30,8 +30,17 @@ test('#834 Custos › Financeiro: regime do imposto vem da rota, troca e salva c
   // Trocar o regime troca o rótulo e mostra a alíquota do RET, sem perder a outra.
   assert.equal(m!.rotuloDepoisDeTrocar, 'Alíquota do RET', relato(a));
   assert.equal(m!.aliquotaDepoisDeTrocar, 4, relato(a));
-  assert.deepEqual(m!.patch, { considerar_ret: true, ret_pct: 4, imposto_percentual: 6.73 },
+  // As DUAS alíquotas são gravadas: inválida no regime oculto barra o Salvar.
+  assert.equal(m!.salvarDesabilitadoComOutraInvalida, true, 'Salvar habilitado com alíquota padrão −5 %' + relato(a));
+  assert.equal(m!.salvarDesabilitadoValido, false, relato(a));
+  assert.deepEqual(m!.patch, { considerar_ret: true, ret_pct: 4, imposto_percentual: 5 },
     'o Salvar não mandou o PATCH com o regime e as duas alíquotas' + relato(a));
+  // O que o servidor gravou sobe para a tela do estudo, pelos dois eventos.
+  const gravado = { considerar_ret: true, ret_pct: 4, imposto_percentual: 5 };
+  assert.deepEqual(m!.eventos, [
+    { tipo: 'viab:premissas-change', dados: gravado },
+    { tipo: 'viab:premissas-salvas', dados: gravado },
+  ], 'a tela do estudo não soube do imposto salvo — a aba Financeiro regravaria o antigo' + relato(a));
 
   // Base `% Receita` com permuta física, medida antes da troca (imposto padrão
   // 6,73 %): a da tela é a do motor — 8 unidades vendáveis de R$ 1.000.000

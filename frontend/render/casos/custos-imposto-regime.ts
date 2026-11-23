@@ -4,8 +4,12 @@
 //  · os parâmetros chegam pela API (`GET /avancado/parametros`) e viram o
 //    seletor de regime e a alíquota — sem `forcarEstado` no meio;
 //  · fora do RET o controle não fala em RET;
+//  · alíquota inválida no regime que NÃO está à vista também desabilita o
+//    Salvar (as duas são gravadas);
 //  · trocar o regime e clicar Salvar manda o PATCH com o regime e as DUAS
-//    alíquotas;
+//    alíquotas, e as colunas gravadas sobem para a tela do estudo
+//    (`viab:premissas-change`/`-salvas`) — senão a aba Viabilidade ›
+//    Financeiro regravava o valor antigo;
 //  · a base `% Receita` da tela (`_ctx().receitaTotal`) é a mesma do motor
 //    com permuta física — o VGV vendável, não o total.
 //
@@ -65,12 +69,16 @@ export interface MedidaImpostoRegime {
   rotuloDepoisDeTrocar: string;
   aliquotaDepoisDeTrocar: unknown;
   patch: unknown;
+  salvarDesabilitadoComOutraInvalida: boolean;
+  salvarDesabilitadoValido: boolean;
+  eventos: { tipo: string; dados: unknown }[];
   receitaTotalTela: number | undefined;
   receitaTotalMotor: number;
   receitaTotalVgvTotal: number;
 }
 
 const patches: unknown[] = [];
+const eventos: { tipo: string; dados: unknown }[] = [];
 
 export const caso = {
   nome: 'custos-imposto-regime',
@@ -115,6 +123,9 @@ export const caso = {
       editavel: true,
       grupo: 'financeiro',
     });
+    for (const tipo of ['viab:premissas-change', 'viab:premissas-salvas']) {
+      raiz.addEventListener(tipo, (e: Event) => eventos.push({ tipo, dados: (e as CustomEvent).detail?.dados }));
+    }
     raiz.appendChild(el);
     for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, 0));
@@ -138,14 +149,30 @@ export const caso = {
       ...((select()?.opcoes ?? []) as any[]).filter((o) => o.valor === select()?.valor).map((o) => o.rotulo),
     ].join(' ');
 
-    // Troca para RET pelo evento do primitivo, como o usuário faria.
-    select().dispatchEvent(new CustomEvent('urbi:select-change', { detail: { valor: 'ret' }, bubbles: true, composed: true }));
-    await tela.updateComplete;
+    // Pelos eventos dos primitivos, como o usuário faria.
+    const regime = async (valor: string) => {
+      select().dispatchEvent(new CustomEvent('urbi:select-change', { detail: { valor }, bubbles: true, composed: true }));
+      await tela.updateComplete;
+    };
+    const digitar = async (valor: number) => {
+      num().dispatchEvent(new CustomEvent('urbi:input-numero-change', { detail: { valor }, bubbles: true, composed: true }));
+      await tela.updateComplete;
+    };
+    const botao = () => caixa().querySelector('urbi-botao') as HTMLElement;
+
+    // Alíquota padrão inválida, e o regime trocado para RET: o Salvar continua barrado.
+    await digitar(-5);
+    await regime('ret');
     const rotuloDepoisDeTrocar = String(num()?.label ?? '');
     const aliquotaDepoisDeTrocar = num()?.valor;
+    const salvarDesabilitadoComOutraInvalida = botao().hasAttribute('desabilitado');
 
-    // Salvar: o botão da caixa.
-    (caixa().querySelector('urbi-botao') as HTMLElement).click();
+    // Corrige a alíquota padrão para 5 e volta ao RET: agora salva.
+    await regime('padrao');
+    await digitar(5);
+    await regime('ret');
+    const salvarDesabilitadoValido = botao().hasAttribute('desabilitado');
+    botao().click();
     for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, 0));
       await tela.updateComplete;
@@ -162,6 +189,9 @@ export const caso = {
       regimeInicial, rotuloInicial, aliquotaInicial, textoCaixaInicial,
       rotuloDepoisDeTrocar, aliquotaDepoisDeTrocar,
       patch: patches.at(-1),
+      salvarDesabilitadoComOutraInvalida,
+      salvarDesabilitadoValido,
+      eventos,
       receitaTotalTela,
       receitaTotalMotor: (linhaPctReceita?.total ?? 0) / 0.01,
       receitaTotalVgvTotal: vgvLinha(RECEITA.tipologias) * (1 - 0.0673),

@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import {
-  OPCOES_REGIME_IMPOSTO, TETO_ALIQUOTA_IMPOSTO, aliquotaDoRegime, erroAliquotaImposto, formImpostoAlterado,
+  OPCOES_REGIME_IMPOSTO, TETO_ALIQUOTA_IMPOSTO, aliquotaDoRegime, dadosEstudoDoImpostoSalvo, erroAliquotaImposto,
+  erroFormImposto, formImpostoAlterado,
   formImpostoDeParametros, patchImpostoAvancado, rotuloAliquotaImposto,
 } from './imposto-regime.js';
 import { calcularFluxo, receitaTotalBaseCusto, vgvVendavelPorLinha, type FluxoConfig } from './fluxo-caixa-motor.js';
@@ -56,6 +57,19 @@ test('#834 erroAliquotaImposto: só percentual entre 0 e o teto', () => {
   for (const v of [-0.01, 100.01, NaN, Infinity, null, undefined, '7']) {
     assert.match(String(erroAliquotaImposto(v)), /entre 0 e 100/, String(v));
   }
+});
+
+test('#834 erroFormImposto: alíquota inválida no regime oculto também barra o Salvar', () => {
+  assert.equal(erroFormImposto({ regime: 'ret', retPct: 4, padraoPct: 7 }), null);
+  assert.match(String(erroFormImposto({ regime: 'ret', retPct: 4, padraoPct: -5 })), /entre 0 e 100/);
+  assert.match(String(erroFormImposto({ regime: 'padrao', retPct: 101, padraoPct: 7 })), /entre 0 e 100/);
+});
+
+test('#834 dadosEstudoDoImpostoSalvo: as colunas que sobem para a tela do estudo', () => {
+  assert.deepEqual(dadosEstudoDoImpostoSalvo({ considerar_ret: true, ret_pct: 4, imposto_percentual: 5, data_inicio_projeto: 'jan/2027' }),
+    { considerar_ret: true, ret_pct: 4, imposto_percentual: 5 });
+  assert.deepEqual(dadosEstudoDoImpostoSalvo({ considerar_ret: false, ret_pct: '4.00', imposto_percentual: null }),
+    { considerar_ret: false, ret_pct: 4, imposto_percentual: null });
 });
 
 test('#834 fora do RET o controle não fala em RET', () => {
