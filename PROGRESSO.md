@@ -18,6 +18,12 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Medição na Pinguim (só leitura, estudos Avançado 21, 22, 40 e 41): 24 linhas `pct_vgv`, todas já
   com canônico nulo; efeito da migração nestes estudos: R$ 0. Entra junto com a fatia 1, senão o R$
   recalculado usa a base antiga até ela entrar.
+- Rodada 1 de revisão: o rótulo do seletor de base financiável do Funding (`dinheiroParaRotulo`)
+  passa a resolver o R$ da linha `pct_vgv` sem canônico pela mesma conta do motor
+  (`resolverCustoTotal`), com um contexto montado de `calc`; antes mostraria "—" depois da migração.
+  O harness ganhou a contagem de escritas da `043` isolada (2 na 1ª passada, 0 na 2ª), que dá dente
+  à linha já sem canônico. Registradas no PR: ordem de merge (a fatia 1 antes ou junto, na mesma
+  release), a precisão de 2 casas do % gravado e o dado legado anterior à correção da coluna única.
 
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 

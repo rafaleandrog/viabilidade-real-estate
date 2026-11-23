@@ -38,7 +38,7 @@ descricao: ADR do modelo de Capital Stack (4 instrumentos com waterfall), supers
 > vier depois a nem tentar.
 >
 > **O mecanismo existe e é o suportado hoje:** tirar a tabela do `schema.json` e esvaziá-la com
-> `dados.limparTabela` (`scripts/migracoes-harness.mjs:340-348`), deixando a **poda do
+> `dados.limparTabela` (`scripts/migracoes-harness.mjs:391-396`), deixando a **poda do
 > reconciliador** derrubar a estrutura vazia no mesmo boot. É literalmente o que o job
 > `migracao-declarativa` deste repositório manda fazer (`.github/workflows/pr-guards.yml:216`), e o
 > `shell_min` do manifesto está acima dos pisos que esse fluxo exige

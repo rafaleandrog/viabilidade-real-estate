@@ -1217,7 +1217,11 @@ export function vgvVendidoVendavelMensal(
  * unidade é `rs`; nas demais devolve `null`, para o chamador não afirmar um
  * número que não sabe.
  */
-export function dinheiroParaRotulo(custo: any, calcLinhas: Array<{ id: any; total: number }>): number | null {
+export function dinheiroParaRotulo(
+  custo: any,
+  calcLinhas: Array<{ id: any; total: number }>,
+  ctx?: ContextoCusto,
+): number | null {
   const doMotor = (calcLinhas ?? []).find((l) => l.id === custo?.id);
   if (doMotor) return doMotor.total;
   const canonico = custo?.orcamento_valor_canonico;
@@ -1225,6 +1229,13 @@ export function dinheiroParaRotulo(custo: any, calcLinhas: Array<{ id: any; tota
     return Number(canonico);
   }
   const bruto = custo?.orcamento_valor;
+  // Linha em % do VGV sem canônico (o que a migração deixa) e fora do motor:
+  // com o contexto, o R$ sai pela MESMA conta do motor (`resolverCustoTotal`),
+  // não por uma cópia da regra. Sem contexto, não afirma número.
+  if (ctx && custo?.orcamento_unidade === 'pct_vgv'
+    && bruto !== null && bruto !== undefined && bruto !== '' && Number.isFinite(Number(bruto))) {
+    return resolverCustoTotal(custo, ctx);
+  }
   if ((custo?.orcamento_unidade || 'rs') !== 'rs') return null;
   if (bruto === null || bruto === undefined || bruto === '' || !Number.isFinite(Number(bruto))) return null;
   return Number(bruto);

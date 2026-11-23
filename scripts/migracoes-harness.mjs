@@ -554,6 +554,27 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         if (!certo) erro(`043 — linha ${id} (${rotulo}) saiu errada`, new Error(`canônico=${l?.orcamento_valor_canonico}`));
         else ok(`043 — linha ${id}: ${rotulo}`);
       }
+
+      // Dente do ramo "já sem canônico" (106): ela nasce nula e exige nula, então
+      // a asserção por linha sozinha passa até com a migração apagada. O que a
+      // distingue é a CONTA DE ESCRITAS, medida isolando a `043` num banco próprio:
+      // só 101 e 107 têm canônico a anular — 106 não pode gerar escrita, e uma
+      // 2ª passada não escreve nada (idempotência). Comentar o `atualizar` zera a
+      // contagem; anular sempre a infla.
+      const m043 = lista.find((x) => x.arq.startsWith('043_'));
+      if (!m043) {
+        erro('043 não encontrada na cadeia', new Error('arquivo ausente'));
+      } else {
+        const iso = bancoFake(SEED);
+        await m043.fn({ dados: iso });
+        const n1 = iso.escritas.atualizar;
+        if (n1 !== 2) erro('043 — nº de escritas na 1ª passada', new Error(`esperado 2 (linhas 101 e 107), veio ${n1}`));
+        else ok('043 — 1ª passada escreve só nas 2 linhas com canônico a anular (106 não escreve)');
+        await m043.fn({ dados: iso });
+        const n2 = iso.escritas.atualizar - n1;
+        if (n2 !== 0) erro('043 — idempotência', new Error(`2ª passada escreveu ${n2} linha(s)`));
+        else ok('043 — 2ª passada não escreve nada');
+      }
     }
 
     // #585: a `037` faz o backfill de `estudos.juros_tabela_aa_padrao` a partir

@@ -437,6 +437,25 @@ test('#442 rótulo: sem canônico e em unidade derivada, NÃO afirma número', (
   assert.equal(dinheiroParaRotulo(custo, []), null);
 });
 
+test('#442 rótulo: % do VGV sem canônico (pós-migração) resolve o R$ pelo contexto, a mesma conta do motor', () => {
+  const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: null };
+  const ctxVgv = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 200_000_000 };
+  assert.equal(dinheiroParaRotulo(custo, [], ctxVgv), 10_000_000);
+  assert.equal(dinheiroParaRotulo(custo, [], ctxVgv), resolverCustoTotal(custo, ctxVgv));
+  // Unidade que não é % do VGV continua sem afirmar número, mesmo com contexto.
+  const obra = { id: 10, orcamento_unidade: 'pct_obra', orcamento_valor: '5', orcamento_valor_canonico: null };
+  assert.equal(dinheiroParaRotulo(obra, [], ctxVgv), null);
+});
+
+test('#442 rótulo: a tela de Funding passa o contexto ao rótulo (fiação)', () => {
+  // Sem o 3º argumento o seletor de base financiável volta a mostrar "—" para
+  // linha em % do VGV sem canônico, e nenhum teste de função pura enxerga.
+  const fonte = readFileSync(new URL('./tela-funding.ts', import.meta.url), 'utf8');
+  const chamadas = fonte.match(/dinheiroParaRotulo\([^)]*\)/g) ?? [];
+  assert.equal(chamadas.length, 1);
+  assert.match(chamadas[0], /dinheiroParaRotulo\(custo, [^,]+, ctx\)/);
+});
+
 test('#442 rótulo: permuta física tem os dois campos nulos, e não há dinheiro a mostrar', () => {
   // `backend/rotas/avancado.ts:1394-1397` zera os dois de propósito.
   const custo = { id: 3, orcamento_unidade: 'rs', orcamento_valor: null, orcamento_valor_canonico: null };

@@ -9,7 +9,7 @@ import {
   listarFundingOperacoes, criarFundingOperacao, atualizarFundingOperacao, removerFundingOperacao,
 } from './viabilidade-api.js';
 import { calcularFluxo, taxaDescontoOuPadrao, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { dinheiroParaRotulo, impostoDoEstudoAvancado, mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
+import { dinheiroParaRotulo, impostoDoEstudoAvancado, mesRepasse, rotuloMesRelativo, type ContextoCusto, type EventoCrono } from './fluxo-shared.js';
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao, indicadoresAntecipacao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
@@ -315,7 +315,15 @@ export class ViabFunding extends LitElement {
   // #442: este rótulo lia `orcamento_valor` cru — a mesma coluna que a issue
   // mostrou congelada. A decisão mora em `dinheiroParaRotulo`, pura e testada.
   private _rotuloValor(custo: any): string {
-    const v = dinheiroParaRotulo(custo, this.calc?.linhasCusto ?? []);
+    // Contexto só com o que o `% do VGV` lê: a base é a que o motor publica em
+    // `calc` (a mesma que `resolverCustoTotal` aplica nas linhas do motor).
+    const ctx = this.calc
+      ? ({
+        areaPrivativaTotal: 0, areaTerreno: 0,
+        vgvTotal: this.calc.vgvTotal, vgvVendavel: this.calc.vgvVendavel,
+      } as ContextoCusto)
+      : undefined;
+    const v = dinheiroParaRotulo(custo, this.calc?.linhasCusto ?? [], ctx);
     return v === null ? '—' : fmtR$(v);
   }
 
