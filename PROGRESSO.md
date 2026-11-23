@@ -15,8 +15,13 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   badges de Projetos sem `% VGV`; a lista passa a incluí-lo.
 - Caso de render novo `custos-projetos-pct-vgv`: badge `% VGV` na tela, R$ da coluna Resultado e
   base da conversão. Tirar `pct_vgv` da lista de Projetos deixa o caso vermelho.
-- Diferença medida: R$ 0. Leitura na Pinguim (estudos 21, 22, 40 e 41): nenhuma linha de Projetos
-  do Avançado está em `pct_vgv`.
+- Diferença medida: R$ 0 nos estudos lidos na Pinguim (21, 22, 40 e 41): nenhuma linha de Projetos
+  do Avançado está em `pct_vgv`. A rota de custos fixa `por_pagina: 500`, então a leitura não perdeu linhas.
+- Os formulários de `referencia/formularios/` e seus dois scripts (gerador e importador) espelham a
+  tabela de unidades da tela: Projetos passa a aceitar `pct_vgv` nos dois mapas, a nota e o rótulo
+  de "Cada 1% do VGV" deixam de dizer que Projetos não aceita. Os dois formulários Avançado foram
+  regerados pelo gerador (conteúdo das células conferido contra o gerador anterior: só as
+  validações de unidade e a nota mudam); os Preliminares não mudam.
 - Guia `docs/avancado.md` cita `% do VGV` em Projetos.
 
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
