@@ -383,6 +383,11 @@ export const CASOS: CasoBaseline[] = [
     // pago — o que muda é quando ele é pago, e o desconto do VPL enxerga isso.
     // Os DESALAVANCADOS (`resultado`, `margemPct`, `roiPct`) são os da #426/#521
     // (proforma desalavancada) e o clamp não os toca — são eixos independentes.
-    esperado: { resultado: 3_799_999.66, margemPct: 37.99999789199993, roiPct: 61.290317096774196, tir: 26.644417484686667, caixaFinalAlavancado: 4_389_999.67, vplLiquidoFunding: 1_027_362.61, fundingSaidas: 1_409_999.99 },
+    // #824 (resto da safra): o último componente de cada safra fica com o resto,
+    // e a soma das partes passa a ser exatamente o contratado — este é o caso com
+    // permuta, o único que arredondava +R$ 0,01 por safra. Mudam centavos:
+    //   resultado 3_799_999.66 → 3_799_999.94 · caixaFinalAlavancado 4_389_999.67 → 4_389_999.91
+    //   vplLiquidoFunding 1_027_362.61 → 1_027_362.58 · fundingSaidas 1_409_999.99 → 1_410_000.03
+    esperado: { resultado: 3_799_999.94, margemPct: 37.999999628, roiPct: 61.29032161290322, tir: 26.644419057914348, caixaFinalAlavancado: 4_389_999.91, vplLiquidoFunding: 1_027_362.58, fundingSaidas: 1_410_000.03 },
   },
 ];
