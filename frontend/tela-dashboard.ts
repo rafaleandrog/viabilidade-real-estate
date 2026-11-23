@@ -5,7 +5,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtPctOuIndef, fmtNum, fmtM2 } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { areaPrivativaTotalLinhas, areaVendavelTotalLinhas } from './fluxo-shared.js';
+import { areaPrivativaTotalLinhas, areaVendavelTotalLinhas, impostoDoEstudoAvancado } from './fluxo-shared.js';
 import { proformaAvancado } from './proforma-avancado.js';
 import {
   acoesDoEstudo,
@@ -464,7 +464,7 @@ export class ViabTelaDashboard extends LitElement {
         linhasCusto,
         curvas,
         areaTerreno: Number(estudo?.terreno_manual_area) || Number(estudo?.area_terreno_nucleo) || 0,
-        ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        ret: impostoDoEstudoAvancado(params),
         // #473: default true preserva o comportamento histórico (VGV bruto).
         corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
         // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba

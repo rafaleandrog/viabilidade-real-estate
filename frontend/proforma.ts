@@ -729,7 +729,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const permutaFinNaoResidencialLegada = e.permuta_financeira_nao_residencial_modo === 'valor_fixo'
     ? n(e.permuta_financeira_nao_residencial_valor)
     : vgvNaoResidencial * n(e.permuta_financeira_nao_residencial_pct) / 100;
-  const permutaFinNaoResidencial = canonico(e.permuta_financeira_nao_residencial_valor_canonico, permutaFinNaoResidencialLegada) * fatorSens('permuta_financeira');
+  const permutaFinNaoResidencial = lot ? 0 : canonico(e.permuta_financeira_nao_residencial_valor_canonico, permutaFinNaoResidencialLegada) * fatorSens('permuta_financeira');
   const receitaLiquida = vgv - imposto - corretagem - marketing - permutaFinResidencial - permutaFinNaoResidencial;
 
   // ── Custos diretos ──
