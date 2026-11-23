@@ -21,7 +21,7 @@ empresa, cenários de sensibilidade e uma leitura do mercado local.
 | Conceito | O que significa |
 |---|---|
 | **Tipo de empreendimento** | **Loteamento** (venda de lotes de uma gleba) ou **Incorporação** (venda de unidades construídas sobre um ou mais lotes). Define quais premissas, custos e indicadores aparecem. Só muda enquanto o estudo está em Rascunho. |
-| **Nível de análise** | **Preliminar**: análise estática, sem dimensão temporal — a Proforma sai das premissas na hora. **Avançado**: cronograma, vendas por safra, custos distribuídos no tempo, funding e fluxo de caixa mensal, com TIR, VPL, payback e exposição máxima. Escolhido na criação e imutável depois. |
+| **Nível de análise** | **Preliminar**: análise estática, sem dimensão temporal — a Proforma sai das premissas na hora. **Avançado**: cronograma, vendas por safra, custos distribuídos no tempo, funding e fluxo de caixa mensal, com TIR, VPL, payback e exposição máxima. Escolhido na criação e imutável depois. As bases dos dois níveis são equivalentes: ver [Fórmulas](formulas). |
 | **Terreno** | Vem do **Núcleo** da instância (uma gleba para Loteamento; um ou mais lotes para Incorporação, com a área somada) ou é **inserido manualmente** (nome e área digitados). A origem se escolhe na criação e o vínculo só muda em Rascunho. |
 | **Proforma** | A tabela de resultado do estudo: VGV, deduções da receita, custos diretos e indiretos, resultado e indicadores (margem, ROI, custo de obras sobre VGV). Ver [Fórmulas da Proforma](formulas). |
 | **Benchmark** | Valores de referência por tipo de empreendimento, mantidos pelo administrador: validam os indicadores (verde ou vermelho) e dão as faixas padrão dos cenários. Ver [Benchmarks](benchmarks). |

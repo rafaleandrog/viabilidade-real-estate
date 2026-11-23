@@ -4,6 +4,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Preliminar × Avançado: as bases equivalentes (fecha a issue 841, 5 fatias)
+
+- Decisão do dono: igualar as bases dos dois níveis (quadro de bases, mais A-a, B-a, C-a). Cinco PRs:
+  fatia 1 (PR 964) `% do VGV` e corretagem sobre o VGV vendável no Avançado; fatia 2 (PR 962)
+  migração 043 que anula o R$ canônico das linhas `pct_vgv`, `versao` 0.1.42; fatia 3 (PR 963)
+  Projetos em `% do VGV` no Avançado; fatia 4 (PR 965) permuta física por produto do catálogo no
+  Preliminar (`unidades_permutadas`); fatia 5 (esta) a seção Preliminar × Avançado em
+  `docs/formulas.md`.
+- Diferença medida na Pinguim (só leitura, pares 38×40 e 39×41): Avançado de Incorporação resultado
+  R$ 60.830.818 → 61.072.010; Avançado de Loteamento R$ 104.926.930 → 106.558.180 (marketing
+  4.650.000 → 4.200.000; corretagem 10.500.000 nos dois). Preliminar de Loteamento VGV 209.250.000 →
+  210.000.000 (+R$ 573.900 de resultado); Preliminar de Incorporação +R$ 75.285. Resíduo de R$ 1.641
+  no VGV bruto da Incorporação fica fora, para issue própria.
+- **Ordem de merge:** 964 e 962 juntos (só juntos todo estudo muda de número de uma vez), depois 963,
+  965 e esta, que descreve o comportamento das outras quatro.
+- **Pendências do dono:** (a) a pergunta obsoleta "Corretagem incide sobre a permuta física" ainda
+  está no gerador de formulários (`scripts/formularios/gerar_formularios.py`); fica para depois do PR
+  963 por conflito nos `.xlsx`. (b) O preço médio por unidade no cenário estressado com fator de
+  permuta (observação do PR 965). (c) A coluna nova do PR 965 entra sem bump de `versao`, pela regra
+  do repositório, e a doc do SDK manda bumpar: divergência a decidir.
+
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 
 - Pedido do autor, com captura: Infraestrutura em "% VGV", derivada de um custo em R$, aparecia
