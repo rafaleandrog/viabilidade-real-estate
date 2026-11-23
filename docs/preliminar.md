@@ -54,7 +54,10 @@ no Loteamento e, na Incorporação, a soma das **áreas privativas fechadas** (r
 residencial) de Terreno & Áreas — as áreas abertas ficam fora. A **Área total** da linha (base × %)
 e a **Área média** (área total ÷ unidades) são calculadas, e o **VGV** é a área total × o preço.
 Como a área vem da base, mudar a Terreno & Áreas recalcula área média e VGV sem tocar nos
-percentuais. A soma dos percentuais tem que ser **100% da base**: o indicador abaixo da tabela
+percentuais. O percentual é guardado com **4 casas decimais**, e a tela mostra no máximo 2: quando a
+participação real não fecha em 4 casas (864 m² de uma base de 10.400 m² são 8,307692…%, guardados
+como 8,3077%), o VGV pode diferir em centavos de uma planilha que usa a fração exata — nesse
+exemplo, R$ 0,78 num VGV de R$ 139,7 milhões. A soma dos percentuais tem que ser **100% da base**: o indicador abaixo da tabela
 mostra quanto está alocado e quanto resta, o produto novo já nasce com o que falta, e com a soma
 diferente de 100% o app recusa **Salvar premissas** e **Submeter para análise**.
 Uma linha só compõe o catálogo, e só entra no VGV, com **área, preço e unidades** maiores que zero:
