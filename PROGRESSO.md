@@ -4,6 +4,21 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Projetos do Avançado aceita % do VGV (fatia 3 de 5 das bases Preliminar × Avançado)
+
+- A linha de custo Projetos do Avançado passa a oferecer a unidade `% VGV`, além de R$, R$/m² priv
+  e % Construção. O servidor já aceitava a unidade em toda categoria; só o mapa de unidades por
+  categoria da tela (`UNIDADES_CAT`) a escondia. A conversão da badge e o motor
+  (`resolverCustoTotal`) já eram genéricos, então nada mais mudou. A base de `pct_vgv` não é
+  tocada aqui.
+- Teste existente alterado com autorização do dono: `custos-bases-pct.render.test.ts` travava as
+  badges de Projetos sem `% VGV`; a lista passa a incluí-lo.
+- Caso de render novo `custos-projetos-pct-vgv`: badge `% VGV` na tela, R$ da coluna Resultado e
+  base da conversão. Tirar `pct_vgv` da lista de Projetos deixa o caso vermelho.
+- Diferença medida: R$ 0. Leitura na Pinguim (estudos 21, 22, 40 e 41): nenhuma linha de Projetos
+  do Avançado está em `pct_vgv`.
+- Guia `docs/avancado.md` cita `% do VGV` em Projetos.
+
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 
 - Pedido do autor, com captura: Infraestrutura em "% VGV", derivada de um custo em R$, aparecia

@@ -71,7 +71,7 @@ As unidades em % diferem na base. **% da receita** é o VGV vendável (sem as un
 recebido** é o que de fato entra em caixa, com os juros de tabela — oferecido no marketing, na
 manutenção pós-obra, no marketing global, na gestão e no Outro dos custos diretos e indiretos. **% da obra** é o grupo Obras inteiro, outorga
 e contingência inclusas; **% da construção** é só construção, decoração e gestão da obra — oferecido
-em Projetos. As bases estão em [Fórmulas](formulas).
+em Projetos, que também aceita **% do VGV**. As bases estão em [Fórmulas](formulas).
 
 O **imposto sobre a receita** tem dois regimes, escolhidos na sub-aba Financeiro dos Custos, no
 campo **Imposto sobre a receita**: o **Imposto padrão do estudo** (a mesma alíquota que o Preliminar
