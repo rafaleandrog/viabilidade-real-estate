@@ -283,7 +283,7 @@ Quando o `componentes` do corpo não bate com as linhas `entrada` e `parcelas` q
 20% e 70% com entrada e parcelamento de 50% cada), o plano é gravado como veio e a resposta traz `espelho_divergente: true`;
 nada é recusado. No modal **Fluxo de pagamento**, um plano assim aparece só para leitura: um aviso diz que o cálculo usa os
 componentes gravados, as linhas de entrada, parcelamento e saldo de chaves ficam desabilitadas e **Aplicar** mantém o plano
-como está, sem descartar componentes. Isso vale só para o plano gravado pela API com esse descompasso; um plano criado pela tela não é tratado assim, mesmo depois de o Cronograma mudar. Para editar um plano divergente, monte-o de novo pela API com linhas coerentes.
+como está, sem descartar componentes. Isso vale só para o plano gravado pela API com esse descompasso; um plano criado pela tela não é tratado assim, mesmo depois de o Cronograma mudar. Para editar um plano divergente, monte-o de novo pela API com linhas coerentes. As datas que vêm do Cronograma, o mês do repasse e o marco das parcelas ao longo da obra, não contam como descompasso: um plano cujos componentes tragam um mês de repasse ou um marco diferente do que o Cronograma dá segue editável, e **Aplicar** o regrava com as datas do Cronograma vigente.
 
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.
