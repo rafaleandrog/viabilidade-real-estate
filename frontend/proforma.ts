@@ -13,6 +13,7 @@
 
 import { calcularCascata, CASCATA_LOTEAMENTO, type EstadoLinha, type UnidadeMestre } from './areas-cascata.js';
 import { produtosComAreaDerivada } from './produtos-alv.js';
+import { permutaFisicaPorCategoria, type PermutaPorProdutos } from './permuta-produtos.js';
 
 export interface ProformaInput {
   tipo_empreendimento: string;
@@ -145,6 +146,8 @@ export interface ProdutoPreliminar {
   area_media_m2?: number | string | null;
   preco_venda_m2?: number | string | null;
   unidades?: number | string | null;
+  // Unidades entregues em PERMUTA FÍSICA (`permuta-produtos.ts`); lida por `unidadesPermutadasDoProduto`.
+  unidades_permutadas?: number | string | null;
   // Classificação Residencial/Não Residencial. Nasceu na #565 (coluna, tela e
   // persistência) e passou a governar o cálculo na #570: é ela que separa o
   // VGV, a área e o preço médio de cada categoria — e, com eles, a base das
@@ -656,9 +659,20 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // em `precoR`/`precoNR`, como a #568 deixou. Categoria sem linha no catálogo
   // tem `precoMedioM2` nulo — vale zero, porque não há estoque daquela
   // categoria para entregar.
-  const precoPermutaR = semProdutos ? precoR : (porTipo.residencial.precoMedioM2 ?? 0);
+  // Permuta física DECLARADA POR PRODUTO (fatia por produto): se alguma linha da
+  // categoria entrega unidades em permuta, ela vem do catálogo — m² = Σ unidades
+  // × área do produto, VGV = Σ unidades × área × preço DO PRODUTO (já estressado
+  // em `catalogoEstressado`, sem reaplicar o fator de preço) — e os campos por
+  // área daquela categoria são ignorados. Categoria sem produto permutado segue
+  // pelo caminho por área, byte a byte como era.
+  const permutaProd = permutaFisicaPorCategoria(catalogoEstressado, lot);
+  const porProdR = permutaProd.residencial.ativa;
+  const porProdNR = permutaProd.nao_residencial.ativa;
+  const precoPermutaR = porProdR ? permutaProd.residencial.vgv / permutaProd.residencial.areaM2
+    : (semProdutos ? precoR : (porTipo.residencial.precoMedioM2 ?? 0));
   const precoPermutaNR = lot ? 0
-    : (semProdutos ? precoNR : (porTipo.nao_residencial.precoMedioM2 ?? 0));
+    : (porProdNR ? permutaProd.nao_residencial.vgv / permutaProd.nao_residencial.areaM2
+      : (semProdutos ? precoNR : (porTipo.nao_residencial.precoMedioM2 ?? 0)));
 
   const areaPermutaResidencialLegada = e.permuta_fisica_modo === 'pct_area_venda'
     ? areaBasePermutaResidencial * n(e.permuta_fisica_pct) / 100
@@ -666,20 +680,29 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // BUG7-08: o fator escala o valor JÁ RESOLVIDO (canônico se houver, senão o
   // legado acima) — cobre os dois em vez de exigir que a UI escale campos
   // individualmente.
-  const areaPermutaResidencial = canonico(e.permuta_fisica_area_canonica, areaPermutaResidencialLegada) * fatorSens('permuta_fisica');
+  const areaPermutaResidencial = porProdR
+    ? permutaProd.residencial.areaM2 * fatorSens('permuta_fisica')
+    : canonico(e.permuta_fisica_area_canonica, areaPermutaResidencialLegada) * fatorSens('permuta_fisica');
   const areaPermutaNaoResidencialLegada = lot ? 0
     : (e.permuta_fisica_nr_modo === 'pct_area_venda'
       ? areaBasePermutaNaoResidencial * n(e.permuta_fisica_nr_pct) / 100
       : n(e.permuta_fisica_nr_area_m2));
   // Loteamento: o valor canônico residual (de quando era Incorporação) também é ignorado, como na permuta financeira NR.
-  const areaPermutaNaoResidencial = lot ? 0 : canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada) * fatorSens('permuta_fisica');
+  const areaPermutaNaoResidencial = lot ? 0 : (porProdNR
+    ? permutaProd.nao_residencial.areaM2 * fatorSens('permuta_fisica')
+    : canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada) * fatorSens('permuta_fisica'));
   const areaPermutaFisica = areaPermutaResidencial + areaPermutaNaoResidencial;
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
   // A permuta reduz o VGV (área entregue × preço da SUA categoria) — reduz o
   // resultado nos dois tipos de empreendimento (#14).
-  const vgvPermutaSolicitadaR = areaPermutaResidencial * precoPermutaR;
-  const vgvPermutaSolicitadaNR = areaPermutaNaoResidencial * precoPermutaNR;
+  // Por produto o VGV é a SOMA dos produtos (não área × preço médio): é o que
+  // mantém cada produto valorado pelo seu próprio preço. O fator de stress da
+  // permuta entra uma vez, como no caminho por área.
+  const vgvPermutaSolicitadaR = porProdR ? permutaProd.residencial.vgv * fatorSens('permuta_fisica')
+    : areaPermutaResidencial * precoPermutaR;
+  const vgvPermutaSolicitadaNR = porProdNR ? permutaProd.nao_residencial.vgv * fatorSens('permuta_fisica')
+    : areaPermutaNaoResidencial * precoPermutaNR;
   const vgvPermutaSolicitada = vgvPermutaSolicitadaR + vgvPermutaSolicitadaNR;
   // A permuta física não pode entregar mais do que existe para vender. A
   // subtração era feita sem piso: permuta de 100% da área sobre um catálogo
@@ -809,7 +832,14 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoMedioM2 = lot
     ? precoPermutaR
     : (areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0);
-  const valorPermutaFisica = areaPermutaFisica * precoMedioM2;
+  // Com alguma categoria por produto, o valor da permuta é a soma do VGV EFETIVO
+  // (já capado) das duas categorias — a média residual abaixo não recupera o
+  // preço de cada produto, e misturá-la com o VGV de uma categoria por área
+  // daria um memo que não fecha com a dedução. Sem nenhuma, a expressão é a de
+  // sempre (por área).
+  const valorPermutaFisica = (porProdR || porProdNR)
+    ? vgvPermutaResidencial + vgvPermutaNaoResidencial
+    : areaPermutaFisica * precoMedioM2;
   // #571: `null`, não 0 — vgv ≤ 0 é "sem base para medir", e um estudo
   // deficitário de verdade (margem negativa) precisa continuar distinguível
   // de "indefinido".
@@ -832,7 +862,14 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // Loteamento) saíram junto com o fallback de VGV — mantê-los daria contagem
   // de unidades num estudo cuja receita é zero.
   const numUnidades = totalCatalogo.unidades;
-  const precoMedioUnidade = numUnidades > 0 ? vgv / numUnidades : 0;
+  // Por produto, as unidades permutadas SAEM do denominador: o VGV já é líquido
+  // delas (foram entregues, não vendidas), então preço médio = VGV ÷ unidades
+  // que de fato vendem. Por área nada muda: a permuta não tem contagem de
+  // unidades, e o denominador segue sendo o catálogo todo.
+  const unidadesPermutadasR = porProdR ? permutaProd.residencial.unidades : 0;
+  const unidadesPermutadasNR = porProdNR ? permutaProd.nao_residencial.unidades : 0;
+  const unidadesVendaveis = numUnidades - unidadesPermutadasR - unidadesPermutadasNR;
+  const precoMedioUnidade = unidadesVendaveis > 0 ? vgv / unidadesVendaveis : 0;
   // Detalhe por tipo (#7): nº e preço médio por unidade, R e NR separados. Preço
   // médio = VGV do tipo (já líquido de permuta física) ÷ nº de unidades do tipo.
   // A contagem por tipo vem do `tipo` de cada linha do catálogo (#570) — antes
@@ -851,8 +888,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const numUnidadesNaoResidencial = porTipoReal.nao_residencial.unidades;
   const vgvUnidadeResidencial = lot ? porTipoReal.residencial.vgv : vgvResidencial;
   const vgvUnidadeNaoResidencial = lot ? porTipoReal.nao_residencial.vgv : vgvNaoResidencial;
-  const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvUnidadeResidencial / numUnidadesResidencial : 0;
-  const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvUnidadeNaoResidencial / numUnidadesNaoResidencial : 0;
+  const vendaveisR = numUnidadesResidencial - (lot ? 0 : unidadesPermutadasR);
+  const vendaveisNR = numUnidadesNaoResidencial - (lot ? 0 : unidadesPermutadasNR);
+  const precoMedioUnidadeResidencial = vendaveisR > 0 ? vgvUnidadeResidencial / vendaveisR : 0;
+  const precoMedioUnidadeNaoResidencial = vendaveisNR > 0 ? vgvUnidadeNaoResidencial / vendaveisNR : 0;
 
   // Aproveitamento do coeficiente máximo (#569): o teto só existe com
   // coeficiente > 0 — Loteamento nunca preenche o campo, então `coefMax` fica
@@ -1003,4 +1042,16 @@ export function precoSugeridoM2(e: ProformaInput, pisoResultadoPct: number): num
     if (margemNoPreco(mid) >= pisoResultadoPct) hi = mid; else lo = mid;
   }
   return hi;
+}
+
+/**
+ * Que categorias do estudo têm a permuta física declarada POR PRODUTO. É a MESMA
+ * leitura do motor (catálogo efetivo, área derivada, Loteamento num bucket só):
+ * a tela de Permutas usa esta função para desabilitar os campos por área que a
+ * Proforma vai ignorar, em vez de reimplementar a regra.
+ */
+export function permutaFisicaPorProdutosDoEstudo(
+  e: ProformaInput,
+): { residencial: PermutaPorProdutos; nao_residencial: PermutaPorProdutos } {
+  return permutaFisicaPorCategoria(catalogoEfetivo(produtosDoEstudo(e)), e.tipo_empreendimento === 'loteamento');
 }

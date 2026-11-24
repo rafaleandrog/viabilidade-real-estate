@@ -747,7 +747,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > O que mudou é que `absorcaoMensal` devolve `pctTotal`/`pctDescartado`/`mesesDescartados` ao lado
 > de `pcts` (`frontend/fluxo-shared.ts:365-376`, acumulados em `:424-432` no modo `personalizado`
 > e em `:439-457` no `distribuido`), `calcularFluxo` emite `console.warn`
-> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2753-2771`) e o painel de Reconciliação acusa
+> (`avisarAbsorcaoDescartada`, `frontend/fluxo-caixa-motor.ts:2739-2757`) e o painel de Reconciliação acusa
 > **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
 > ou o total que a curva declarou quando houve descarte —
 > `frontend/fluxo-invariantes.ts:343-376` (`divergenciasAbsorcao`), chamada por `validarProduto:418`).
@@ -1401,23 +1401,23 @@ A área contratada é a base de:
 
 A corretagem acompanha a contratação e precisa declarar se sua base é o valor bruto ou líquido. A mesma despesa não pode existir simultaneamente como dedução embutida e linha de custo.
 
-> **Comportamento vigente (#473, 2026-08-24).** `frontend/fluxo-shared.ts` expõe as DUAS bases,
-> nomeadas explicitamente — é o que a #227 pedia e ficou pela metade até aqui:
-> `vgvVendidoBrutoMensal` reparte o **VGV bruto** da linha (`vgvLinha`, tipologia inteira) e
-> `vgvVendidoVendavelMensal` reparte o **VGV vendável** (`vgvVendavelLinha`, exclui as unidades
-> permutadas fisicamente — a mesma base de `vendaBrutaContratadaMensal`/`receitaMensalLinha`).
+> **Comportamento vigente.** `frontend/fluxo-shared.ts` expõe as DUAS bases, nomeadas
+> explicitamente: `vgvVendidoBrutoMensal` reparte o **VGV bruto** da linha (`vgvLinha`, tipologia
+> inteira) e `vgvVendidoVendavelMensal` reparte o **VGV vendável** (`vgvVendavelLinha`, exclui as
+> unidades permutadas fisicamente — a mesma base de `vendaBrutaContratadaMensal`/`receitaMensalLinha`).
 >
-> A Corretagem de vendas (`corretagemMensal`, `frontend/fluxo-caixa-motor.ts`) escolhe entre as
-> duas por `estudos.corretagem_sobre_permuta_fisica` (só no Avançado — `CAMPOS_SOMENTE_AVANCADO`,
-> `backend/rotas/estudos.ts`): **default `true`** (VGV bruto, permuta física inclusa — preserva o
-> número de todo estudo existente) ou `false` (VGV vendável, alinhando a corretagem à baixa de
-> estoque). O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` (#194) continua na base
-> bruta histórica — a chave não se estende a ele, é fora do escopo da #473.
+> A Corretagem de vendas (`corretagemMensal`, `frontend/fluxo-caixa-motor.ts`) incide **sempre** sobre
+> o VGV vendável, alinhada à baixa de estoque; com valor canônico, o % efetivo sai do canônico sobre
+> o VGV vendável. A coluna `estudos.corretagem_sobre_permuta_fisica` ficou no schema sem leitor
+> (segue aceita no PATCH por compatibilidade). O Preço do Terreno em `distribuicao_modo:
+> 'sales_revenue'` continua na base bruta histórica.
+>
+> *Histórico (desenho anterior, superado):* a base era escolhida pela flag, com default `true` (VGV
+> bruto, permuta física inclusa) para preservar os estudos existentes; a flag foi removida da lógica
+> quando a base vendável passou a ser a única.
 >
 > 📊 **A base vendável tem lastro na EVI** (`cfINC!BL` × `cfINC!U` × `Areas e Precos!F17` —
-> `BRIEF-EVI.md` T10): a planilha não incide corretagem sobre a permuta física. O default do app
-> continua sendo a base bruta, por decisão do autor (D7) — a EVI é consultiva e não autoriza mudar
-> lógica existente; o achado só pesa na escolha de quem configura o estudo.
+> `BRIEF-EVI.md` T10): a planilha não incide corretagem sobre a permuta física.
 
 ### 12.3 Contratação não contém juros futuros
 
@@ -1913,7 +1913,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2471`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2451`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2278,7 +2278,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2788`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2768`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`

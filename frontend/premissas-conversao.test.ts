@@ -245,7 +245,7 @@ test('#442 ir PARA rs dispensa a grandeza — o canônico já é R$', () => {
 // os anteriores paravam em `camposDaTrocaDeUnidade` e nunca chegavam ao motor.
 
 test('#442 critério 3: o motor lê o MESMO dinheiro antes e depois da troca', () => {
-  const ctxMotor = { areaPrivativaTotal: 4_000, areaTerreno: 2_500, vgvTotal: 171_448_400 };
+  const ctxMotor = { areaPrivativaTotal: 4_000, areaTerreno: 2_500, vgvTotal: 171_448_400, vgvVendavel: 171_448_400 };
   const antes = { orcamento_unidade: 'pct_vgv', orcamento_valor: 0.24, orcamento_valor_canonico: 411_476.16 };
   const depois = {
     ...antes,
@@ -364,7 +364,7 @@ test('#514 ida e volta: digitar 10 sob "% Obra" grava R$ 5.000.000, e resolverCu
   assert.equal(canonico, 5_000_000);
   const total = resolverCustoTotal(
     { orcamento_unidade: 'pct_obra', orcamento_valor: 10, orcamento_valor_canonico: canonico },
-    { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, totalObra: 50_000_000 },
+    { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, vgvVendavel: 0, totalObra: 50_000_000 },
   );
   assert.equal(total, 5_000_000);
 });
@@ -423,29 +423,48 @@ test('#514/#590 (achado de revisão, PR #643): toda chamada de _ctxConversao() p
 
 test('#442 rótulo: prefere o total do motor', () => {
   const custo = { id: 7, orcamento_unidade: 'rs', orcamento_valor: '0.24', orcamento_valor_canonico: '411476.16' };
-  assert.equal(dinheiroParaRotulo(custo, [{ id: 7, total: 411_476.16 }]), 411_476.16);
+  assert.equal(dinheiroParaRotulo(custo, [{ id: 7, total: 411_476.16 }], undefined), 411_476.16);
 });
 
 test('#442 rótulo: fora do motor (permuta), cai no canônico', () => {
   const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: '8572420' };
-  assert.equal(dinheiroParaRotulo(custo, []), 8_572_420);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), 8_572_420);
 });
 
 test('#442 rótulo: sem canônico e em unidade derivada, NÃO afirma número', () => {
   // Antes deste PR o rótulo dizia "R$ 5,00" para uma linha de 5% do VGV.
   const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: null };
-  assert.equal(dinheiroParaRotulo(custo, []), null);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), null);
+});
+
+test('#442 rótulo: % do VGV sem canônico (pós-migração) resolve o R$ nominal sobre a base vendável do contexto', () => {
+  const custo = { id: 9, orcamento_unidade: 'pct_vgv', orcamento_valor: '5', orcamento_valor_canonico: null };
+  const ctxVgv = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 200_000_000, vgvVendavel: 200_000_000 };
+  assert.equal(dinheiroParaRotulo(custo, [], ctxVgv), 10_000_000);
+  assert.equal(dinheiroParaRotulo(custo, [], ctxVgv), resolverCustoTotal(custo, ctxVgv));
+  // Unidade que não é % do VGV continua sem afirmar número, mesmo com contexto.
+  const obra = { id: 10, orcamento_unidade: 'pct_obra', orcamento_valor: '5', orcamento_valor_canonico: null };
+  assert.equal(dinheiroParaRotulo(obra, [], ctxVgv), null);
+});
+
+test('#442 rótulo: a tela de Funding passa o contexto ao rótulo (fiação)', () => {
+  // Sem o 3º argumento o seletor de base financiável volta a mostrar "—" para
+  // linha em % do VGV sem canônico, e nenhum teste de função pura enxerga.
+  const fonte = readFileSync(new URL('./tela-funding.ts', import.meta.url), 'utf8');
+  const chamadas = fonte.match(/dinheiroParaRotulo\([^)]*\)/g) ?? [];
+  assert.equal(chamadas.length, 1);
+  assert.match(chamadas[0], /dinheiroParaRotulo\(custo, [^,]+, ctx\)/);
 });
 
 test('#442 rótulo: permuta física tem os dois campos nulos, e não há dinheiro a mostrar', () => {
   // `backend/rotas/avancado.ts:1394-1397` zera os dois de propósito.
   const custo = { id: 3, orcamento_unidade: 'rs', orcamento_valor: null, orcamento_valor_canonico: null };
-  assert.equal(dinheiroParaRotulo(custo, []), null);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), null);
 });
 
 test('#442 rótulo: linha rs legada, sem canônico, ainda é R$', () => {
   const custo = { id: 4, orcamento_unidade: 'rs', orcamento_valor: '300000', orcamento_valor_canonico: null };
-  assert.equal(dinheiroParaRotulo(custo, []), 300_000);
+  assert.equal(dinheiroParaRotulo(custo, [], undefined), 300_000);
 });
 
 test('#442 canônico derivado de linha legada é arredondado — é dinheiro (C7)', () => {

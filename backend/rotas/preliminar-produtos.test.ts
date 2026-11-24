@@ -9,7 +9,7 @@ import { CAMPOS, erroPctAlv } from './preliminar-produtos.js';
 // A posição confere a issue: "entre Nome e Área média".
 
 test('CAMPOS inclui `tipo`, entre `nome` e `area_media_m2` (e `pct_alv` logo depois, #781)', () => {
-  assert.deepEqual(CAMPOS, ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem']);
+  assert.deepEqual(CAMPOS, ['nome', 'tipo', 'pct_alv', 'area_media_m2', 'preco_venda_m2', 'unidades', 'unidades_permutadas', 'ordem']);
   const iNome = CAMPOS.indexOf('nome');
   const iTipo = CAMPOS.indexOf('tipo');
   const iArea = CAMPOS.indexOf('area_media_m2');
