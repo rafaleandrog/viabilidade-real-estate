@@ -175,3 +175,15 @@ test('localStorage: corta em MAX_ALTERNATIVAS', () => {
   st.setItem('viab:funding-alternativas:1', JSON.stringify(alts));
   assert.equal(lerAlternativas(1, st).length, MAX_ALTERNATIVAS);
 });
+
+test('plano: operação nova ancorada ao cronograma é criada preservando o cronograma_evento', () => {
+  const nova = { ...novaOperacaoAlternativa('divida', 'Dívida ancorada'), cronograma_evento: 'obra' } as OperacaoFunding;
+  const alt = alternativaDoSalvo([], 'a', 'a1');
+  alt.operacoes.push(nova);
+  const plano = planoUsarAlternativa([], alt);
+  assert.equal(plano.criar.length, 1);
+  assert.equal((plano.criar[0] as any).cronograma_evento, 'obra');
+  assert.equal(plano.criar[0].id, undefined);
+  assert.deepEqual(plano.atualizar, []);
+  assert.deepEqual(plano.remover, []);
+});
