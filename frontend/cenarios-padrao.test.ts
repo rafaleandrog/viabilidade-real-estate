@@ -125,7 +125,7 @@ const TRES = cenariosPadrao({ min: -10, max: 10 }, { min: -5, max: 5 });
 test('gravarCenariosPadrao: grava os três em sequência, com ordem a partir da inicial', async () => {
   const corpos: any[] = [];
   const r = await gravarCenariosPadrao(TRES, 7, async (d) => { corpos.push(d); return { id: corpos.length }; });
-  assert.deepEqual(r, { gravados: 3, ordemLivre: 10, pendentes: [], erro: null });
+  assert.deepEqual(r, { gravados: 3, pendentes: [], erro: null });
   assert.deepEqual(corpos.map((c) => [c.nome, c.ordem]), [['Otimista', 7], ['Base', 8], ['Pessimista', 9]]);
   assert.deepEqual(corpos[2], { nome: 'Pessimista', preco_venda_pct: -10, custo_obra_pct: 5, ordem: 9 });
 });
@@ -155,13 +155,15 @@ test('ordemDaTentativa: a nova tentativa não reaproveita a ordem gravada quando
   const r1 = await gravarCenariosPadrao(TRES, ordemDaTentativa(lista, null), async (d) => {
     corpos.push(d); return ++n === 2 ? { erro: true, mensagem: 'x' } : {};
   });
-  assert.equal(r1.ordemLivre, 2);
-  // A releitura falhou: `lista` continua velha. A 2ª tentativa parte de 2, não de 1.
-  assert.equal(ordemDaTentativa(lista, r1.ordemLivre), 2);
-  const r2 = await gravarCenariosPadrao(r1.pendentes, ordemDaTentativa(lista, r1.ordemLivre), async (d) => { corpos.push(d); return {}; });
+  // A tela reservou 3 posições a partir de 1 (a régua fica em 4); o Otimista entrou em 1.
+  const reservada = 1 + TRES.length;
+  // A releitura falhou: `lista` continua velha. A 2ª tentativa parte da reservada, não de 1.
+  assert.equal(ordemDaTentativa(lista, reservada), 4);
+  const r2 = await gravarCenariosPadrao(r1.pendentes, ordemDaTentativa(lista, reservada), async (d) => { corpos.push(d); return {}; });
   assert.equal(r2.erro, null);
   const gravadas = corpos.filter((_, i) => i !== 1).map((c) => c.ordem);
-  assert.deepEqual(gravadas, [1, 2, 3]);
+  // Lacuna (2 e 3 reservadas e não usadas) é tolerada; repetição, não.
+  assert.deepEqual(gravadas, [1, 4, 5]);
   // Com a lista relida, vale a maior das duas.
   assert.equal(ordemDaTentativa([{ ordem: 0 }, { ordem: 5 }], 2), 6);
 });

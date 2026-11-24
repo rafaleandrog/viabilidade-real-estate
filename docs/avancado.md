@@ -240,8 +240,10 @@ um diálogo com os três já preenchidos, editáveis antes de salvar:
 As faixas são as dos benchmarks de sensibilidade de preço e de custo de obra (as mesmas que limitam
 os controles); sem benchmark configurado, ±15%. O Base reproduz o estudo real. **Salvar os três**
 grava os três como cenários comuns, que podem ser removidos como qualquer outro. Se um deles falhar,
-o diálogo continua aberto só com os que faltam, o botão passa a dizer **Salvar os que faltam**, e
-tentar de novo não duplica os já gravados. Enquanto uma gravação está em andamento, **Salvar
+o diálogo continua aberto só com os que faltam e o botão passa a dizer **Salvar os que faltam**:
+tentar de novo não regrava os que a tela recebeu como gravados. Se a conexão cair depois de o
+servidor gravar e antes de a resposta chegar, a tela não tem como saber, e esse cenário pode
+aparecer em dobro — confira a lista antes de tentar de novo. Enquanto uma gravação está em andamento, **Salvar
 cenário** e **Gerar otimista, base e pessimista** ficam desabilitados.
 
 Salvar, gerar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em

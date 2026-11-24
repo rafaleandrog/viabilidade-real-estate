@@ -118,8 +118,6 @@ export function ordemDaTentativa(cenarios: { ordem?: unknown }[], reservada: num
 export interface ResultadoGravacao {
   /** Quantos foram gravados, na ordem do rascunho. */
   gravados: number;
-  /** A `ordem` que a próxima gravação deve usar: a inicial mais os gravados. */
-  ordemLivre: number;
   /** O que falta gravar: vazio quando todos entraram. Tentar de novo usa só isto. */
   pendentes: CenarioPadrao[];
   /** Mensagem do primeiro erro, ou `null`. */
@@ -152,5 +150,5 @@ export async function gravarCenariosPadrao(
     }
     gravados++;
   }
-  return { gravados, ordemLivre: ordemInicial + gravados, pendentes: rascunho.slice(gravados), erro };
+  return { gravados, pendentes: rascunho.slice(gravados), erro };
 }

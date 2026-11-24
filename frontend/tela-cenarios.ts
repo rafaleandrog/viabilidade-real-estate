@@ -544,9 +544,10 @@ export class ViabTelaCenarios extends LitElement {
       });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cenário', 'erro'); return; }
       this.nomeNovo = '';
-      const cens = await listarCenarios(this.estudo.id);
-      this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
       urbiVerso.notificar('Cenário salvo.', 'sucesso');
+      const cens = await listarCenarios(this.estudo.id);
+      if (cens?.erro) urbiVerso.notificar('A lista de cenários não foi relida. Recarregue a página.', 'erro');
+      else this.cenarios = cens.dados || [];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar o cenário', 'erro');
     } finally {
@@ -782,7 +783,8 @@ export class ViabTelaCenarios extends LitElement {
       }
       if (r.gravados > 0) {
         const cens = await listarCenarios(estudoId);
-        this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
+        if (cens?.erro) urbiVerso.notificar('A lista de cenários não foi relida. Recarregue a página.', 'erro');
+        else this.cenarios = cens.dados || [];
       }
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'A lista de cenários não foi relida. Recarregue a página.', 'erro');
