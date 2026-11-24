@@ -139,12 +139,6 @@ export const EXCECOES = [
       "LIMITE DO GUARD — a frase afirma a AUSENCIA do simbolo no alvo (\"nao le X\", \"sem ler X\", \"nao ha campo\"). Exigir que ele apareca inverte o sentido do texto. Classe conhecida, sem deteccao automatica confiavel.",
   },
   {
-    arquivo: "referencia/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-shared.ts:601-603",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :601-603 — \"ePermutaFinanceira\" está em :670. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
     arquivo: "frontend/premissas-conversao.ts",
     endereco: "fluxo-shared.ts:426-440",
     motivo:
