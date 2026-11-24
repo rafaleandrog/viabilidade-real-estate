@@ -6,7 +6,7 @@ import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFundin
 import { mesRepasse } from './fluxo-shared.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, recusaDoPostComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
-  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, type AlternativaFunding,
+  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, religarCriadas, type AlternativaFunding,
 } from './funding-alternativas.js';
 
 const CRONO = [
@@ -552,4 +552,25 @@ test('sincronizarAncoras: operação ancorada no salvo recebe o mês de hoje; cu
   // Já sincronizada: devolve a mesma lista, e o plano não vê mudança de início.
   assert.equal(sincronizarAncoras(r, salvas), r);
   assert.deepEqual(planoUsarAlternativa(salvas, { id: 'a', nome: 'x', operacoes: r.slice(0, 3) }), { criar: [], atualizar: [{ id: 3, campos: { inicio_mes: 8 } }], remover: [] });
+});
+
+test('religarCriadas: depois de aplicar, a operação criada recebe o id e a alternativa volta a ser igual ao salvo', () => {
+  const salvas = [
+    { id: 1, tipo: 'divida', nome: '1º Dívida', valor: 10 },
+    { id: 7, tipo: 'equity', nome: '1º Equity', valor: 5, pct_retorno: 20 },  // criada pelo "Usar esta"
+  ] as any;
+  const ops = [
+    { id: 1, tipo: 'divida', nome: '1º Dívida', valor: 10 },
+    { tipo: 'equity', nome: '1º Equity', valor: 5, pct_retorno: 20 },
+    { tipo: 'divida', nome: 'Fora', valor: 1, __fora: true },
+  ] as any;
+  const r = religarCriadas(ops, salvas) as any[];
+  assert.equal(r[1].id, 7);
+  assert.equal(r[2].id, undefined, 'operação fora não é religada');
+  assert.equal(ops[1].id, undefined, 'não muta a entrada');
+  assert.equal(planoVazio(planoUsarAlternativa(salvas, { id: 'a', nome: 'x', operacoes: r })), true);
+  assert.equal(religarCriadas(r, salvas), r, 'já religada: mesma lista');
+  // Id já usado por outra operação da alternativa não é reaproveitado.
+  const dupla = religarCriadas([{ id: 7, tipo: 'equity', nome: '1º Equity' }, { tipo: 'equity', nome: '1º Equity' }] as any, salvas) as any[];
+  assert.equal(dupla[1].id, undefined);
 });

@@ -6,7 +6,7 @@ import { rotuloMesRelativo } from './fluxo-shared.js';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, novaOperacaoAlternativa, planoUsarAlternativa, planoVazio,
-  lerAlternativas, gravarAlternativas, errosDoEstadoFinal, sincronizarAncoras,
+  lerAlternativas, gravarAlternativas, errosDoEstadoFinal, sincronizarAncoras, religarCriadas,
   type AlternativaFunding, type IndicadoresEstrutura, type PlanoUsarAlternativa,
 } from './funding-alternativas.js';
 import './viab-num.js';
@@ -109,7 +109,8 @@ export class ViabFundingAlternativas extends LitElement {
     if ((mudou.has('salvas') || mudou.has('estudoId')) && this.alternativas.length) {
       // A âncora pode ter andado desde que a alternativa foi guardada.
       const sinc = this.alternativas.map((a) => {
-        const ops = sincronizarAncoras(a.operacoes, this.salvas ?? []);
+        // E as operações criadas por um "Usar esta" anterior recebem o id que ganharam.
+        const ops = sincronizarAncoras(religarCriadas(a.operacoes, this.salvas ?? []), this.salvas ?? []);
         return ops === a.operacoes ? a : { ...a, operacoes: ops };
       });
       if (sinc.some((a, k) => a !== this.alternativas[k])) this._gravar(sinc);
