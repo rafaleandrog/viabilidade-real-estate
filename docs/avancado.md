@@ -46,7 +46,8 @@ categorias, na ordem **Terreno**, **Jurídico**, **Projeto**, **Comercial**, **F
 **Abrir**; as fontes do Apelo Comercial aparecem sem link — as que têm arquivo indicam
 "arquivo no Apelo Comercial" e o arquivo se abre no próprio Apelo Comercial, e as que são só texto
 mostram apenas o texto. Ao voltar à sub-aba, a lista é recarregada e mostra o que foi anexado nesse
-intervalo.
+intervalo. Se uma das fontes (documentos de Informações ou fontes do Apelo Comercial) não carregar, o
+checklist dela aparece como "não verificado", e não como pendente.
 
 O mapa das categorias é fixo: imagem principal, render e planta (de Informações) entram em
 **Projeto**; anúncios, população e mercado (do Apelo Comercial) entram em **Comercial**; a fonte do

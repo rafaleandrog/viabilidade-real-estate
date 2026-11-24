@@ -133,16 +133,25 @@ export const CHECKLIST_DATA_ROOM: Record<
   outros: [],
 };
 
+export type EstadoChecklist = 'presente' | 'pendente' | 'indisponivel';
+
+/** Fontes que não carregaram: o item que depende delas não é "pendente", é não verificado. */
+export type FontesIndisponiveis = { empreendimento?: boolean; apelo?: boolean };
+
 export function checklistDataRoom(
   grupos: Record<CategoriaDataRoom, ItemDataRoom[]>,
-): Record<CategoriaDataRoom, { rotulo: string; presente: boolean }[]> {
-  const saida = vazio<{ rotulo: string; presente: boolean }>();
+  indisponiveis: FontesIndisponiveis = {},
+): Record<CategoriaDataRoom, { rotulo: string; presente: boolean; estado: EstadoChecklist }[]> {
+  const saida = vazio<{ rotulo: string; presente: boolean; estado: EstadoChecklist }>();
   for (const { id } of CATEGORIAS_DATA_ROOM) {
     const itens = grupos?.[id] ?? [];
-    saida[id] = CHECKLIST_DATA_ROOM[id].map((c) => ({
-      rotulo: c.rotulo,
-      presente: itens.some((i) => i.origem === c.origem && i.tipo === c.tipo),
-    }));
+    saida[id] = CHECKLIST_DATA_ROOM[id].map((c) => {
+      const presente = itens.some((i) => i.origem === c.origem && i.tipo === c.tipo);
+      const estado: EstadoChecklist = presente
+        ? 'presente'
+        : indisponiveis[c.origem] ? 'indisponivel' : 'pendente';
+      return { rotulo: c.rotulo, presente, estado };
+    });
   }
   return saida;
 }

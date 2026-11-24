@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { buscarApelo, listarDocumentosEmpreendimento } from './viabilidade-api.js';
 import { precisaCarregar } from './viab-imagem-principal.js';
 import {
-  agruparDataRoom, categoriaSemTipo, CATEGORIAS_DATA_ROOM, checklistDataRoom, deveRecarregarDataRoom, respostaDaCargaVale,
+  agruparDataRoom, categoriaSemTipo, CATEGORIAS_DATA_ROOM, checklistDataRoom, CHECKLIST_DATA_ROOM, deveRecarregarDataRoom, respostaDaCargaVale,
   type CategoriaDataRoom, type ItemDataRoom,
 } from './data-room.js';
 
@@ -116,7 +116,9 @@ export class ViabDataRoom extends LitElement {
       return html`<urbi-loading mensagem="Carregando documentos..."></urbi-loading>`;
     }
     const grupos = agruparDataRoom(this.docsEmpreendimento, this.docsApelo);
-    const lista = checklistDataRoom(grupos);
+    const indisponiveis = { empreendimento: this.docsEmpreendimento === null, apelo: this.docsApelo === null };
+    const lista = checklistDataRoom(grupos, indisponiveis);
+    const fonteFalhou = (id: CategoriaDataRoom) => CHECKLIST_DATA_ROOM[id].some((c) => indisponiveis[c.origem]);
     return html`
       ${this.avisos.map((a) => html`<urbi-banner variante="alerta">${a}</urbi-banner>`)}
       <div class="secoes">
@@ -126,11 +128,13 @@ export class ViabDataRoom extends LitElement {
               ? html`<ul>${grupos[id].map((i) => this._renderItem(i))}</ul>`
               : html`<p class="vazio">${categoriaSemTipo(id)
                   ? 'Ainda não há tipo de documento para esta categoria.'
-                  : 'Nenhum documento nesta categoria.'}</p>`}
+                  : fonteFalhou(id)
+                    ? 'Não foi possível carregar estes documentos.'
+                    : 'Nenhum documento nesta categoria.'}</p>`}
             ${lista[id].length ? html`
               <ul class="check">
                 ${lista[id].map((c) => html`
-                  <li class=${c.presente ? 'ok' : 'pendente'}>${c.presente ? '✓' : '○'} ${c.rotulo}${c.presente ? '' : ' — pendente'}</li>`)}
+                  <li class=${c.estado === 'presente' ? 'ok' : c.estado}>${c.estado === 'presente' ? '✓ ' : c.estado === 'pendente' ? '○ ' : ''}${c.rotulo}${c.estado === 'pendente' ? ' — pendente' : c.estado === 'indisponivel' ? ' — não verificado' : ''}</li>`)}
               </ul>` : nothing}
             ${this._renderOndeAnexar(id)}
           </urbi-card>`)}

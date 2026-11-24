@@ -76,9 +76,9 @@ test('checklist com presente e ausente', () => {
   const g = agruparDataRoom([emp(1, 'render')], [apelo(1, 'mercado')]);
   const c = checklistDataRoom(g);
   assert.deepEqual(c.projeto, [
-    { rotulo: 'Imagem principal', presente: false },
-    { rotulo: 'Render', presente: true },
-    { rotulo: 'Planta', presente: false },
+    { rotulo: 'Imagem principal', presente: false, estado: 'pendente' },
+    { rotulo: 'Render', presente: true, estado: 'presente' },
+    { rotulo: 'Planta', presente: false, estado: 'pendente' },
   ]);
   assert.deepEqual(c.comercial.map((x) => x.presente), [false, false, true]);
   assert.deepEqual(c.terreno, []);
@@ -89,6 +89,19 @@ test('checklist não confunde origem: tipo do apelo não marca empreendimento', 
   const c = checklistDataRoom(agruparDataRoom([], [apelo(1, 'anuncios')]));
   assert.ok(c.projeto.every((x) => !x.presente));
   assert.equal(c.comercial[0].presente, true);
+});
+
+test('checklist: fonte indisponível vira "indisponivel", nunca "pendente"', () => {
+  const g = agruparDataRoom([emp(1, 'render')], null);
+  const c = checklistDataRoom(g, { apelo: true });
+  assert.deepEqual(c.projeto.map((x) => x.estado), ['pendente', 'presente', 'pendente']);
+  assert.deepEqual(c.comercial.map((x) => x.estado), ['indisponivel', 'indisponivel', 'indisponivel']);
+  assert.ok(c.comercial.every((x) => !x.presente));
+  const d = checklistDataRoom(agruparDataRoom(null, [apelo(1, 'mercado')]), { empreendimento: true });
+  assert.deepEqual(d.projeto.map((x) => x.estado), ['indisponivel', 'indisponivel', 'indisponivel']);
+  assert.deepEqual(d.comercial.map((x) => x.estado), ['pendente', 'pendente', 'presente']);
+  // sem o argumento, nada é indisponível
+  assert.ok(checklistDataRoom(g).comercial.every((x) => x.estado === 'pendente'));
 });
 
 test('entradas nulas ou indefinidas', () => {

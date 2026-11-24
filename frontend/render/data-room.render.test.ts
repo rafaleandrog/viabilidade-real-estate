@@ -40,3 +40,16 @@ test('Data room: a sub-aba monta o painel com as 6 categorias e o checklist', { 
   assert.equal(m!.semTipo.filter((t) => t.includes('Ainda não há tipo de documento')).length, 3,
     'Terreno, Jurídico e Financeiro dizem que ainda não há tipo' + relato(a));
 });
+
+test('Data room: rota do Apelo falha -> checklist dela "não verificado", não "pendente"', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'data-room-falha', larguras: [900] });
+  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
+  const m = a.extra?.['900'] as { checklist: string[]; semTipo: string[] } | undefined;
+  assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+  assert.equal(m!.checklist.filter((t) => t.includes('não verificado')).length, 3,
+    'Anúncios, População e Mercado ficam não verificados' + relato(a));
+  assert.ok(m!.checklist.some((t) => t.startsWith('✓ Planta')), 'a fonte que carregou segue verificada' + relato(a));
+  assert.ok(m!.checklist.some((t) => t.includes('Render') && t.includes('pendente')), 'Render segue pendente' + relato(a));
+  assert.ok(!m!.checklist.some((t) => t.includes('Mercado') && t.includes('pendente')), 'Mercado não é pendente' + relato(a));
+  assert.ok(m!.semTipo.some((t) => t.includes('Não foi possível carregar estes documentos')), 'categoria sem itens avisa a falha' + relato(a));
+});
