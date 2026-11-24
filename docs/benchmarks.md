@@ -47,9 +47,9 @@ Os benchmarks aparecem em três lugares dos estudos:
 A tela fica na aba **Benchmark** do Painel e em *Admin → Apps → viabilidade → Benchmarks*, com as
 fichas **Loteamento** e **Incorporação** e três seções — **Indicador de Benchmark**, **Indicador de
 Sensibilidade** e **Faixas do medidor**. Na primeira abertura por quem pode escrever, os indicadores
-padrão que faltam são semeados nos dois tipos. Uma instância cujos benchmarks já existiam não ganha
-sozinha um indicador padrão novo, como `velocidade`: crie-o por **Novo indicador**, com o campo
-`velocidade`, e ele aparece na seção de sensibilidade. Só o `admin` do app escreve. Detalhe em
+padrão que faltam são semeados nos dois tipos. Numa instância cujos benchmarks já existiam, a
+abertura por quem pode escrever semeia só o indicador `velocidade` quando ele falta (os outros
+indicadores apagados de propósito não voltam). Só o `admin` do app escreve. Detalhe em
 [Administração](administracao).
 
 ## Instruções para não humanos

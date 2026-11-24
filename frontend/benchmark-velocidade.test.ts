@@ -34,3 +34,22 @@ test('#971 cenários: o benchmark `velocidade` dá a faixa do controle', () => {
   const bm = [{ campo: 'velocidade', variacao_positiva_pct: 20, variacao_negativa_pct: 10 }];
   assert.deepEqual(faixaDaVelocidade(bm), { min: -10, max: 20 });
 });
+
+// Achado P2 do App do Codex (PR 978): numa instalação que já tinha benchmarks,
+// o auto-semear (só com a lista vazia) nunca criava `velocidade`.
+import { semeaduraNecessaria } from './benchmarks-semeadura.js';
+
+test('#971 semeadura: lista vazia semeia tudo; lista sem `velocidade` semeia só ela; completa, nada', () => {
+  assert.deepEqual(semeaduraNecessaria([]), {});
+  assert.deepEqual(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'roi' }]), { campos: ['velocidade'] });
+  assert.equal(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'velocidade' }]), null);
+});
+
+test('#971 semeadura: a tela de benchmarks usa a função e passa os campos ao semear', () => {
+  const tela = readFileSync(join(RAIZ, 'frontend/viabilidade-config-benchmarks.ts'), 'utf8');
+  assert.match(tela, /const semeadura = semeaduraNecessaria\(itens\);/);
+  assert.match(tela, /if \(semeadura && !this\.somenteLeitura && !this\._semeadoTentado\)/);
+  assert.match(tela, /await semearBenchmarks\(semeadura\.campos\);/);
+  const api = readFileSync(join(RAIZ, 'frontend/viabilidade-api.ts'), 'utf8');
+  assert.match(api, /body: JSON\.stringify\(\{ campos \}\)/);
+});

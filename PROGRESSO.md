@@ -10,8 +10,10 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   (`CAMPOS_SENSIBILIDADE_CENARIOS`): a das variáveis da Proforma do Preliminar fica como estava.
 - A tela de benchmarks o mostra na seção de sensibilidade, como "Velocidade de vendas"; os
   medidores o descartam com o motivo de sensibilidade.
-- Instância que já tinha benchmarks não o ganha pelo auto-semear (que só roda com a lista vazia):
-  o admin o cria por "Novo indicador" com o campo `velocidade`, como o guia de Benchmarks diz.
+- Instância que já tinha benchmarks: o auto-semear só rodava com a lista vazia, então `velocidade`
+  nunca nasceria (achado P2 do App do Codex). A tela passa a semear SÓ `velocidade` quando ele
+  falta (`semeaduraNecessaria`), e `POST /benchmarks/semear` aceita `{ campos }` para isso — semear
+  tudo traria de volta indicador padrão apagado de propósito.
 - Teste existente alterado: as contagens de `benchmarksPadrao` (10 → 11 no Loteamento, 9 → 10 na
   Incorporação), consequência do indicador novo aprovado pelo dono.
 

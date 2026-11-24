@@ -111,9 +111,9 @@ tipo de empreendimento, escolhido nas fichas **Loteamento** e **Incorporação**
   automaticamente da meta.
 
 Na primeira abertura por quem pode escrever, o app semeia sozinho, nos dois tipos, os indicadores
-padrão que ainda faltam — os de meta e os cinco de sensibilidade. Uma instância cujos benchmarks já
-existiam não ganha sozinha um indicador padrão novo: crie-o por **Novo indicador**, que cria um com
-identificador próprio (por exemplo `velocidade`); **Remover** apaga. Só o `admin` do app escreve; os demais veem a aba do
+padrão que ainda faltam — os de meta e os cinco de sensibilidade. Numa instância cujos benchmarks já
+existiam, a abertura semeia só `velocidade`, se ele faltar; os outros apagados de propósito não
+voltam. **Novo indicador** cria um com identificador próprio; **Remover** apaga. Só o `admin` do app escreve; os demais veem a aba do
 Painel em modo de leitura. O que cada indicador valida está em [Benchmarks](benchmarks).
 
 ### Curvas de distribuição

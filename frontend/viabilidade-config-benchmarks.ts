@@ -7,6 +7,7 @@ import {
   urbiVerso, listarBenchmarks, atualizarBenchmark, removerBenchmark, criarBenchmark, semearBenchmarks,
 } from './viabilidade-api.js';
 import './viab-num.js';
+import { semeaduraNecessaria } from './benchmarks-semeadura.js';
 
 // Indicadores de SENSIBILIDADE = as 4 variáveis estressadas na Proforma. Os demais
 // `campo` são metas de benchmark. Rótulos amigáveis na seção de sensibilidade.
@@ -70,10 +71,13 @@ export class ViabConfigBenchmarks extends LitElement {
       let itens = res?.dados || [];
       // #13: auto-seed silencioso no 1º acesso (sem botão). Seed é idempotente e
       // admin-only no backend — só tenta para quem pode escrever (não somenteLeitura).
-      if (itens.length === 0 && !this.somenteLeitura && !this._semeadoTentado) {
+      // #971: também com a lista preenchida, quando falta um indicador padrão novo
+      // (`velocidade`) — e aí semeia SÓ ele (`semeaduraNecessaria`).
+      const semeadura = semeaduraNecessaria(itens);
+      if (semeadura && !this.somenteLeitura && !this._semeadoTentado) {
         this._semeadoTentado = true;
         try {
-          await semearBenchmarks();
+          await semearBenchmarks(semeadura.campos);
           res = await listarBenchmarks(this.tipo);
           itens = res?.dados || [];
         } catch (e) { console.error(e); }
