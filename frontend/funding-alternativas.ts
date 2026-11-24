@@ -108,31 +108,44 @@ const semMarcadoresDeTela = <T extends object>(o: T): T => {
 };
 
 /**
- * Ordem de gravação: REMOVER, depois ATUALIZAR, por último CRIAR. O servidor
- * confere o teto de retorno do equity (100% por modo) a cada gravação, então
- * trocar um equity de 80% por outro de 80% só passa se o antigo sair antes de
- * o novo entrar. Dentro de "atualizar", com `salvas` informadas, as operações
- * que baixam `valor`/`pct_retorno` vêm antes das que sobem.
+ * Ordem de gravação, pensada no teto do servidor (soma de `pct_retorno` dos
+ * equities do MESMO `modo_retorno` <= 100%; `valor` não entra):
+ * 1) remover; 2) zerar `pct_retorno` de quem troca de modo; 3) atualizar o que
+ * não aumenta o pct nem troca de modo; 4) atualizar quem troca de modo (completo);
+ * 5) atualizar o que aumenta o pct; 6) criar.
+ * Prova: após 1-3 cada operação, em cada modo, contribui <= ao valor final; 4 e 5
+ * só levam operações ao valor final; logo nenhuma soma intermediária passa da
+ * final, que o usuário quer válida.
  */
 export function passosDoPlano(plano: PlanoUsarAlternativa, salvas: OperacaoFunding[] = []): PassoPlano[] {
   const porId = new Map<IdOp, OperacaoFunding>();
   for (const s of salvas) if (s.id != null) porId.set(s.id, s);
-  const delta = (u: PlanoUsarAlternativa['atualizar'][number]): number => {
+  type U = PlanoUsarAlternativa['atualizar'][number];
+  const efetivo = (u: U) => {
     const salva = porId.get(u.id) as any;
-    let d = 0;
-    for (const k of ['valor', 'pct_retorno']) {
-      const novo = (u.campos as any)[k];
-      if (typeof novo === 'number' && salva && typeof salva[k] === 'number') d += novo - salva[k];
-    }
-    return d;
+    const c = u.campos as any;
+    const equity = (salva?.tipo ?? c.tipo) === 'equity';
+    return {
+      equity,
+      modoAntes: String(salva?.modo_retorno ?? 'permuta_financeira'),
+      modoDepois: String(c.modo_retorno ?? salva?.modo_retorno ?? 'permuta_financeira'),
+      pctAntes: Number(salva?.pct_retorno) || 0,
+      pctDepois: Number(c.pct_retorno ?? salva?.pct_retorno) || 0,
+    };
   };
-  const atualizar = plano.atualizar
-    .map((u, i) => ({ u, i, d: delta(u) }))
-    .sort((a, b) => (a.d < 0 ? -1 : 0) - (b.d < 0 ? -1 : 0) || a.i - b.i)
-    .map((x) => x.u);
+  const info = plano.atualizar.map((u) => ({ u, e: efetivo(u) }));
+  const trocaModo = (x: (typeof info)[number]) => x.e.equity && x.e.modoAntes !== x.e.modoDepois;
+  const sobePct = (x: (typeof info)[number]) => x.e.equity && !trocaModo(x) && x.e.pctDepois > x.e.pctAntes;
+  const trocas = info.filter(trocaModo);
+  const livres = info.filter((x) => !trocaModo(x) && !sobePct(x));
+  const subidas = info.filter(sobePct);
+  const upd = (x: (typeof info)[number]): PassoPlano => ({ acao: 'atualizar', id: x.u.id, campos: x.u.campos });
   return [
     ...plano.remover.map((id): PassoPlano => ({ acao: 'remover', id })),
-    ...atualizar.map((u): PassoPlano => ({ acao: 'atualizar', id: u.id, campos: u.campos })),
+    ...trocas.map((x): PassoPlano => ({ acao: 'atualizar', id: x.u.id, campos: { pct_retorno: 0 } })),
+    ...livres.map(upd),
+    ...trocas.map(upd),
+    ...subidas.map(upd),
     ...plano.criar.map((op): PassoPlano => ({ acao: 'criar', op })),
   ];
 }

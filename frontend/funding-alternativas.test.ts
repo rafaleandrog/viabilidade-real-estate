@@ -208,7 +208,7 @@ test('passosDoPlano: remover → atualizar → criar; reduções antes de aument
     { id: 3, tipo: 'equity', nome: 'C', valor: 5, pct_retorno: 5 },
   ] as any;
   const plano = {
-    criar: [{ tipo: 'equity', nome: 'N', pct_retorno: 80 }] as any,
+    criar: [{ tipo: 'equity', nome: 'N', pct_retorno: 40 }] as any,
     atualizar: [
       { id: 2, campos: { pct_retorno: 40 } },   // sobe
       { id: 1, campos: { pct_retorno: 20 } },   // baixa
@@ -218,4 +218,83 @@ test('passosDoPlano: remover → atualizar → criar; reduções antes de aument
   const passos = passosDoPlano(plano, salvas);
   assert.deepEqual(passos.map((p) => p.acao), ['remover', 'atualizar', 'atualizar', 'criar']);
   assert.deepEqual(passos.filter((p) => p.acao === 'atualizar').map((p: any) => p.id), [1, 2]);
+  simularServidor(salvas, passos);
+});
+
+/** Aplica os passos sobre as salvas e confere o teto de 100% por modo a cada passo (como o servidor). */
+function simularServidor(salvas: any[], passos: any[]): void {
+  const ops = salvas.map((o) => ({ ...o }));
+  let prox = 1000;
+  const confere = (op: any, ignorar?: any) => {
+    if (op.tipo !== 'equity') return;
+    const modo = String(op.modo_retorno ?? 'permuta_financeira');
+    const usado = ops.filter((o) => o.tipo === 'equity' && o.id !== ignorar
+      && String(o.modo_retorno ?? 'permuta_financeira') === modo).reduce((a, o) => a + (Number(o.pct_retorno) || 0), 0);
+    assert.ok(usado + (Number(op.pct_retorno) || 0) <= 100.01, `soma em ${modo} passou de 100`);
+  };
+  for (const p of passos) {
+    if (p.acao === 'remover') ops.splice(ops.findIndex((o) => o.id === p.id), 1);
+    else if (p.acao === 'criar') { const n = { ...p.op, id: prox++ }; confere(n); ops.push(n); }
+    else {
+      const i = ops.findIndex((o) => o.id === p.id);
+      const novo = { ...ops[i], ...p.campos };
+      confere(novo, p.id);
+      ops[i] = novo;
+    }
+  }
+}
+
+test('passosDoPlano: ordem não soma valor com pct (A 20→80 com valor menor, B 80→20)', () => {
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 10_000_000, pct_retorno: 20 },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 100, pct_retorno: 80 },
+  ] as any;
+  const plano = {
+    criar: [],
+    atualizar: [
+      { id: 1, campos: { pct_retorno: 80, valor: 1_000_000 } },
+      { id: 2, campos: { pct_retorno: 20 } },
+    ],
+    remover: [],
+  };
+  const passos = passosDoPlano(plano, salvas);
+  assert.deepEqual(passos.map((p: any) => p.id), [2, 1]);
+  simularServidor(salvas, passos);
+});
+
+test('passosDoPlano: troca de modo cruzada zera antes e nunca passa de 100 por modo', () => {
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 1, modo_retorno: 'permuta_financeira', pct_retorno: 80 },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 1, modo_retorno: 'resultado_final', pct_retorno: 80 },
+  ] as any;
+  const plano: any = {
+    criar: [],
+    atualizar: [
+      { id: 1, campos: { modo_retorno: 'resultado_final', pct_retorno: 80 } },
+      { id: 2, campos: { modo_retorno: 'permuta_financeira', pct_retorno: 80 } },
+    ],
+    remover: [],
+  };
+  const passos = passosDoPlano(plano, salvas) as any[];
+  assert.deepEqual(passos.slice(0, 2).map((p) => p.campos), [{ pct_retorno: 0 }, { pct_retorno: 0 }]);
+  simularServidor(salvas, passos);
+});
+
+test('passosDoPlano: reduzir valor mas subir pct conta como aumento; remover+criar 80/80 respeita o teto', () => {
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 100, pct_retorno: 10 },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 100, pct_retorno: 50 },
+    { id: 3, tipo: 'equity', nome: 'C', valor: 100, pct_retorno: 80 },
+  ] as any;
+  const plano = {
+    criar: [{ tipo: 'equity', nome: 'N', pct_retorno: 80 }] as any,
+    atualizar: [
+      { id: 1, campos: { valor: 1, pct_retorno: 20 } },  // valor cai, pct sobe
+      { id: 2, campos: { pct_retorno: 0 } },
+    ],
+    remover: [3],
+  };
+  const passos = passosDoPlano(plano, salvas);
+  assert.deepEqual(passos.map((p: any) => p.id ?? 'n'), [3, 2, 1, 'n']);
+  simularServidor(salvas, passos);
 });

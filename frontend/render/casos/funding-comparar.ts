@@ -40,12 +40,12 @@ export const caso = {
     { seletor: 'table.comparacao', minimo: 1 },
     { seletor: 'th.num', minimo: 2 },
     // CONTEÚDO, não só casca: sem `.simular` ligado (ou com simulador devolvendo
-    // null) toda célula sai "—" e estes seletores reprovam. 4 indicadores × (salvo +
+    // null) toda célula sai "—" e `com-valor` reprova (o `exigir` só tem piso, então
+    // não há como exigir "nenhuma célula vazia"). 4 indicadores × (salvo +
     // alternativa), menos a TIR que pode ser "—": pelo menos 6 com valor.
     { seletor: 'table.comparacao td.num.com-valor', minimo: 6 },
     // A alternativa (um equity a mais) difere do salvo em ao menos um indicador.
     { seletor: 'table.comparacao td.num.difere', minimo: 1 },
-    { seletor: 'table.comparacao td.num.vazio', minimo: 0 },
   ],
   aceitaNaoReproduzido: [
     'urbi-banner.variante',
