@@ -39,15 +39,20 @@ test('#971 cenários: o benchmark `velocidade` dá a faixa do controle', () => {
 // o auto-semear (só com a lista vazia) nunca criava `velocidade`.
 import { semeaduraNecessaria } from './benchmarks-semeadura.js';
 
-test('#971 semeadura: lista vazia semeia tudo; lista sem `velocidade` semeia só ela; completa, nada', () => {
-  assert.deepEqual(semeaduraNecessaria([]), {});
-  assert.deepEqual(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'roi' }]), { campos: ['velocidade'] });
-  assert.equal(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'velocidade' }]), null);
+test('#971 semeadura: lista vazia semeia tudo; na 1ª carga, sem `velocidade` semeia só ela; completa, nada', () => {
+  assert.deepEqual(semeaduraNecessaria([], true), {});
+  assert.deepEqual(semeaduraNecessaria([], false), {});
+  assert.deepEqual(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'roi' }], true), { campos: ['velocidade'] });
+  assert.equal(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'velocidade' }], true), null);
+});
+
+test('#971 semeadura: a recarga depois de Remover `velocidade` não o recria (achado do App do Codex)', () => {
+  assert.equal(semeaduraNecessaria([{ campo: 'preco' }, { campo: 'roi' }], false), null);
 });
 
 test('#971 semeadura: a tela de benchmarks usa a função e passa os campos ao semear', () => {
   const tela = readFileSync(join(RAIZ, 'frontend/viabilidade-config-benchmarks.ts'), 'utf8');
-  assert.match(tela, /const semeadura = semeaduraNecessaria\(itens\);/);
+  assert.match(tela, /const primeiraCarga = !this\._carregouUmaVez;\s*this\._carregouUmaVez = true;\s*const semeadura = semeaduraNecessaria\(itens, primeiraCarga\);/);
   assert.match(tela, /if \(semeadura && !this\.somenteLeitura && !this\._semeadoTentado\)/);
   assert.match(tela, /await semearBenchmarks\(semeadura\.campos\);/);
   const api = readFileSync(join(RAIZ, 'frontend/viabilidade-api.ts'), 'utf8');

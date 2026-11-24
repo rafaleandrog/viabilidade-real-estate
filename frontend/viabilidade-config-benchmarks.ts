@@ -46,6 +46,8 @@ export class ViabConfigBenchmarks extends LitElement {
   // #13: garante uma única tentativa de auto-seed por instância (evita re-semear
   // ao trocar de tipo se um tipo ficar legitimamente vazio após o seed).
   private _semeadoTentado = false;
+  // #971: a semeadura do indicador que falta (`velocidade`) só vale na 1ª carga.
+  private _carregouUmaVez = false;
 
   static styles = [estiloConteudo, css`
     .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -72,8 +74,11 @@ export class ViabConfigBenchmarks extends LitElement {
       // #13: auto-seed silencioso no 1º acesso (sem botão). Seed é idempotente e
       // admin-only no backend — só tenta para quem pode escrever (não somenteLeitura).
       // #971: também com a lista preenchida, quando falta um indicador padrão novo
-      // (`velocidade`) — e aí semeia SÓ ele (`semeaduraNecessaria`).
-      const semeadura = semeaduraNecessaria(itens);
+      // (`velocidade`) — e aí semeia SÓ ele, e só na PRIMEIRA carga da tela: a
+      // recarga depois de Remover não pode desfazer a remoção (`semeaduraNecessaria`).
+      const primeiraCarga = !this._carregouUmaVez;
+      this._carregouUmaVez = true;
+      const semeadura = semeaduraNecessaria(itens, primeiraCarga);
       if (semeadura && !this.somenteLeitura && !this._semeadoTentado) {
         this._semeadoTentado = true;
         try {

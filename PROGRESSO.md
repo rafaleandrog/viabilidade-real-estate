@@ -13,7 +13,8 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Instância que já tinha benchmarks: o auto-semear só rodava com a lista vazia, então `velocidade`
   nunca nasceria (achado P2 do App do Codex). A tela passa a semear SÓ `velocidade` quando ele
   falta (`semeaduraNecessaria`), e `POST /benchmarks/semear` aceita `{ campos }` para isso — semear
-  tudo traria de volta indicador padrão apagado de propósito.
+  tudo traria de volta indicador padrão apagado. Só na primeira carga da tela (achado seguinte do
+  App): a recarga depois de Remover não desfaz a remoção; na próxima abertura, ele volta com ±15%.
 - Teste existente alterado: as contagens de `benchmarksPadrao` (10 → 11 no Loteamento, 9 → 10 na
   Incorporação), consequência do indicador novo aprovado pelo dono.
 

@@ -48,8 +48,9 @@ A tela fica na aba **Benchmark** do Painel e em *Admin → Apps → viabilidade 
 fichas **Loteamento** e **Incorporação** e três seções — **Indicador de Benchmark**, **Indicador de
 Sensibilidade** e **Faixas do medidor**. Na primeira abertura por quem pode escrever, os indicadores
 padrão que faltam são semeados nos dois tipos. Numa instância cujos benchmarks já existiam, a
-abertura por quem pode escrever semeia só o indicador `velocidade` quando ele falta (os outros
-indicadores apagados de propósito não voltam). Só o `admin` do app escreve. Detalhe em
+abertura da tela por quem pode escrever semeia só o indicador `velocidade` quando ele falta; os
+outros indicadores apagados não voltam. Apagado, o `velocidade` sai da tabela e volta, com ±15%,
+na próxima abertura da tela — o mesmo valor que os Cenários usam sem ele. Só o `admin` do app escreve. Detalhe em
 [Administração](administracao).
 
 ## Instruções para não humanos
