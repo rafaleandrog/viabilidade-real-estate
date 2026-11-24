@@ -215,15 +215,41 @@ mantém as suas:
 
 ### Cenários
 
-Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** e compare a
-variação de TIR, VPL e exposição máxima contra o cenário real, com o gráfico **Fluxo acumulado —
+Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** (preço de
+venda e custo de obra, em %) e compare o cenário com o real, com o gráfico **Fluxo acumulado —
 cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é fixo: ele cobre o
 fluxo acumulado da base e o de todas as posições dos dois controles, então mover um controle move
 a curva, não a escala, e a ordem de grandeza da variação fica visível. Quando o cenário real não tem
 exposição (exposição máxima 0), a variação da exposição aparece como **n/d**. Os cenários ficam salvos no
-estudo. Salvar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
-análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação continua
-disponível, sem os botões **Salvar cenário** e **Remover**.
+estudo.
+
+A tabela **Cenários salvos** começa pela linha travada do cenário real e compara cada cenário salvo
+com ela em seis indicadores: VGV, Resultado, Margem, VPL, TIR e Exposição máxima, cada um com a
+variação em relação ao real (o Payback aparece ao lado, sem variação). Resultado é o fluxo de caixa
+livre acumulado no fim do horizonte, e Margem é Resultado ÷ VGV, a mesma leitura de caixa do Resumo.
+
+O botão **Gerar otimista, base e pessimista** cria de uma vez os três cenários clássicos. Ele abre
+um diálogo com os três já preenchidos, editáveis antes de salvar:
+
+| Cenário | Preço de venda | Custo de obra |
+|---|---|---|
+| Otimista | limite de alta da faixa de preço | limite de queda da faixa de custo |
+| Base | 0% | 0% |
+| Pessimista | limite de queda da faixa de preço | limite de alta da faixa de custo |
+
+As faixas são as dos benchmarks de sensibilidade de preço e de custo de obra (as mesmas que limitam
+os controles); sem benchmark configurado, ±15%. O Base reproduz o estudo real. **Salvar os três**
+grava os três como cenários comuns, que podem ser removidos como qualquer outro. Se um deles falhar,
+o diálogo continua aberto só com os que faltam e o botão passa a dizer **Salvar os que faltam**:
+tentar de novo não regrava os que a tela recebeu como gravados. Se a conexão cair depois de o
+servidor gravar e antes de a resposta chegar, a tela não tem como saber, e esse cenário pode
+aparecer em dobro — confira a lista antes de tentar de novo. Enquanto uma gravação está em andamento, **Salvar
+cenário** e **Gerar otimista, base e pessimista** ficam desabilitados.
+
+Salvar, gerar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
+análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação e a
+tabela continuam disponíveis, sem os botões **Salvar cenário**, **Gerar otimista, base e
+pessimista** e **Remover**.
 
 ### Análise de mercado e Apelo Comercial
 
@@ -290,6 +316,44 @@ Quando o `componentes` do corpo não bate com as linhas `entrada` e `parcelas` q
 nada é recusado. No modal **Fluxo de pagamento**, um plano assim aparece só para leitura: um aviso diz que o cálculo usa os
 componentes gravados, as linhas de entrada, parcelamento e saldo de chaves ficam desabilitadas e **Aplicar** mantém o plano
 como está, sem descartar componentes. Isso vale só para o plano gravado pela API com esse descompasso; um plano criado pela tela não é tratado assim, mesmo depois de o Cronograma mudar. Para editar um plano divergente, monte-o de novo pela API com linhas coerentes. As datas que vêm do Cronograma, o mês do repasse e o marco das parcelas ao longo da obra, não contam como descompasso: um plano cujos componentes tragam um mês de repasse ou um marco diferente do que o Cronograma dá segue editável, e **Aplicar** o regrava com as datas do Cronograma vigente.
+
+**Criar um Avançado a partir de um Preliminar.** `POST /estudos/:id/derivar-avancado` gera um estudo
+Avançado **novo**, pré-preenchido com o que o Preliminar já sabe, e deixa o Preliminar como está. Exige
+editor do estudo de origem e nível `escrita` ou `admin` no app. A origem tem de ser um Preliminar de
+`loteamento` ou `incorporacao`: um Avançado de origem recebe **422** `NIVEL_INVALIDO`, e um tipo
+desconhecido, **422** `TIPO_INVALIDO`. O corpo é vazio; a resposta é **201** com `{ estudo, relatorio }`,
+e o estudo nasce em `rascunho`, com o criador como editor, na mesma transação que grava o resto — se
+qualquer passo falhar, nada fica gravado.
+
+O que a rota leva:
+
+- as colunas do estudo (menos as de permuta física, que não viajam), o catálogo de produtos, a análise
+  de mercado, o apelo comercial e os imóveis vinculados, como na duplicação;
+- **uma tipologia por produto** do catálogo efetivo (`apartamento` ou `loja` na Incorporação, `lote` no
+  Loteamento), com a área por unidade em 2 casas. A área privativa aberta é só informação de referência: não
+  entra no valor das tipologias (todas nascem com área aberta zero) e continua registrada nas
+  Premissas do estudo;
+- **um grupo de receita** com 100% das unidades e o plano de absorção e de pagamento com que um grupo
+  novo nasce, mais o cronograma padrão do Avançado;
+- as **linhas de Custos** equivalentes aos custos do Preliminar, com a unidade de cada uma: R$ para o
+  valor fixo, **R$/m²** só quando a conta com a área do Avançado reproduz o valor do Preliminar ao
+  centavo, e **percentual vivo** (`% do VGV`, `% das Obras`, `% da construção`) para os custos que o
+  Preliminar guarda em percentual;
+- a **permuta física** como linhas de Preço › Permuta física: por produto, as unidades declaradas no
+  próprio produto; por área, a tipologia da família cuja conta de unidades inteiras deixa o menor
+  resíduo, com o resíduo declarado;
+- a **permuta financeira** como uma linha em R$ com a soma residencial e não residencial;
+- o regime do imposto: RET com a alíquota do parâmetro do app para o estudo sujeito ao RET, imposto
+  padrão do estudo nos demais.
+
+O `relatorio` é a lista de `{ origem, destino, regra, nota?, alerta? }` que diz, em português, o que foi
+levado e como — e **o que não foi ou mudou de valor**: cada diferença entre o VGV bruto do Preliminar e
+o do Avançado (por arredondamento das áreas), cada custo percentual cuja base própria
+do Avançado dá outro valor, cada permuta que não coube em unidades inteiras, a área aberta mantida como referência, sem
+alerta, e a permuta financeira sem VGV vendável. Os itens com `alerta: true` são os que pedem
+conferência. O mesmo relatório é gravado nas notas do estudo novo, depois das notas da origem. Ficam de
+fora, e o relatório diz: documentos, membros, cenários de sensibilidade, a cascata de áreas do
+Loteamento, a data de início (quando o Preliminar não tem) e os juros de tabela (0% até preencher).
 
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.

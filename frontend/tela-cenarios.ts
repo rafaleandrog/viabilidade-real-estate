@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
+import './viab-num.js';
 import { fmtR$, fmtPct } from './viab-format.js';
 import {
   type EventoCrono, type PeriodoAgregado, periodosAnuais, rotuloMesRelativo, mesRepasse,
@@ -15,6 +16,7 @@ import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
 import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
+import { faixaDoBenchmark, cenariosPadrao, indicadoresCenario, ordemDaTentativa, gravarCenariosPadrao, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   type FundingCalc, type OperacaoFunding,
@@ -45,8 +47,6 @@ import {
 // ─────────────────────────────────────────────────────────────────────────
 
 const n = (v: any): number => Number(v) || 0;
-
-interface Faixa { min: number; max: number; }
 
 @customElement('viab-tela-cenarios')
 export class ViabTelaCenarios extends LitElement {
@@ -195,6 +195,15 @@ export class ViabTelaCenarios extends LitElement {
     table.cen td urbi-badge { vertical-align: middle; }
     table.cen td .cen-nd { color: var(--cor-texto-sec); font-size: 0.8rem; }
     .cen-wrap { overflow-x: auto; }
+    /* #889: título da tabela e o botão de gerar os três cenários na mesma linha. */
+    .cen-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .cen-topo h3 { margin: 0; }
+    /* #889: o diálogo de gerar otimista, base e pessimista. */
+    .gerar-ajuda { margin: 0 0 10px; font-size: 0.82rem; color: var(--cor-texto-sec); }
+    table.gerar-padrao-tab { width: 100%; border-collapse: collapse; }
+    table.gerar-padrao-tab th, table.gerar-padrao-tab td { padding: 4px 6px; text-align: left; font-size: 0.82rem; }
+    table.gerar-padrao-tab th { color: var(--cor-texto-sec); font-weight: 600; }
+    .gerar-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
   `];
 
   updated() {
@@ -238,23 +247,14 @@ export class ViabTelaCenarios extends LitElement {
         // série é cortada e `saldoFinal` exibe um saldo truncado.
         operacoesFunding: this.operacoes,
       };
-      this.faixaPreco = this._faixa(bm?.dados || [], 'preco');
-      this.faixaCusto = this._faixa(bm?.dados || [], 'custo_obras');
+      this.faixaPreco = faixaDoBenchmark(bm?.dados || [], 'preco');
+      this.faixaCusto = faixaDoBenchmark(bm?.dados || [], 'custo_obras');
       this.cenarios = cens?.erro ? [] : (cens.dados || []);
       this.cacheCalc.clear();  // baseConfig novo invalida tudo que estava memorizado
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar os cenários', 'erro');
     }
     this.carregando = false;
-  }
-
-  // Limites do slider a partir do benchmark de sensibilidade (variação ± %).
-  // Sem benchmark configurado, cai num padrão de ±15%.
-  private _faixa(benchmarks: any[], campo: string): Faixa {
-    const b = benchmarks.find((x) => String(x.campo) === campo);
-    const pos = b && b.variacao_positiva_pct != null ? Math.abs(n(b.variacao_positiva_pct)) : 15;
-    const neg = b && b.variacao_negativa_pct != null ? Math.abs(n(b.variacao_negativa_pct)) : 15;
-    return { min: -Math.round(neg), max: Math.round(pos) };
   }
 
   /** Teto do cache: arrastar os dois sliders de ponta a ponta gera no máximo
@@ -508,7 +508,7 @@ export class ViabTelaCenarios extends LitElement {
               @urbi:input-change=${(e: CustomEvent) => this.nomeNovo = e.detail.valor}
             ></urbi-input>
             <urbi-botao variante="primario" icone="fa-solid fa-floppy-disk"
-              ?desabilitado=${this.salvando} @click=${this._salvar}>Salvar cenário</urbi-botao>
+              ?desabilitado=${this.salvando || this.gerando} @click=${this._salvar}>Salvar cenário</urbi-botao>
           </div>` : nothing}
       </urbi-card>
     `;
@@ -534,23 +534,26 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _salvar = async () => {
-    if (!this.editavel || this.salvando || !this.estudo?.id) return;
+    if (!this.editavel || this.salvando || this.gerando || !this.estudo?.id) return;
     this.salvando = true;
     try {
       const nome = this.nomeNovo.trim() || `Preço ${this.precoPct >= 0 ? '+' : ''}${this.precoPct}% · Obra ${this.custoPct >= 0 ? '+' : ''}${this.custoPct}%`;
       const res = await criarCenario(this.estudo.id, {
         nome, preco_venda_pct: this.precoPct, custo_obra_pct: this.custoPct,
-        ordem: this.cenarios.length,
+        ordem: this._reservarOrdens(1),
       });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cenário', 'erro'); return; }
       this.nomeNovo = '';
-      const cens = await listarCenarios(this.estudo.id);
-      this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
       urbiVerso.notificar('Cenário salvo.', 'sucesso');
+      const cens = await listarCenarios(this.estudo.id);
+      if (cens?.erro) urbiVerso.notificar('A lista de cenários não foi relida. Recarregue a página.', 'erro');
+      else this.cenarios = cens.dados || [];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar o cenário', 'erro');
+    } finally {
+      // #889: no `finally`, e não depois do `try`: o `return` do erro da API saía sem liberar a trava.
+      this.salvando = false;
     }
-    this.salvando = false;
   };
 
   private _confirmarRemover = async () => {
@@ -570,9 +573,18 @@ export class ViabTelaCenarios extends LitElement {
     // ⚠️ #596: esta tabela já teve uma coluna extra condicional ("Resultado
     // após custo financ.", só com operação de Funding). Ela saiu — a tabela
     // não ramifica mais por presença de funding.
+    // #889: a coluna "Resultado" de hoje é OUTRA grandeza — o fluxo de caixa
+    // livre acumulado (`indicadoresCenario`), sem custo financeiro descontado.
     return html`
       <section class="secao-cenarios">
-        <h3>Cenários salvos</h3>
+        <div class="cen-topo">
+          <h3>Cenários salvos</h3>
+          ${this.editavel ? html`
+            <urbi-botao class="gerar-padrao" variante="secundario" pequeno icone="fa-solid fa-wand-magic-sparkles"
+              ?desabilitado=${this.gerando || this.salvando} @click=${this._abrirGerarPadrao}>
+              Gerar otimista, base e pessimista
+            </urbi-botao>` : nothing}
+        </div>
         <div class="cen-wrap">
           <table class="cen">
             <thead>
@@ -580,6 +592,12 @@ export class ViabTelaCenarios extends LitElement {
                 <th>Cenário</th>
                 <th class="cen-estreita">Preço venda</th>
                 <th class="cen-estreita">Custo obra</th>
+                <th>VGV</th>
+                <th class="cen-var" aria-label="Variação de VGV vs. cenário real" scope="col"></th>
+                <th>Resultado</th>
+                <th class="cen-var" aria-label="Variação de Resultado vs. cenário real" scope="col"></th>
+                <th>Margem</th>
+                <th class="cen-var" aria-label="Variação de Margem vs. cenário real" scope="col"></th>
                 <th>VPL</th>
                 <th class="cen-var" aria-label="Variação de VPL vs. cenário real" scope="col"></th>
                 <th>TIR</th>
@@ -599,11 +617,12 @@ export class ViabTelaCenarios extends LitElement {
         ${this.cenarios.length === 0
           ? html`<urbi-estado-vazio icone="fa-solid fa-layer-group"
               mensagem=${this.editavel
-                ? 'Nenhum cenário salvo. Ajuste os parâmetros acima e clique em “Salvar cenário”.'
+                ? 'Nenhum cenário salvo. Ajuste os parâmetros acima e clique em “Salvar cenário”, ou use “Gerar otimista, base e pessimista”.'
                 : 'Nenhum cenário salvo.'}></urbi-estado-vazio>`
           : nothing}
       </section>
       ${this.removerId != null ? this._renderConfirmRemover() : nothing}
+      ${this.rascunhoPadrao ? this._renderGerarPadrao() : nothing}
     `;
   }
 
@@ -616,6 +635,7 @@ export class ViabTelaCenarios extends LitElement {
         <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
         <td class="cen-estreita">—</td>
         <td class="cen-estreita">—</td>
+        ${this._celulasIndicadores(base, null)}
         <td class=${base.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(base.vpl)}</td>
         <td class="cen-var"></td>
         <td>${tir}</td>
@@ -662,6 +682,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${c.nome || 'Cenário'}</td>
         <td class="cen-estreita">${pctTxt(n(c.preco_venda_pct))}</td>
         <td class="cen-estreita">${pctTxt(n(c.custo_obra_pct))}</td>
+        ${this._celulasIndicadores(calc, base)}
         <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}</td>
         <td class="cen-var">${this._badgeVar(calc.vpl, base.vpl, true)}</td>
         <td>${tir}</td>
@@ -677,6 +698,130 @@ export class ViabTelaCenarios extends LitElement {
               @click=${() => this.removerId = Number(c.id)}></urbi-botao>` : nothing}
         </td>
       </tr>
+    `;
+  }
+
+  /**
+   * #889: as células de VGV, Resultado e Margem (valor + variação contra o
+   * cenário real). `base = null` é a própria linha do cenário real, sem
+   * variação. Os três são "maior é melhor". VPL, TIR e Exposição seguem nas
+   * colunas que já existiam, desenhadas pelo chamador.
+   */
+  private _celulasIndicadores(calc: FluxoCalc, base: FluxoCalc | null): TemplateResult {
+    const i = indicadoresCenario(calc);
+    const b = base ? indicadoresCenario(base) : null;
+    return html`
+      <td>${fmtR$(i.vgv)}</td>
+      <td class="cen-var">${b ? this._badgeVar(i.vgv, b.vgv, true) : nothing}</td>
+      <td class=${i.resultado >= 0 ? 'pos' : 'neg'}>${fmtR$(i.resultado)}</td>
+      <td class="cen-var">${b ? this._badgeVar(i.resultado, b.resultado, true) : nothing}</td>
+      <td>${i.margemPct === null ? '—' : fmtPct(i.margemPct)}</td>
+      <td class="cen-var">${b ? this._badgeVar(i.margemPct, b.margemPct, true) : nothing}</td>
+    `;
+  }
+
+  /**
+   * #889: rascunho do diálogo "Gerar otimista, base e pessimista" — os três
+   * cenários pré-preenchidos por `cenariosPadrao`, editáveis antes de salvar.
+   * `null` = diálogo fechado.
+   */
+  @state() private rascunhoPadrao: CenarioPadrao[] | null = null;
+  @state() private gerando = false;
+
+  /** #889: abre o diálogo com os três cenários pré-preenchidos pelas faixas dos benchmarks. */
+  private _abrirGerarPadrao = () => {
+    if (!this.editavel) return;
+    this.rascunhoPadrao = cenariosPadrao(this.faixaPreco, this.faixaCusto);
+  };
+
+  /**
+   * #889: a maior `ordem` já reservada por esta tela, mais um. Só cresce: a
+   * lista em memória pode estar velha (releitura que falhou), e a `ordem` de
+   * uma gravação nova nunca pode repetir uma que a tela já mandou gravar.
+   */
+  private ordemReservada = 0;
+
+  /**
+   * #889: a régua ÚNICA de `ordem` das duas gravações (Salvar cenário e Gerar
+   * os três): a próxima depois da lista e de tudo que a tela já reservou.
+   * Reserva `n` posições e devolve a primeira. Falha no meio deixa lacuna, que
+   * a ordenação por `ordem` tolera; repetição, não.
+   */
+  private _reservarOrdens(n: number): number {
+    const inicio = ordemDaTentativa(this.cenarios, this.ordemReservada);
+    this.ordemReservada = inicio + n;
+    return inicio;
+  }
+
+  private _editarPadrao(i: number, campo: 'precoVendaPct' | 'custoObraPct', valor: number | null) {
+    if (!this.rascunhoPadrao) return;
+    this.rascunhoPadrao = this.rascunhoPadrao.map((c, j) => j === i ? { ...c, [campo]: valor ?? 0 } : c);
+  }
+
+  /**
+   * #889: grava os três como cenários comuns, pelo mesmo `POST` do Salvar, em
+   * sequência e com `ordem` pela régua única (`_reservarOrdens`). Um erro no meio para
+   * a sequência e avisa; o diálogo fica só com os que faltam (tentar de novo não
+   * duplica os já gravados), e a lista é relida. A trava `gerando` é liberada em
+   * toda saída, inclusive se a releitura falhar.
+   */
+  private _salvarPadrao = async () => {
+    const rascunho = this.rascunhoPadrao;
+    if (!this.editavel || this.gerando || this.salvando || !rascunho || !this.estudo?.id) return;
+    const estudoId = this.estudo.id;
+    this.gerando = true;
+    try {
+      const todos = rascunho.length === 3;
+      const r = await gravarCenariosPadrao(rascunho, this._reservarOrdens(rascunho.length),
+        (dados) => criarCenario(estudoId, dados));
+      if (r.erro) {
+        this.rascunhoPadrao = r.pendentes;
+        urbiVerso.notificar(r.erro, 'erro');
+      } else {
+        this.rascunhoPadrao = null;
+        urbiVerso.notificar(todos ? 'Cenários otimista, base e pessimista salvos.' : 'Cenários salvos.', 'sucesso');
+      }
+      if (r.gravados > 0) {
+        const cens = await listarCenarios(estudoId);
+        if (cens?.erro) urbiVerso.notificar('A lista de cenários não foi relida. Recarregue a página.', 'erro');
+        else this.cenarios = cens.dados || [];
+      }
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'A lista de cenários não foi relida. Recarregue a página.', 'erro');
+    } finally {
+      this.gerando = false;
+    }
+  };
+
+  private _renderGerarPadrao(): TemplateResult {
+    const rascunho = this.rascunhoPadrao ?? [];
+    return html`
+      <urbi-modal title="Gerar otimista, base e pessimista" maxWidth="520px"
+        @urbi-modal:close=${() => { if (!this.gerando) this.rascunhoPadrao = null; }}>
+        <p class="gerar-ajuda">As variações vêm das faixas de sensibilidade dos benchmarks
+          (±${FAIXA_PADRAO_PCT}% quando não configuradas). Ajuste antes de salvar.</p>
+        <table class="gerar-padrao-tab">
+          <thead><tr><th>Cenário</th><th>Preço de venda (%)</th><th>Custo de obra (%)</th></tr></thead>
+          <tbody>
+            ${rascunho.map((c, i) => html`
+              <tr data-cenario=${c.nome}>
+                <td>${c.nome}</td>
+                <td><viab-num label="" casas-decimais="2" .valor=${c.precoVendaPct}
+                  ?desabilitado=${this.gerando}
+                  @urbi:input-numero-change=${(e: CustomEvent) => this._editarPadrao(i, 'precoVendaPct', e.detail.valor)}></viab-num></td>
+                <td><viab-num label="" casas-decimais="2" .valor=${c.custoObraPct}
+                  ?desabilitado=${this.gerando}
+                  @urbi:input-numero-change=${(e: CustomEvent) => this._editarPadrao(i, 'custoObraPct', e.detail.valor)}></viab-num></td>
+              </tr>`)}
+          </tbody>
+        </table>
+        <div class="gerar-acoes">
+          <urbi-botao variante="fantasma" ?desabilitado=${this.gerando}
+            @click=${() => this.rascunhoPadrao = null}>Cancelar</urbi-botao>
+          <urbi-botao class="gerar-salvar" variante="primario" icone="fa-solid fa-floppy-disk"
+            ?desabilitado=${this.gerando || this.salvando} @click=${this._salvarPadrao}>${rascunho.length === 3 ? 'Salvar os três' : 'Salvar os que faltam'}</urbi-botao>
+        </div>
+      </urbi-modal>
     `;
   }
 

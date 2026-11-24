@@ -12,6 +12,41 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   `areasParaTrocarDeTipo`. A tela não oferecia a troca (o seletor de tipo só existe no formulário de criar).
 - Testes alterados e removidos conforme a autorização, listados no PR.
 
+## 2026-11-24 — Cenários do Avançado: otimista, base e pessimista com um clique
+
+- Botão **Gerar otimista, base e pessimista** na aba Cenários do Avançado (só para quem escreve).
+  Abre um diálogo com os três pré-preenchidos pelas faixas dos benchmarks de sensibilidade de preço
+  e de custo de obra (±15% sem benchmark): otimista = preço no limite de alta e obra no de queda;
+  base = 0 e 0; pessimista = o contrário. Os valores são editáveis antes de salvar, e os três são
+  gravados pelo mesmo `POST` do Salvar, como cenários comuns.
+- A tabela de cenários salvos passa a comparar seis indicadores contra o real: VGV, Resultado e
+  Margem (novos) e VPL, TIR e Exposição máxima (já existiam). Margem = Resultado ÷ VGV, a mesma
+  leitura de caixa do Resumo.
+- Funções puras em `frontend/cenarios-padrao.ts` (`faixaDoBenchmark`, que passou a ser a única régua
+  das faixas, `cenariosPadrao` e `indicadoresCenario`); teste de que o Base reproduz o estudo nos
+  seis indicadores; dois casos de render (quem escreve e quem não escreve).
+- Recorte decidido pelo dono: a velocidade de vendas como terceira alavanca fica fora (exigiria
+  coluna nova no `schema.json`) e virou a issue 971. Sem schema, migração nem `versao`.
+
+## 2026-11-24 — Criar um Avançado a partir de um Preliminar: planejador e rota (fatia 2 de 4)
+
+- Entrega: `POST /estudos/:id/derivar-avancado` (`backend/rotas/derivar-avancado.ts`). A função pura
+  `planejarDerivacao` monta o estudo Avançado novo, as tipologias, o grupo de receita, as alocações, as
+  linhas de custo e o relatório a partir do valor efetivo do Preliminar (`calcularProforma`, uma só
+  vez); `executarDerivacao` grava tudo numa transação, na ordem das dependências, e vincula o criador
+  como editor. Inscrição em eventos e evento `estudo_criado` saem depois do commit. O Preliminar não é
+  alterado.
+- A conferência do VGV bruto fecha ao centavo: a diferença entre o Avançado e o Preliminar é só
+  `diferencaQuantizacao` (arredondamento das áreas), que, quando não é zero, vira item do relatório
+  (nunca um "igual" que não é). Percentuais cuja base própria do Avançado dá outro valor também são
+  declarados, com os dois valores.
+- Testes em `backend/rotas/derivar-avancado.test.ts`: o plano item a item, a equivalência com
+  `calcularFluxo`, a reconciliação de camadas, o executor com dados em memória, a rota de ponta a ponta
+  com um dublê que valida tipo, enum e coluna como o shell, e a fiação da rota. Documentação em
+  `docs/avancado.md` e `docs/modelo-de-dados.md`.
+- **Falta:** a fatia 3 (botão e tela do Preliminar, e `docs/preliminar.md`) e a fatia 4 (remoção da
+  troca de tipo). A conferência na instância Pinguim — criar um Avançado de um Preliminar real e
+  comparar o relatório com os números — fica para depois da tela.
 ## 2026-11-23 — Preliminar × Avançado: as bases equivalentes (fecha a issue 841, 5 fatias)
 
 - Decisão do dono: igualar as bases dos dois níveis (quadro de bases, mais A-a, B-a, C-a). Cinco PRs:

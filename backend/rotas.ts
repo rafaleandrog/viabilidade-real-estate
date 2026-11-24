@@ -1,6 +1,7 @@
 import '@urbiverso/sdk/express';
 import { Router } from 'express';
 import { rotasEstudos } from './rotas/estudos.js';
+import { rotasDerivarAvancado } from './rotas/derivar-avancado.js';
 import { rotasMembrosEstudo } from './rotas/membros-estudo.js';
 import { rotasImoveisEstudo } from './rotas/imoveis-estudo.js';
 import { rotasBenchmarks } from './rotas/benchmarks.js';
@@ -21,6 +22,7 @@ import { rotasLoteParametros } from './rotas/lote-parametros.js';
 export const rotas: ReturnType<typeof Router> = Router();
 
 rotas.use(rotasEstudos);
+rotas.use(rotasDerivarAvancado);
 rotas.use(rotasMembrosEstudo);
 rotas.use(rotasImoveisEstudo);
 rotas.use(rotasBenchmarks);
