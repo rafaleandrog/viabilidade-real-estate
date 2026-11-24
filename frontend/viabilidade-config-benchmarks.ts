@@ -101,7 +101,7 @@ export class ViabConfigBenchmarks extends LitElement {
         <p class="sec">
           Duas seções: os <strong>indicadores de meta</strong> (comparação verde/vermelho) e os
           <strong>indicadores de sensibilidade</strong> — as variáveis estressadas nos cenários
-          Bear/Base/Bull da Proforma. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
+          Bear/Base/Bull da Proforma e nos Cenários do Avançado. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
         </p>
 
         ${this.tipoFixo ? nothing : html`
@@ -134,7 +134,7 @@ export class ViabConfigBenchmarks extends LitElement {
 
             <section class="secao">
               <h3>Indicador de Sensibilidade</h3>
-              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma.</p>
+              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma e nos Cenários do Avançado (velocidade de vendas).</p>
               <urbi-tabela
                 .colunas=${this._colunasSensibilidade()}
                 .linhas=${this._itensSensibilidade()}
