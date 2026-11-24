@@ -6,7 +6,7 @@ import { rotuloMesRelativo } from './fluxo-shared.js';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, novaOperacaoAlternativa, planoUsarAlternativa, planoVazio,
-  lerAlternativas, gravarAlternativas, errosDoEstadoFinal,
+  lerAlternativas, gravarAlternativas, errosDoEstadoFinal, sincronizarAncoras,
   type AlternativaFunding, type IndicadoresEstrutura, type PlanoUsarAlternativa,
 } from './funding-alternativas.js';
 import './viab-num.js';
@@ -105,6 +105,14 @@ export class ViabFundingAlternativas extends LitElement {
     if (mudou.has('simular') || mudou.has('salvas')) {
       // O cache vale para UM simulador e UM conjunto de salvas: trocou, descarta.
       this._cache.clear();
+    }
+    if ((mudou.has('salvas') || mudou.has('estudoId')) && this.alternativas.length) {
+      // A âncora pode ter andado desde que a alternativa foi guardada.
+      const sinc = this.alternativas.map((a) => {
+        const ops = sincronizarAncoras(a.operacoes, this.salvas ?? []);
+        return ops === a.operacoes ? a : { ...a, operacoes: ops };
+      });
+      if (sinc.some((a, k) => a !== this.alternativas[k])) this._gravar(sinc);
     }
   }
 
@@ -260,7 +268,9 @@ export class ViabFundingAlternativas extends LitElement {
     if (v === null || v === undefined) return html`<td class="num vazio">—</td>`;
     const difere = base != null && base[k] !== v ? 'difere' : '';
     if (k === 'tirAlavancada') return html`<td class="num com-valor ${difere}">${fmtPct(v)}</td>`;
-    return html`<td class="num com-valor ${difere} ${v < 0 ? 'neg' : ''}">${fmtR$(v)}</td>`;
+    // A exposição sai em magnitude, como no resto do app; o sinal fica na cor.
+    const mostrado = k === 'exposicaoMaxima' ? Math.abs(v) : v;
+    return html`<td class="num com-valor ${difere} ${v < 0 ? 'neg' : ''}">${fmtR$(mostrado)}</td>`;
   }
 
   private _tabelaComparativa(): TemplateResult {

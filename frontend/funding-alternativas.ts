@@ -154,6 +154,33 @@ export function passosDoPlano(plano: PlanoUsarAlternativa, salvas: OperacaoFundi
   ];
 }
 
+/**
+ * O início de uma operação ancorada (evento do cronograma ou fase) é resolvido
+ * pelo servidor a cada gravação, a partir do cronograma ATUAL. Uma alternativa
+ * guardada antes de a âncora andar teria o mês velho: aqui as operações que
+ * existem no funding salvo e estão ancoradas lá recebem a âncora e o mês de
+ * hoje, para a simulação e o plano verem o que o servidor vai gravar.
+ * Não muta a entrada; devolve a mesma lista quando nada muda.
+ */
+export function sincronizarAncoras(ops: OperacaoFunding[], salvas: OperacaoFunding[]): OperacaoFunding[] {
+  const porId = new Map<IdOp, OperacaoFunding>();
+  for (const s of salvas) if (s.id != null) porId.set(s.id, s);
+  let mudou = false;
+  const saida = ops.map((o) => {
+    const salva = o.id != null ? (porId.get(o.id) as any) : undefined;
+    if (!salva || salva.tipo !== o.tipo) return o;
+    const ev = salva.cronograma_evento;
+    const ancoradaNoSalvo = (!!ev && ev !== 'customizado') || salva.fase_ancora_id != null;
+    if (!ancoradaNoSalvo) return o;
+    const atual = o as any;
+    if (atual.inicio_mes === salva.inicio_mes && atual.cronograma_evento === ev
+      && (atual.fase_ancora_id ?? null) === (salva.fase_ancora_id ?? null)) return o;
+    mudou = true;
+    return { ...o, inicio_mes: salva.inicio_mes, cronograma_evento: ev, fase_ancora_id: salva.fase_ancora_id ?? null } as OperacaoFunding;
+  });
+  return mudou ? saida : ops;
+}
+
 export function planoVazio(p: PlanoUsarAlternativa): boolean {
   return p.criar.length === 0 && p.atualizar.length === 0 && p.remover.length === 0;
 }

@@ -6,7 +6,7 @@ import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFundin
 import { mesRepasse } from './fluxo-shared.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
-  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, type AlternativaFunding,
+  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, type AlternativaFunding,
 } from './funding-alternativas.js';
 
 const CRONO = [
@@ -471,4 +471,25 @@ test('errosDoEstadoFinal: recusa o que o servidor recusa (taxa negativa, carênc
   assert.equal(errosDoEstadoFinal(altCom({ ...BASE_POR_TIPO.divida, periodo_carencia_meses: 30 } as unknown as OperacaoFunding)).length, 1);
   assert.equal(errosDoEstadoFinal(altCom({ ...BASE_POR_TIPO.divida, ativo: false } as unknown as OperacaoFunding)).length, 1);
   assert.deepEqual(errosDoEstadoFinal(altCom(BASE_POR_TIPO.divida as unknown as OperacaoFunding)), []);
+});
+
+test('sincronizarAncoras: operação ancorada no salvo recebe o mês de hoje; customizada e nova não mudam', () => {
+  const salvas = [
+    { id: 1, tipo: 'divida', nome: 'A', valor: 1, inicio_mes: 12, cronograma_evento: 'obra' },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 1, inicio_mes: 3, fase_ancora_id: 9, cronograma_evento: 'customizado' },
+    { id: 3, tipo: 'divida', nome: 'C', valor: 1, inicio_mes: 5, cronograma_evento: 'customizado' },
+  ] as any;
+  const ops = [
+    { ...salvas[0], inicio_mes: 4 },          // âncora andou de 4 para 12
+    { ...salvas[1], inicio_mes: 0 },          // fase andou de 0 para 3
+    { ...salvas[2], inicio_mes: 8 },          // customizada: o mês digitado vale
+    { tipo: 'divida', nome: 'nova', valor: 1, inicio_mes: 2 },
+  ] as any;
+  const copia = JSON.parse(JSON.stringify(ops));
+  const r = sincronizarAncoras(ops, salvas) as any[];
+  assert.deepEqual(r.map((o) => o.inicio_mes), [12, 3, 8, 2]);
+  assert.deepEqual(ops, copia, 'não muta a entrada');
+  // Já sincronizada: devolve a mesma lista, e o plano não vê mudança de início.
+  assert.equal(sincronizarAncoras(r, salvas), r);
+  assert.deepEqual(planoUsarAlternativa(salvas, { id: 'a', nome: 'x', operacoes: r.slice(0, 3) }), { criar: [], atualizar: [{ id: 3, campos: { inicio_mes: 8 } }], remover: [] });
 });
