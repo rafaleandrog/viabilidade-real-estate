@@ -1039,10 +1039,6 @@ test('campos aposentados pela `041` (marketing global e valor venal) de cliente 
   }
 });
 
-// #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarProdutosParaSubmissao`
-// é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
-// servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
-// "a API não contorna a tela" passaria a valer só na tela.
 test('fiação: o handler do PATCH não converte mais produtos nem troca o tipo', () => {
   const ini = FONTE_ROTA.indexOf("rotasEstudos.patch('/estudos/:id'");
   const fim = FONTE_ROTA.indexOf('async function removerEstudo', ini);
@@ -1054,6 +1050,10 @@ test('fiação: o handler do PATCH não converte mais produtos nem troca o tipo'
   assert.equal(FONTE_ROTA.includes('areasParaTrocarDeTipo'), false);
 });
 
+// #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarProdutosParaSubmissao`
+// é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
+// servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
+// "a API não contorna a tela" passaria a valer só na tela.
 test('#781/#784 fiação: POST /estudos/:id/status recusa em_analise (Loteamento e Incorporação) com soma ≠ 100% da base', () => {
   for (const parte of [
     "(novoStatus === 'em_analise' || novoStatus === 'aprovado')",

@@ -185,8 +185,8 @@ export function montarPatchEstudo(
     uf?: string | null;
     sequencia?: number | null;
     // #660: o `nome` PERSISTIDO. Ele entra porque a recomposição dispara também
-    // quando só a UF ou só o tipo mudam — e nesses PATCHes o nome não vem no
-    // corpo. Sem ele, mudar a UF gravaria um nome de exibição SEM o nome.
+    // quando só a UF muda — e nesse PATCH o nome não vem no corpo. Sem ele,
+    // mudar a UF gravaria um nome de exibição SEM o nome.
     nome?: string | null;
   },
 ): { dados: Record<string, any> } | { http: number; codigo: string; mensagem: string } {
@@ -290,8 +290,7 @@ export function montarPatchEstudo(
   // ⚠️ **Dispara quando QUALQUER parte componente muda, não só o `nome`.** A
   // primeira versão condicionava a recomposição a `dados.nome !== undefined`, e
   // isso reproduzia o próprio defeito da issue pelos outros dois eixos: um PATCH
-  // que mudasse só a UF,
-  // gravava a parte nova e deixava o `nome_exibicao` com a antiga — a tela
+  // que mudasse só a UF gravava a parte nova e deixava o `nome_exibicao` com a antiga — a tela
   // exibindo o rótulo velho para sempre, que é exatamente o que a #660 conserta.
   //
   // Cada parte vem do CORPO quando ele a traz, e do registro persistido quando
