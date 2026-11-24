@@ -5,7 +5,7 @@ import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFunding } from './funding-motor.js';
 import { mesRepasse } from './fluxo-shared.js';
 import {
-  MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
+  MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
   novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, type AlternativaFunding,
 } from './funding-alternativas.js';
 
@@ -373,13 +373,84 @@ test('alternativas: sem storage utilizável, gravar e ler devolve da memória', 
   assert.deepEqual(lerAlternativas(31, lanca), []);
 });
 
-test('alternativas: storage normal tem precedência sobre a memória e mantém o comportamento antigo', () => {
+test('alternativas: a memória da página vence o storage (cota cheia: setItem falha e getItem devolve o velho)', () => {
   limparCacheAlternativas();
   const st = storageFalso();
-  const a = [alternativaDoSalvo(SALVAS, 'A', 'a')];
-  assert.equal(gravarAlternativas(33, a, st), true);
-  assert.deepEqual(lerAlternativas(33, st), a);
+  const velha = [alternativaDoSalvo(SALVAS, 'Velha', 'v')];
+  const nova = [alternativaDoSalvo(SALVAS, 'Nova', 'n')];
+  assert.equal(gravarAlternativas(33, velha, st), true);
+  const cheio = { getItem: (k: string) => st.getItem(k), setItem() { throw new Error('QuotaExceeded'); } } as unknown as Storage;
+  assert.equal(gravarAlternativas(33, nova, cheio), false);
+  assert.deepEqual(lerAlternativas(33, cheio), nova);
+  assert.deepEqual(lerAlternativas(33, st), nova);
+  // primeira leitura da página (memória sem a chave): lê o storage; corrompido vira []
+  limparCacheAlternativas();
+  assert.deepEqual(lerAlternativas(33, st), velha);
   st.setItem('viab:funding-alternativas:33', '{não é json');
   assert.deepEqual(lerAlternativas(33, st), []);
   limparCacheAlternativas();
+});
+
+// ── paridade com o servidor ─────────────────────────────────────────
+// O frontend não importa de `backend/`, mas este teste carrega o módulo do
+// servidor em tempo de execução: trava que `validarOperacaoComoServidor`
+// aceite/recuse exatamente o que `validarCamposOperacao` aceita/recusa. O
+// especificador é uma variável de propósito: um `import` estático arrastaria o
+// typecheck do backend (augmentação de tipos do SDK) para o do frontend.
+const CAMINHO_BACKEND_FUNDING = '../backend/rotas/funding.ts';
+async function validarCamposOperacao(op: Record<string, any>): Promise<string | null> {
+  const mod = await import(CAMINHO_BACKEND_FUNDING);
+  return mod.validarCamposOperacao(op);
+}
+
+const BASE_POR_TIPO: Record<string, Record<string, any>> = {
+  financiamento_producao: { tipo: 'financiamento_producao', nome: 'F', ativo: true, valor: 100, taxa_anual: 12, percentual_financiavel: 50, exposicao_minima: 10, periodo_amortizacao_meses: 24, periodo_carencia_meses: 6, aporte_meses: 3, inicio_mes: 1, custo_linha_ids: [1, 2] },
+  divida: { tipo: 'divida', nome: 'D', ativo: true, valor: 100, taxa_anual: 12, periodo_amortizacao_meses: 24, periodo_carencia_meses: 6, taxa_estruturacao_pct: 1, outros_encargos_iniciais: 0, inicio_mes: 2, aporte_meses: 1, cronograma_evento: 'obra' },
+  equity: { tipo: 'equity', nome: 'E', ativo: true, valor: 100, pct_retorno: 30, modo_retorno: 'permuta_financeira', taxa_administracao_mensal: 0, inicio_mes: 1, aporte_meses: 2 },
+  antecipacao_recebiveis: { tipo: 'antecipacao_recebiveis', nome: 'A', ativo: true, valor: 100, taxa_anual: 20, pct_carteira_cedida: 40, taxa_estruturacao_pct: 1, inicio_mes: 3 },
+};
+const CAMPOS_NUM = [
+  'valor', 'inicio_mes', 'aporte_meses', 'taxa_anual', 'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
+  'exposicao_minima', 'percentual_financiavel', 'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais', 'pct_carteira_cedida',
+];
+
+function casosDeParidade(): Array<[string, Record<string, any>]> {
+  const casos: Array<[string, Record<string, any>]> = [];
+  for (const [tipo, base] of Object.entries(BASE_POR_TIPO)) {
+    casos.push([`${tipo} base`, base]);
+    for (const campo of CAMPOS_NUM) {
+      for (const v of [-1, 101, 'x', null, 0, 50]) casos.push([`${tipo} ${campo}=${JSON.stringify(v)}`, { ...base, [campo]: v }]);
+    }
+    casos.push([`${tipo} carência>=amort`, { ...base, periodo_amortizacao_meses: 12, periodo_carencia_meses: 12 }]);
+    casos.push([`${tipo} carência>amort`, { ...base, periodo_amortizacao_meses: 12, periodo_carencia_meses: 20 }]);
+    casos.push([`${tipo} amort 0 carência 5`, { ...base, periodo_amortizacao_meses: 0, periodo_carencia_meses: 5 }]);
+    casos.push([`${tipo} aporte_meses 0`, { ...base, aporte_meses: 0 }]);
+    for (const a of ['sim', false, true, null, 1]) casos.push([`${tipo} ativo=${JSON.stringify(a)}`, { ...base, ativo: a }]);
+    casos.push([`${tipo} tipo inválido`, { ...base, tipo: 'xx' }]);
+    casos.push([`${tipo} modo inválido`, { ...base, modo_retorno: 'xx' }]);
+    casos.push([`${tipo} evento inválido`, { ...base, cronograma_evento: 'xx' }]);
+    casos.push([`${tipo} evento válido`, { ...base, cronograma_evento: 'lancamento' }]);
+    for (const l of [['a'], 'x', [1, '2'], [null], []]) casos.push([`${tipo} custo_linha_ids=${JSON.stringify(l)}`, { ...base, custo_linha_ids: l }]);
+  }
+  return casos;
+}
+
+test('paridade: validarOperacaoComoServidor aceita ⇔ validarCamposOperacao aceita', async () => {
+  const casos = casosDeParidade();
+  assert.ok(casos.length > 300);
+  for (const [nome, op] of casos) {
+    const servidor = await validarCamposOperacao(op);
+    assert.equal(validarOperacaoComoServidor(op) === null, servidor === null, nome);
+    assert.equal(validarOperacaoComoServidor(op), servidor, `${nome} (mensagem)`);
+  }
+});
+
+test('errosDoEstadoFinal: recusa o que o servidor recusa (taxa negativa, carência >= amortização, ativo inválido)', () => {
+  const div = { ...BASE_POR_TIPO.divida, taxa_anual: -3 } as unknown as OperacaoFunding;
+  const erros = errosDoEstadoFinal(altCom(div));
+  assert.equal(erros.length, 1);
+  assert.match(erros[0], /taxa_anual não pode ser negativo/);
+  assert.equal(errosDoEstadoFinal(altCom({ ...BASE_POR_TIPO.divida, periodo_carencia_meses: 30 } as unknown as OperacaoFunding)).length, 1);
+  assert.equal(errosDoEstadoFinal(altCom({ ...BASE_POR_TIPO.divida, ativo: false } as unknown as OperacaoFunding)).length, 1);
+  assert.deepEqual(errosDoEstadoFinal(altCom(BASE_POR_TIPO.divida as unknown as OperacaoFunding)), []);
 });

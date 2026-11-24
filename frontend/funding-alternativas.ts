@@ -209,14 +209,77 @@ const ROTULO_MODO: Record<string, string> = {
   resultado_final: 'Resultado final',
 };
 
+// Espelham as listas de `backend/rotas/funding.ts` (o frontend não importa de
+// `backend/`: bundles separados). O teste de paridade em
+// `funding-alternativas.test.ts` trava a divergência contra `validarCamposOperacao`.
+const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
+const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
+const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
+const CAMPOS_NAO_NEGATIVOS = [
+  'valor', 'inicio_mes', 'aporte_meses', 'taxa_anual',
+  'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
+  'exposicao_minima', 'percentual_financiavel',
+  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
+  'pct_carteira_cedida',
+];
+const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct', 'pct_carteira_cedida'];
+
+/**
+ * Reproduz TODAS as regras de `validarCamposOperacao` (backend/rotas/funding.ts),
+ * na mesma ordem e com as mesmas condições. Devolve a mensagem ou `null`.
+ * Fail-closed: o que o servidor recusaria, o painel recusa antes de gravar.
+ */
+export function validarOperacaoComoServidor(dados: Record<string, any>): string | null {
+  if (dados.tipo !== undefined && !TIPOS_OPERACAO.includes(dados.tipo)) {
+    return `tipo deve ser um de: ${TIPOS_OPERACAO.join(', ')}`;
+  }
+  if (dados.modo_retorno !== undefined && !MODOS_RETORNO.includes(dados.modo_retorno)) {
+    return `modo_retorno deve ser um de: ${MODOS_RETORNO.join(', ')}`;
+  }
+  if (dados.cronograma_evento !== undefined && !EVENTOS_ANCORA.includes(dados.cronograma_evento)) {
+    return `cronograma_evento deve ser um de: ${EVENTOS_ANCORA.join(', ')}`;
+  }
+  for (const campo of CAMPOS_NAO_NEGATIVOS) {
+    if (dados[campo] === undefined || dados[campo] === null) continue;
+    const v = Number(dados[campo]);
+    if (!Number.isFinite(v)) return `${campo} deve ser numérico`;
+    if (v < 0) return `${campo} não pode ser negativo`;
+  }
+  for (const campo of CAMPOS_PERCENTUAL_0_100) {
+    if (dados[campo] === undefined || dados[campo] === null) continue;
+    if (Number(dados[campo]) > 100) return `${campo} não pode passar de 100`;
+  }
+  if (dados.custo_linha_ids !== undefined && dados.custo_linha_ids !== null) {
+    const lista = dados.custo_linha_ids;
+    if (!Array.isArray(lista) || !lista.every((v: any) => Number.isFinite(Number(v)))) {
+      return 'custo_linha_ids deve ser uma lista de números';
+    }
+  }
+  const amort = dados.periodo_amortizacao_meses;
+  const carencia = dados.periodo_carencia_meses;
+  if (amort !== undefined && carencia !== undefined && Number(carencia) >= Number(amort) && Number(amort) > 0) {
+    return 'periodo_carencia_meses deve ser menor que periodo_amortizacao_meses';
+  }
+  if (dados.aporte_meses !== undefined && Number(dados.aporte_meses) < 1) {
+    return 'aporte_meses deve ser pelo menos 1';
+  }
+  if (dados.ativo !== undefined && typeof dados.ativo !== 'boolean') {
+    return 'ativo deve ser um booleano';
+  }
+  if (dados.ativo === false && dados.tipo !== 'financiamento_producao') {
+    return 'ativo só é aplicável ao Financiamento à produção';
+  }
+  return null;
+}
+
 /**
  * Espelho das regras do servidor (`somaRetornoExcede` e `validarCamposOperacao`
  * de `backend/rotas/funding.ts`) sobre o ESTADO FINAL da alternativa, antes de
  * gravar qualquer passo. Considera só as operações incluídas (as marcadas
  * `__fora` e o Financiamento à produção com `ativo === false` não entram, como
- * na simulação). Espelha: soma de `pct_retorno` dos equities por modo <= 100
- * (tolerância 100.01; modo padrão permuta_financeira), `pct_retorno` e `valor`
- * negativos e `pct_retorno` acima de 100. Devolve uma mensagem por problema.
+ * na simulação). Aplica `validarOperacaoComoServidor` a cada uma e soma
+ * `pct_retorno` dos equities por modo <= 100 (tolerância 100.01; modo padrão
+ * permuta_financeira). Devolve uma mensagem por problema.
  */
 export function errosDoEstadoFinal(alt: AlternativaFunding): string[] {
   const erros: string[] = [];
@@ -225,12 +288,10 @@ export function errosDoEstadoFinal(alt: AlternativaFunding): string[] {
   const porModo = new Map<string, number>();
   for (const o of incluidas) {
     const nome = o.nome || ROTULO_TIPO_ERRO[o.tipo] || o.tipo;
-    const valor = Number((o as any).valor);
-    if (Number.isFinite(valor) && valor < 0) erros.push(`"${nome}": o valor não pode ser negativo.`);
+    const msg = validarOperacaoComoServidor(o as any);
+    if (msg) erros.push(`"${nome}": ${msg}.`);
     if (o.tipo !== 'equity') continue;
     const pct = Number((o as any).pct_retorno) || 0;
-    if (pct < 0) erros.push(`"${nome}": o retorno não pode ser negativo.`);
-    if (pct > 100) erros.push(`"${nome}": o retorno não pode passar de 100%.`);
     const modo = String((o as any).modo_retorno ?? 'permuta_financeira');
     porModo.set(modo, (porModo.get(modo) ?? 0) + pct);
   }
@@ -269,16 +330,22 @@ function storagePadrao(): Storage | null {
 const daMemoria = (estudoId: number | string): AlternativaFunding[] =>
   (memoria.get(chaveDe(estudoId)) ?? []).slice(0, MAX_ALTERNATIVAS);
 
-/** Lê as alternativas do estudo; storage ausente, que lança ou sem a chave cai na memória; dado inválido vira `[]`. */
+/**
+ * Lê as alternativas do estudo. A memória da página, quando tem a chave, vence:
+ * ela é gravada junto com o storage e é pelo menos tão nova (com a cota cheia o
+ * `setItem` falha e o `getItem` devolveria a versão velha). O storage só é lido
+ * na primeira leitura da página; dado inválido vira `[]`.
+ */
 export function lerAlternativas(estudoId: number | string, storage?: Storage | null): AlternativaFunding[] {
+  if (memoria.has(chaveDe(estudoId))) return daMemoria(estudoId);
   let bruto: string | null | undefined;
   try {
     const st = storage === undefined ? storagePadrao() : storage;
     bruto = st?.getItem(chaveDe(estudoId));
   } catch {
-    return memoria.has(chaveDe(estudoId)) ? daMemoria(estudoId) : [];
+    return [];
   }
-  if (!bruto) return memoria.has(chaveDe(estudoId)) ? daMemoria(estudoId) : [];
+  if (!bruto) return [];
   try {
     const dado = JSON.parse(bruto);
     if (!Array.isArray(dado)) return [];
