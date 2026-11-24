@@ -563,13 +563,13 @@ test('14: executor com dados em memória — ordem das tabelas, ids remapeados e
 });
 
 // ── Rota de ponta a ponta, com o validador do shell ──
-function criarApp(mem: Mem, contexto: Record<string, any> = { nivelApp: 'admin', usuario: { id: 1, nome: 'Teste' } }) {
+function criarApp(mem: Mem, contexto: Record<string, any> = { nivelApp: 'admin', usuario: { id: 1, nome: 'Teste' } }, aliquotaParametro: unknown = 4) {
   const app = express();
   app.use(express.json());
   app.use((req: any, _res, next) => {
     req.dados = mem;
     req.contexto = contexto;
-    req.parametros = { obter: async () => 4 };
+    req.parametros = { obter: async () => aliquotaParametro };
     req.eventos = { publicar: async () => {}, inscreverUsuario: async () => {}, cancelarInscricao: async () => {} };
     next();
   });
@@ -670,4 +670,55 @@ test('15: fiação — a rota planeja, grava na transação, e só depois inscre
   const rotas = readFileSync(new URL('../rotas.ts', import.meta.url), 'utf8');
   assert.ok(rotas.includes("from './rotas/derivar-avancado.js'"), 'backend/rotas.ts importa o router');
   assert.ok(/rotas\.use\(rotasDerivarAvancado\)/.test(rotas), 'backend/rotas.ts registra o router');
+});
+
+
+// ── B1: o plano é a fonte única do catálogo copiado ──
+test('B1: o catálogo gravado é o do plano, não uma segunda leitura da origem', async () => {
+  const produtos = catalogoBase();
+  const plano = planoPronto(estudoInc(), produtos);
+  assert.equal(plano.produtosOrigem.length, produtos.length);
+
+  // O "banco" tem, na origem, um catálogo editado depois da leitura que gerou o plano.
+  const mem = new Mem();
+  for (const p of produtos) mem.semear('preliminar_produtos', { ...p, estudo_id: 7, nome: 'EDITADO DEPOIS', unidades: 999 });
+  const trx = new Mem('trx', mem);
+  const { novo } = await executarDerivacao(trx as any, 7, plano, 1);
+  const copiados = mem.linhas('preliminar_produtos').filter((p) => p.estudo_id === Number(novo.id));
+  assert.equal(copiados.length, produtos.length);
+  assert.ok(copiados.every((p) => p.nome !== 'EDITADO DEPOIS' && p.unidades !== 999), 'a cópia vem do plano');
+  assert.deepEqual(copiados.map((p) => p.nome).sort(), produtos.map((p) => p.nome).sort());
+});
+
+// ── Observação 2: permuta por produto acima das unidades do produto ──
+test('permuta por produto limitada às unidades do produto — nota com os dois números e alerta', () => {
+  const produtos = catalogoBase();
+  const un = Number(produtos[0].unidades);
+  produtos[0].unidades_permutadas = un + 5;
+  const plano = planejarDerivacao(estudoInc(), produtos, OPTS);
+  const it = plano.relatorio.find((r) => /Permuta física/.test(r.origem) && /declara/.test(r.nota ?? ''));
+  assert.ok(it, 'item de relatório com a limitação');
+  assert.equal(it!.alerta, true);
+  assert.ok((it!.nota ?? '').includes(String(un + 5)) && (it!.nota ?? '').includes(String(un)));
+  assert.ok(!/exatamente/.test(it!.nota ?? ''));
+  // Dentro do limite, a nota segue dizendo "exatamente" e sem alerta.
+  const ok = catalogoBase();
+  ok[0].unidades_permutadas = 3;
+  const itOk = planejarDerivacao(estudoInc(), ok, OPTS).relatorio.find((r) => /exatamente/.test(r.nota ?? ''));
+  assert.ok(itOk && !itOk.alerta);
+});
+
+// ── Observação 6: parâmetro vazio não vira alíquota 0 ──
+test('rota: parâmetro de alíquota vazio não vira 0 — vale o ret_pct copiado, com alerta', async () => {
+  for (const ruim of ['', null]) {
+    const mem = new Mem();
+    const id = semearPreliminar(mem, { sujeito_ret: true, ret_pct: '3.50' });
+    await comServidor(criarApp(mem, undefined, ruim), async (base) => {
+      const res = await fetch(`${base}/estudos/${id}/derivar-avancado`, { method: 'POST' });
+      const corpo = await res.json();
+      assert.equal(res.status, 201, JSON.stringify(corpo));
+      assert.equal(corpo.estudo.ret_pct, 3.5);
+      assert.ok(corpo.relatorio.some((r: any) => r.alerta === true && /alíquota/.test(r.nota ?? '')));
+    });
+  }
 });

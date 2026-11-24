@@ -8,7 +8,7 @@ import {
   type LinhaCronograma,
 } from './avancado.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
-import { coagirNumericosOuLancar, idDeRota } from './coercao-numerica.js';
+import { coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
 import {
   calcularProforma, catalogoEfetivo, produtoCompoeCatalogo, produtosDoEstudo, tipoProdutoEfetivo,
   vgvBrutoDeProforma, type ProformaInput,
@@ -112,6 +112,12 @@ export interface PlanoDerivacao {
   custos: CustoPlanejado[];
   relatorio: ItemRelatorio[];
   conferencia: ConferenciaVgv;
+  /**
+   * As linhas CRUAS do catálogo que geraram este plano. O executor copia `preliminar_produtos`
+   * a partir delas, e não de uma segunda leitura: uma edição do catálogo entre as duas leituras
+   * faria tipologias/custos/conferência descreverem um catálogo e o estudo novo guardar outro.
+   */
+  produtosOrigem: Record<string, any>[];
 }
 
 // As doze colunas de permuta física do `estudos` (par residencial e par `_nr_`). NÃO viajam: no
@@ -280,9 +286,15 @@ export function planejarDerivacao(
     if (porProduto.length > 0) {
       for (const i of porProduto) {
         const un = Math.round(unidadesPermutadasDoProduto(catalogo[i] as any));
+        const declarado = Number((catalogo[i] as any).unidades_permutadas);
+        const limitado = Number.isFinite(declarado) && declarado > un + 1e-9;
         permutas.push(linhaPermuta(i, un));
         item(`${rotulo} — ${tipologias[i].nome}`, 'Custos › Terreno › Preço › Permuta física',
-          `${un} unidade(s) da tipologia "${tipologias[i].nome}"`, 'As unidades declaradas no produto foram levadas exatamente.');
+          `${un} unidade(s) da tipologia "${tipologias[i].nome}"`,
+          limitado
+            ? `O produto declara ${declarado} unidade(s) em permuta, mas tem só ${un}; a permuta foi limitada às unidades do produto (${un}).`
+            : 'As unidades declaradas no produto foram levadas exatamente.',
+          limitado);
       }
       continue;
     }
@@ -594,6 +606,7 @@ export function planejarDerivacao(
     custos: todos.map((c) => c.linha),
     relatorio,
     conferencia,
+    produtosOrigem: [...(produtos ?? [])],
   };
 }
 
@@ -621,8 +634,11 @@ export async function executarDerivacao(
   }
 
   // Catálogo de produtos, análise de mercado e apelo comercial, como na duplicação.
+  // O catálogo de produtos NÃO é relido: vem do plano, a mesma leitura que gerou tipologias e custos.
   for (const { tabela, campos } of FILHAS_SIMPLES) {
-    const linhas = await dados.varrerTudo(tabela, { filtros: { estudo_id: origemId } });
+    const linhas = tabela === 'preliminar_produtos'
+      ? plano.produtosOrigem
+      : await dados.varrerTudo(tabela, { filtros: { estudo_id: origemId } });
     for (const copiaFilha of montarCopiasFilhas(linhas as any[], novoId, campos)) {
       await dados.criar(tabela, coagirNumericosOuLancar(tabela, omitirValoresNulos(copiaFilha)));
     }
@@ -701,8 +717,8 @@ rotasDerivarAvancado.post('/estudos/:id/derivar-avancado', async (req: Request, 
     const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
     let aliquotaRet: number | null = null;
     try {
-      const v = Number(await req.parametros!.obter('aliquota_ret_pct'));
-      aliquotaRet = Number.isFinite(v) ? v : null;
+      // Parser estrito: `null`/`''` não viram 0.
+      aliquotaRet = numeroEstrito(await req.parametros!.obter('aliquota_ret_pct'));
     } catch { aliquotaRet = null; }
     const cronograma = recalcularTravados(
       cronogramaPadrao().filter((c) => orig.tem_pre_lancamento !== false || c.evento !== 'pre_lancamento'),
