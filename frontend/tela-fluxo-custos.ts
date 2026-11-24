@@ -160,7 +160,7 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   diretos: {
     'Marketing & Publicidade': ['rs', 'pct_vgv', 'pct_recebido'],
     'Corretagem de vendas':    ['pct_vgv'],
-    'Projetos':                ['rs', 'rs_m2_priv', 'pct_constr'],
+    'Projetos':                ['rs', 'rs_m2_priv', 'pct_vgv', 'pct_constr'],
     'Licenças e Aprovações':   ['rs', 'rs_m2_priv'],
     [CATEGORIA_MANUTENCAO_POS_OBRA]: ['rs', 'pct_vgv', 'pct_recebido'],
     'Outro':                   ['rs', 'pct_vgv', 'pct_recebido'],

@@ -58,7 +58,7 @@ UNIDADES_POR_CATEGORIA = {
     ('obra', 'Construção'): ['rs', 'rs_m2_priv'], ('obra', 'Outorga'): ['rs', 'pct_vgv'], ('obra', 'Decoração'): ['rs', 'rs_m2_priv'],
     ('obra', 'Gestão da obra'): ['rs', 'pct_obra'], ('obra', 'Contingência'): ['rs', 'pct_vgv'], ('obra', 'Outro'): ['rs', 'pct_vgv'],
     ('diretos', 'Marketing & Publicidade'): ['rs', 'pct_vgv', 'pct_recebido'], ('diretos', 'Corretagem de vendas'): ['pct_vgv'],
-    ('diretos', 'Projetos'): ['rs', 'rs_m2_priv', 'pct_constr'], ('diretos', 'Licenças e Aprovações'): ['rs', 'rs_m2_priv'],
+    ('diretos', 'Projetos'): ['rs', 'rs_m2_priv', 'pct_vgv', 'pct_constr'], ('diretos', 'Licenças e Aprovações'): ['rs', 'rs_m2_priv'],
     ('diretos', 'Manutenção pós-obra'): ['rs', 'pct_vgv', 'pct_recebido'], ('diretos', 'Outro'): ['rs', 'pct_vgv', 'pct_recebido'],
     ('indireto', 'Marketing global'): ['rs', 'pct_vgv', 'pct_recebido'], ('indireto', 'Stand de vendas'): ['rs', 'pct_vgv'],
     ('indireto', 'Gestão'): ['rs', 'pct_vgv', 'pct_recebido'], ('indireto', 'Outro'): ['rs', 'pct_vgv', 'pct_recebido'],

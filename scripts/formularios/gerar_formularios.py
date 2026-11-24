@@ -740,7 +740,7 @@ UNIDADES_POR_CATEGORIA = {
     ('obra', 'Construção'): ['rs', 'rs_m2_priv'], ('obra', 'Outorga'): ['rs', 'pct_vgv'], ('obra', 'Decoração'): ['rs', 'rs_m2_priv'],
     ('obra', 'Gestão da obra'): ['rs', 'pct_obra'], ('obra', 'Contingência'): ['rs', 'pct_vgv'], ('obra', 'Outro'): ['rs', 'pct_vgv'],
     ('diretos', 'Marketing & Publicidade'): ['rs', 'pct_vgv', 'pct_recebido'], ('diretos', 'Corretagem de vendas'): ['pct_vgv'],
-    ('diretos', 'Projetos'): ['rs', 'rs_m2_priv', 'pct_constr'], ('diretos', 'Licenças e Aprovações'): ['rs', 'rs_m2_priv'],
+    ('diretos', 'Projetos'): ['rs', 'rs_m2_priv', 'pct_vgv', 'pct_constr'], ('diretos', 'Licenças e Aprovações'): ['rs', 'rs_m2_priv'],
     ('diretos', 'Manutenção pós-obra'): ['rs', 'pct_vgv', 'pct_recebido'], ('diretos', 'Outro'): ['rs', 'pct_vgv', 'pct_recebido'],
     ('indireto', 'Marketing global'): ['rs', 'pct_vgv', 'pct_recebido'], ('indireto', 'Stand de vendas'): ['rs', 'pct_vgv'],
     ('indireto', 'Gestão'): ['rs', 'pct_vgv', 'pct_recebido'], ('indireto', 'Outro'): ['rs', 'pct_vgv', 'pct_recebido'],
@@ -754,7 +754,7 @@ NOTA_CUSTOS = (
     'pct_recebido · pct_constr). TERRENO: Preço (rs, rs_m2_terreno; permuta financeira: rs, pct_vgv) · Registro (rs, rs_m2_priv) · Outro (rs, pct_vgv). '
     'OBRA: Construção, Decoração (rs, rs_m2_priv) · Outorga, Contingência, Outro (rs, pct_vgv) · Gestão da obra (rs, pct_obra). '
     'DIRETOS: Marketing & Publicidade, Manutenção pós-obra, Outro (rs, pct_vgv, pct_recebido) · Corretagem de vendas (pct_vgv) · '
-    'Projetos (rs, rs_m2_priv, pct_constr) · Licenças e Aprovações (rs, rs_m2_priv). INDIRETO: Marketing global, Gestão, Outro '
+    'Projetos (rs, rs_m2_priv, pct_vgv, pct_constr) · Licenças e Aprovações (rs, rs_m2_priv). INDIRETO: Marketing global, Gestão, Outro '
     '(rs, pct_vgv, pct_recebido) · Stand de vendas (rs, pct_vgv). FINANCEIRO: Juros de financiamento, Taxas bancárias, Estruturação de dívida, '
     'Investidores, Outro (rs, pct_vgv). Cronograma padrão: terreno/Preço = customizado; terreno/demais, indireto = planejamento; '
     'obra/diretos/financeiro = obra; Manutenção pós-obra = pos_obra. Início e Duração só valem com cronograma = customizado; '
@@ -1197,7 +1197,7 @@ def avancado(tipo, ex):
                f'IF(NOT(OR({combos})),"⚠ unidade não aceita nesta categoria",'
                f'IF(AND({vr}<>"",{vp}<>""),"⚠ preencha só uma linha de valor",'
                f'IF(IF(LEFT({un},3)="pct",{vp}="",{vr}=""),"⚠ falta o valor na linha certa","OK")))))')
-    f.calc('k_1pct', 'Cada 1% do VGV de tabela equivale a (para converter Projetos, que não aceita % do VGV)', 'R$',
+    f.calc('k_1pct', 'Cada 1% do VGV de tabela equivale a (para converter um custo entre R$ e % do VGV)', 'R$',
            f'{r("k_vgv")}*0.01', F_RS)
     for grp in ('terreno', 'obra', 'diretos', 'indireto', 'financeiro'):
         f.calc(f'k_g_{grp}', f'Σ custos conversíveis — {grp}', 'R$',
