@@ -3258,12 +3258,12 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 #255; o ramo da fase-âncora da API, por #938). A nota fica pela história.
 
 - **Tela:** as colunas Início e Duração decidem pelo mesmo `regimeCronogramaLinha`
-  (`frontend/tela-fluxo-custos.ts:985` e `:1016`). Construção, fase-âncora e evento fixo mostram as
+  (`frontend/tela-fluxo-custos.ts:1009` e `:1040`). Construção, fase-âncora e evento fixo mostram as
   duas grandezas como calculadas, sem campo editável.
 - **API:** nos dois ramos do PATCH de custos — fase-âncora e evento do cronograma — a âncora atual é
   sempre lida e entregue a `resolverTravamentoCusto` (`backend/rotas/avancado.ts:157`). Um corpo com
   `inicio_mes` **ou** `duracao_meses` numa linha ancorada, sem trazer a âncora, recebe 422
-  `CAMPO_TRAVADO` (`:2001` na fase, `:2012` no evento) e nada é gravado. Com a âncora no corpo
+  `CAMPO_TRAVADO` (`:2006` na fase, `:2017` no evento) e nada é gravado. Com a âncora no corpo
   (`fase_ancora_id`, ou um `cronograma_evento` diferente de `customizado`, mesmo repetindo a atual),
   início e duração são recalculados a partir dela e os valores enviados são ignorados.
 
