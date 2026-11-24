@@ -13,9 +13,9 @@ import {
   urbiVerso,
   buscarParametrosAvancado, atualizarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
-  listarFasesAvancado, listarTipologiasCatalogo, atualizarEstudo,
+  listarFasesAvancado, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
-import { calcularFluxo, vgvVendavelPorLinha, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { calcularFluxo, vgvVendavelPorLinha, vgvVendavelTotalBase, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
   OPCOES_REGIME_IMPOSTO, aliquotaDoRegime, avisoRegimeOculto, dadosEstudoDoImpostoSalvo, erroAliquotaImposto, erroFormImposto,
   formImpostoAlterado, formImpostoDeParametros,
@@ -160,7 +160,7 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   diretos: {
     'Marketing & Publicidade': ['rs', 'pct_vgv', 'pct_recebido'],
     'Corretagem de vendas':    ['pct_vgv'],
-    'Projetos':                ['rs', 'rs_m2_priv', 'pct_constr'],
+    'Projetos':                ['rs', 'rs_m2_priv', 'pct_vgv', 'pct_constr'],
     'Licenças e Aprovações':   ['rs', 'rs_m2_priv'],
     [CATEGORIA_MANUTENCAO_POS_OBRA]: ['rs', 'pct_vgv', 'pct_recebido'],
     'Outro':                   ['rs', 'pct_vgv', 'pct_recebido'],
@@ -302,15 +302,11 @@ export class ViabFluxoCustos extends LitElement {
   private imposto: ImpostoReceita | undefined = undefined;
   @state() private impostoForm: FormImposto = { regime: 'padrao', retPct: 4, padraoPct: 0 };
   @state() private salvandoImposto = false;
-  // #473: base da Corretagem de vendas quanto à permuta física —
-  // `estudos.corretagem_sobre_permuta_fisica`, salva na hora do toggle (sem
-  // rascunho: é um booleano isolado, não precisa do padrão Salvar do RET).
-  @state() private salvandoCorretagemPermuta = false;
   @state() private carregando = true;
   @state() private removerAlvo: any = null;
   // #192: empilha "Gestão da obra" junto da Construção nos gráficos de avanço.
   @state() private incluirGestaoObra = false;
-  private ctxCusto: ContextoCusto = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0 };
+  private ctxCusto: ContextoCusto = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, vgvVendavel: 0 };
   // #192: insumos do motor guardados para os gráficos de avanço da obra —
   // rodar `calcularFluxo` aqui é o que garante que os valores batam com a
   // linha Construção do Fluxo de Caixa, em vez de redistribuir por conta.
@@ -354,7 +350,14 @@ export class ViabFluxoCustos extends LitElement {
   // Contexto sem as bases que dependem de outros custos (`totalObra`,
   // `totalConstrucao`) — o ponto de partida das duas.
   private _ctxBase(): ContextoCusto {
-    return { ...this.ctxCusto, receitaTotal: this._receitaTotal(), receitaRecebida: this._receitaRecebida() };
+    return { ...this.ctxCusto, receitaTotal: this._receitaTotal(), receitaRecebida: this._receitaRecebida(), vgvVendavel: this._vgvVendavel() };
+  }
+
+  // Base de `% do VGV`: o VGV VENDÁVEL (potencial menos a permuta física), a
+  // mesma grandeza que o motor usa em `pct_vgv`. Calculada a cada leitura,
+  // como `_receitaTotal()`: as linhas de permuta física mudam sem recarregar.
+  private _vgvVendavel(): number {
+    return vgvVendavelTotalBase(this.linhasReceita, this.custos);
   }
 
   // Base de `% Receita`: o VGV VENDÁVEL de cada linha (a permuta física fica
@@ -537,6 +540,8 @@ export class ViabFluxoCustos extends LitElement {
         areaPrivativaTotal: areaPrivativaTotalLinhas(linhas),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
+        // Placeholder: a base viva de `pct_vgv` sai de `_vgvVendavel()` em `_ctxBase()`.
+        vgvVendavel: 0,
       };
       // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
       // custos já carregados. Editável apenas (#120).
@@ -581,7 +586,6 @@ export class ViabFluxoCustos extends LitElement {
         </div>
 
         ${g.id === 'financeiro' ? this._renderImposto() : nothing}
-        ${g.id === 'diretos' ? this._renderCorretagemPermutaFisica() : nothing}
 
         <urbi-tabela
           expandir
@@ -640,40 +644,6 @@ export class ViabFluxoCustos extends LitElement {
     `;
   }
 
-  // #473: toggle da base da Corretagem de vendas quanto à permuta física —
-  // `estudos.corretagem_sobre_permuta_fisica`, default `true` (VGV bruto,
-  // permuta física inclusa — preserva o número de todo estudo existente).
-  // Salva na hora do toggle (não precisa de rascunho: é um booleano isolado).
-  private _renderCorretagemPermutaFisica(): TemplateResult {
-    const dis = !this.editavel;
-    const marcado = this.estudo?.corretagem_sobre_permuta_fisica !== false;
-    return html`
-      <div class="ret-box">
-        <urbi-checkbox
-          label="Corretagem incide sobre a permuta física"
-          title="Marcado (padrão): a corretagem é cobrada também sobre as unidades permutadas fisicamente pelo terreno. Desmarcado: a corretagem incide só sobre a base vendável, excluindo a permuta física."
-          ?desabilitado=${dis || this.salvandoCorretagemPermuta}
-          ?marcado=${marcado}
-          @urbi:checkbox-change=${(e: CustomEvent) => this._salvarCorretagemPermutaFisica(e.detail.marcado)}
-        ></urbi-checkbox>
-      </div>
-    `;
-  }
-
-  private async _salvarCorretagemPermutaFisica(v: boolean) {
-    this.salvandoCorretagemPermuta = true;
-    try {
-      const res = await atualizarEstudo(this.estudo.id, { corretagem_sobre_permuta_fisica: v });
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      this.estudo = { ...this.estudo, corretagem_sobre_permuta_fisica: v };
-      urbiVerso.notificar('Base da corretagem atualizada.', 'sucesso');
-    } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar a base da corretagem', 'erro');
-    } finally {
-      this.salvandoCorretagemPermuta = false;
-    }
-  }
-
   // ── #192: gráficos de avanço da obra (só a linha Projetado) ──────────────
   //
   // Escopo decidido pelo autor (2026-07-27): a referência visual da planilha
@@ -713,8 +683,6 @@ export class ViabFluxoCustos extends LitElement {
       curvas: this.curvas,
       areaTerreno: this.ctxCusto.areaTerreno,
       ret: this.imposto,
-      // #473: default true preserva o comportamento histórico (VGV bruto).
-      corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
       // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba
       // Viabilidade → Financeiro (`estudos.juros_tabela_aa_padrao`). Campo
       // OBRIGATORIO de `FluxoConfig`: parar de passa-lo vira TS2741, nao silencio.
@@ -1211,7 +1179,7 @@ export class ViabFluxoCustos extends LitElement {
     return {
       areaPrivativa: this.ctxCusto.areaPrivativaTotal,
       areaTerreno: this.ctxCusto.areaTerreno,
-      vgv: this.ctxCusto.vgvTotal,
+      vgv: this._vgvVendavel(),
       receita: this._receitaTotal(),
       // #514: mesma base que o motor usa para `pct_obra`.
       obra: this._totalObra(excluirId),

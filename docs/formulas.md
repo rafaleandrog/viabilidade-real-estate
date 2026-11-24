@@ -83,7 +83,7 @@ permuta pelas premissas de preço por m² por uso.
 
 Imposto (a alíquota do RET, parâmetro do app, quando o estudo está **Sujeito a RET**; senão a
 alíquota digitada), corretagem, marketing e as permutas financeiras — cada uma em % do VGV da sua
-categoria na Incorporação; no Loteamento só a residencial existe, sobre o VGV único.
+categoria na Incorporação (no Avançado, % do VGV vendável, sem a permuta física); no Loteamento só a residencial existe, sobre o VGV único.
 
 ```text
 Receita líquida = VGV − deduções
@@ -280,7 +280,7 @@ Nos Custos do Avançado, cada unidade percentual aplica o % sobre uma base próp
 
 | Unidade | Base |
 |---|---|
-| % VGV | VGV de tabela, somado das linhas de receita |
+| % VGV | VGV vendável (VGV potencial menos as unidades da permuta física), somado das linhas de receita |
 | % Receita | receita líquida do imposto (RET ou imposto padrão do estudo) sobre o VGV vendável, sem juros |
 | % Obra | o grupo Obras inteiro (construção, outorga, decoração, gestão da obra, contingência e outros), menos as linhas em % Obra |
 | % Recebido | receita **recebida**: a soma do recebimento bruto do fluxo, com os juros de tabela — a mesma Receita Bruta da Proforma |
@@ -305,7 +305,9 @@ Trocar a unidade não muda o canônico. Nas Premissas do Preliminar, a troca gra
 o modo: a coluna por unidade é um valor histórico que só muda quando você digita. Nos Custos do
 Avançado, que têm uma coluna única de orçamento, a troca a regrava na unidade nova com o número que
 a tela mostra. Estudos antigos continuam legíveis: o valor ativo vira canônico na primeira edição
-deliberada.
+deliberada. Nas linhas em % do VGV do Avançado, depois da atualização do app que mudou a base do
+VGV para a vendável, o valor em R$ deixa de ser o congelado e passa a ser recalculado do
+percentual gravado sobre o VGV vendável; a tela volta a congelá-lo na próxima edição da linha.
 
 ## Precisão
 

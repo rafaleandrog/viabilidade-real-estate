@@ -21,7 +21,7 @@ test('Custos do Avançado: badges % Construção / % Recebido e as bases que a t
   const m = a.extra?.['1280'] as MedidaBasesPct | undefined;
   assert.ok(m, 'o caso não devolveu a medida extra — `medir()` não rodou' + relato(a));
 
-  assert.deepEqual(m!.badgesProjetos, ['R$', 'R$/m² priv', '% Construção'], relato(a));
+  assert.deepEqual(m!.badgesProjetos, ['R$', 'R$/m² priv', '% VGV', '% Construção'], relato(a));
   assert.deepEqual(m!.badgesMarketing, ['R$', '% VGV', '% Recebido'], relato(a));
 
   // Custo de construção = 96.000.000 + 6% de gestão = 101.760.000; Projetos

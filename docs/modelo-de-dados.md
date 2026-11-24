@@ -21,6 +21,10 @@ descricao: As tabelas do app, o que cada uma guarda, as relações entre elas, o
 | `apelo_comercial_documentos` | As fontes anexadas à avaliação (`documento`, `tipo_dado`, `texto_adicional`). |
 | `analise_mercado` | O retrato de **mercado** do estudo: preço e custo por m², velocidade de vendas, macros (IPCA, Selic, INCC e Focus), `riscos` JSON, `abrangencia` (município, UF ou nacional), `origem` e `data_referencia`. Guarda só o lado mercado; o lado projeto é derivado do estudo ao renderizar, nunca persistido. Ver [Análise de Mercado](analise-mercado). |
 
+**`estudos.corretagem_sobre_permuta_fisica`:** a coluna continua no schema e a API ainda a aceita,
+mas nada a lê — a corretagem do Avançado incide sempre sobre o VGV vendável, e a tela não a oferece
+mais. Um valor gravado nela não muda custo, resultado nem indicador.
+
 **Colunas aposentadas de `estudos`:** `licenciamento_modo`, `licenciamento_pct` e
 `licenciamento_valor_fixo` estão declaradas no schema desde a primeira versão, mas nenhuma tela as
 oferece e o motor da Proforma nunca as leu — um valor gravado nelas pela API não entra em custo,

@@ -38,6 +38,71 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - Medido na Pinguim (só leitura), Preliminar com a permuta equivalente à do Avançado par: o 39 vai de
   VGV 209.250.000 para 210.000.000 e resultado +573.900; o 38, de VGV 139.704.323 para 139.797.039
   e resultado +75.285.
+## 2026-11-23 — Projetos do Avançado aceita % do VGV (fatia 3 de 5 das bases Preliminar × Avançado)
+
+- A linha de custo Projetos do Avançado passa a oferecer a unidade `% VGV`, além de R$, R$/m² priv
+  e % Construção. O servidor já aceitava a unidade em toda categoria; só o mapa de unidades por
+  categoria da tela (`UNIDADES_CAT`) a escondia. A conversão da badge e o motor
+  (`resolverCustoTotal`) já eram genéricos, então nada mais mudou. A base de `pct_vgv` não é
+  tocada aqui.
+- Teste existente alterado com autorização do dono: `custos-bases-pct.render.test.ts` travava as
+  badges de Projetos sem `% VGV`; a lista passa a incluí-lo.
+- Caso de render novo `custos-projetos-pct-vgv`: badge `% VGV` na tela, R$ da coluna Resultado e
+  base da conversão. Tirar `pct_vgv` da lista de Projetos deixa o caso vermelho.
+- Diferença medida: R$ 0 nos estudos lidos na Pinguim (21, 22, 40 e 41): nenhuma linha de Projetos
+  do Avançado está em `pct_vgv`. A rota de custos fixa `por_pagina: 500`, então a leitura não perdeu linhas.
+- Os formulários de `referencia/formularios/` e seus dois scripts (gerador e importador) espelham a
+  tabela de unidades da tela: Projetos passa a aceitar `pct_vgv` nos dois mapas, a nota e o rótulo
+  de "Cada 1% do VGV" deixam de dizer que Projetos não aceita. Os dois formulários Avançado foram
+  regerados pelo gerador (conteúdo das células conferido contra o gerador anterior: só as
+  validações de unidade e a nota mudam); os Preliminares não mudam.
+- Guia `docs/avancado.md` cita `% do VGV` em Projetos.
+## 2026-11-23 — Base do % do VGV no Avançado, fatia 2 de 5: migração recalcula o R$ congelado
+
+- Decisão do dono: nas linhas de custo do Avançado em `% do VGV`, o R$ canônico congelado é
+  recalculado sobre a base nova (VGV vendável, que a fatia 1 põe no motor). Mecanismo: a migração
+  `043_pct_vgv_recalcula_base_vendavel.js` anula `orcamento_valor_canonico` só das linhas
+  `pct_vgv`; sem canônico, o motor resolve pelo percentual gravado em `orcamento_valor`
+  (`resolverCustoTotal`, `corretagemMensal`, `distribuirProporcional` e a permuta financeira).
+- Guarda fail-closed: não anula quando `orcamento_valor` não é decimal simples, está fora de
+  [0, 100] ou é 0 com canônico diferente de 0. Idempotente; as demais unidades ficam intactas.
+- `versao` do manifesto 0.1.41 → 0.1.42 (migração nova, regra do guard). O harness ganhou sete
+  linhas-semente, uma por ramo da guarda; apagar o `atualizar` da migração deixa a asserção vermelha.
+- Medição na Pinguim (só leitura, estudos Avançado 21, 22, 40 e 41): 24 linhas `pct_vgv`, todas já
+  com canônico nulo; efeito da migração nestes estudos: R$ 0. Entra junto com a fatia 1, senão o R$
+  recalculado usa a base antiga até ela entrar.
+- Rodada 1 de revisão: o rótulo do seletor de base financiável do Funding (`dinheiroParaRotulo`)
+  passa a resolver o R$ nominal da linha `pct_vgv` sem canônico (% × base de `pct_vgv`), com um
+  contexto montado de `calc`; antes mostraria "—" depois da migração.
+  O harness ganhou a contagem de escritas da `043` isolada (2 na 1ª passada, 0 na 2ª), que dá dente
+  à linha já sem canônico. Registradas no PR: ordem de merge (a fatia 1 antes ou junto, na mesma
+  release), a precisão de 2 casas do % gravado e o dado legado anterior à correção da coluna única.
+- Rodada 2: este PR passa a depender da fatia 1 (a branch dela foi mesclada aqui). `dinheiroParaRotulo`
+  tem o 3º parâmetro obrigatório (`ContextoCusto | undefined`), então esquecer o contexto vira erro
+  de compilação; a tela de Funding monta o contexto tipado, sem cast, com `vgvVendavel` real. Os
+  comentários deixam de afirmar que o rótulo é "a conta do motor": ele mostra o valor nominal, e na
+  permuta financeira o motor aplica o % sobre o recebimento com deduções. Testes existentes do rótulo
+  só ganharam `undefined` explícito no 3º argumento (assinatura), sem mudar asserção.
+## 2026-11-23 — Avançado: `% do VGV` e corretagem sobre o VGV vendável (fatia 1 de 5)
+
+- Decisão do dono: `% do VGV` do Avançado passa a incidir sobre o VGV vendável (potencial menos a
+  permuta física). `ContextoCusto.vgvVendavel` é obrigatório (esquecer vira erro de compilação) e
+  `resolverCustoTotal` em `pct_vgv` o lê; o motor o monta como Σ do vendável das linhas e a tela de
+  Custos o recalcula a cada leitura (`vgvVendavelTotalBase`), inclusive na conversão de unidade.
+- A corretagem usa sempre o vendável: `corretagemSobrePermutaFisica` saiu de `FluxoConfig`,
+  `ContextoCusto` e de todos os chamadores, e o controle saiu da tela de Custos. A coluna
+  `estudos.corretagem_sobre_permuta_fisica` fica no schema sem leitor (os scripts de formulário
+  Python só a escrevem; não mudaram).
+- Com `orcamento_valor_canonico` congelado, esta fatia sozinha muda um caso: a permuta financeira em
+  `% do VGV` com canônico tem o % derivado (canônico ÷ base) reinterpretado, porque a base passou a
+  ser o vendável e o % é aplicado sobre a receita de caixa (exemplo medido: VGV 100M, vendável 70M,
+  % 5, canônico 5M → dedução de 3.500.000 para 5.000.000). A corretagem e as demais linhas `pct_vgv`
+  preservam o R$ quando a absorção do VGV vendável cabe no horizonte do fluxo. Por isso a fatia 1 só pode entrar junto com a fatia 2 (migração que anula o
+  canônico e faz o motor usar o % gravado), no mesmo release; depois dela a dedução volta a 5% da
+  receita de caixa. Os testes travam os dois estados (sem canônico e com canônico congelado).
+- Citações `arquivo:linha` de `fluxo-caixa-motor.ts` em docs/referência renumeradas.
+
+---
 
 ## 2026-11-23 — Campos de formulário: no máximo 2 casas decimais, também ao focar
 
