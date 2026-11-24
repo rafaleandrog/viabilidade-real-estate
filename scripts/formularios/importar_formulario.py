@@ -320,6 +320,12 @@ def _validar_avancado(m, erros, avisos):
     sem_nome('funding.equity', 'Equity')
     sem_nome('funding.antecipacao', 'Antecipação de recebíveis')
     sem_nome('cenarios', 'Cenário')
+    # A API recusa a velocidade fora de −90% a +500% (VELOCIDADE_VENDAS_INVALIDA); recusar aqui evita
+    # criar o estudo e só descobrir no POST do cenário, com o estudo já meio escrito.
+    for n, c in sorted(m['cenarios'].items()):
+        v = c.get('velocidade_vendas_pct')
+        if v is not None and (not isinstance(v, (int, float)) or isinstance(v, bool) or not -90 <= v <= 500):
+            E(f'Cenário {n}: velocidade de vendas deve ficar entre −90% e +500% (veio {v})')
     sem_nome('funding.financiamento_producao', 'Financiamento à produção')
 
     def sem_chave(lista, rotulo, chaves):
@@ -787,7 +793,9 @@ def escrever_avancado(api, m, eid):
     for n, c in ordenados(m['cenarios']):
         if c.get('nome'):
             api.chamar('POST', f'{base}/cenarios', {'nome': c['nome'], 'preco_venda_pct': c.get('preco_venda_pct', 0),
-                                                    'custo_obra_pct': c.get('custo_obra_pct', 0), 'ordem': n - 1})
+                                                    'custo_obra_pct': c.get('custo_obra_pct', 0),
+                                                    'velocidade_vendas_pct': c.get('velocidade_vendas_pct', 0),
+                                                    'ordem': n - 1})
 
 
 def canonico(eid):
@@ -1015,6 +1023,16 @@ def reler(api, m, eid):
     ped = [c for _, c in ordenados(m['cenarios']) if c.get('nome')]
     if len(cen) != len(ped):
         div.append(f'cenários: pedidos {len(ped)}, gravados {len(cen)}')
+    gravados = {str(c.get('nome')): c for c in cen}
+    for c in ped:
+        g = gravados.get(str(c['nome']))
+        if g is None:
+            div.append(f'cenário {c["nome"]}: pedido e não encontrado entre os gravados')
+            continue
+        for col in ('preco_venda_pct', 'custo_obra_pct', 'velocidade_vendas_pct'):
+            pedido, lido = c.get(col) or 0, g.get(col)
+            if lido is None or not igual(pedido, lido):
+                div.append(f'cenário {c["nome"]}: {col} pedido {pedido:g}, gravado {lido}')
     return div
 
 

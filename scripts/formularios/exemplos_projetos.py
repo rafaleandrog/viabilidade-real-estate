@@ -111,8 +111,8 @@ def avanc_inc(derivados):
               dv1_nome='CCB capital de giro', dv1_valor=5_000_000, dv1_aporte='customizado', dv1_mes=2, dv1_dist='Sim',
               dv1_aporte_m=3, dv1_taxa=P(16), dv1_amort=24, dv1_carencia=12, dv1_estr=P(1.5), dv1_adm=3000, dv1_outros=25000,
               eq1_nome='Sócio investidor', eq1_valor=12_000_000, eq1_aporte='planejamento', eq1_modo='resultado_final', eq1_pct=P(30),
-              ce1_nome='Otimista — preço +5%, obra −3%', ce1_preco=P(5), ce1_obra=P(-3),
-              ce2_nome='Pessimista — preço −10%, obra +8%', ce2_preco=P(-10), ce2_obra=P(8))
+              ce1_nome='Otimista — preço +5%, obra −3%, vendas +20%', ce1_preco=P(5), ce1_obra=P(-3), ce1_vel=P(20),
+              ce2_nome='Pessimista — preço −10%, obra +8%, vendas −20%', ce2_preco=P(-10), ce2_obra=P(8), ce2_vel=P(-20))
     return ex
 
 
@@ -188,8 +188,8 @@ def avanc_lot(derivados):
               eq1_modo='permuta_financeira', eq1_pct=P(10),
               an1_nome='Cessão da carteira à securitizadora', an1_aporte='pos_obra', an1_pct=P(50), an1_taxa=P(15),
               an1_estr=P(1.5), an1_adm=4000, an1_outros=30_000,
-              ce1_nome='Otimista — preço +5%, obra −3%', ce1_preco=P(5), ce1_obra=P(-3),
-              ce2_nome='Pessimista — preço −10%, obra +8%', ce2_preco=P(-10), ce2_obra=P(8))
+              ce1_nome='Otimista — preço +5%, obra −3%, vendas +20%', ce1_preco=P(5), ce1_obra=P(-3), ce1_vel=P(20),
+              ce2_nome='Pessimista — preço −10%, obra +8%, vendas −20%', ce2_preco=P(-10), ce2_obra=P(8), ce2_vel=P(-20))
     return ex
 
 
