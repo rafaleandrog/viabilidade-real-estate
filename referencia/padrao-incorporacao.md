@@ -2502,8 +2502,9 @@ A sensibilidade mostra o efeito de uma premissa variada dentro de limites defini
 Ela não substitui um cenário completo e não deve alterar permanentemente as premissas.
 
 > **Comportamento vigente, alinhado ao padrão.** `avancado_cenarios` guarda variações nomeadas por
-> dois eixos: `preco_venda_pct` e `custo_obra_pct`. Cada cenário reaplica o motor sobre o mesmo
-> estudo com esses deltas, sem mutar o estudo-base.
+> três eixos: `preco_venda_pct`, `custo_obra_pct` e `velocidade_vendas_pct` (a curva de vendas
+> encolhe ou alonga por `prazo ÷ (1 + v)`, mantendo a forma). Cada cenário reaplica o motor sobre o
+> mesmo estudo com esses deltas, sem mutar o estudo-base.
 >
 > Na aba Proforma, a **sensibilidade** estressa **uma** variável (preço/m², permuta física,
 > permuta financeira ou custo de obras na Incorporação) e exibe **Bear** (`base × (1 − var⁻)`),

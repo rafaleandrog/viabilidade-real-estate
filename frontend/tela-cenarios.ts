@@ -350,7 +350,7 @@ export class ViabTelaCenarios extends LitElement {
 
   /**
    * #747: as séries (em R$ milhões) que delimitam o eixo Y do card — a base e
-   * os QUATRO cantos das faixas dos sliders (`faixaPreco` × `faixaCusto`).
+   * os OITO cantos das faixas dos sliders (`faixaPreco` × `faixaCusto` × `faixaVelocidade`, #971).
    * Passa por `_calc`, então os cantos ficam no mesmo memo dos sliders.
    */
   private _envelopeCenarios(base: FluxoCalc): number[][] {
@@ -443,7 +443,7 @@ export class ViabTelaCenarios extends LitElement {
     const comparacao = emMilhoes(comparacaoCenario(
       base, cenario, alterado ? this._rotuloCenario() : 'Cenário simulado', periodos,
     ));
-    // #747: o eixo Y é ESTÁTICO — o envelope da base e dos quatro cantos das
+    // #747: o eixo Y é ESTÁTICO — o envelope da base e dos oito cantos das
     // faixas dos sliders (assimétricas, dos benchmarks), arredondado para fora.
     // Sem `min-y`/`max-y` o primitivo refaz o domínio a cada pixel do slider,
     // e o que anda na tela é o eixo, não o dado.
