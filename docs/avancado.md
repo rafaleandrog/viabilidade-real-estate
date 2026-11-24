@@ -291,6 +291,43 @@ nada é recusado. No modal **Fluxo de pagamento**, um plano assim aparece só pa
 componentes gravados, as linhas de entrada, parcelamento e saldo de chaves ficam desabilitadas e **Aplicar** mantém o plano
 como está, sem descartar componentes. Isso vale só para o plano gravado pela API com esse descompasso; um plano criado pela tela não é tratado assim, mesmo depois de o Cronograma mudar. Para editar um plano divergente, monte-o de novo pela API com linhas coerentes. As datas que vêm do Cronograma, o mês do repasse e o marco das parcelas ao longo da obra, não contam como descompasso: um plano cujos componentes tragam um mês de repasse ou um marco diferente do que o Cronograma dá segue editável, e **Aplicar** o regrava com as datas do Cronograma vigente.
 
+**Criar um Avançado a partir de um Preliminar.** `POST /estudos/:id/derivar-avancado` gera um estudo
+Avançado **novo**, pré-preenchido com o que o Preliminar já sabe, e deixa o Preliminar como está. Exige
+editor do estudo de origem e nível `escrita` ou `admin` no app. A origem tem de ser um Preliminar de
+`loteamento` ou `incorporacao`: um Avançado de origem recebe **422** `NIVEL_INVALIDO`, e um tipo
+desconhecido, **422** `TIPO_INVALIDO`. O corpo é vazio; a resposta é **201** com `{ estudo, relatorio }`,
+e o estudo nasce em `rascunho`, com o criador como editor, na mesma transação que grava o resto — se
+qualquer passo falhar, nada fica gravado.
+
+O que a rota leva:
+
+- as colunas do estudo (menos as de permuta física, que não viajam), o catálogo de produtos, a análise
+  de mercado, o apelo comercial e os imóveis vinculados, como na duplicação;
+- **uma tipologia por produto** do catálogo efetivo (`apartamento` ou `loja` na Incorporação, `lote` no
+  Loteamento), com a área por unidade em 2 casas e a área aberta rateada por unidade, proporcional à
+  área fechada de cada produto da família;
+- **um grupo de receita** com 100% das unidades e o plano de absorção e de pagamento com que um grupo
+  novo nasce, mais o cronograma padrão do Avançado;
+- as **linhas de Custos** equivalentes aos custos do Preliminar, com a unidade de cada uma: R$ para o
+  valor fixo, **R$/m²** só quando a conta com a área do Avançado reproduz o valor do Preliminar ao
+  centavo, e **percentual vivo** (`% do VGV`, `% das Obras`, `% da construção`) para os custos que o
+  Preliminar guarda em percentual;
+- a **permuta física** como linhas de Preço › Permuta física: por produto, as unidades declaradas no
+  próprio produto; por área, a tipologia da família cuja conta de unidades inteiras deixa o menor
+  resíduo, com o resíduo declarado;
+- a **permuta financeira** como uma linha em R$ com a soma residencial e não residencial;
+- o regime do imposto: RET com a alíquota do parâmetro do app para o estudo sujeito ao RET, imposto
+  padrão do estudo nos demais.
+
+O `relatorio` é a lista de `{ origem, destino, regra, nota?, alerta? }` que diz, em português, o que foi
+levado e como — e **o que não foi ou mudou de valor**: cada diferença entre o VGV bruto do Preliminar e
+o do Avançado (por área aberta e por arredondamento das áreas), cada custo percentual cuja base própria
+do Avançado dá outro valor, cada permuta que não coube em unidades inteiras, a área aberta sem produto
+para recebê-la e a permuta financeira sem VGV vendável. Os itens com `alerta: true` são os que pedem
+conferência. O mesmo relatório é gravado nas notas do estudo novo, depois das notas da origem. Ficam de
+fora, e o relatório diz: documentos, membros, cenários de sensibilidade, a cascata de áreas do
+Loteamento, a data de início (quando o Preliminar não tem) e os juros de tabela (0% até preencher).
+
 O fluxo de caixa não é persistido: o cliente o calcula a partir desses dados, e a listagem do
 Painel refaz o mesmo cálculo para mostrar VGV, resultado e margem de cada estudo Avançado.
 

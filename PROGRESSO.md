@@ -4,6 +4,25 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-24 — Criar um Avançado a partir de um Preliminar: planejador e rota (fatia 2 de 4)
+
+- Entrega: `POST /estudos/:id/derivar-avancado` (`backend/rotas/derivar-avancado.ts`). A função pura
+  `planejarDerivacao` monta o estudo Avançado novo, as tipologias, o grupo de receita, as alocações, as
+  linhas de custo e o relatório a partir do valor efetivo do Preliminar (`calcularProforma`, uma só
+  vez); `executarDerivacao` grava tudo numa transação, na ordem das dependências, e vincula o criador
+  como editor. Inscrição em eventos e evento `estudo_criado` saem depois do commit. O Preliminar não é
+  alterado.
+- A conferência do VGV bruto fecha ao centavo: a diferença entre o Avançado e o Preliminar é a soma de
+  `diferencaAreaAberta` e `diferencaQuantizacao`, e cada uma, quando não é zero, vira item do relatório
+  (nunca um "igual" que não é). Percentuais cuja base própria do Avançado dá outro valor também são
+  declarados, com os dois valores.
+- Testes em `backend/rotas/derivar-avancado.test.ts`: o plano item a item, a equivalência com
+  `calcularFluxo`, a reconciliação de camadas, o executor com dados em memória, a rota de ponta a ponta
+  com um dublê que valida tipo, enum e coluna como o shell, e a fiação da rota. Documentação em
+  `docs/avancado.md` e `docs/modelo-de-dados.md`.
+- **Falta:** a fatia 3 (botão e tela do Preliminar, e `docs/preliminar.md`) e a fatia 4 (remoção da
+  troca de tipo). A conferência na instância Pinguim — criar um Avançado de um Preliminar real e
+  comparar o relatório com os números — fica para depois da tela.
 ## 2026-11-23 — Preliminar × Avançado: as bases equivalentes (fecha a issue 841, 5 fatias)
 
 - Decisão do dono: igualar as bases dos dois níveis (quadro de bases, mais A-a, B-a, C-a). Cinco PRs:

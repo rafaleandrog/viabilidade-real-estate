@@ -120,6 +120,32 @@ id sem correspondência é descartado enquanto sobrar id vivo na lista; uma list
 como veio, porque uma lista vazia ativaria a base financiável padrão e a cópia financiaria o que o
 original não financia. `curva_id` copia direto, porque curvas são globais da instância.
 
+## O que a criação de um Avançado a partir de um Preliminar copia
+
+`POST /estudos/:id/derivar-avancado` cria um estudo **Avançado novo** a partir de um Preliminar do mesmo
+`tipo_empreendimento` e deixa o Preliminar intacto. Como na duplicação, o estudo, as estruturas filhas
+e o vínculo do criador como editor gravam numa única transação, na ordem das dependências: estudo,
+imóveis, catálogo e demais filhas simples, tipologias, grupo de receita, alocações, linhas de custo e
+membro.
+
+| Estrutura | Levada | Como |
+|---|---|---|
+| `estudos` | sim | as colunas do Preliminar, menos as geradas pelo shell e **menos as doze colunas de permuta física** (o par residencial e o par `_nr_`); `nivel_analise` vira `avancado` e `considerar_ret` e `ret_pct` seguem o regime de imposto do Preliminar |
+| `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | sim | como na duplicação |
+| `avancado_tipologias` | gerada | uma por produto do catálogo efetivo; produto sem área, preço ou unidades não vira tipologia |
+| `avancado_fases` e `avancado_alocacoes` | gerada | um grupo de receita com uma alocação por tipologia, com 100% das unidades |
+| `avancado_linhas_custo` | gerada | os custos do Preliminar com a unidade equivalente; a permuta física aponta para a tipologia criada |
+| `avancado_cronograma` | não gravada | o cronograma padrão vale por leitura, até alguém editá-lo |
+| `estudo_documentos`, `apelo_comercial_documentos` | não | os arquivos continuam só no Preliminar |
+| `estudo_membros` | não | o criador entra como `editor` |
+| cenários de sensibilidade | não | o Avançado não tem equivalente |
+
+As referências entre as linhas novas são montadas pelos ids criados: `tipologia_id` e `fase_id` das
+alocações e `permuta_tipologia_id` das linhas de permuta física apontam para as linhas do estudo novo,
+nunca para o Preliminar. O que mudou de valor na passagem — o VGV bruto por área aberta e por
+arredondamento de área, e os custos percentuais cuja base é outra no Avançado — vai no relatório da
+resposta e nas notas do estudo novo.
+
 ## Referências lógicas — colunas de id sem chave estrangeira
 
 Quatro colunas guardam id de outra linha sem FK no banco, cada uma por um motivo, e nenhuma deve ser
