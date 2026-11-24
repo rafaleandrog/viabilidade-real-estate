@@ -10,12 +10,14 @@ import './viab-num.js';
 
 // Indicadores de SENSIBILIDADE = as 4 variáveis estressadas na Proforma. Os demais
 // `campo` são metas de benchmark. Rótulos amigáveis na seção de sensibilidade.
-const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras']);
-const ROTULO_SENS: Record<string, string> = {
+// #971: `velocidade` é a sensibilidade dos Cenários do Avançado (velocidade de vendas).
+export const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras', 'velocidade']);
+export const ROTULO_SENS: Record<string, string> = {
   preco: 'Preço R$/m²',
   permuta_fisica: 'Permuta física',
   permuta_financeira: 'Permuta financeira',
   custo_obras: 'Custo de obras',
+  velocidade: 'Velocidade de vendas',
 };
 
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
@@ -99,7 +101,7 @@ export class ViabConfigBenchmarks extends LitElement {
         <p class="sec">
           Duas seções: os <strong>indicadores de meta</strong> (comparação verde/vermelho) e os
           <strong>indicadores de sensibilidade</strong> — as variáveis estressadas nos cenários
-          Bear/Base/Bull da Proforma. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
+          Bear/Base/Bull da Proforma e nos Cenários do Avançado. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
         </p>
 
         ${this.tipoFixo ? nothing : html`
@@ -132,7 +134,7 @@ export class ViabConfigBenchmarks extends LitElement {
 
             <section class="secao">
               <h3>Indicador de Sensibilidade</h3>
-              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma.</p>
+              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma e nos Cenários do Avançado (velocidade de vendas).</p>
               <urbi-tabela
                 .colunas=${this._colunasSensibilidade()}
                 .linhas=${this._itensSensibilidade()}
