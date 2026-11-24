@@ -234,14 +234,31 @@ test('#486: nivel_analise NAO esta entre os campos engolidos em silencio', () =>
   assert.ok('codigo' in r, 'trocar o nivel tem que ERRAR, nao ser ignorado');
 });
 
-test('PATCH: tipo_empreendimento so muda em rascunho', () => {
+test('PATCH: tipo_empreendimento nao muda (nem em rascunho)', () => {
   assert.equal(
     'codigo' in (montarPatchEstudo({ tipo_empreendimento: 'loteamento' }, AVANCADO) as any)
       && (montarPatchEstudo({ tipo_empreendimento: 'loteamento' }, AVANCADO) as any).codigo,
     'TIPO_TRAVADO');
-  assert.deepEqual(
-    montarPatchEstudo({ tipo_empreendimento: 'loteamento' }, { ...AVANCADO, status: 'rascunho' }),
-    { dados: { tipo_empreendimento: 'loteamento' } });
+  const emRascunho = montarPatchEstudo({ tipo_empreendimento: 'loteamento' }, { ...AVANCADO, status: 'rascunho' }) as any;
+  assert.equal(emRascunho.codigo, 'TIPO_TRAVADO');
+  assert.equal(emRascunho.http, 422);
+});
+
+test('PATCH: tipo_empreendimento IGUAL ao gravado e aceito e nao entra no patch', () => {
+  const r = montarPatchEstudo({ tipo_empreendimento: 'incorporacao', notas: 'oi' },
+    { nivel_analise: 'preliminar', status: 'rascunho', tipo_empreendimento: 'incorporacao', nome: 'E' }) as any;
+  assert.deepEqual(r.dados, { notas: 'oi' });
+  const so = montarPatchEstudo({ tipo_empreendimento: 'incorporacao' },
+    { nivel_analise: 'preliminar', status: 'rascunho', tipo_empreendimento: 'incorporacao', nome: 'E' }) as any;
+  assert.equal(so.codigo, 'NENHUM_CAMPO'); // mesmo padrao de nivel_analise repetido sozinho
+});
+
+test('PATCH: tipo diferente em rascunho recusa com 422 TIPO_TRAVADO e a mensagem manda criar estudo novo', () => {
+  const r = montarPatchEstudo({ tipo_empreendimento: 'loteamento', nome: 'x' },
+    { nivel_analise: 'preliminar', status: 'rascunho', tipo_empreendimento: 'incorporacao', nome: 'E' }) as any;
+  assert.equal(r.http, 422);
+  assert.equal(r.codigo, 'TIPO_TRAVADO');
+  assert.match(r.mensagem, /crie um estudo novo/);
 });
 
 test('PATCH: campo bloqueado sozinho da NENHUM_CAMPO, nao grava id', () => {
@@ -846,16 +863,14 @@ test('#660: nome curto não é tocado — o corte só existe quando estoura', ()
   assert.equal(d.dados.nome_exibicao, 'INC - Pátio - DF - 002');
 });
 
-test('#660: o tipo do CORPO manda na sigla — em rascunho ele é editável no MESMO PATCH', () => {
-  // `tipo_empreendimento` muda em rascunho, e `tela-premissas` manda o registro
-  // inteiro. Usar o tipo persistido gravava o tipo novo com a sigla velha, e o
-  // rótulo ficava errado para sempre. A UF já era lida do corpo; o tipo não era.
+test('#660: a sigla vem do tipo GRAVADO — o tipo repetido no corpo não muda o rótulo', () => {
   const d = montarPatchEstudo(
-    { nome: 'Gleba', tipo_empreendimento: 'loteamento' },
+    { nome: 'Gleba', tipo_empreendimento: 'incorporacao' },
     ESTUDO_NOMEAVEL,
   );
   assert.ok('dados' in d, JSON.stringify(d));
-  assert.equal(d.dados.nome_exibicao, 'LOT - Gleba - DF - 002');
+  assert.equal(d.dados.nome_exibicao, 'INC - Gleba - DF - 002');
+  assert.equal('tipo_empreendimento' in d.dados, false);
 });
 
 test('#660: PATCH que muda SÓ a UF recompõe o nome de exibição — o defeito da issue pelo outro eixo', () => {
@@ -864,13 +879,12 @@ test('#660: PATCH que muda SÓ a UF recompõe o nome de exibição — o defeito
   assert.equal(d.dados.nome_exibicao, 'INC - Pátio Urbitá - GO - 002');
 });
 
-test('#660: PATCH que muda SÓ o tipo (rascunho) também recompõe', () => {
+test('#660: PATCH que tenta mudar o tipo é recusado e nada é recomposto', () => {
   const d = montarPatchEstudo(
     { tipo_empreendimento: 'loteamento' },
     { ...ESTUDO_NOMEAVEL, nome: 'Pátio Urbitá' },
-  );
-  assert.ok('dados' in d);
-  assert.equal(d.dados.nome_exibicao, 'LOT - Pátio Urbitá - DF - 002');
+  ) as any;
+  assert.equal(d.codigo, 'TIPO_TRAVADO');
 });
 
 test('#660: PATCH sem nenhuma parte componente NÃO mexe em nome_exibicao', () => {
@@ -1025,28 +1039,21 @@ test('campos aposentados pela `041` (marketing global e valor venal) de cliente 
   }
 });
 
+test('fiação: o handler do PATCH não converte mais produtos nem troca o tipo', () => {
+  const ini = FONTE_ROTA.indexOf("rotasEstudos.patch('/estudos/:id'");
+  const fim = FONTE_ROTA.indexOf('async function removerEstudo', ini);
+  assert.ok(ini > 0 && fim > ini, 'handler do PATCH localizado');
+  const handler = FONTE_ROTA.slice(ini, fim);
+  for (const proibido of ['areasParaTrocarDeTipo', 'preliminar_produtos', 'trocaDeTipo', 'limpezaAoTrocarTipo', 'separarLimpezaAdiada']) {
+    assert.equal(handler.includes(proibido), false, `o handler do PATCH voltou a conter ${proibido}`);
+  }
+  assert.equal(FONTE_ROTA.includes('areasParaTrocarDeTipo'), false);
+});
+
 // #781 fiação: o portão da soma dos percentuais na SUBMISSÃO. `validarProdutosParaSubmissao`
 // é pura e está testada em `frontend/produtos-alv.test.ts`; nada aqui sobe
 // servidor, então apagar o bloco do handler deixaria a suíte verde — a regra
 // "a API não contorna a tela" passaria a valer só na tela.
-test('#781/#784 fiação: PATCH que troca o tipo do rascunho leva a área derivada dos produtos', () => {
-  for (const parte of [
-    "estudo.nivel_analise !== 'avancado'\n      && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')", // o Avançado não converte produtos na troca de tipo
-    "(dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao')", // só o destino validado: typo não converte nada
-    'dados.tipo_empreendimento !== tipoOrigem',
-    'areasParaTrocarDeTipo(produtos as any[], base)',
-    "atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null })",
-  ]) assert.ok(FONTE_ROTA.includes(parte), `o PATCH deixou de ter: ${parte}`);
-  assert.ok(
-    FONTE_ROTA.indexOf("atualizar('estudos', estudoId, dados)") < FONTE_ROTA.indexOf('areasParaTrocarDeTipo(produtos as any[], base)'),
-    'o estudo é atualizado (e o patch validado) ANTES de qualquer produto ser convertido',
-  );
-  assert.ok(FONTE_ROTA.includes("atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem })"),
-    'falha na conversão tem que devolver o tipo de origem');
-  assert.ok(FONTE_ROTA.includes('convertidos.push(') && FONTE_ROTA.includes('for (const c of convertidos)'),
-    'falha na conversão tem que desfazer os produtos JÁ convertidos');
-});
-
 test('#781/#784 fiação: POST /estudos/:id/status recusa em_analise (Loteamento e Incorporação) com soma ≠ 100% da base', () => {
   for (const parte of [
     "(novoStatus === 'em_analise' || novoStatus === 'aprovado')",
