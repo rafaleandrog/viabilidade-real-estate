@@ -36,7 +36,7 @@ resultado ou indicador nenhum. Continuam no schema porque removê-las é mudanç
 | Tabela | O que guarda |
 |---|---|
 | `avancado_cronograma` | Os eventos do cronograma por estudo (planejamento, pré-lançamento, lançamento, obra, pós-obra) com `inicio_mes` a partir de zero e `duracao_meses`. Único por `[estudo_id, evento]`. |
-| `avancado_tipologias` | O catálogo de tipologias do estudo: nome, tipo de unidade, área privativa (fechada e aberta), dormitórios, vagas, `quantidade` (total de unidades) e `preco_m2` de referência. Desacoplado da receita. A coluna `unidades_permutadas` continua no schema, mas o app não a lê nem a escreve: a fonte da permuta física do Avançado é a linha de custo Preço / Permuta física. |
+| `avancado_tipologias` | O catálogo de tipologias do estudo: nome, tipo de unidade, área privativa (fechada e aberta; a derivação de um Preliminar deixa a aberta em zero, porque ela é só referência), dormitórios, vagas, `quantidade` (total de unidades) e `preco_m2` de referência. Desacoplado da receita. A coluna `unidades_permutadas` continua no schema, mas o app não a lê nem a escreve: a fonte da permuta física do Avançado é a linha de custo Preço / Permuta física. |
 | `avancado_fases` | A fase de vendas, dona da **absorção** (`absorcao` JSON) e do **fluxo de pagamento** (`fluxo_pagamento` JSON). |
 | `avancado_alocacoes` | A alocação de venda: `unidades` de uma `tipologia_id` numa `fase_id`, a um `preco_m2`. Pode haver várias por tipologia. A trava de saldo vale no estudo inteiro: Σ unidades alocadas da tipologia em todas as fases ≤ `quantidade` do catálogo. Trocar a tipologia de uma alocação segue as regras de criá-la: o saldo conferido é o da tipologia nova, e o `preco_m2` passa a ser o dela, salvo preço informado na mesma edição. A permuta física sai de dentro dessas alocações: Σ unidades em permuta física da tipologia ≤ Σ unidades alocadas, conferido ao gravar a permuta e ao reduzir ou excluir alocação ou grupo. |
 | `avancado_linhas_custo` | As linhas de custo, nos cinco grupos (terreno, obra, diretos, indireto, financeiro), com unidade de orçamento, valor canônico e ancoragem ao cronograma. |
@@ -119,6 +119,32 @@ Nenhuma referência viva aponta para o original: `fase_ancora_id` (custos e oper
 id sem correspondência é descartado enquanto sobrar id vivo na lista; uma lista inteira órfã volta
 como veio, porque uma lista vazia ativaria a base financiável padrão e a cópia financiaria o que o
 original não financia. `curva_id` copia direto, porque curvas são globais da instância.
+
+## O que a criação de um Avançado a partir de um Preliminar copia
+
+`POST /estudos/:id/derivar-avancado` cria um estudo **Avançado novo** a partir de um Preliminar do mesmo
+`tipo_empreendimento` e deixa o Preliminar intacto. Como na duplicação, o estudo, as estruturas filhas
+e o vínculo do criador como editor gravam numa única transação, na ordem das dependências: estudo,
+imóveis, catálogo e demais filhas simples, tipologias, grupo de receita, alocações, linhas de custo e
+membro.
+
+| Estrutura | Levada | Como |
+|---|---|---|
+| `estudos` | sim | as colunas do Preliminar, menos as geradas pelo shell e **menos as doze colunas de permuta física** (o par residencial e o par `_nr_`); `nivel_analise` vira `avancado` e `considerar_ret` e `ret_pct` seguem o regime de imposto do Preliminar |
+| `estudo_imoveis`, `preliminar_produtos`, `analise_mercado`, `apelo_comercial` | sim | como na duplicação |
+| `avancado_tipologias` | gerada | uma por produto do catálogo efetivo; produto sem área, preço ou unidades não vira tipologia |
+| `avancado_fases` e `avancado_alocacoes` | gerada | um grupo de receita com uma alocação por tipologia, com 100% das unidades |
+| `avancado_linhas_custo` | gerada | os custos do Preliminar com a unidade equivalente; a permuta física aponta para a tipologia criada |
+| `avancado_cronograma` | não gravada | o cronograma padrão vale por leitura, até alguém editá-lo |
+| `estudo_documentos`, `apelo_comercial_documentos` | não | os arquivos continuam só no Preliminar |
+| `estudo_membros` | não | o criador entra como `editor` |
+| cenários de sensibilidade | não | o Avançado não tem equivalente |
+
+As referências entre as linhas novas são montadas pelos ids criados: `tipologia_id` e `fase_id` das
+alocações e `permuta_tipologia_id` das linhas de permuta física apontam para as linhas do estudo novo,
+nunca para o Preliminar. O que mudou de valor na passagem — o VGV bruto por
+arredondamento de área, e os custos percentuais cuja base é outra no Avançado — vai no relatório da
+resposta e nas notas do estudo novo.
 
 ## Referências lógicas — colunas de id sem chave estrangeira
 
