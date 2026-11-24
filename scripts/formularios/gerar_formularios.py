@@ -1099,6 +1099,10 @@ def avancado(tipo, ex):
                 f'cenarios[{c_}].preco_venda_pct', F_PCT, minimo=-1, maximo=10, ex=ex.get(f'{k}_preco'))
         f.campo(f'{k}_obra', f'Cenário {c_} — Custo de obra', 'variação % (pode ser negativa)',
                 f'cenarios[{c_}].custo_obra_pct', F_PCT, minimo=-1, maximo=10, ex=ex.get(f'{k}_obra'))
+        # #981: velocidade de vendas (#971) — vende-se (1 + v) vezes mais por mês e o prazo de vendas
+        # vira prazo ÷ (1 + v); a mesma faixa que a API aceita, de −90% a +500%.
+        f.campo(f'{k}_vel', f'Cenário {c_} — Velocidade de vendas', 'variação % (−90% a +500%; prazo de vendas ÷ (1 + v))',
+                f'cenarios[{c_}].velocidade_vendas_pct', F_PCT, minimo=-0.9, maximo=5, ex=ex.get(f'{k}_vel'))
 
     # ════════ referência calculada ════════
     f.secao('REFERÊNCIA CALCULADA — não preencher (conferência do que foi preenchido)', calc=True)

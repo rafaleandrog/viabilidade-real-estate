@@ -787,7 +787,9 @@ def escrever_avancado(api, m, eid):
     for n, c in ordenados(m['cenarios']):
         if c.get('nome'):
             api.chamar('POST', f'{base}/cenarios', {'nome': c['nome'], 'preco_venda_pct': c.get('preco_venda_pct', 0),
-                                                    'custo_obra_pct': c.get('custo_obra_pct', 0), 'ordem': n - 1})
+                                                    'custo_obra_pct': c.get('custo_obra_pct', 0),
+                                                    'velocidade_vendas_pct': c.get('velocidade_vendas_pct', 0),
+                                                    'ordem': n - 1})
 
 
 def canonico(eid):
@@ -1015,6 +1017,15 @@ def reler(api, m, eid):
     ped = [c for _, c in ordenados(m['cenarios']) if c.get('nome')]
     if len(cen) != len(ped):
         div.append(f'cenários: pedidos {len(ped)}, gravados {len(cen)}')
+    gravados = {str(c.get('nome')): c for c in cen}
+    for c in ped:
+        g = gravados.get(str(c['nome']))
+        if g is None:
+            continue
+        for col in ('preco_venda_pct', 'custo_obra_pct', 'velocidade_vendas_pct'):
+            pedido, lido = float(c.get(col) or 0), g.get(col)
+            if lido is None or abs(float(lido) - pedido) > 0.005:
+                div.append(f'cenário {c["nome"]}: {col} pedido {pedido:g}, gravado {lido}')
     return div
 
 
