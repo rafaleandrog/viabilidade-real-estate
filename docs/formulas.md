@@ -356,6 +356,90 @@ valor exibido é derivado de outra unidade — um % VGV que vem de um custo em R
 campo mostra o arredondamento, e o cálculo segue com o valor exato. Clicar no campo e sair sem
 digitar não altera nada; só o número digitado substitui o valor guardado.
 
+## Preliminar × Avançado
+
+O mesmo projeto, estudado nos dois níveis com os mesmos custos de obra, fecha nas mesmas bases.
+Esta seção lista, tema a tema, a base que cada nível usa. As diferenças que restam vêm do tempo
+(o Avançado tem juros de tabela e desconto comercial; o Preliminar não), do horizonte do fluxo (no Avançado, o recebido e a corretagem contam só o que cai dentro do horizonte; o Preliminar incide sobre o VGV vendável inteiro) e do controle de deduções
+da permuta financeira, que só o Avançado tem.
+
+| Tema | Base |
+|---|---|
+| Custos em % do VGV | VGV vendável, nos dois níveis |
+| Valoração da permuta física | preço da unidade de fato permutada, nos dois níveis |
+| Projetos | R$, % do VGV ou % da construção, nos dois níveis |
+| Corretagem | VGV vendável, nos dois níveis |
+| Imposto e permuta financeira | Avançado: receita recebida (com os juros de tabela); Preliminar: VGV vendável |
+
+### Custos em % do VGV
+
+Em % do VGV, o custo incide sobre o **VGV vendável**: o VGV potencial menos a permuta física. A
+unidade permutada não gera venda, então o custo proporcional ao VGV não incide sobre ela. Quais
+custos aceitam essa unidade depende do nível.
+
+```text
+VGV vendável = VGV potencial − permuta física
+Custo em % do VGV = VGV vendável × %
+```
+
+- **Preliminar:** marketing, manutenção, contingência, gestão dos indiretos, incorporação e registro
+  (só na Incorporação), infraestrutura (só no Loteamento, no modo % do VGV) e Projetos (quando em
+  % do VGV). A gestão da construção não entra aqui: incide sobre o custo de obras.
+- **Avançado:** marketing, manutenção pós-obra, stand de vendas, gestão e outros indiretos,
+  contingência, outorga, Projetos, os custos Financeiro (juros de financiamento, taxas bancárias, estruturação de dívida, investidores e Outro) e as linhas Outro dos grupos Terreno, Obra, Diretos e Indiretos.
+  Incorporação e registro em % do VGV é, no Avançado, uma linha Outro do grupo Terreno: a categoria
+  Registro só aceita R$ e R$/m². A gestão da obra é em % Obra.
+
+### Valoração da permuta física
+
+A permuta física vale o preço da unidade que de fato é entregue.
+
+- **Avançado:** a tipologia reservada para a permuta, com o preço dela.
+- **Preliminar:** o produto do catálogo com unidades permutadas, com o preço dele. Quando a categoria
+  não indica produto, o Preliminar usa a área permutada com o preço médio da categoria no catálogo.
+  Sem catálogo, a Incorporação usa a premissa de preço por m² e o Loteamento vale zero, como descrito em
+  "VGV".
+
+### Projetos
+
+Projetos aceita as mesmas unidades nos dois níveis: R$, % do VGV (sobre o VGV vendável) e % da
+construção. O Avançado aceita ainda R$/m² privativo.
+
+### Corretagem
+
+A corretagem incide sobre o VGV vendável nos dois níveis. A permuta física não gera venda
+contratada, então não gera comissão. No Avançado, ela acompanha as vendas que caem dentro do
+horizonte do fluxo; no Preliminar, que não tem tempo, incide sobre o VGV vendável inteiro.
+
+### Imposto e permuta financeira
+
+- **Avançado:** o imposto incide sobre a receita recebida, o recebimento bruto de cada mês, com os
+  juros de tabela. A permuta financeira em % do VGV incide sobre esse recebido, menos o imposto
+  e/ou a corretagem quando a linha marca as deduções ("Deduzir das permutas financeiras"); por
+  padrão, nenhuma é deduzida.
+- **Preliminar:** não tem tempo nem esse controle; imposto e permuta financeira incidem sobre o VGV
+  vendável da categoria.
+
+Por isso o que separa os dois níveis aqui é o juro de tabela (e o imposto sobre ele), o desconto
+comercial e, quando marcada, a dedução na base da permuta financeira.
+
+### Exemplo
+
+Um loteamento com VGV de tabela de R$ 232,5 milhões, dos quais R$ 22,5 milhões em lotes de permuta
+física, estudado nos dois níveis:
+
+| Linha | Preliminar | Avançado |
+|---|---:|---:|
+| VGV vendável | R$ 210.000.000 | R$ 210.000.000 |
+| Marketing (2% do VGV) | R$ 4.200.000 | R$ 4.200.000 |
+| Corretagem (5%) | R$ 10.500.000 | R$ 10.500.000 |
+
+O exemplo pressupõe a venda inteira dentro do horizonte do fluxo. Marketing e corretagem saem iguais ao centavo, porque as duas bases são o VGV vendável e a permuta
+é valorada pelo preço do lote entregue. No Avançado, o imposto e a permuta financeira incidem sobre
+o recebido, que traz os juros de tabela; o Preliminar não os tem.
+
+Numa incorporação, as bases desses temas também coincidem.
+
 ## Interpretações
 
 Onde a especificação original era ambígua, o app segue o protótipo e o bom senso: o custo do
