@@ -105,9 +105,22 @@ export function proximaOrdem(cenarios: { ordem?: unknown }[]): number {
   return Math.floor(maior) + 1;
 }
 
+/**
+ * A `ordem` de partida de uma gravação: a próxima depois dos salvos e, numa
+ * nova tentativa depois de falha parcial, nunca abaixo da que a tentativa
+ * anterior deixou livre (`retomada`). Sem isso, se a releitura da lista também
+ * falhar, a lista em memória fica velha e a nova tentativa reaproveita uma
+ * `ordem` já gravada.
+ */
+export function ordemDaTentativa(cenarios: { ordem?: unknown }[], retomada: number | null): number {
+  return Math.max(proximaOrdem(cenarios), retomada ?? 0);
+}
+
 export interface ResultadoGravacao {
   /** Quantos foram gravados, na ordem do rascunho. */
   gravados: number;
+  /** A `ordem` que a próxima gravação deve usar: a inicial mais os gravados. */
+  ordemLivre: number;
   /** O que falta gravar: vazio quando todos entraram. Tentar de novo usa só isto. */
   pendentes: CenarioPadrao[];
   /** Mensagem do primeiro erro, ou `null`. */
@@ -140,5 +153,5 @@ export async function gravarCenariosPadrao(
     }
     gravados++;
   }
-  return { gravados, pendentes: rascunho.slice(gravados), erro };
+  return { gravados, ordemLivre: ordemInicial + gravados, pendentes: rascunho.slice(gravados), erro };
 }

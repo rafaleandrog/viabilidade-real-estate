@@ -16,7 +16,7 @@ import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
 import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
-import { faixaDoBenchmark, cenariosPadrao, indicadoresCenario, proximaOrdem, gravarCenariosPadrao, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
+import { faixaDoBenchmark, cenariosPadrao, indicadoresCenario, ordemDaTentativa, gravarCenariosPadrao, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   type FundingCalc, type OperacaoFunding,
@@ -729,7 +729,11 @@ export class ViabTelaCenarios extends LitElement {
   private _abrirGerarPadrao = () => {
     if (!this.editavel) return;
     this.rascunhoPadrao = cenariosPadrao(this.faixaPreco, this.faixaCusto);
+    this.ordemRetomada = null;
   };
+
+  /** #889: a `ordem` livre deixada por uma gravação interrompida; `null` fora de uma nova tentativa. */
+  private ordemRetomada: number | null = null;
 
   private _editarPadrao(i: number, campo: 'precoVendaPct' | 'custoObraPct', valor: number | null) {
     if (!this.rascunhoPadrao) return;
@@ -749,21 +753,24 @@ export class ViabTelaCenarios extends LitElement {
     const estudoId = this.estudo.id;
     this.gerando = true;
     try {
-      const r = await gravarCenariosPadrao(rascunho, proximaOrdem(this.cenarios),
+      const todos = rascunho.length === 3;
+      const r = await gravarCenariosPadrao(rascunho, ordemDaTentativa(this.cenarios, this.ordemRetomada),
         (dados) => criarCenario(estudoId, dados));
       if (r.erro) {
         this.rascunhoPadrao = r.pendentes;
+        this.ordemRetomada = r.ordemLivre;
         urbiVerso.notificar(r.erro, 'erro');
       } else {
         this.rascunhoPadrao = null;
-        urbiVerso.notificar('Cenários otimista, base e pessimista salvos.', 'sucesso');
+        this.ordemRetomada = null;
+        urbiVerso.notificar(todos ? 'Cenários otimista, base e pessimista salvos.' : 'Cenários salvos.', 'sucesso');
       }
       if (r.gravados > 0) {
         const cens = await listarCenarios(estudoId);
         this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
       }
     } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao reler os cenários', 'erro');
+      urbiVerso.notificar(e?.message || 'Os cenários foram salvos, mas a lista não foi relida. Recarregue a página.', 'erro');
     } finally {
       this.gerando = false;
     }
@@ -795,7 +802,7 @@ export class ViabTelaCenarios extends LitElement {
           <urbi-botao variante="fantasma" ?desabilitado=${this.gerando}
             @click=${() => this.rascunhoPadrao = null}>Cancelar</urbi-botao>
           <urbi-botao class="gerar-salvar" variante="primario" icone="fa-solid fa-floppy-disk"
-            ?desabilitado=${this.gerando} @click=${this._salvarPadrao}>Salvar os três</urbi-botao>
+            ?desabilitado=${this.gerando} @click=${this._salvarPadrao}>${rascunho.length === 3 ? 'Salvar os três' : 'Salvar os que faltam'}</urbi-botao>
         </div>
       </urbi-modal>
     `;

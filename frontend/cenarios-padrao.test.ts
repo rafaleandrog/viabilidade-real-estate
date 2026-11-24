@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   faixaDoBenchmark, cenariosPadrao, indicadoresCenario, FAIXA_PADRAO_PCT,
-  proximaOrdem, gravarCenariosPadrao,
+  proximaOrdem, gravarCenariosPadrao, ordemDaTentativa,
 } from './cenarios-padrao.js';
 import { calcularFluxo, aplicarCenario, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 // A configuração dos casos de render é usada só como um estudo qualquer com
@@ -97,7 +97,8 @@ test('#889 fiação: a aba Cenários usa a régua, os padrões e os indicadores 
   assert.match(tela, /faixaDoBenchmark\(bm\?\.dados \|\| \[\], 'custo_obras'\)/);
   assert.match(tela, /cenariosPadrao\(this\.faixaPreco, this\.faixaCusto\)/);
   assert.match(tela, /indicadoresCenario\(calc\)/);
-  assert.match(tela, /gravarCenariosPadrao\(rascunho, proximaOrdem\(this\.cenarios\),/);
+  assert.match(tela, /gravarCenariosPadrao\(rascunho, ordemDaTentativa\(this\.cenarios, this\.ordemRetomada\),/);
+  assert.match(tela, /this\.ordemRetomada = r\.ordemLivre;/);
   assert.match(tela, /this\.rascunhoPadrao = r\.pendentes;/);
   // A trava do botão é liberada em toda saída (finally), inclusive se reler a lista lançar.
   assert.match(tela, /finally \{\s*this\.gerando = false;\s*\}/);
@@ -117,7 +118,7 @@ const TRES = cenariosPadrao({ min: -10, max: 10 }, { min: -5, max: 5 });
 test('gravarCenariosPadrao: grava os três em sequência, com ordem a partir da inicial', async () => {
   const corpos: any[] = [];
   const r = await gravarCenariosPadrao(TRES, 7, async (d) => { corpos.push(d); return { id: corpos.length }; });
-  assert.deepEqual(r, { gravados: 3, pendentes: [], erro: null });
+  assert.deepEqual(r, { gravados: 3, ordemLivre: 10, pendentes: [], erro: null });
   assert.deepEqual(corpos.map((c) => [c.nome, c.ordem]), [['Otimista', 7], ['Base', 8], ['Pessimista', 9]]);
   assert.deepEqual(corpos[2], { nome: 'Pessimista', preco_venda_pct: -10, custo_obra_pct: 5, ordem: 9 });
 });
@@ -137,4 +138,23 @@ test('gravarCenariosPadrao: exceção lançada também para e preserva os penden
   assert.equal(r.gravados, 2);
   assert.equal(r.erro, 'rede');
   assert.deepEqual(r.pendentes.map((c) => c.nome), ['Pessimista']);
+});
+
+test('ordemDaTentativa: a nova tentativa não reaproveita a ordem gravada quando a lista em memória ficou velha', async () => {
+  // Lista em memória com um cenário (ordem 0); a 1ª tentativa grava o Otimista em 1 e falha no Base.
+  const lista = [{ ordem: 0 }];
+  let n = 0;
+  const corpos: any[] = [];
+  const r1 = await gravarCenariosPadrao(TRES, ordemDaTentativa(lista, null), async (d) => {
+    corpos.push(d); return ++n === 2 ? { erro: true, mensagem: 'x' } : {};
+  });
+  assert.equal(r1.ordemLivre, 2);
+  // A releitura falhou: `lista` continua velha. A 2ª tentativa parte de 2, não de 1.
+  assert.equal(ordemDaTentativa(lista, r1.ordemLivre), 2);
+  const r2 = await gravarCenariosPadrao(r1.pendentes, ordemDaTentativa(lista, r1.ordemLivre), async (d) => { corpos.push(d); return {}; });
+  assert.equal(r2.erro, null);
+  const gravadas = corpos.filter((_, i) => i !== 1).map((c) => c.ordem);
+  assert.deepEqual(gravadas, [1, 2, 3]);
+  // Com a lista relida, vale a maior das duas.
+  assert.equal(ordemDaTentativa([{ ordem: 0 }, { ordem: 5 }], 2), 6);
 });
