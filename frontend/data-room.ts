@@ -73,7 +73,8 @@ export function agruparDataRoom(
   const grupos = vazio<ItemDataRoom>();
 
   for (const d of Array.isArray(docsEmpreendimento) ? docsEmpreendimento : []) {
-    const doc = d ?? {};
+    if (d == null) continue;
+    const doc = d;
     const tipo = texto(doc.categoria);
     const categoria = categoriaDe(CATEGORIA_EMPREENDIMENTO, tipo);
     grupos[categoria].push({
@@ -89,7 +90,8 @@ export function agruparDataRoom(
   }
 
   for (const d of Array.isArray(docsApelo) ? docsApelo : []) {
-    const doc = d ?? {};
+    if (d == null) continue;
+    const doc = d;
     const tipo = texto(doc.tipo_dado);
     const categoria = categoriaDe(CATEGORIA_APELO, tipo);
     const arquivo = texto(doc.nome_arquivo);

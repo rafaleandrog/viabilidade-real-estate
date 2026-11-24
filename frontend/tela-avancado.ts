@@ -7,6 +7,7 @@ import './tela-apelo.js';
 import './tela-fluxo-cronograma.js';
 import './tela-empreendimento-info.js';
 import './tela-empreendimento-tipologias.js';
+import './data-room-painel.js';
 import './tela-fluxo-receitas.js';
 import './tela-fluxo-custos.js';
 import './tela-fluxo-ver.js';
@@ -105,6 +106,7 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
     { id: 'informacoes', label: 'Informações', icone: 'fa-solid fa-circle-info' },
     { id: 'cronograma',  label: 'Cronograma',  icone: 'fa-solid fa-calendar-days' },
     { id: 'tipologias',  label: 'Tipologias',  icone: 'fa-solid fa-table-list' },
+    { id: 'data-room',   label: 'Data room',   icone: 'fa-solid fa-folder-open' },
   ],
   // Premissas removida no Avançado (#88): todo o seu conteúdo (áreas/produtos/
   // custos/impostos/deduções estáticos) só faz sentido no Preliminar. Os campos
@@ -325,6 +327,8 @@ export class ViabTelaAvancado extends LitElement {
           return html`<viab-fluxo-cronograma .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-cronograma>`;
         case 'tipologias':
           return html`<viab-empreendimento-tipologias .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-empreendimento-tipologias>`;
+        case 'data-room':
+          return html`<viab-data-room .estudo=${this.estudo}></viab-data-room>`;
         case 'informacoes':
         default:
           return html`<viab-empreendimento-info .estudo=${this.estudo} .editavel=${this._editavelPremissas} .podeEditar=${this.podeEditar}></viab-empreendimento-info>`;

@@ -38,6 +38,26 @@ Acumulado** e os **Indicadores vs. benchmark** — a página de leitura do estud
 | **Cronograma** | A **Data de início do projeto** e as fases — Planejamento, Pré-lançamento (ligado pelo interruptor **Este empreendimento tem Pré-lançamento**), Lançamento, Obra e Pós-obras — com duração em meses, desenhadas no **Gantt do cronograma**. As fases são o calendário sobre o qual custos e vendas se distribuem. |
 | **Tipologias** | O catálogo de unidades: nome, tipo de unidade (apartamento, cobertura, loja, lote ou outro), área privativa, quantidade e vagas. Os preços ficam em Viabilidade → Receitas. |
 
+#### Data room
+
+A sub-aba **Data room** reúne, num só lugar, os documentos já anexados ao estudo, agrupados em seis
+categorias, na ordem **Terreno**, **Jurídico**, **Projeto**, **Comercial**, **Financeiro** e
+**Outros**. Cada documento aparece com o nome, o tipo e, quando há arquivo para abrir, o link
+**Abrir**; as fontes do Apelo Comercial que são só texto aparecem sem link.
+
+O mapa das categorias é fixo: imagem principal, render e planta (de Informações) entram em
+**Projeto**; anúncios, população e mercado (do Apelo Comercial) entram em **Comercial**; a fonte do
+Apelo Comercial do tipo outro, ou sem tipo, entra em **Outros**. Nenhum documento fica de fora: o que
+não casa com nenhuma regra cai em Outros. **Terreno**, **Jurídico** e **Financeiro** aparecem vazias,
+avisando que ainda não há tipo de documento para elas.
+
+Cada categoria com tipos conhecidos mostra um **checklist** do que já foi anexado (✓) e do que ainda
+está pendente.
+
+O Data room **só lê**: anexar e remover continuam onde sempre foram — **Empreendimento › Informações**
+para imagem principal, renders e plantas, e **Apelo Comercial** para as fontes comerciais; a própria
+sub-aba traz atalhos para essas telas. O acesso do Data room para avaliadores externos ainda não existe.
+
 #### Loteamento no Avançado
 
 O Avançado serve os dois tipos de empreendimento, e no Loteamento quatro coisas mudam:

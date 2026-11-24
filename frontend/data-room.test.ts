@@ -92,7 +92,7 @@ test('checklist não confunde origem: tipo do apelo não marca empreendimento', 
 test('entradas nulas ou indefinidas', () => {
   assert.equal(total(agruparDataRoom(null, undefined)), 0);
   const g = agruparDataRoom([null as any, emp(1, 'planta')], [undefined as any]);
-  assert.equal(total(g), 3); // entrada nula também não some: cai em outros
+  assert.equal(total(g), 1); // null/undefined não são documento: descartados
 });
 
 test('não muta as entradas', () => {
