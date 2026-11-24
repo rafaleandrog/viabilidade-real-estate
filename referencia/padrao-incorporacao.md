@@ -3258,20 +3258,20 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 #255; o ramo da fase-âncora da API, por #938). A nota fica pela história.
 
 - **Tela:** as colunas Início e Duração decidem pelo mesmo `regimeCronogramaLinha`
-  (`frontend/tela-fluxo-custos.ts:985` e `:1016`). Construção, fase-âncora e evento fixo mostram as
+  (`frontend/tela-fluxo-custos.ts:1009` e `:1040`). Construção, fase-âncora e evento fixo mostram as
   duas grandezas como calculadas, sem campo editável.
 - **API:** nos dois ramos do PATCH de custos — fase-âncora e evento do cronograma — a âncora atual é
   sempre lida e entregue a `resolverTravamentoCusto` (`backend/rotas/avancado.ts:157`). Um corpo com
   `inicio_mes` **ou** `duracao_meses` numa linha ancorada, sem trazer a âncora, recebe 422
-  `CAMPO_TRAVADO` (`:2001` na fase, `:2012` no evento) e nada é gravado. Com a âncora no corpo
+  `CAMPO_TRAVADO` (`:2006` na fase, `:2017` no evento) e nada é gravado. Com a âncora no corpo
   (`fase_ancora_id`, ou um `cronograma_evento` diferente de `customizado`, mesmo repetindo a atual),
   início e duração são recalculados a partir dela e os valores enviados são ignorados.
 
 **A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
-(`frontend/tela-fluxo-custos.ts:790-791`). Quem classifica é a **subcategoria**: toda linha
-`Preço/Permuta` é tratada como permuta **financeira** pelo motor
-(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:601-603`). A permuta **física** vem da linha de custo
+(`frontend/tela-fluxo-custos.ts:940-941`). Quem classifica é a **subcategoria**: toda linha
+`Preço → Permuta financeira` é tratada como permuta **financeira** pelo motor
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:900-902`). A permuta **física** vem da linha de custo
 `Preço → Permuta física` (`permuta_tipologia_id` + `permuta_quantidade`), e **não** de
 `unidades_permutadas` no catálogo de Tipologias: desde as #266/#267/#268 esse campo é dado
 histórico, sem fallback — sem a linha de custo, o KPI é 0 (§15.1). Usar `distribuicao_modo` como critério de migração
@@ -3289,7 +3289,7 @@ primeira edição. A #260 migra todos os demais consumidores para o resolver can
 > ✅ **A regra que fecha esta armadilha existe desde 2026-08-01** (convenção **C7**, Anexo A): o
 > canônico é o **valor monetário a 2 casas**; `%` e `R$/m²` são derivados, com precisão plena
 > internamente. `converterUnidade` arredondar **tudo** a 2 casas
-> (`frontend/premissas-conversao.ts:50-58`), inclusive o percentual, é o que quebra o round-trip —
+> (`frontend/premissas-conversao.ts:108-116`), inclusive o percentual, é o que quebra o round-trip —
 > o percentual não é monetário e não deveria ser quantizado.
 
 **A13 — A tela e a exportação formatavam dinheiro diferente; hoje a divergência é outra.**

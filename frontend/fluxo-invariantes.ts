@@ -327,13 +327,19 @@ export function validarCustosDuplicados(linhasCusto: any[]): Divergencia[] {
   // duas linhas sem subcategoria continuem sendo duplicata entre si — nos
   // demais grupos ela nunca é editável (`tela-fluxo-custos.ts`), então a
   // chave nova coincide com a antiga e a detecção não afrouxa ali.
+  // Permuta física com tipologia declarada acrescenta a tipologia à chave: o
+  // motor reserva a permuta POR TIPOLOGIA, então uma linha por tipologia (o
+  // que o upgrade Preliminar → Avançado gera) não é duplicata. Duas linhas
+  // para a mesma tipologia, ou ambas sem tipologia, seguem acusadas.
   const contagem = new Map<string, { grupo: string; categoria: string; subcategoria: string; count: number }>();
   for (const c of linhasCusto) {
     const categoria = String(c?.categoria || '');
     if (!categoria || categoria === 'Outro') continue;
     const grupo = String(c?.grupo || '');
     const subcategoria = String(c?.subcategoria || '');
-    const chave = `${grupo}::${categoria}::${subcategoria}`;
+    const tipologia = ePermutaFisica(c) && c.permuta_tipologia_id != null && c.permuta_tipologia_id !== ''
+      ? `::tipologia:${Number(c.permuta_tipologia_id)}` : '';
+    const chave = `${grupo}::${categoria}::${subcategoria}${tipologia}`;
     const atual = contagem.get(chave);
     if (atual) atual.count++;
     else contagem.set(chave, { grupo, categoria, subcategoria, count: 1 });
