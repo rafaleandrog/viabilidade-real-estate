@@ -142,29 +142,3 @@ export function validarSomaPctAlv(
       + ` (${estado === 'falta' ? `faltam ${fmt(100 - soma)}%` : `excedem ${fmt(soma - 100)}%`}).`,
   };
 }
-
-export interface AreaParaTrocarDeTipo { id: number; area_media_m2: number }
-
-/**
- * Ao trocar o tipo de um rascunho (Loteamento ↔ Incorporação) a BASE do % muda
- * (ALV ↔ áreas privativas fechadas): o `pct_alv` gravado seria relido contra
- * outra base e o VGV mudaria sozinho. Devolve, para cada produto com `pct_alv`,
- * a área média DERIVADA da base de ORIGEM (em 2 casas, a escala da coluna), que
- * a rota grava junto com a limpeza de `pct_alv` — o produto vira legado e o VGV
- * não muda na troca.
- */
-export function areasParaTrocarDeTipo(
-  produtos: (ProdutoAlv & { id?: number | string | null })[] | undefined,
-  alvM2: number,
-): AreaParaTrocarDeTipo[] {
-  const saida: AreaParaTrocarDeTipo[] = [];
-  for (const p of produtos ?? []) {
-    if (!temValor(p.pct_alv) || p.id === null || p.id === undefined) continue;
-    const area = Math.round(areaMediaDaLinha(p, alvM2) * 100) / 100;
-    // Linha sem área derivável (sem unidades, sem base, ou 0%): NÃO se converte. Ela
-    // fica como está — com o `pct_alv` que o usuário digitou — em vez de ter a única
-    // informação que tem apagada e voltar como 0% se o estudo for revertido.
-    if (area > 0) saida.push({ id: Number(p.id), area_media_m2: area });
-  }
-  return saida;
-}

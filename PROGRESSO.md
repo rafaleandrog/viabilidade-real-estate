@@ -4,6 +4,14 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-24 — O tipo do estudo não muda mais depois de criado (fatia 4 de 4 da issue 833)
+
+- Decisão do dono (24/11): `PATCH /estudos/:id` recusa com `422 TIPO_TRAVADO` um `tipo_empreendimento`
+  diferente do gravado, em qualquer status; o mesmo valor segue aceito (e ignorado, como `nivel_analise`).
+  Saíram a conversão de produtos na troca, a limpeza da permuta financeira não residencial e
+  `areasParaTrocarDeTipo`. A tela não oferecia a troca (o seletor de tipo só existe no formulário de criar).
+- Testes alterados e removidos conforme a autorização, listados no PR.
+
 ## 2026-11-23 — Preliminar × Avançado: as bases equivalentes (fecha a issue 841, 5 fatias)
 
 - Decisão do dono: igualar as bases dos dois níveis (quadro de bases, mais A-a, B-a, C-a). Cinco PRs:

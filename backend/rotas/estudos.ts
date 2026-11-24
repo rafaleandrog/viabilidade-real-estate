@@ -25,7 +25,7 @@ import {
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { baseProdutosM2, type ProformaInput } from '../../frontend/proforma.js';
-import { areasParaTrocarDeTipo, rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
+import { rotuloBaseProdutos } from '../../frontend/produtos-alv.js';
 import { validarProdutosParaSubmissao } from '../../frontend/produtos-submissao.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
 import { coagirNumericosDeclarados, coagirNumericosOuLancar, idDeRota, numeroEstrito } from './coercao-numerica.js';
@@ -111,7 +111,7 @@ const CAMPOS_APOSENTADOS = new Set([
 
 // Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
 // geridas pelo framework (removido_em/removido_por_id — DADOS_CAMPO_RESERVADO se
-// repassadas a req.dados.atualizar). tipo_empreendimento só em rascunho.
+// repassadas a req.dados.atualizar). tipo_empreendimento só repete o valor gravado.
 const CAMPOS_BLOQUEADOS_PATCH = new Set([
   'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id',
   'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
@@ -198,8 +198,14 @@ export function montarPatchEstudo(
     if (CAMPOS_APOSENTADOS.has(k)) continue;
     // Campos exclusivos do Avançado não são escritos por uma tela de Preliminar.
     if (estudo?.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;
-    if (k === 'tipo_empreendimento' && estudo?.status !== 'rascunho') {
-      return { http: 422, codigo: 'TIPO_TRAVADO', mensagem: 'tipo_empreendimento só pode mudar em Rascunho' };
+    // O tipo é fixado na criação, em qualquer status. Repetir o valor gravado é
+    // aceito e ignorado (como `nivel_analise`); outro valor é recusado — para
+    // outro tipo, cria-se um estudo novo.
+    if (k === 'tipo_empreendimento') {
+      if (v !== estudo?.tipo_empreendimento) {
+        return { http: 422, codigo: 'TIPO_TRAVADO', mensagem: 'tipo_empreendimento não pode ser alterado; para outro tipo, crie um estudo novo' };
+      }
+      continue;
     }
     // Nível de análise é imutável após a criação (Preliminar × Avançado definem
     // estruturas diferentes — trocar corromperia o estudo). Repetir o valor
@@ -284,7 +290,7 @@ export function montarPatchEstudo(
   // ⚠️ **Dispara quando QUALQUER parte componente muda, não só o `nome`.** A
   // primeira versão condicionava a recomposição a `dados.nome !== undefined`, e
   // isso reproduzia o próprio defeito da issue pelos outros dois eixos: um PATCH
-  // que mudasse só a UF, ou só o `tipo_empreendimento` (editável em rascunho),
+  // que mudasse só a UF,
   // gravava a parte nova e deixava o `nome_exibicao` com a antiga — a tela
   // exibindo o rótulo velho para sempre, que é exatamente o que a #660 conserta.
   //
@@ -298,11 +304,9 @@ export function montarPatchEstudo(
   // fallback para o registro persistido é o que mantém a recomposição correta
   // nesse caso — antes ele era redundante por aqui, agora não é.
   const parteDoNomeMudou = dados.nome !== undefined
-    || dados.uf !== undefined
-    || dados.tipo_empreendimento !== undefined;
-  const tipoEfetivo = dados.tipo_empreendimento !== undefined
-    ? dados.tipo_empreendimento
-    : estudo?.tipo_empreendimento;
+    || dados.uf !== undefined;
+  // O tipo é imutável: o efetivo é sempre o gravado.
+  const tipoEfetivo = estudo?.tipo_empreendimento;
   const nomeEfetivo = dados.nome !== undefined ? dados.nome : estudo?.nome;
   // Sem tipo ou sem nome não há o que compor: recompor aqui produziria um rótulo
   // pior que o gravado. `siglaDoTipo` faz `slice` — tipo não-string lançaria.
@@ -334,7 +338,7 @@ export function montarPatchEstudo(
   if ('falha' in coagido) {
     return { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: coagido.falha.mensagem };
   }
-  return { dados: { ...coagido.dados, ...limpezaAoTrocarTipo(estudo?.tipo_empreendimento, coagido.dados.tipo_empreendimento) } };
+  return { dados: coagido.dados };
 }
 
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
@@ -739,48 +743,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
     const dados = decisao.dados;
 
-    // #781/#784: trocar o tipo do rascunho (Loteamento ↔ Incorporação). O catálogo
-    // vive em `pct_alv`, e a BASE do % muda com o tipo (ALV ↔ áreas privativas
-    // fechadas): sem levar a área derivada da base de ORIGEM junto, o `pct_alv`
-    // seria relido contra outra base e o VGV mudaria sozinho na troca.
-    //
-    // A ORDEM é a do estudo primeiro, produtos depois: o `atualizar` do estudo é
-    // quem valida o patch inteiro contra o schema, então um patch recusado não
-    // deixa produto convertido para trás. E se a conversão falhar no meio, o tipo
-    // volta ao de origem — os produtos já convertidos seguem legítimos (área
-    // preenchida, `pct_alv` limpo é o estado legado), e a base usada é a do estudo
-    // ANTES da troca, lida acima.
-    const tipoOrigem = estudo.tipo_empreendimento as string | undefined;
-    // Só no Preliminar (`!== 'avancado'`): o Avançado lê `area_media_m2` como entrada, e
-    // reescrevê-la a partir das áreas estáticas do Preliminar corromperia a linha guardada.
-    const trocaDeTipo = estudo.nivel_analise !== 'avancado'
-      && (tipoOrigem === 'loteamento' || tipoOrigem === 'incorporacao')
-      && (dados.tipo_empreendimento === 'loteamento' || dados.tipo_empreendimento === 'incorporacao') // só o destino validado: typo não converte nada
-      && dados.tipo_empreendimento !== tipoOrigem;
-    const limpezaAdiada = trocaDeTipo ? separarLimpezaAdiada(dados) : {}; const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
-    if (trocaDeTipo) {
-      // Cada produto convertido guarda o estado ANTERIOR para a compensação: se um
-      // update falhar no meio, os já convertidos voltam ao que eram (com o `pct_alv`
-      // e a área originais) e o tipo volta ao de origem — a falha não deixa o
-      // estudo parcialmente mutado.
-      const convertidos: { id: number; antes: Record<string, unknown> }[] = [];
-      try {
-        const produtos = await req.dados!.varrerTudo('preliminar_produtos', { filtros: { estudo_id: estudoId } });
-        const base = baseProdutosM2(estudo as unknown as ProformaInput);
-        for (const a of areasParaTrocarDeTipo(produtos as any[], base)) {
-          const orig = (produtos as any[]).find((p) => Number(p.id) === a.id);
-          await req.dados!.atualizar('preliminar_produtos', a.id, { area_media_m2: a.area_media_m2, pct_alv: null });
-          convertidos.push({ id: a.id, antes: { area_media_m2: orig?.area_media_m2 ?? null, pct_alv: orig?.pct_alv ?? null } });
-        } if (Object.keys(limpezaAdiada).length > 0) { const limpo = await req.dados!.atualizar('estudos', estudoId, limpezaAdiada); if (atualizado && limpo) Object.assign(atualizado, limpo); }
-      } catch (e) {
-        for (const c of convertidos) {
-          try { await req.dados!.atualizar('preliminar_produtos', c.id, coagirNumericosOuLancar('preliminar_produtos', c.antes)); }
-          catch (e2) { console.error('Falha ao desfazer a conversão do produto', c.id, e2); }
-        }
-        await req.dados!.atualizar('estudos', estudoId, { tipo_empreendimento: tipoOrigem });
-        throw e;
-      }
-    }
+    const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     res.json(atualizado);
   } catch (e: any) {
     console.error('Erro em PATCH /estudos/:id:', e);
@@ -1031,39 +994,4 @@ export function ordenarEstudosRecentes<T extends { id?: unknown; criado_em?: unk
     if (ta !== tb) return tb > ta ? 1 : -1;
     return Number(b.id) - Number(a.id);
   });
-}
-
-// A semântica residencial/não residencial das permutas é da Incorporação; o
-// Loteamento só edita a permuta residencial. Um rascunho que já foi
-// Incorporação pode carregar permuta financeira não residencial que o
-// Loteamento não tem campo para editar nem remover — ao trocar para Loteamento
-// ela é zerada pelo patch do estudo (o motor já a ignora lá); na troca do
-// Preliminar, depois da conversão dos produtos (ver `separarLimpezaAdiada`).
-export const CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL = [
-  'permuta_financeira_nao_residencial_pct',
-  'permuta_financeira_nao_residencial_modo',
-  'permuta_financeira_nao_residencial_valor',
-  'permuta_financeira_nao_residencial_valor_canonico',
-] as const;
-
-export function limpezaAoTrocarTipo(tipoOrigem: unknown, tipoDestino: unknown): Record<string, unknown> {
-  if (tipoDestino !== 'loteamento' || tipoOrigem !== 'incorporacao') return {};
-  return {
-    permuta_financeira_nao_residencial_pct: 0,
-    permuta_financeira_nao_residencial_modo: 'pct_vgv',
-    permuta_financeira_nao_residencial_valor: null,
-    permuta_financeira_nao_residencial_valor_canonico: null,
-  };
-}
-
-// Na troca de tipo com conversão de produtos, a limpeza sai do patch principal e
-// só é gravada depois de a conversão dar certo: se ela falhar, a compensação
-// devolve o tipo e os campos nunca foram zerados (sem dado perdido no caminho de
-// erro). Remove as chaves de `dados` e as devolve.
-export function separarLimpezaAdiada(dados: Record<string, any>): Record<string, unknown> {
-  const r: Record<string, unknown> = {};
-  for (const c of CAMPOS_PERMUTA_FIN_NAO_RESIDENCIAL) {
-    if (c in dados) { r[c] = dados[c]; delete dados[c]; }
-  }
-  return r;
 }

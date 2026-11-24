@@ -100,7 +100,7 @@ legível não muda ao renomear: é a identidade estável do estudo.
   quais botões desenhar.
 - `PATCH /estudos/:id` aceita `nome` de quem pode editar o estudo no status atual. O servidor
   recompõe `nome_exibicao` — o rótulo que as telas mostram — sempre que qualquer parte que o compõe
-  chega no pedido (`nome`, `uf` ou `tipo_empreendimento`, este só em Rascunho). `nome_exibicao` não
+  chega no pedido (`nome` ou `uf`). `nome_exibicao` não
   aceita escrita do cliente, e `id_legivel` nunca muda. Como `nome_exibicao` é o nome mais sigla,
   UF e sequência, e tem o mesmo limite de 200 caracteres, o servidor encolhe a parte do nome quando
   o rótulo estouraria; o `nome` gravado nunca é truncado.
