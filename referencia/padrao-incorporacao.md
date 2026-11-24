@@ -3289,7 +3289,7 @@ primeira edição. A #260 migra todos os demais consumidores para o resolver can
 > ✅ **A regra que fecha esta armadilha existe desde 2026-08-01** (convenção **C7**, Anexo A): o
 > canônico é o **valor monetário a 2 casas**; `%` e `R$/m²` são derivados, com precisão plena
 > internamente. `converterUnidade` arredondar **tudo** a 2 casas
-> (`frontend/premissas-conversao.ts:50-58`), inclusive o percentual, é o que quebra o round-trip —
+> (`frontend/premissas-conversao.ts:108-116`), inclusive o percentual, é o que quebra o round-trip —
 > o percentual não é monetário e não deveria ser quantizado.
 
 **A13 — A tela e a exportação formatavam dinheiro diferente; hoje a divergência é outra.**
