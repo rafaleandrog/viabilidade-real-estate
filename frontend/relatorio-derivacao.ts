@@ -7,7 +7,7 @@
  * novo, e a tela do estudo o consome uma única vez ao carregar.
  *
  * Sem DOM e sem `lit`: é lido pela tela e pelos testes. Recarregar a página perde o relatório daqui; o
- * mesmo texto fica nas Notas do estudo.
+ * mesmo texto fica gravado no campo de notas do estudo (a API o devolve; a tela não o exibe).
  */
 
 export interface ItemRelatorioDerivacao {
@@ -75,4 +75,12 @@ export function podeCriarAvancado(
   permissao: { podeEditar?: boolean } | null | undefined,
 ): boolean {
   return !!estudo && estudo.nivel_analise !== 'avancado' && !!permissao?.podeEditar;
+}
+
+/**
+ * O botão Criar do modal pode agir? Não com alteração não salva nas Premissas (a rota deriva do que está
+ * GRAVADO, então o estudo novo omitiria o que a tela mostra) e não com uma criação em andamento.
+ */
+export function podeConfirmarCriacao(naoSalvas: boolean, criando: boolean): boolean {
+  return !naoSalvas && !criando;
 }

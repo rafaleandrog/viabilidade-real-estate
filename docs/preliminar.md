@@ -40,8 +40,11 @@ completar, e o botão **Criar** gera um estudo Avançado **novo**, em Rascunho, 
   Premissas e não entra no valor das tipologias do Avançado.
 
 Ao criar, a tela abre o estudo novo e mostra o **relatório da criação**: o que foi levado e como, com
-os **alertas** (o que pede conferência) à frente. O relatório aparece só nessa primeira abertura; o
-mesmo texto fica registrado nas **Notas** do estudo novo, e é de lá que se lê depois.
+os **alertas** (o que pede conferência) à frente. O relatório aparece uma vez, ao abrir o estudo novo; depois
+de fechado (**Entendi, fechar**) ou ao recarregar a página, ele não volta à tela. Leia-o antes de fechar.
+
+O Avançado nasce do que está **salvo**. Com alterações não salvas nas Premissas, o modal avisa e o botão
+**Criar** fica desabilitado até você salvá-las.
 
 ### Premissas
 

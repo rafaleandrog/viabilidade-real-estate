@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  guardarRelatorio, consumirRelatorio, ordenarAlertasPrimeiro, resumirRelatorio, podeCriarAvancado,
+  guardarRelatorio, consumirRelatorio, ordenarAlertasPrimeiro, resumirRelatorio, podeCriarAvancado, podeConfirmarCriacao,
   type ItemRelatorioDerivacao,
 } from './relatorio-derivacao.js';
 
@@ -93,4 +93,19 @@ test('fiação: tela-estudo usa a regra, a API, o guardar e o consumir', () => {
   assert.match(f, /consumirRelatorio\(id\)/);
   const api = readFileSync(new URL('./viabilidade-api.ts', import.meta.url), 'utf8');
   assert.match(api, /\/estudos\/\$\{estudoId\}\/derivar-avancado`, \{ method: 'POST' \}/);
+});
+
+test('podeConfirmarCriacao: não com Premissas não salvas, nem com criação em andamento', () => {
+  assert.equal(podeConfirmarCriacao(false, false), true);
+  assert.equal(podeConfirmarCriacao(true, false), false);
+  assert.equal(podeConfirmarCriacao(false, true), false);
+  assert.equal(podeConfirmarCriacao(true, true), false);
+});
+
+test('fiação: o modal e o Criar leem a decisão, e o relatório fecha pelo slot acao', () => {
+  const f = readFileSync(new URL('./tela-estudo.ts', import.meta.url), 'utf8');
+  assert.match(f, /podeConfirmarCriacao\(naoSalvas, this\.derivando\)/);
+  assert.match(f, /podeConfirmarCriacao\(premissasNaoSalvas\(this\.estudo, this\._estudoSalvo\), this\.derivando\)/);
+  assert.match(f, /slot="acao"/);
+  assert.doesNotMatch(f, /continua nas Notas/);
 });

@@ -11,7 +11,7 @@ import {
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios, derivarAvancado,
 } from './viabilidade-api.js';
 import {
-  guardarRelatorio, consumirRelatorio, ordenarAlertasPrimeiro, resumirRelatorio, podeCriarAvancado,
+  guardarRelatorio, consumirRelatorio, ordenarAlertasPrimeiro, resumirRelatorio, podeCriarAvancado, podeConfirmarCriacao,
   type ItemRelatorioDerivacao,
 } from './relatorio-derivacao.js';
 
@@ -257,6 +257,7 @@ export class ViabTelaEstudo extends LitElement {
 
   /** Modal de confirmação de "Criar estudo Avançado a partir deste" (só Preliminar, só editor). */
   private _renderDerivarAvancado(): TemplateResult {
+    const naoSalvas = premissasNaoSalvas(this.estudo, this._estudoSalvo);
     return html`
       <urbi-modal title="Criar estudo Avançado a partir deste" maxWidth="560px"
         @urbi-modal:close=${this._fecharDerivar}>
@@ -281,6 +282,10 @@ export class ViabTelaEstudo extends LitElement {
             registrada nas Premissas e não entra no valor das tipologias do Avançado.
           </div>
 
+          ${naoSalvas ? html`<urbi-banner variante="alerta" class="derivar-nao-salvo">
+            Há alterações não salvas nas Premissas. O estudo Avançado é criado a partir do que está SALVO,
+            e essas alterações ficariam de fora. Salve as Premissas antes de criar.
+          </urbi-banner>` : nothing}
           ${this.derivarErro ? html`<urbi-banner variante="erro">${this.derivarErro}</urbi-banner>` : nothing}
 
           <div class="form-acoes">
@@ -288,7 +293,7 @@ export class ViabTelaEstudo extends LitElement {
               @click=${this._fecharDerivar}>Cancelar</urbi-botao>
             <urbi-botao variante="primario"
               ?carregando=${this.derivando}
-              ?desabilitado=${this.derivando}
+              ?desabilitado=${!podeConfirmarCriacao(naoSalvas, this.derivando)}
               @click=${this._criarAvancado}>Criar</urbi-botao>
           </div>
         </div>
@@ -316,10 +321,11 @@ export class ViabTelaEstudo extends LitElement {
               </li>`)}
           </ul>
           <div class="relatorio-nota">
-            Este relatório aparece só agora; ao recarregar a página ele continua nas Notas do estudo.
+            Este relatório aparece só agora, ao abrir o estudo novo: depois de fechado, ou ao recarregar a
+            página, ele não volta à tela.
           </div>
-          <urbi-botao pequeno variante="fantasma"
-            @click=${() => { this.relatorioDerivacao = null; }}>Fechar relatório</urbi-botao>
+          <urbi-botao slot="acao" pequeno variante="fantasma"
+            @click=${() => { this.relatorioDerivacao = null; }}>Entendi, fechar</urbi-botao>
         </urbi-banner>
       </div>
     `;
@@ -336,7 +342,7 @@ export class ViabTelaEstudo extends LitElement {
   };
 
   private _criarAvancado = async () => {
-    if (this.derivando) return;
+    if (!podeConfirmarCriacao(premissasNaoSalvas(this.estudo, this._estudoSalvo), this.derivando)) return;
     this.derivando = true;
     this.derivarErro = '';
     try {

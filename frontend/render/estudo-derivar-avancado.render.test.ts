@@ -25,6 +25,7 @@ const CASOS = [
   ['estudo-derivar-sem-botao', 'sem botão para quem só lê'],
   ['estudo-derivar-modal', 'modal de confirmação'],
   ['estudo-derivar-relatorio', 'relatório da derivação'],
+  ['estudo-derivar-modal-nao-salvo', 'modal com Premissas não salvas'],
 ] as const;
 
 for (const [caso, rotulo] of CASOS) {

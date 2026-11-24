@@ -1,7 +1,7 @@
 // Caso de render: o relatório da derivação, no estudo NOVO. Um alerta e dois itens comuns, com textos
 // longos de propósito — a lista interpola `origem → destino: regra. nota` dentro de um banner, e é essa
 // forma que estoura a caixa quando o texto cresce. O alerta tem de vir primeiro, e o aviso de que o
-// relatório também está nas Notas do estudo tem de estar na tela.
+// relatório não volta depois de fechado tem de estar na tela.
 
 import { ACEITA_NAO_REPRODUZIDO, montarEstudo } from './estudo-derivar-botao.js';
 
@@ -31,6 +31,7 @@ export const caso = {
       throw new Error('o alerta deveria vir primeiro na lista do relatório');
     }
     const texto = (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ');
-    if (!texto.includes('continua nas Notas do estudo')) throw new Error('falta o aviso de que o relatório fica nas Notas');
+    if (!texto.includes('ele não volta à tela')) throw new Error('falta o aviso de que o relatório não volta depois de fechado');
+    if (texto.includes('Notas do estudo')) throw new Error('a tela não tem Notas do estudo: a promessa é falsa');
   },
 };
