@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   absorcaoMensal, curvaComVelocidade, janelaVendasDaCurva, velocidadeVendasValida, absorcaoComVelocidade,
+  VELOCIDADE_VENDAS_MIN, VELOCIDADE_VENDAS_MAX,
 } from './fluxo-shared.js';
 import { calcularFluxo, aplicarCenario, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { validarFluxoCalc } from './fluxo-invariantes.js';
@@ -38,9 +39,11 @@ function config(absorcao: any): FluxoConfig {
   } as FluxoConfig;
 }
 
-test('velocidadeVendasValida: só número finito acima de −100%', () => {
-  for (const v of [0, 50, -50, -99.99, 300]) assert.equal(velocidadeVendasValida(v), true, String(v));
-  for (const v of [-100, -150, NaN, Infinity, '10', null, undefined]) assert.equal(velocidadeVendasValida(v), false, String(v));
+test('velocidadeVendasValida: só número finito de −90% a +500% (a mesma faixa da API)', () => {
+  for (const v of [0, 50, -50, -90, 300, 500]) assert.equal(velocidadeVendasValida(v), true, String(v));
+  for (const v of [-90.01, -100, -150, 500.01, NaN, Infinity, '10', null, undefined]) assert.equal(velocidadeVendasValida(v), false, String(v));
+  assert.equal(VELOCIDADE_VENDAS_MIN, -90);
+  assert.equal(VELOCIDADE_VENDAS_MAX, 500);
 });
 
 test('curvaComVelocidade: com 0 ou velocidade inválida devolve a MESMA curva, sem trocar a referência', () => {

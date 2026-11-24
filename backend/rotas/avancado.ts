@@ -2290,7 +2290,33 @@ rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', removerCusto);
 // recalcular o fluxo. Nenhum indicador derivado é gravado.
 // ─────────────────────────────────────────────────────────────────
 
-const CAMPOS_CENARIO = ['nome', 'preco_venda_pct', 'custo_obra_pct', 'ordem'];
+const CAMPOS_CENARIO = ['nome', 'preco_venda_pct', 'custo_obra_pct', 'velocidade_vendas_pct', 'ordem'];
+
+/**
+ * #971: faixa aceita da velocidade de vendas de um cenário, em %. Abaixo de
+ * −90% o prazo de vendas passaria de 10× o do estudo (−100% pararia as vendas);
+ * acima de +500% ele cairia a menos de 1/6. É a MESMA faixa que o motor do
+ * frontend aceita (`VELOCIDADE_VENDAS_MIN`/`_MAX` em `frontend/fluxo-shared.ts`).
+ */
+export const VELOCIDADE_VENDAS_MIN = -90;
+export const VELOCIDADE_VENDAS_MAX = 500;
+
+/** Mensagem de erro da velocidade de vendas, ou `null` se ela é aceita (ausente/nula vale). */
+export function erroVelocidadeVendas(v: unknown): string | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < VELOCIDADE_VENDAS_MIN || v > VELOCIDADE_VENDAS_MAX) {
+    return `A velocidade de vendas deve ficar entre ${VELOCIDADE_VENDAS_MIN}% e +${VELOCIDADE_VENDAS_MAX}%.`;
+  }
+  return null;
+}
+
+/** Responde 400 e devolve `true` quando a velocidade já coagida está fora da faixa. */
+function recusarVelocidadeVendas(res: Response, coagidos: Record<string, any>): boolean {
+  const msg = erroVelocidadeVendas(coagidos.velocidade_vendas_pct);
+  if (!msg) return false;
+  erro(res, 400, 'VELOCIDADE_VENDAS_INVALIDA', msg);
+  return true;
+}
 
 rotasAvancado.get('/estudos/:id/avancado/cenarios', async (req: Request, res: Response) => {
   try {
@@ -2318,6 +2344,7 @@ rotasAvancado.post('/estudos/:id/avancado/cenarios', async (req: Request, res: R
       nome: 'Cenário',
       preco_venda_pct: 0,
       custo_obra_pct: 0,
+      velocidade_vendas_pct: 0,
       ordem: 0,
     };
     for (const campo of CAMPOS_CENARIO) {
@@ -2325,6 +2352,7 @@ rotasAvancado.post('/estudos/:id/avancado/cenarios', async (req: Request, res: R
     }
     const coagidos = coagirOuRecusar(res, 'avancado_cenarios', dados);
     if (!coagidos) return;
+    if (recusarVelocidadeVendas(res, coagidos)) return;
     const criado = await req.dados!.criar('avancado_cenarios', coagidos);
     res.status(201).json(criado);
   } catch (e: any) {
@@ -2354,6 +2382,7 @@ rotasAvancado.patch('/estudos/:id/avancado/cenarios/:cid', async (req: Request, 
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     const coagidos = coagirOuRecusar(res, 'avancado_cenarios', dados);
     if (!coagidos) return;
+    if (recusarVelocidadeVendas(res, coagidos)) return;
 
     const atualizado = await req.dados!.atualizar('avancado_cenarios', cid, coagidos);
     res.json(atualizado);

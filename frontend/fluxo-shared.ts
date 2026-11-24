@@ -1395,9 +1395,19 @@ export function janelaVendasDaCurva(
   return { inicio: periodo.inicio, fim: Number.isFinite(fim) && fim >= periodo.inicio ? fim : periodo.fim };
 }
 
-/** A velocidade é válida acima de −100% (−100% pararia as vendas: prazo infinito). */
+/**
+ * Faixa aceita da velocidade de vendas, em %: de −90% (prazo de vendas 10× o do
+ * estudo; −100% pararia as vendas) a +500% (prazo 1/6). É a MESMA faixa que a
+ * API grava (`erroVelocidadeVendas` em `backend/rotas/avancado.ts`); a tela
+ * limita os controles a ela.
+ */
+export const VELOCIDADE_VENDAS_MIN = -90;
+export const VELOCIDADE_VENDAS_MAX = 500;
+
+/** A velocidade é um número finito dentro de [`VELOCIDADE_VENDAS_MIN`, `VELOCIDADE_VENDAS_MAX`]. */
 export function velocidadeVendasValida(velocidadePct: unknown): boolean {
-  return typeof velocidadePct === 'number' && Number.isFinite(velocidadePct) && velocidadePct > -100;
+  return typeof velocidadePct === 'number' && Number.isFinite(velocidadePct)
+    && velocidadePct >= VELOCIDADE_VENDAS_MIN && velocidadePct <= VELOCIDADE_VENDAS_MAX;
 }
 
 /**
@@ -1409,11 +1419,13 @@ export function velocidadeVendasValida(velocidadePct: unknown): boolean {
  * Conta: sobre o trecho ativo `p` (da primeira à última venda — o início das
  * vendas não se move), com `F(x)` o % acumulado até `x` meses (linear dentro do
  * mês) e `k = 1 + v`, o mês `j` novo vende `F((j+1)·k) − F(j·k)`. A soma
- * continua a da curva base; prazo novo fracionário deixa o último mês parcial.
+ * continua a da curva base — a que `absorcaoMensal` devolve, já limitada à
+ * janela do cronograma; prazo novo fracionário deixa o último mês parcial.
  *
  * Devolve uma curva `personalizado` com `janelaLivre` (ver
  * `janelaVendasDaCurva`), ou a `absorcao` recebida, intacta, quando a
- * velocidade é 0, inválida, ou a curva não tem venda.
+ * velocidade é 0, inválida (fora da faixa — a API e a tela não a deixam
+ * chegar aqui), ou a curva não tem venda.
  */
 export function curvaComVelocidade(absorcao: any, crono: EventoCrono[], velocidadePct: number): any {
   if (velocidadePct === 0 || !velocidadeVendasValida(velocidadePct)) return absorcao;

@@ -437,6 +437,7 @@
         "nome":            { "tipo": "texto", "limite": 100 },
         "preco_venda_pct": { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 0 },
         "custo_obra_pct":  { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 0 },
+        "velocidade_vendas_pct": { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 0 },
         "ordem":           { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["estudo_id"]]
