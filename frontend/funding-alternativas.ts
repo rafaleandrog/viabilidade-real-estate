@@ -157,9 +157,11 @@ export function passosDoPlano(plano: PlanoUsarAlternativa, salvas: OperacaoFundi
 /**
  * O início de uma operação ancorada (evento do cronograma ou fase) é resolvido
  * pelo servidor a cada gravação, a partir do cronograma ATUAL. Uma alternativa
- * guardada antes de a âncora andar teria o mês velho: aqui as operações que
- * existem no funding salvo e estão ancoradas lá recebem a âncora e o mês de
- * hoje, para a simulação e o plano verem o que o servidor vai gravar.
+ * guardada antes de a âncora andar teria o mês velho, e uma guardada antes de a
+ * fase ser apagada teria uma âncora que não existe mais: aqui as operações que
+ * existem no funding salvo e estão ancoradas lá OU na alternativa recebem a
+ * âncora e o mês do salvo, para a simulação e o plano verem o que o servidor
+ * vai gravar.
  * Não muta a entrada; devolve a mesma lista quando nada muda.
  */
 export function sincronizarAncoras(ops: OperacaoFunding[], salvas: OperacaoFunding[]): OperacaoFunding[] {
@@ -170,9 +172,13 @@ export function sincronizarAncoras(ops: OperacaoFunding[], salvas: OperacaoFundi
     const salva = o.id != null ? (porId.get(o.id) as any) : undefined;
     if (!salva || salva.tipo !== o.tipo) return o;
     const ev = salva.cronograma_evento;
-    const ancoradaNoSalvo = (!!ev && ev !== 'customizado') || salva.fase_ancora_id != null;
-    if (!ancoradaNoSalvo) return o;
     const atual = o as any;
+    const ancoradaNoSalvo = (!!ev && ev !== 'customizado') || salva.fase_ancora_id != null;
+    const ancoradaNaAlternativa = (!!atual.cronograma_evento && atual.cronograma_evento !== 'customizado')
+      || atual.fase_ancora_id != null;
+    // As duas direções: âncora que andou, e âncora que deixou de existir (fase
+    // apagada anula `fase_ancora_id` no salvo; o mês ficou customizado lá).
+    if (!ancoradaNoSalvo && !ancoradaNaAlternativa) return o;
     if (atual.inicio_mes === salva.inicio_mes && atual.cronograma_evento === ev
       && (atual.fase_ancora_id ?? null) === (salva.fase_ancora_id ?? null)) return o;
     mudou = true;
@@ -230,9 +236,9 @@ const igual = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) ===
  * a nova.
  */
 /**
- * Os campos que as rotas de operação gravam — espelho de `CAMPOS_OPERACAO`
- * (backend/rotas/avancado.ts), menos `ordem`, que a alternativa não decide.
- * O teste de paridade compara esta lista com a do backend.
+ * Os campos que as rotas de operação gravam — espelho exato de
+ * `CAMPOS_OPERACAO` (backend/rotas/avancado.ts), travado pelo teste de
+ * paridade. Quem tira `ordem` da comparação do plano é `CAMPOS_GRAVAVEIS`.
  */
 export const CAMPOS_OPERACAO_ESPELHO = [
   'tipo', 'nome', 'ordem', 'valor',

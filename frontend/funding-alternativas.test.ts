@@ -600,3 +600,12 @@ test('planoUsarAlternativa: metadado da linha e ordem nunca viram diferença', (
   alt.operacoes[0].valor = 11;
   assert.deepEqual(planoUsarAlternativa(salvas, alt).atualizar, [{ id: 1, campos: { valor: 11 } }]);
 });
+
+test('sincronizarAncoras: fase apagada no salvo limpa a âncora morta da alternativa', () => {
+  const salvas = [{ id: 1, tipo: 'divida', nome: 'A', valor: 1, inicio_mes: 6, cronograma_evento: 'customizado', fase_ancora_id: null }] as any;
+  const ops = [{ ...salvas[0], inicio_mes: 2, fase_ancora_id: 44 }] as any;
+  const r = sincronizarAncoras(ops, salvas) as any[];
+  assert.equal(r[0].fase_ancora_id, null);
+  assert.equal(r[0].inicio_mes, 6);
+  assert.equal(r[0].cronograma_evento, 'customizado');
+});

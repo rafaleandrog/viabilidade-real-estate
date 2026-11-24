@@ -186,10 +186,14 @@ export class ViabFundingAlternativas extends LitElement {
     const salvasAntes = this.salvas ?? [];
     // A tela devolve as linhas que criou, para esta alternativa (e só ela)
     // passar a apontar para elas e continuar "igual ao salvo".
+    // A religação usa a alternativa COMO FOI APLICADA (este `alt`), não a atual:
+    // uma edição feita enquanto os requests corriam desalinharia a ordem das
+    // operações criadas. O resultado substitui a alternativa, porque é ele que
+    // corresponde ao que o servidor gravou.
     const aoCriar = (criadas: OperacaoFunding[]) => {
       const k = this.alternativas.findIndex((a) => a.id === alt.id);
       if (k < 0 || !criadas.length) return;
-      const nova = religarAposUsar(this.alternativas[k], salvasAntes, criadas);
+      const nova = religarAposUsar(alt, salvasAntes, criadas);
       this._gravar(this.alternativas.map((a, x) => (x === k ? nova : a)));
     };
     this.dispatchEvent(new CustomEvent('viab:usar-alternativa', {
