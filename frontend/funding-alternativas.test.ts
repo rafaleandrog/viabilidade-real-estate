@@ -5,7 +5,7 @@ import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFunding } from './funding-motor.js';
 import { mesRepasse } from './fluxo-shared.js';
 import {
-  MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
+  MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, recusaDoPostComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
   novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, type AlternativaFunding,
 } from './funding-alternativas.js';
 
@@ -416,6 +416,7 @@ test('alternativas: a memória da página vence o storage (cota cheia: setItem f
 // especificador é uma variável de propósito: um `import` estático arrastaria o
 // typecheck do backend (augmentação de tipos do SDK) para o do frontend.
 const CAMINHO_BACKEND_FUNDING = '../backend/rotas/funding.ts';
+const CAMINHO_BACKEND_COERCAO = '../backend/rotas/coercao-numerica.ts';
 async function validarCamposOperacao(op: Record<string, any>): Promise<string | null> {
   const mod = await import(CAMINHO_BACKEND_FUNDING);
   return mod.validarCamposOperacao(op);
@@ -461,6 +462,65 @@ test('paridade: validarOperacaoComoServidor aceita ⇔ validarCamposOperacao ace
     assert.equal(validarOperacaoComoServidor(op) === null, servidor === null, nome);
     assert.equal(validarOperacaoComoServidor(op), servidor, `${nome} (mensagem)`);
   }
+});
+
+// Reproduz a ordem do POST com as funções REAIS do servidor: coerção numérica,
+// `tipo`/`nome` obrigatórios e `validarCamposOperacao` (sobre os dados coagidos).
+// No `nome` vai além do servidor, de propósito (conservador): só espaços e mais de
+// 100 caracteres (schema `obrigatorio` + `limite: 100`).
+async function servidorRecusa(op: Record<string, any>): Promise<string | null> {
+  const coer = await import(CAMINHO_BACKEND_COERCAO);
+  const r = coer.coagirNumericosDeclarados('avancado_funding_operacoes', op);
+  if ('falha' in r) return r.falha.mensagem;
+  const dados = r.dados;
+  if (!dados.tipo) return 'tipo é obrigatório';
+  if (!dados.nome || typeof dados.nome !== 'string' || !dados.nome.trim()) return 'nome é obrigatório';
+  if (dados.nome.length > 100) return 'nome longo';
+  return validarCamposOperacao(dados);
+}
+
+test('paridade do POST: recusaDoPostComoServidor ⇔ coerção + tipo/nome + validarCamposOperacao', async () => {
+  const INTEIROS = ['inicio_mes', 'aporte_meses', 'periodo_amortizacao_meses', 'periodo_carencia_meses', 'ordem'];
+  const casos: Array<[string, Record<string, any>]> = [];
+  for (const [tipo, base] of Object.entries(BASE_POR_TIPO)) {
+    casos.push([`${tipo} base`, base]);
+    for (const n of ['', '   ', 'x'.repeat(100), 'x'.repeat(101), undefined, null, 5]) {
+      casos.push([`${tipo} nome=${JSON.stringify(n)}`, { ...base, nome: n }]);
+    }
+    for (const t of [undefined, '', null]) casos.push([`${tipo} tipo=${JSON.stringify(t)}`, { ...base, tipo: t }]);
+    for (const campo of [...CAMPOS_NUM, 'ordem', 'estudo_id', 'fase_ancora_id']) {
+      for (const v of ['abc', '', '12', ' 7 ', '1e3', '0x10', 1.5, true, NaN, Infinity, {}, [], '1.5']) {
+        casos.push([`${tipo} ${campo}=${String(v)}`, { ...base, [campo]: v }]);
+      }
+    }
+  }
+  assert.ok(casos.some(([n]) => n.includes('1.5')) && INTEIROS.length === 5);
+  for (const [nome, op] of casos) {
+    const servidor = await servidorRecusa(op);
+    const front = recusaDoPostComoServidor(op);
+    assert.equal(front === null, servidor === null, `${nome}: front=${front} servidor=${servidor}`);
+  }
+  assert.equal(recusaDoPostComoServidor({ ...BASE_POR_TIPO.divida, nome: '' }), 'nome é obrigatório');
+});
+
+test('errosDoEstadoFinal: nome apagado, tipo ausente e número inválido são recusados antes de gravar', () => {
+  const div = BASE_POR_TIPO.divida as any;
+  assert.equal(errosDoEstadoFinal(altCom({ ...div, nome: '' })).length, 1);
+  assert.equal(errosDoEstadoFinal(altCom({ ...div, nome: 'x'.repeat(101) })).length, 1);
+  assert.equal(errosDoEstadoFinal(altCom({ ...div, tipo: '' })).length, 1);
+  assert.equal(errosDoEstadoFinal(altCom({ ...div, valor: 'abc' })).length, 1);
+  assert.equal(errosDoEstadoFinal(altCom({ ...div, inicio_mes: 1.5 })).length, 1);
+});
+
+test('lerAlternativas: alternativa com operação nula, não objeto ou sem tipo é descartada', () => {
+  limparCacheAlternativas();
+  const boa = { id: 'a', nome: 'A', operacoes: [{ tipo: 'divida', nome: 'D' }] };
+  for (const [i, ops] of [[null], [1], ['x'], [[]], [{ nome: 'sem tipo' }], [{ tipo: 3 }]].entries()) {
+    const st = storageFalso();
+    st.setItem(`viab:funding-alternativas:${90 + i}`, JSON.stringify([{ id: 'b', nome: 'B', operacoes: ops }, boa]));
+    assert.deepEqual(lerAlternativas(90 + i, st), [boa], JSON.stringify(ops));
+  }
+  limparCacheAlternativas();
 });
 
 test('errosDoEstadoFinal: recusa o que o servidor recusa (taxa negativa, carência >= amortização, ativo inválido)', () => {

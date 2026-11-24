@@ -302,12 +302,66 @@ export function validarOperacaoComoServidor(dados: Record<string, any>): string 
   return null;
 }
 
+// Campos numéricos de `avancado_funding_operacoes` no `schema.json` (cópia local: o
+// frontend não importa de `backend/`); `true` = inteiro (`inteiro`/`referencia`), que
+// `coagirNumericosDeclarados` exige inteiro. O teste de paridade trava a divergência.
+const NUMERICOS_OPERACAO: Record<string, boolean> = {
+  estudo_id: true, ordem: true, fase_ancora_id: true, inicio_mes: true, aporte_meses: true,
+  periodo_amortizacao_meses: true, periodo_carencia_meses: true,
+  valor: false, taxa_anual: false, pct_retorno: false, exposicao_minima: false, percentual_financiavel: false,
+  taxa_estruturacao_pct: false, taxa_administracao_mensal: false, outros_encargos_iniciais: false, pct_carteira_cedida: false,
+};
+const RE_DECIMAL_ESTRITO = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/;
+
+/** Espelha `numeroEstrito` (backend/rotas/coercao-numerica.ts): número finito ou string decimal estrita. */
+function numeroEstritoComoServidor(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string' || !RE_DECIMAL_ESTRITO.test(v)) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Espelha `coagirNumericosDeclarados` (a `coagirOuRecusar` do POST/PATCH): `null` e
+ * `undefined` passam; os demais precisam ser número estrito e, nos inteiros, inteiro.
+ * Devolve a mensagem do primeiro campo que o servidor recusaria, ou `null`.
+ */
+export function coagirComoServidor(op: Record<string, any>): string | null {
+  for (const [campo, inteiro] of Object.entries(NUMERICOS_OPERACAO)) {
+    const v = op[campo];
+    if (v === null || v === undefined) continue;
+    const n = numeroEstritoComoServidor(v);
+    if (n === null) return `Campo "${campo}" deve ser um número`;
+    if (inteiro && !Number.isInteger(n)) return `Campo "${campo}" deve ser um número inteiro`;
+  }
+  return null;
+}
+
+const LIMITE_NOME = 100; // `limite` da coluna `nome` no schema.json
+
+/**
+ * Tudo o que o POST de uma operação recusa, na ordem do servidor: coerção numérica,
+ * `tipo` e `nome` obrigatórios, depois `validarCamposOperacao`. Mais conservador que o
+ * servidor no `nome` (só espaços conta como vazio; o schema declara `obrigatorio` e
+ * `limite: 100`).
+ */
+export function recusaDoPostComoServidor(op: Record<string, any>): string | null {
+  const coercao = coagirComoServidor(op);
+  if (coercao) return coercao;
+  if (!op.tipo) return 'tipo é obrigatório';
+  if (typeof op.nome !== 'string' || !op.nome.trim()) return 'nome é obrigatório';
+  if (op.nome.length > LIMITE_NOME) return `nome não pode passar de ${LIMITE_NOME} caracteres`;
+  return validarOperacaoComoServidor(op);
+}
+
 /**
  * Espelho das regras do servidor (`somaRetornoExcede` e `validarCamposOperacao`
  * de `backend/rotas/funding.ts`) sobre o ESTADO FINAL da alternativa, antes de
  * gravar qualquer passo. Considera as operações que ficam gravadas: todas menos
  * as marcadas `__fora`, que o plano remove. O Financiamento à produção desligado
- * continua gravado e o servidor o valida inteiro no PATCH, então ele entra. Aplica `validarOperacaoComoServidor` a cada uma e soma
+ * continua gravado e o servidor o valida inteiro no PATCH, então ele entra. Aplica `recusaDoPostComoServidor` a cada uma (coerção
+ * numérica estrita, `tipo` e `nome` obrigatórios, `validarCamposOperacao`: tudo o que o
+ * POST ou o PATCH recusariam no meio do plano, depois das remoções) e soma
  * `pct_retorno` dos equities por modo <= 100 (tolerância 100.01; modo padrão
  * permuta_financeira). Devolve uma mensagem por problema.
  */
@@ -318,7 +372,7 @@ export function errosDoEstadoFinal(alt: AlternativaFunding): string[] {
   const porModo = new Map<string, number>();
   for (const o of incluidas) {
     const nome = o.nome || ROTULO_TIPO_ERRO[o.tipo] || o.tipo;
-    const msg = validarOperacaoComoServidor(o as any);
+    const msg = recusaDoPostComoServidor(o as any);
     if (msg) erros.push(`"${nome}": ${msg}.`);
     if (o.tipo !== 'equity') continue;
     const pct = Number((o as any).pct_retorno) || 0;
@@ -380,7 +434,8 @@ export function lerAlternativas(estudoId: number | string, storage?: Storage | n
     const dado = JSON.parse(bruto);
     if (!Array.isArray(dado)) return [];
     return dado
-      .filter((a) => a && typeof a.id === 'string' && typeof a.nome === 'string' && Array.isArray(a.operacoes))
+      .filter((a) => a && typeof a.id === 'string' && typeof a.nome === 'string' && Array.isArray(a.operacoes)
+        && a.operacoes.every((o: any) => o && typeof o === 'object' && !Array.isArray(o) && typeof o.tipo === 'string'))
       .slice(0, MAX_ALTERNATIVAS);
   } catch {
     return [];

@@ -158,7 +158,7 @@ operações serão criadas, alteradas e removidas; ao confirmar, o funding do es
 alternativa. Operação com **Incluir** desmarcado sai do funding ao aplicar. **Usar esta** fica
 desabilitado, com um aviso na alternativa, quando ela passa de 100% de retorno de equity num mesmo
 modo de retorno ou fere outra regra das operações (valor, taxa ou prazo negativo, percentual acima de
-100, carência maior que a amortização): nada é gravado. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
+100, carência igual ou maior que a amortização, nome vazio ou com mais de 100 caracteres, número inválido): nada é gravado. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
 **desligado** e seus parâmetros ficam preservados. Depois de aplicar, os dados do funding são recarregados e a
 alternativa continua guardada para novas comparações.
 
