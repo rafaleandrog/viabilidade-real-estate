@@ -57,7 +57,7 @@ test('#566: modoEfetivo preserva um modo válido em uso (não força o padrão)'
 // está ausente. É o mesmo recurso que a #566 usou para provar que a Permuta
 // física parou de oferecer "Unidade" — a lista é exportada e conferida direto.
 test('#781/#784: o grid de Produtos cadastra por % da base e Unidades; áreas são calculadas — nos dois tipos', () => {
-  const chaves = ['nome', 'tipo', 'pct', 'unidades', 'areaTotal', 'area', 'preco', 'vgv'];
+  const chaves = ['nome', 'tipo', 'pct', 'unidades', 'unidadesPermutadas', 'areaTotal', 'area', 'preco', 'vgv'];
   const lot = colunasProduto(true);
   const inc = colunasProduto(false);
   assert.deepEqual(lot.map((c) => c.chave), chaves);

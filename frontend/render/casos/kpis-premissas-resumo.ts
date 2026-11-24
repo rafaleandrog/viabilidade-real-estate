@@ -1,15 +1,16 @@
 // Caso de render: o card "Resumo" de Premissas → Produtos (Incorporação),
 // com "Preço médio/unid." de 9 DÍGITOS (#579 — "o VALOR salta para fora do
-// quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1529-1558`)
+// quadro do KPI"). `_renderResumo` (`frontend/tela-premissas.ts:1611-1640`)
 // só aparece na sub-aba `secao: 'produtos'`, e a MESMA `.kpis` que ele usa
 // também rege `.kpis.aproveitamento` (#569) e `.kpis.area-alocada` (#573,
 // que corenderiza aqui — `_renderAlocacaoAlv()` mora na mesma sub-aba): os
 // três modificadores só ajustam `margin-top`, a track é uma regra só, e este
 // caso prova a track para os três de uma vez.
 //
-// `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:832-833`)
-// e `vgv = área_média_m2 × preço_m2 × unidades` por produto — o `unidades`
-// se CANCELA na divisão, então `precoMedioUnidade = area_media_m2 ×
+// `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:863-871`)
+// e, no modo por área, `vgv = área_média_m2 × preço_m2 × unidades` por produto
+// (o modo por unidade não tem esse cancelamento) — o `unidades` se CANCELA na
+// divisão, então `precoMedioUnidade = area_media_m2 ×
 // preco_venda_m2`, independente de quantas unidades o catálogo tiver. Por
 // isso `100 × 1.714.484 = 171.448.400,00` (mesmos dígitos do exemplo
 // literal da issue) sem precisar de um catálogo de 1 unidade só —

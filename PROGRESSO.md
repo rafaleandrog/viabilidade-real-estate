@@ -4,6 +4,40 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-23 — Permuta por produto: rodada de observações da revisão
+
+- A API recusa (400) `unidades_permutadas > 0` quando a `unidades` efetiva, do corpo ou da linha
+  gravada, é nula, negativa, fracionária ou ilegível: o teto agora é fail-closed, e não só quando
+  `unidades` chega válida. Sem permuta, a coerção numérica segue decidindo.
+- A regra de corte das permutadas no teto das unidades saiu do método da tela para função pura
+  exportada (`dadosEdicaoUnidadesPermutadas`), e um caso de render novo edita as duas colunas pelos
+  eventos do primitivo e lê o corpo dos PATCH: reverter o handler de Unidades ou o de Permutadas
+  deixava a suíte verde antes e agora a derruba.
+- Comentários corrigidos: endereço de `_editarCustoUnidade`/`_valorUnidade`, "Nove colunas" e o
+  cancelamento de `unidades` no preço médio, que vale só no modo por área.
+
+## 2026-11-23 — Permuta física por produto do catálogo (Preliminar)
+
+- Quadro da base comum, tema 2, decisão do dono: a permuta física do Preliminar passa a poder ser
+  declarada por produto, como o Avançado faz com as unidades reservadas de cada tipologia. Coluna
+  nova `preliminar_produtos.unidades_permutadas` (inteiro, padrão 0), sem migração (não há dado a
+  transformar) e sem bump da `versao`, pela regra do repositório.
+- Motor (`calcularProforma`): se algum produto de uma categoria tem unidades permutadas, a permuta
+  daquela categoria vem do catálogo (m² = Σ unidades × área; VGV = Σ unidades × área × preço do
+  produto, sobre o catálogo já estressado) e os campos por área dela são ignorados. Sem nenhum
+  produto permutado, o caminho por área é o de antes. O cap por categoria, o `moeda` e as
+  identidades por categoria seguem. Regra pura em `frontend/permuta-produtos.ts`, lida também pela
+  aba Permutas, que desabilita os campos por área da categoria por produto e diz onde editar.
+- Preço médio por unidade desconta as unidades permutadas só no modo por produto; o memo
+  `valorPermutaFisica` é a soma do VGV efetivo das categorias quando alguma é por produto.
+- Backend: `unidades_permutadas` validado (inteiro 0 ≤ x ≤ unidades, fail-closed; `400
+  UNIDADES_PERMUTADAS_INVALIDAS`) e copiado na duplicação do estudo, que herda a coluna de `CAMPOS`.
+  Dois testes existentes que fixavam a lista de colunas foram atualizados com autorização do dono.
+- Tela: coluna "Unidades permutadas" em `colunasProduto`. Dois casos de render: a coluna, e o estado
+  desabilitado da aba Permutas.
+- Medido na Pinguim (só leitura), Preliminar com a permuta equivalente à do Avançado par: o 39 vai de
+  VGV 209.250.000 para 210.000.000 e resultado +573.900; o 38, de VGV 139.704.323 para 139.797.039
+  e resultado +75.285.
 ## 2026-11-23 — Projetos do Avançado aceita % do VGV (fatia 3 de 5 das bases Preliminar × Avançado)
 
 - A linha de custo Projetos do Avançado passa a oferecer a unidade `% VGV`, além de R$, R$/m² priv
