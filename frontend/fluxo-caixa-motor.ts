@@ -20,7 +20,7 @@ import {
   areaPrivativaTotalLinhas, resolverCustoTotal, totalConstrucaoCustos, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, eMarketing, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
-  mesRepasse, ultimoMesFunding,
+  mesRepasse, ultimoMesFunding, janelaVendasDaCurva, absorcaoComVelocidade,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte, type ImpostoReceita,
 } from './fluxo-shared.js';
 
@@ -2119,7 +2119,7 @@ export function ultimoMesRecebivelLinha(
   // A última safra é o fim da janela Pós-chaves DESTE Grupo (1 a 12 meses).
   const periodo = periodoAbsorcao(cronograma, mesesPosChaves(linha?.absorcao));
   if (!periodo) return 0;
-  const ultimoMesVenda = periodo.fim;
+  const ultimoMesVenda = janelaVendasDaCurva(linha?.absorcao, periodo)!.fim;
   const fp = linha?.fluxo_pagamento ?? null;
   if (!fp) return ultimoMesVenda; // sem config → à vista no mês da venda (#190/#191 não se aplicam)
 
@@ -2677,14 +2677,14 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Parâmetros de um cenário: variações percentuais (deltas) aplicadas sobre a
- * configuração-base. `0` = cenário-base (sem alteração).
+ * Parâmetros de um cenário: variações percentuais (deltas) aplicadas sobre a configuração-base. `0` = cenário-base (sem alteração).
  *  - `precoVendaPct`: varia o preço/m² de TODAS as tipologias de receita.
  *  - `custoObraPct`: varia o orçamento das linhas de custo do grupo `obra`.
  */
 export interface CenarioParams {
   precoVendaPct: number;
   custoObraPct: number;
+  velocidadeVendasPct?: number; // #971: vende (1+v)× mais por mês, prazo ÷ (1+v) — `curvaComVelocidade`. Ausente = 0.
 }
 
 /**
@@ -2700,7 +2700,7 @@ export function aplicarCenario(config: FluxoConfig, params: CenarioParams): Flux
   return {
     ...config,
     linhasReceita: (config.linhasReceita ?? []).map((l) => ({
-      ...l,
+      ...l, ...absorcaoComVelocidade(l, config.cronograma ?? [], n(params?.velocidadeVendasPct)),
       tipologias: (l.tipologias ?? []).map((t: any) => ({ ...t, preco_m2: n(t?.preco_m2) * fPreco })),
     })),
     linhasCusto: (config.linhasCusto ?? []).map((c) => (

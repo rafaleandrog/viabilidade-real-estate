@@ -586,7 +586,7 @@ export function absorcaoMensal(
   // `duracao_meses` legado de um bloco — vem de `pos_chaves_meses` do próprio
   // Grupo (1 a 12; ausente = 12, a janela de sempre).
   const posChaves = mesesPosChaves(absorcao);
-  const periodo = periodoAbsorcao(crono, posChaves);
+  const periodo = janelaVendasDaCurva(absorcao, periodoAbsorcao(crono, posChaves));
   if (!periodo) return null;
   const tamanho = periodo.fim - periodo.inicio + 1;
   const pcts = new Array<number>(tamanho).fill(0);
@@ -1364,3 +1364,92 @@ export function impostoDoEstudoAvancado(params: any): ImpostoReceita | undefined
 
 /** #834: teto de uma alíquota de imposto sobre a receita, em %. O piso é 0. */
 export const TETO_ALIQUOTA_IMPOSTO = 100;
+
+// ─────────────────────────────────────────────────────────────────
+// Velocidade de vendas dos cenários do Avançado (#971)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * A janela de vendas de uma curva: a do cronograma (`periodo`) e, só para a
+ * curva de CENÁRIO marcada com `janelaLivre` (modo `personalizado`), do mesmo
+ * início até o último mês com venda. Uma velocidade negativa alonga as vendas além
+ * da janela de sempre (fim da obra + pós-chaves), e sem a extensão o que
+ * passasse do fim seria descartado — vendas sumindo do cenário.
+ *
+ * `janelaLivre` só existe em memória: é escrito por `curvaComVelocidade` e
+ * nunca gravado. Curva sem a marca tem exatamente a janela de antes.
+ */
+export function janelaVendasDaCurva(
+  absorcao: any,
+  periodo: { inicio: number; fim: number } | null,
+): { inicio: number; fim: number } | null {
+  if (!periodo) return null;
+  if (absorcao?.modo !== 'personalizado' || absorcao?.janelaLivre !== true || !Array.isArray(absorcao?.meses)) {
+    return periodo;
+  }
+  // Termina na ÚLTIMA venda, para os dois lados: estende além da janela do
+  // cronograma (velocidade negativa) e também encurta, para a janela de 12 meses
+  // de pós-chaves do modo `personalizado` não esticar o horizonte com meses vazios.
+  let fim = -Infinity;
+  for (const m of absorcao.meses) if (n(m?.pct) !== 0 && n(m?.mes) > fim) fim = n(m?.mes);
+  return { inicio: periodo.inicio, fim: Number.isFinite(fim) && fim >= periodo.inicio ? fim : periodo.fim };
+}
+
+/** A velocidade é válida acima de −100% (−100% pararia as vendas: prazo infinito). */
+export function velocidadeVendasValida(velocidadePct: unknown): boolean {
+  return typeof velocidadePct === 'number' && Number.isFinite(velocidadePct) && velocidadePct > -100;
+}
+
+/**
+ * A curva de vendas de uma linha de receita sob uma velocidade de vendas de
+ * `velocidadePct` % (#971, opção B do dono): vende-se `(1 + v)` vezes mais por
+ * mês, e o prazo de vendas vira `prazo ÷ (1 + v)`. A FORMA da curva se mantém:
+ * é a mesma curva com o relógio acelerado ou desacelerado.
+ *
+ * Conta: sobre o trecho ativo `p` (da primeira à última venda — o início das
+ * vendas não se move), com `F(x)` o % acumulado até `x` meses (linear dentro do
+ * mês) e `k = 1 + v`, o mês `j` novo vende `F((j+1)·k) − F(j·k)`. A soma
+ * continua a da curva base; prazo novo fracionário deixa o último mês parcial.
+ *
+ * Devolve uma curva `personalizado` com `janelaLivre` (ver
+ * `janelaVendasDaCurva`), ou a `absorcao` recebida, intacta, quando a
+ * velocidade é 0, inválida, ou a curva não tem venda.
+ */
+export function curvaComVelocidade(absorcao: any, crono: EventoCrono[], velocidadePct: number): any {
+  if (velocidadePct === 0 || !velocidadeVendasValida(velocidadePct)) return absorcao;
+  const abs = absorcaoMensal(absorcao ?? { modo: 'linear' }, crono);
+  if (!abs) return absorcao;
+  const primeiro = abs.pcts.findIndex((x) => x !== 0);
+  if (primeiro < 0) return absorcao;
+  let ultimo = abs.pcts.length - 1;
+  while (ultimo > primeiro && abs.pcts[ultimo] === 0) ultimo--;
+  const p = abs.pcts.slice(primeiro, ultimo + 1);
+  const acumulado = (x: number): number => {
+    const t = Math.max(0, Math.min(p.length, x));
+    const i = Math.floor(t);
+    let s = 0;
+    for (let q = 0; q < i; q++) s += p[q];
+    return i < p.length ? s + p[i] * (t - i) : s;
+  };
+  const k = 1 + velocidadePct / 100;
+  // Tolerância contra o erro de ponto flutuante que faria nascer um mês extra com ~0%.
+  const meses = Math.max(1, Math.ceil(p.length / k - 1e-9));
+  const novos: { mes: number; pct: number }[] = [];
+  for (let j = 0; j < meses; j++) {
+    novos.push({ mes: abs.inicio + primeiro + j, pct: acumulado((j + 1) * k) - acumulado(j * k) });
+  }
+  // O último mês fecha com o resto: a soma é a da curva base, sem resíduo de arredondamento.
+  const soma = p.reduce((s, x) => s + x, 0);
+  novos[novos.length - 1].pct = soma - novos.slice(0, -1).reduce((s, x) => s + x.pct, 0);
+  return { modo: 'personalizado', janelaLivre: true, meses: novos };
+}
+
+/**
+ * O pedaço de linha de receita que `aplicarCenario` troca pela velocidade de
+ * vendas: `{ absorcao }` com a curva do cenário, ou `{}` com velocidade 0 — a
+ * linha segue exatamente a mesma, sem nem trocar a referência da curva.
+ */
+export function absorcaoComVelocidade(linha: any, crono: EventoCrono[], velocidadePct: number): { absorcao?: any } {
+  if (velocidadePct === 0) return {};
+  return { absorcao: curvaComVelocidade(linha?.absorcao, crono, velocidadePct) };
+}

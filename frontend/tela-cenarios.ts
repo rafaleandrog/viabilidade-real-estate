@@ -272,7 +272,7 @@ export class ViabTelaCenarios extends LitElement {
   private _calc(params: CenarioParams): FluxoCalc {
     // A chave inclui o filtro de fase (#186) — sem isso, trocar o filtro
     // reaproveitaria do cache um cálculo da fase anterior.
-    const chave = `${this.faseFiltro}|${n(params.precoVendaPct)}|${n(params.custoObraPct)}`;
+    const chave = `${this.faseFiltro}|${n(params.precoVendaPct)}|${n(params.custoObraPct)}|${n(params.velocidadeVendasPct)}`;
     const memo = this.cacheCalc.get(chave);
     if (memo) return memo;
     const calc = calcularFluxo(aplicarCenario(this._configFiltrado(), params));

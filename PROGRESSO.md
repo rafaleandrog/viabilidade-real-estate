@@ -4,6 +4,19 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-24 — Velocidade de vendas nos cenários: o motor (fatia 1 de 3)
+
+- Definição do dono (opção B): velocidade +v vende `(1 + v)` vezes mais por mês, e o prazo de vendas
+  vira `prazo ÷ (1 + v)`, mantendo a forma da curva e o mês da primeira venda. `v > −100%`.
+- `curvaComVelocidade` (`frontend/fluxo-shared.ts`) reamostra o trecho ativo da curva mensal
+  (da primeira à última venda) pelo acumulado linear dentro do mês; o último mês fecha com o resto.
+  `aplicarCenario` a aplica a cada linha de receita quando `velocidadeVendasPct ≠ 0`; com 0 a linha
+  é a mesma, sem trocar a referência da curva.
+- A janela de vendas da curva de cenário (marca `janelaLivre`, só em memória) vai da primeira à
+  ÚLTIMA venda (`janelaVendasDaCurva`), em `absorcaoMensal` e no horizonte de recebíveis
+  (`ultimoMesRecebivelLinha`). Medido sem isso: −50% descartava metade das vendas.
+- Sem tela nem schema nesta fatia: o campo só chega à tela na fatia 2. Ver a issue 971.
+
 ## 2026-11-24 — O tipo do estudo não muda mais depois de criado (fatia 4 de 4 da issue 833)
 
 - Decisão do dono (24/11): `PATCH /estudos/:id` recusa com `422 TIPO_TRAVADO` um `tipo_empreendimento`
