@@ -1209,11 +1209,17 @@ export function vgvVendidoVendavelMensal(
  * já resolvido; permuta física e financeira não entram lá (#268), e para elas o
  * canônico é a fonte — exceto na permuta FÍSICA, em que o backend zera os dois
  * campos de propósito (`backend/rotas/avancado.ts:1394-1397`), e aí não há
- * dinheiro nenhum a mostrar. Sem canônico, a coluna crua só é R$ quando a
+ * dinheiro nenhum a mostrar. Exceção: linha `pct_vgv` sem canônico, com
+ * contexto — o R$ é o percentual nominal × a base vendável do contexto.
+ * Sem canônico, a coluna crua só é R$ quando a
  * unidade é `rs`; nas demais devolve `null`, para o chamador não afirmar um
  * número que não sabe.
  */
-export function dinheiroParaRotulo(custo: any, calcLinhas: Array<{ id: any; total: number }>): number | null {
+export function dinheiroParaRotulo(
+  custo: any,
+  calcLinhas: Array<{ id: any; total: number }>,
+  ctx: ContextoCusto | undefined,
+): number | null {
   const doMotor = (calcLinhas ?? []).find((l) => l.id === custo?.id);
   if (doMotor) return doMotor.total;
   const canonico = custo?.orcamento_valor_canonico;
@@ -1221,6 +1227,15 @@ export function dinheiroParaRotulo(custo: any, calcLinhas: Array<{ id: any; tota
     return Number(canonico);
   }
   const bruto = custo?.orcamento_valor;
+  // Linha em % do VGV sem canônico (o que a migração deixa) e fora do motor:
+  // com o contexto, o R$ é o valor NOMINAL (% × base de `pct_vgv`), o mesmo que
+  // o canônico dava antes da migração. Para a permuta financeira o motor aplica
+  // o % sobre o recebimento com deduções; o rótulo não afirma essa conta.
+  // Sem contexto, não afirma número.
+  if (ctx && custo?.orcamento_unidade === 'pct_vgv'
+    && bruto !== null && bruto !== undefined && bruto !== '' && Number.isFinite(Number(bruto))) {
+    return resolverCustoTotal(custo, ctx);
+  }
   if ((custo?.orcamento_unidade || 'rs') !== 'rs') return null;
   if (bruto === null || bruto === undefined || bruto === '' || !Number.isFinite(Number(bruto))) return null;
   return Number(bruto);

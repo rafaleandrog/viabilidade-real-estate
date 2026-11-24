@@ -84,6 +84,23 @@ const SEED = {
     { id: 2, estudo_id: 1, grupo: 'obra', categoria: 'Gestão da obra', inicio_mes: 1, duracao_meses: 24 },
     { id: 3, estudo_id: 1, grupo: 'terreno', categoria: 'Compra', inicio_mes: 1, duracao_meses: 1 },
     { id: 4, estudo_id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', inicio_mes: 1, duracao_meses: 12 },
+    // A `043` anula o R$ canônico só das linhas `pct_vgv` cujo `orcamento_valor` é
+    // um percentual válido. Cada linha abaixo carrega um ramo da guarda: sem a
+    // semente a asserção da `043` passaria de graça.
+    { id: 101, estudo_id: 1, grupo: 'diretos', categoria: 'Marketing', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'pct_vgv', orcamento_valor: '1.5', orcamento_valor_canonico: '2148663.00' },
+    { id: 102, estudo_id: 1, grupo: 'diretos', categoria: 'Corretagem', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'rs', orcamento_valor: '500000', orcamento_valor_canonico: '500000' },
+    { id: 103, estudo_id: 1, grupo: 'diretos', categoria: 'Legado', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'pct_vgv', orcamento_valor: '0x10', orcamento_valor_canonico: '1000' },
+    { id: 104, estudo_id: 1, grupo: 'diretos', categoria: 'Fora da faixa', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'pct_vgv', orcamento_valor: 250, orcamento_valor_canonico: 2000 },
+    { id: 105, estudo_id: 1, grupo: 'diretos', categoria: 'Discordante', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'pct_vgv', orcamento_valor: '0', orcamento_valor_canonico: '300000' },
+    { id: 106, estudo_id: 1, grupo: 'diretos', categoria: 'Sem canonico', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'pct_vgv', orcamento_valor: 2, orcamento_valor_canonico: null },
+    { id: 107, estudo_id: 1, grupo: 'diretos', categoria: 'Zero coerente', inicio_mes: 1, duracao_meses: 12,
+      orcamento_unidade: 'pct_vgv', orcamento_valor: 0, orcamento_valor_canonico: 0 },
   ],
   avancado_linhas_receita: [
     { id: 1, estudo_id: 1, nome: 'Fase 1', inicio_mes: 1, duracao_meses: 12 },
@@ -514,6 +531,49 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         );
       } else {
         ok(`estudos.${coluna} ficou vazia (SEED semeia ${semeadas.length} estudo(s) — a asserção tem dente)`);
+      }
+    }
+
+    // A `043` anula o canônico das linhas `pct_vgv` com percentual válido e não
+    // toca nas demais (unidade diferente, dado legado, fora da faixa, discordante).
+    {
+      const porId = new Map((banco.db.get('avancado_linhas_custo') ?? []).map((l) => [l.id, l]));
+      const esperado = [
+        [101, true, 'pct_vgv com % válido: canônico anulado'],
+        [102, false, 'unidade rs: canônico intacto'],
+        [103, false, 'orcamento_valor não decimal: fail-closed'],
+        [104, false, 'percentual fora de [0,100]: fail-closed'],
+        [105, false, '% zero com canônico ≠ 0: fail-closed'],
+        [106, true, 'já sem canônico: permanece nulo'],
+        [107, true, '% zero com canônico zero: coerente, anulado (R$ 0 = 0 % de qualquer base)'],
+      ];
+      for (const [id, anulado, rotulo] of esperado) {
+        const l = porId.get(id);
+        const nulo = l && (l.orcamento_valor_canonico === null || l.orcamento_valor_canonico === undefined);
+        const certo = anulado ? nulo : !nulo;
+        if (!certo) erro(`043 — linha ${id} (${rotulo}) saiu errada`, new Error(`canônico=${l?.orcamento_valor_canonico}`));
+        else ok(`043 — linha ${id}: ${rotulo}`);
+      }
+
+      // Dente do ramo "já sem canônico" (106): ela nasce nula e exige nula, então
+      // a asserção por linha sozinha passa até com a migração apagada. O que a
+      // distingue é a CONTA DE ESCRITAS, medida isolando a `043` num banco próprio:
+      // só 101 e 107 têm canônico a anular — 106 não pode gerar escrita, e uma
+      // 2ª passada não escreve nada (idempotência). Comentar o `atualizar` zera a
+      // contagem; anular sempre a infla.
+      const m043 = lista.find((x) => x.arq.startsWith('043_'));
+      if (!m043) {
+        erro('043 não encontrada na cadeia', new Error('arquivo ausente'));
+      } else {
+        const iso = bancoFake(SEED);
+        await m043.fn({ dados: iso });
+        const n1 = iso.escritas.atualizar;
+        if (n1 !== 2) erro('043 — nº de escritas na 1ª passada', new Error(`esperado 2 (linhas 101 e 107), veio ${n1}`));
+        else ok('043 — 1ª passada escreve só nas 2 linhas com canônico a anular (106 não escreve)');
+        await m043.fn({ dados: iso });
+        const n2 = iso.escritas.atualizar - n1;
+        if (n2 !== 0) erro('043 — idempotência', new Error(`2ª passada escreveu ${n2} linha(s)`));
+        else ok('043 — 2ª passada não escreve nada');
       }
     }
 

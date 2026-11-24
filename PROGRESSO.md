@@ -23,6 +23,32 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   regerados pelo gerador (conteúdo das células conferido contra o gerador anterior: só as
   validações de unidade e a nota mudam); os Preliminares não mudam.
 - Guia `docs/avancado.md` cita `% do VGV` em Projetos.
+## 2026-11-23 — Base do % do VGV no Avançado, fatia 2 de 5: migração recalcula o R$ congelado
+
+- Decisão do dono: nas linhas de custo do Avançado em `% do VGV`, o R$ canônico congelado é
+  recalculado sobre a base nova (VGV vendável, que a fatia 1 põe no motor). Mecanismo: a migração
+  `043_pct_vgv_recalcula_base_vendavel.js` anula `orcamento_valor_canonico` só das linhas
+  `pct_vgv`; sem canônico, o motor resolve pelo percentual gravado em `orcamento_valor`
+  (`resolverCustoTotal`, `corretagemMensal`, `distribuirProporcional` e a permuta financeira).
+- Guarda fail-closed: não anula quando `orcamento_valor` não é decimal simples, está fora de
+  [0, 100] ou é 0 com canônico diferente de 0. Idempotente; as demais unidades ficam intactas.
+- `versao` do manifesto 0.1.41 → 0.1.42 (migração nova, regra do guard). O harness ganhou sete
+  linhas-semente, uma por ramo da guarda; apagar o `atualizar` da migração deixa a asserção vermelha.
+- Medição na Pinguim (só leitura, estudos Avançado 21, 22, 40 e 41): 24 linhas `pct_vgv`, todas já
+  com canônico nulo; efeito da migração nestes estudos: R$ 0. Entra junto com a fatia 1, senão o R$
+  recalculado usa a base antiga até ela entrar.
+- Rodada 1 de revisão: o rótulo do seletor de base financiável do Funding (`dinheiroParaRotulo`)
+  passa a resolver o R$ nominal da linha `pct_vgv` sem canônico (% × base de `pct_vgv`), com um
+  contexto montado de `calc`; antes mostraria "—" depois da migração.
+  O harness ganhou a contagem de escritas da `043` isolada (2 na 1ª passada, 0 na 2ª), que dá dente
+  à linha já sem canônico. Registradas no PR: ordem de merge (a fatia 1 antes ou junto, na mesma
+  release), a precisão de 2 casas do % gravado e o dado legado anterior à correção da coluna única.
+- Rodada 2: este PR passa a depender da fatia 1 (a branch dela foi mesclada aqui). `dinheiroParaRotulo`
+  tem o 3º parâmetro obrigatório (`ContextoCusto | undefined`), então esquecer o contexto vira erro
+  de compilação; a tela de Funding monta o contexto tipado, sem cast, com `vgvVendavel` real. Os
+  comentários deixam de afirmar que o rótulo é "a conta do motor": ele mostra o valor nominal, e na
+  permuta financeira o motor aplica o % sobre o recebimento com deduções. Testes existentes do rótulo
+  só ganharam `undefined` explícito no 3º argumento (assinatura), sem mudar asserção.
 ## 2026-11-23 — Avançado: `% do VGV` e corretagem sobre o VGV vendável (fatia 1 de 5)
 
 - Decisão do dono: `% do VGV` do Avançado passa a incidir sobre o VGV vendável (potencial menos a
