@@ -790,7 +790,7 @@ export class ViabFunding extends LitElement {
     this.criando = true;
     try {
       let ordem = this._proximaOrdem();
-      // Remover → atualizar → criar: a ordem que o servidor aceita (teto de retorno do equity).
+      // A ordem de `passosDoPlano` é a que o servidor aceita (teto de retorno do equity por modo).
       for (const passo of passosDoPlano(plano, this.operacoes)) {
         const r = passo.acao === 'remover' ? await removerFundingOperacao(this.estudo.id, passo.id as number)
           : passo.acao === 'atualizar' ? await atualizarFundingOperacao(this.estudo.id, passo.id as number, passo.campos)

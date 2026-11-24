@@ -222,7 +222,7 @@ test('passosDoPlano: remover → atualizar → criar; reduções antes de aument
 });
 
 /** Aplica os passos sobre as salvas e confere o teto de 100% por modo a cada passo (como o servidor). */
-function simularServidor(salvas: any[], passos: any[]): void {
+function simularServidor(salvas: any[], passos: any[]): any[] {
   const ops = salvas.map((o) => ({ ...o }));
   let prox = 1000;
   const confere = (op: any, ignorar?: any) => {
@@ -242,6 +242,7 @@ function simularServidor(salvas: any[], passos: any[]): void {
       ops[i] = novo;
     }
   }
+  return ops;
 }
 
 test('passosDoPlano: ordem não soma valor com pct (A 20→80 com valor menor, B 80→20)', () => {
@@ -297,4 +298,36 @@ test('passosDoPlano: reduzir valor mas subir pct conta como aumento; remover+cri
   const passos = passosDoPlano(plano, salvas);
   assert.deepEqual(passos.map((p: any) => p.id ?? 'n'), [3, 2, 1, 'n']);
   simularServidor(salvas, passos);
+});
+
+test('passosDoPlano: troca só de modo preserva o pct_retorno no estado final', () => {
+  // `campos` traz só o que mudou (o modo); o zeramento prévio não pode ficar gravado.
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 1, modo_retorno: 'permuta_financeira', pct_retorno: 80 },
+  ] as any;
+  const plano: any = { criar: [], atualizar: [{ id: 1, campos: { modo_retorno: 'resultado_final' } }], remover: [] };
+  const final = simularServidor(salvas, passosDoPlano(plano, salvas));
+  assert.equal(final[0].modo_retorno, 'resultado_final');
+  assert.equal(final[0].pct_retorno, 80);
+});
+
+test('passosDoPlano: troca cruzada termina com cada equity no modo e no pct da alternativa', () => {
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 1, modo_retorno: 'permuta_financeira', pct_retorno: 60 },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 1, modo_retorno: 'resultado_final', pct_retorno: 0 },
+  ] as any;
+  const plano: any = {
+    criar: [],
+    atualizar: [
+      { id: 1, campos: { modo_retorno: 'resultado_final' } },
+      { id: 2, campos: { modo_retorno: 'permuta_financeira', pct_retorno: 30 } },
+    ],
+    remover: [],
+  };
+  const passos = passosDoPlano(plano, salvas) as any[];
+  // B já está em 0: nenhum zeramento inútil para ela.
+  assert.equal(passos.filter((p) => p.id === 2 && p.campos?.pct_retorno === 0).length, 0);
+  const final = simularServidor(salvas, passos);
+  assert.deepEqual(final.map((o) => [o.id, o.modo_retorno, o.pct_retorno]),
+    [[1, 'resultado_final', 60], [2, 'permuta_financeira', 30]]);
 });

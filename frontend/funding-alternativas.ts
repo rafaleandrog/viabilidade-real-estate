@@ -140,11 +140,15 @@ export function passosDoPlano(plano: PlanoUsarAlternativa, salvas: OperacaoFundi
   const livres = info.filter((x) => !trocaModo(x) && !sobePct(x));
   const subidas = info.filter(sobePct);
   const upd = (x: (typeof info)[number]): PassoPlano => ({ acao: 'atualizar', id: x.u.id, campos: x.u.campos });
+  const updTroca = (x: (typeof info)[number]): PassoPlano => ({
+    acao: 'atualizar', id: x.u.id, campos: { ...x.u.campos, pct_retorno: x.e.pctDepois },
+  });
   return [
     ...plano.remover.map((id): PassoPlano => ({ acao: 'remover', id })),
-    ...trocas.map((x): PassoPlano => ({ acao: 'atualizar', id: x.u.id, campos: { pct_retorno: 0 } })),
+    ...trocas.filter((x) => x.e.pctAntes !== 0)
+      .map((x): PassoPlano => ({ acao: 'atualizar', id: x.u.id, campos: { pct_retorno: 0 } })),
     ...livres.map(upd),
-    ...trocas.map(upd),
+    ...trocas.map(updTroca),
     ...subidas.map(upd),
     ...plano.criar.map((op): PassoPlano => ({ acao: 'criar', op })),
   ];
