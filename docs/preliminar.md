@@ -15,7 +15,8 @@ custos por m² ou por percentual do VGV, permutas, catálogo de produtos e preç
 recalcula os KPIs na hora. O que ele **não** tem é a dimensão do tempo: não há cronograma, curva de
 vendas, funding nem TIR — isso é o [Estudo Avançado](avancado). O nível é escolhido na criação e
 não muda depois — nem na cópia feita por **Duplicar**, que herda o nível; para levar um Preliminar
-adiante, crie um estudo Avançado.
+adiante, use **Criar estudo Avançado a partir deste** (ver abaixo), que gera um estudo Avançado novo
+já pré-preenchido.
 
 ## Para usuários
 
@@ -24,6 +25,23 @@ As Premissas são editáveis em Rascunho e Em análise por `editor` e `aprovador
 Aprovado ou Reprovado as quatro sub-abas de Premissas ficam em modo de leitura para todos; num
 Arquivado a tela deixa digitar, mas só o `aprovador` consegue salvar (ver
 [Permissões e ciclo de vida](permissoes)).
+
+### Criar um estudo Avançado a partir deste
+
+No cabeçalho do estudo, ao lado de **Membros**, o botão **Criar estudo Avançado a partir deste** aparece
+para quem pode editar o estudo Preliminar. Ele abre uma confirmação que lista o que vai e o que fica a
+completar, e o botão **Criar** gera um estudo Avançado **novo**, em Rascunho, com você como editor.
+
+- **O que vai:** o catálogo de produtos, que vira tipologias com um grupo de receita; os custos das
+  Premissas; o imposto; a data de início; a análise de mercado e o apelo comercial.
+- **O que fica a completar no Avançado:** cronograma, absorção, plano de pagamento, juros de tabela,
+  funding e cenários.
+- **O Preliminar não muda.** A área privativa aberta fica como referência: continua registrada nas
+  Premissas e não entra no valor das tipologias do Avançado.
+
+Ao criar, a tela abre o estudo novo e mostra o **relatório da criação**: o que foi levado e como, com
+os **alertas** (o que pede conferência) à frente. O relatório aparece só nessa primeira abertura; o
+mesmo texto fica registrado nas **Notas** do estudo novo, e é de lá que se lê depois.
 
 ### Premissas
 

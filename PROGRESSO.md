@@ -4,6 +4,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-24 — Criar um Avançado a partir de um Preliminar: o botão e o relatório na tela (fatia 3 de 4)
+
+- Entrega: botão **Criar estudo Avançado a partir deste** no cabeçalho do estudo (`frontend/tela-estudo.ts`),
+  visível só num estudo que não é Avançado e a que o usuário pode editar (`podeCriarAvancado`, em
+  `frontend/relatorio-derivacao.ts`). Abre um `urbi-modal` de confirmação (o que vai, o que fica a
+  completar, o Preliminar não muda, a área aberta como referência), com carregando e erro da API num
+  `urbi-banner` de erro. Ao criar, navega para o estudo novo e mostra o relatório (alertas primeiro,
+  botão para fechar); recarregar a página não o mostra, e o aviso diz que ele fica nas Notas.
+- Cliente: `derivarAvancado` em `frontend/viabilidade-api.ts` (a contagem de funções do wrapper em
+  `frontend/api-caminho-relativo.test.ts` subiu de 82 para 83, depois de as asserções de caminho passarem).
+- Testes: `frontend/relatorio-derivacao.test.ts` (módulo, regra do botão e fiação lida do fonte) e quatro
+  casos de render em Chromium (`frontend/render/estudo-derivar-avancado.render.test.ts`): botão para o
+  editor, sem botão para o leitor, modal e relatório. Guia: `docs/preliminar.md` e `docs/README.md`.
+- **Falta:** a fatia 4 (remoção da troca de tipo). A conferência na instância Pinguim fica para depois.
+
+
 ## 2026-11-24 — Criar um Avançado a partir de um Preliminar: planejador e rota (fatia 2 de 4)
 
 - Entrega: `POST /estudos/:id/derivar-avancado` (`backend/rotas/derivar-avancado.ts`). A função pura

@@ -103,6 +103,11 @@ export function duplicarEstudo(id: number): Promise<any> {
   return urbiVerso.api(`/estudos/${id}/duplicar`, { method: 'POST' });
 }
 
+/** Cria um estudo Avançado novo a partir de um Preliminar. Responde `{ estudo, relatorio }`. */
+export function derivarAvancado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`/estudos/${estudoId}/derivar-avancado`, { method: 'POST' });
+}
+
 export function transicaoStatus(id: number, status: string): Promise<any> {
   return urbiVerso.api(`/estudos/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
 }
