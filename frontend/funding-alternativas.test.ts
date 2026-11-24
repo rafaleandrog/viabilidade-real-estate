@@ -6,7 +6,7 @@ import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFundin
 import { mesRepasse } from './fluxo-shared.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, recusaDoPostComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
-  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, religarCriadas, type AlternativaFunding,
+  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, religarAposUsar, type AlternativaFunding,
 } from './funding-alternativas.js';
 
 const CRONO = [
@@ -554,23 +554,31 @@ test('sincronizarAncoras: operação ancorada no salvo recebe o mês de hoje; cu
   assert.deepEqual(planoUsarAlternativa(salvas, { id: 'a', nome: 'x', operacoes: r.slice(0, 3) }), { criar: [], atualizar: [{ id: 3, campos: { inicio_mes: 8 } }], remover: [] });
 });
 
-test('religarCriadas: depois de aplicar, a operação criada recebe o id e a alternativa volta a ser igual ao salvo', () => {
-  const salvas = [
-    { id: 1, tipo: 'divida', nome: '1º Dívida', valor: 10 },
-    { id: 7, tipo: 'equity', nome: '1º Equity', valor: 5, pct_retorno: 20 },  // criada pelo "Usar esta"
+test('religarAposUsar: só as operações que o plano criou recebem os ids devolvidos, na ordem', () => {
+  const salvasAntes = [
+    { id: 1, tipo: 'divida', nome: 'A', valor: 10 },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 5, pct_retorno: 20 },
   ] as any;
-  const ops = [
-    { id: 1, tipo: 'divida', nome: '1º Dívida', valor: 10 },
-    { tipo: 'equity', nome: '1º Equity', valor: 5, pct_retorno: 20 },
-    { tipo: 'divida', nome: 'Fora', valor: 1, __fora: true },
+  const alt: any = { id: 'x', nome: 'X', operacoes: [
+    { id: 1, tipo: 'divida', nome: 'A', valor: 10 },             // mantida
+    { tipo: 'equity', nome: 'Nova 1', valor: 3, pct_retorno: 10 },  // criada
+    { id: 2, tipo: 'divida', nome: 'B virou dívida', valor: 5 },  // tipo trocado: criada
+    { tipo: 'divida', nome: 'Fora', valor: 1, __fora: true },     // dispensada
+  ] };
+  const plano = planoUsarAlternativa(salvasAntes, alt);
+  assert.equal(plano.criar.length, 2, 'o plano cria exatamente as duas que serão religadas');
+  const r = religarAposUsar(alt, salvasAntes, [70, 71]) as any;
+  assert.deepEqual(r.operacoes.map((o: any) => o.id), [1, 70, 71, undefined]);
+  assert.equal(alt.operacoes[1].id, undefined, 'não muta a entrada');
+  // Depois de aplicada e recarregada, a alternativa religada é igual ao salvo.
+  const salvasDepois = [
+    { id: 1, tipo: 'divida', nome: 'A', valor: 10 },
+    { id: 70, tipo: 'equity', nome: 'Nova 1', valor: 3, pct_retorno: 10 },
+    { id: 71, tipo: 'divida', nome: 'B virou dívida', valor: 5 },
   ] as any;
-  const r = religarCriadas(ops, salvas) as any[];
-  assert.equal(r[1].id, 7);
-  assert.equal(r[2].id, undefined, 'operação fora não é religada');
-  assert.equal(ops[1].id, undefined, 'não muta a entrada');
-  assert.equal(planoVazio(planoUsarAlternativa(salvas, { id: 'a', nome: 'x', operacoes: r })), true);
-  assert.equal(religarCriadas(r, salvas), r, 'já religada: mesma lista');
-  // Id já usado por outra operação da alternativa não é reaproveitado.
-  const dupla = religarCriadas([{ id: 7, tipo: 'equity', nome: '1º Equity' }, { tipo: 'equity', nome: '1º Equity' }] as any, salvas) as any[];
-  assert.equal(dupla[1].id, undefined);
+  const semFora = { ...r, operacoes: r.operacoes.filter((o: any) => !o.__fora) };
+  assert.equal(planoVazio(planoUsarAlternativa(salvasDepois, semFora)), true);
+  // Plano que parou no meio: só o que foi criado é religado.
+  const parcial = religarAposUsar(alt, salvasAntes, [70]) as any;
+  assert.deepEqual(parcial.operacoes.map((o: any) => o.id), [1, 70, 2, undefined]);
 });

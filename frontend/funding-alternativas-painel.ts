@@ -6,7 +6,7 @@ import { rotuloMesRelativo } from './fluxo-shared.js';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, novaOperacaoAlternativa, planoUsarAlternativa, planoVazio,
-  lerAlternativas, gravarAlternativas, errosDoEstadoFinal, sincronizarAncoras, religarCriadas,
+  lerAlternativas, gravarAlternativas, errosDoEstadoFinal, sincronizarAncoras, religarAposUsar,
   type AlternativaFunding, type IndicadoresEstrutura, type PlanoUsarAlternativa,
 } from './funding-alternativas.js';
 import './viab-num.js';
@@ -109,8 +109,7 @@ export class ViabFundingAlternativas extends LitElement {
     if ((mudou.has('salvas') || mudou.has('estudoId')) && this.alternativas.length) {
       // A âncora pode ter andado desde que a alternativa foi guardada.
       const sinc = this.alternativas.map((a) => {
-        // E as operações criadas por um "Usar esta" anterior recebem o id que ganharam.
-        const ops = sincronizarAncoras(religarCriadas(a.operacoes, this.salvas ?? []), this.salvas ?? []);
+        const ops = sincronizarAncoras(a.operacoes, this.salvas ?? []);
         return ops === a.operacoes ? a : { ...a, operacoes: ops };
       });
       if (sinc.some((a, k) => a !== this.alternativas[k])) this._gravar(sinc);
@@ -184,8 +183,17 @@ export class ViabFundingAlternativas extends LitElement {
     const alt = this.alternativas[i];
     const plano = this._plano(alt);
     if (planoVazio(plano) || errosDoEstadoFinal(alt).length) return;
+    const salvasAntes = this.salvas ?? [];
+    // A tela devolve os ids das operações que criou, para esta alternativa (e só
+    // ela) passar a apontar para elas e continuar "igual ao salvo".
+    const aoCriar = (ids: (number | string)[]) => {
+      const k = this.alternativas.findIndex((a) => a.id === alt.id);
+      if (k < 0 || !ids.length) return;
+      const nova = religarAposUsar(this.alternativas[k], salvasAntes, ids);
+      this._gravar(this.alternativas.map((a, x) => (x === k ? nova : a)));
+    };
     this.dispatchEvent(new CustomEvent('viab:usar-alternativa', {
-      detail: { plano, nome: alt.nome, erros: errosDoEstadoFinal(alt) }, bubbles: true, composed: true,
+      detail: { plano, nome: alt.nome, erros: errosDoEstadoFinal(alt), aoCriar }, bubbles: true, composed: true,
     }));
   }
 

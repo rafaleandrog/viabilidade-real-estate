@@ -785,11 +785,14 @@ export class ViabFunding extends LitElement {
   };
 
   /** "Usar esta": aplica o plano da alternativa pelas rotas de operação e recarrega a tela. */
-  private async _usarAlternativa(plano: PlanoUsarAlternativa, nome: string, erros: string[] = []) {
+  private async _usarAlternativa(
+    plano: PlanoUsarAlternativa, nome: string, erros: string[] = [], aoCriar?: (ids: (number | string)[]) => void,
+  ) {
     if (!this.editavel || this.criando) return;
     // Defesa: estado final inválido para o servidor não grava nenhum passo.
     if (erros.length) { urbiVerso.notificar(`Estrutura "${nome}" não aplicada: ${erros.join(' ')}`, 'erro'); return; }
     this.criando = true;
+    const criados: (number | string)[] = [];
     try {
       let ordem = this._proximaOrdem();
       // A ordem de `passosDoPlano` é a que o servidor aceita (teto de retorno do equity por modo).
@@ -798,10 +801,13 @@ export class ViabFunding extends LitElement {
           : passo.acao === 'atualizar' ? await atualizarFundingOperacao(this.estudo.id, passo.id as number, passo.campos)
           : await criarFundingOperacao(this.estudo.id, { ...passo.op, ordem: ordem++ });
         if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível aplicar a estrutura.', 'erro'); return; }
+        if (passo.acao === 'criar' && r?.id != null) criados.push(r.id);
       }
       urbiVerso.notificar(`Estrutura "${nome}" aplicada ao funding.`, 'sucesso');
     } finally {
       this.criando = false;
+      // Mesmo parando no meio, o que foi criado é religado à alternativa.
+      if (criados.length) aoCriar?.(criados);
       // Recarrega mesmo quando parou no meio: parte do plano pode ter sido gravada.
       await this._carregar();
     }
@@ -1177,7 +1183,7 @@ export class ViabFunding extends LitElement {
               : a.id === 'comparar' ? (this.abaAtiva !== 'comparar' ? nothing : html`<viab-funding-alternativas
                   .estudoId=${this.estudo?.id ?? null} .editavel=${this.editavel}
                   .salvas=${this.operacoes} .simular=${this._simularEstrutura} .dataInicio=${this.dataInicio}
-                  @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome, e.detail.erros)}
+                  @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome, e.detail.erros, e.detail.aoCriar)}
                 ></viab-funding-alternativas>`)
               : a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}
           </urbi-hospedeiro>`)}

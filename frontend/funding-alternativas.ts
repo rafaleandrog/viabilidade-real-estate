@@ -182,29 +182,30 @@ export function sincronizarAncoras(ops: OperacaoFunding[], salvas: OperacaoFundi
 }
 
 /**
- * Depois de "Usar esta", as operações criadas ganham id no servidor, mas a
- * alternativa guardada ainda as tem sem id — e reaplicá-la apagaria e
- * recriaria cada uma. Aqui uma operação sem id (fora as marcadas `__fora`) é
- * religada à operação salva de MESMO tipo e MESMO nome que nenhuma outra
- * operação da alternativa já referencia. Se a ligação errar (outra salva com
- * o mesmo nome), o plano atualiza aquela salva para os valores da alternativa
- * em vez de criar uma nova: o estado final é o mesmo.
- * Não muta a entrada; devolve a mesma lista quando nada muda.
+ * Depois de "Usar esta", as operações que o plano CRIOU ganham id no servidor,
+ * mas a alternativa aplicada ainda as tem sem id — reaplicá-la apagaria e
+ * recriaria cada uma. Esta função religa SÓ a alternativa aplicada, com os ids
+ * que o POST devolveu, na ordem em que o plano as criou: a mesma ordem das
+ * operações da alternativa que `planoUsarAlternativa` manda criar (incluídas,
+ * sem id ou com id que o salvo não tem, ou com tipo trocado). Sem heurística
+ * de nome: nenhuma outra alternativa é tocada. `idsCriados` mais curto (plano
+ * que parou no meio) religa só o que foi criado.
+ * Não muta a entrada.
  */
-export function religarCriadas(ops: OperacaoFunding[], salvas: OperacaoFunding[]): OperacaoFunding[] {
-  const usados = new Set<IdOp>();
-  for (const o of ops) if (o.id != null) usados.add(o.id);
-  let mudou = false;
-  const saida = ops.map((o) => {
-    if (o.id != null || (o as { __fora?: boolean }).__fora) return o;
-    const par = salvas.find((s) => s.id != null && !usados.has(s.id) && s.tipo === o.tipo
-      && String(s.nome ?? '').trim() === String(o.nome ?? '').trim());
-    if (!par) return o;
-    usados.add(par.id as IdOp);
-    mudou = true;
-    return { ...o, id: par.id } as OperacaoFunding;
+export function religarAposUsar(
+  alt: AlternativaFunding, salvasAntes: OperacaoFunding[], idsCriados: IdOp[],
+): AlternativaFunding {
+  const porId = new Map<IdOp, OperacaoFunding>();
+  for (const s of salvasAntes) if (s.id != null) porId.set(s.id, s);
+  let k = 0;
+  const operacoes = alt.operacoes.map((op) => {
+    if ((op as { __fora?: boolean }).__fora) return op;
+    const salva = op.id != null ? porId.get(op.id) : undefined;
+    const criada = !salva || salva.tipo !== op.tipo;
+    if (!criada || k >= idsCriados.length) return op;
+    return { ...op, id: idsCriados[k++] } as OperacaoFunding;
   });
-  return mudou ? saida : ops;
+  return { ...alt, operacoes };
 }
 
 export function planoVazio(p: PlanoUsarAlternativa): boolean {
