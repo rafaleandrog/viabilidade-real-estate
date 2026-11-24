@@ -184,16 +184,19 @@ export function sincronizarAncoras(ops: OperacaoFunding[], salvas: OperacaoFundi
 /**
  * Depois de "Usar esta", as operações que o plano CRIOU ganham id no servidor,
  * mas a alternativa aplicada ainda as tem sem id — reaplicá-la apagaria e
- * recriaria cada uma. Esta função religa SÓ a alternativa aplicada, com os ids
- * que o POST devolveu, na ordem em que o plano as criou: a mesma ordem das
- * operações da alternativa que `planoUsarAlternativa` manda criar (incluídas,
- * sem id ou com id que o salvo não tem, ou com tipo trocado). Sem heurística
- * de nome: nenhuma outra alternativa é tocada. `idsCriados` mais curto (plano
- * que parou no meio) religa só o que foi criado.
- * Não muta a entrada.
+ * recriaria cada uma. Esta função religa SÓ a alternativa aplicada, com as
+ * linhas que o POST devolveu, na ordem em que o plano as criou: a mesma ordem
+ * das operações da alternativa que `planoUsarAlternativa` manda criar
+ * (incluídas, sem id ou com id que o salvo não tem, ou com tipo trocado).
+ * A operação religada passa a ser a linha COMPLETA do servidor com os valores
+ * da alternativa por cima: um campo que só o servidor preencheu (padrão do
+ * schema) entra na comparação do plano, e uma edição posterior dele no funding
+ * salvo aparece como diferença. Sem heurística de nome: nenhuma outra
+ * alternativa é tocada. Lista mais curta (plano que parou no meio) religa só o
+ * que foi criado. Não muta a entrada.
  */
 export function religarAposUsar(
-  alt: AlternativaFunding, salvasAntes: OperacaoFunding[], idsCriados: IdOp[],
+  alt: AlternativaFunding, salvasAntes: OperacaoFunding[], criadas: OperacaoFunding[],
 ): AlternativaFunding {
   const porId = new Map<IdOp, OperacaoFunding>();
   for (const s of salvasAntes) if (s.id != null) porId.set(s.id, s);
@@ -202,8 +205,11 @@ export function religarAposUsar(
     if ((op as { __fora?: boolean }).__fora) return op;
     const salva = op.id != null ? porId.get(op.id) : undefined;
     const criada = !salva || salva.tipo !== op.tipo;
-    if (!criada || k >= idsCriados.length) return op;
-    return { ...op, id: idsCriados[k++] } as OperacaoFunding;
+    if (!criada || k >= criadas.length) return op;
+    const linha = criadas[k++];
+    if (!linha || linha.id == null) return op;
+    const { id: _id, ...valores } = op;
+    return { ...clonar(linha), ...valores, id: linha.id } as OperacaoFunding;
   });
   return { ...alt, operacoes };
 }
@@ -223,6 +229,23 @@ const igual = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) ===
  * Mudar o `tipo` de uma operação existente equivale a tirar a antiga e criar
  * a nova.
  */
+/**
+ * Os campos que as rotas de operação gravam — espelho de `CAMPOS_OPERACAO`
+ * (backend/rotas/avancado.ts), menos `ordem`, que a alternativa não decide.
+ * O teste de paridade compara esta lista com a do backend.
+ */
+export const CAMPOS_OPERACAO_ESPELHO = [
+  'tipo', 'nome', 'ordem', 'valor',
+  'cronograma_evento', 'fase_ancora_id', 'inicio_mes',
+  'distribuir_aporte', 'aporte_meses', 'taxa_anual',
+  'periodo_amortizacao_meses', 'periodo_carencia_meses',
+  'modo_retorno', 'pct_retorno',
+  'exposicao_minima', 'percentual_financiavel', 'amortizar_com_caixa_disponivel', 'custo_linha_ids',
+  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
+  'pct_carteira_cedida', 'ativo',
+];
+const CAMPOS_GRAVAVEIS = new Set(CAMPOS_OPERACAO_ESPELHO.filter((c) => c !== 'ordem'));
+
 export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: AlternativaFunding): PlanoUsarAlternativa {
   const plano: PlanoUsarAlternativa = { criar: [], atualizar: [], remover: [] };
   const porId = new Map<IdOp, OperacaoFunding>();
@@ -242,7 +265,9 @@ export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: Alternativa
     mantidas.add(salva.id as IdOp);
     const campos: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(op)) {
-      if (k === 'id' || k.startsWith('__')) continue;
+      // Só os campos que a rota grava: metadado da linha (updated_at e afins)
+      // e `ordem` nunca viram diferença — um PATCH só com eles volta 400.
+      if (!CAMPOS_GRAVAVEIS.has(k)) continue;
       if (!igual((salva as any)[k], v)) campos[k] = clonar(v);
     }
     if (Object.keys(campos).length) plano.atualizar.push({ id: salva.id as IdOp, campos: campos as Partial<OperacaoFunding> });

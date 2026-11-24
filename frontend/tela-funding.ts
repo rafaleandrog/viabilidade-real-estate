@@ -786,13 +786,13 @@ export class ViabFunding extends LitElement {
 
   /** "Usar esta": aplica o plano da alternativa pelas rotas de operação e recarrega a tela. */
   private async _usarAlternativa(
-    plano: PlanoUsarAlternativa, nome: string, erros: string[] = [], aoCriar?: (ids: (number | string)[]) => void,
+    plano: PlanoUsarAlternativa, nome: string, erros: string[] = [], aoCriar?: (criadas: OperacaoFunding[]) => void,
   ) {
     if (!this.editavel || this.criando) return;
     // Defesa: estado final inválido para o servidor não grava nenhum passo.
     if (erros.length) { urbiVerso.notificar(`Estrutura "${nome}" não aplicada: ${erros.join(' ')}`, 'erro'); return; }
     this.criando = true;
-    const criados: (number | string)[] = [];
+    const criados: OperacaoFunding[] = [];
     try {
       let ordem = this._proximaOrdem();
       // A ordem de `passosDoPlano` é a que o servidor aceita (teto de retorno do equity por modo).
@@ -801,7 +801,7 @@ export class ViabFunding extends LitElement {
           : passo.acao === 'atualizar' ? await atualizarFundingOperacao(this.estudo.id, passo.id as number, passo.campos)
           : await criarFundingOperacao(this.estudo.id, { ...passo.op, ordem: ordem++ });
         if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível aplicar a estrutura.', 'erro'); return; }
-        if (passo.acao === 'criar' && r?.id != null) criados.push(r.id);
+        if (passo.acao === 'criar' && r?.id != null) criados.push(r as OperacaoFunding);
       }
       urbiVerso.notificar(`Estrutura "${nome}" aplicada ao funding.`, 'sucesso');
     } finally {

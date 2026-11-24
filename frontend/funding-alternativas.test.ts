@@ -6,7 +6,7 @@ import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFundin
 import { mesRepasse } from './fluxo-shared.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, validarOperacaoComoServidor, recusaDoPostComoServidor, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
-  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, religarAposUsar, type AlternativaFunding,
+  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, sincronizarAncoras, religarAposUsar, CAMPOS_OPERACAO_ESPELHO, type AlternativaFunding,
 } from './funding-alternativas.js';
 
 const CRONO = [
@@ -567,18 +567,36 @@ test('religarAposUsar: só as operações que o plano criou recebem os ids devol
   ] };
   const plano = planoUsarAlternativa(salvasAntes, alt);
   assert.equal(plano.criar.length, 2, 'o plano cria exatamente as duas que serão religadas');
-  const r = religarAposUsar(alt, salvasAntes, [70, 71]) as any;
+  const linha70 = { id: 70, estudo_id: 1, tipo: 'equity', nome: 'Nova 1', valor: 3, pct_retorno: 10, taxa_estruturacao_pct: 0, ordem: 5 };
+  const linha71 = { id: 71, estudo_id: 1, tipo: 'divida', nome: 'B virou dívida', valor: 5, distribuir_aporte: false, ordem: 6 };
+  const r = religarAposUsar(alt, salvasAntes, [linha70, linha71] as any) as any;
   assert.deepEqual(r.operacoes.map((o: any) => o.id), [1, 70, 71, undefined]);
   assert.equal(alt.operacoes[1].id, undefined, 'não muta a entrada');
   // Depois de aplicada e recarregada, a alternativa religada é igual ao salvo.
-  const salvasDepois = [
-    { id: 1, tipo: 'divida', nome: 'A', valor: 10 },
-    { id: 70, tipo: 'equity', nome: 'Nova 1', valor: 3, pct_retorno: 10 },
-    { id: 71, tipo: 'divida', nome: 'B virou dívida', valor: 5 },
-  ] as any;
+  const salvasDepois = [{ id: 1, tipo: 'divida', nome: 'A', valor: 10 }, linha70, linha71] as any;
   const semFora = { ...r, operacoes: r.operacoes.filter((o: any) => !o.__fora) };
   assert.equal(planoVazio(planoUsarAlternativa(salvasDepois, semFora)), true);
   // Plano que parou no meio: só o que foi criado é religado.
-  const parcial = religarAposUsar(alt, salvasAntes, [70]) as any;
+  // A operação religada carrega os campos que só o servidor preencheu: uma
+  // edição posterior deles no funding salvo aparece como diferença no plano.
+  assert.equal(r.operacoes[1].taxa_estruturacao_pct, 0);
+  const editado = salvasDepois.map((o: any) => (o.id === 70 ? { ...o, taxa_estruturacao_pct: 2 } : o));
+  assert.deepEqual(planoUsarAlternativa(editado, semFora).atualizar, [{ id: 70, campos: { taxa_estruturacao_pct: 0 } }]);
+  const parcial = religarAposUsar(alt, salvasAntes, [linha70] as any) as any;
   assert.deepEqual(parcial.operacoes.map((o: any) => o.id), [1, 70, 2, undefined]);
+});
+
+const CAMINHO_BACKEND_AVANCADO = '../backend/rotas/avancado.ts';
+
+test('paridade: CAMPOS_OPERACAO_ESPELHO é exatamente o CAMPOS_OPERACAO do backend', async () => {
+  const mod = await import(CAMINHO_BACKEND_AVANCADO);
+  assert.deepEqual([...CAMPOS_OPERACAO_ESPELHO].sort(), [...mod.CAMPOS_OPERACAO].sort());
+});
+
+test('planoUsarAlternativa: metadado da linha e ordem nunca viram diferença', () => {
+  const salvas = [{ id: 1, tipo: 'divida', nome: 'A', valor: 10, ordem: 3, updated_at: '2026-11-25', estudo_id: 9 }] as any;
+  const alt: any = { id: 'a', nome: 'x', operacoes: [{ id: 1, tipo: 'divida', nome: 'A', valor: 10, ordem: 0, updated_at: '2026-01-01', estudo_id: 9 }] };
+  assert.equal(planoVazio(planoUsarAlternativa(salvas, alt)), true);
+  alt.operacoes[0].valor = 11;
+  assert.deepEqual(planoUsarAlternativa(salvas, alt).atualizar, [{ id: 1, campos: { valor: 11 } }]);
 });

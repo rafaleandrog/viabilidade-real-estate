@@ -184,12 +184,12 @@ export class ViabFundingAlternativas extends LitElement {
     const plano = this._plano(alt);
     if (planoVazio(plano) || errosDoEstadoFinal(alt).length) return;
     const salvasAntes = this.salvas ?? [];
-    // A tela devolve os ids das operações que criou, para esta alternativa (e só
-    // ela) passar a apontar para elas e continuar "igual ao salvo".
-    const aoCriar = (ids: (number | string)[]) => {
+    // A tela devolve as linhas que criou, para esta alternativa (e só ela)
+    // passar a apontar para elas e continuar "igual ao salvo".
+    const aoCriar = (criadas: OperacaoFunding[]) => {
       const k = this.alternativas.findIndex((a) => a.id === alt.id);
-      if (k < 0 || !ids.length) return;
-      const nova = religarAposUsar(this.alternativas[k], salvasAntes, ids);
+      if (k < 0 || !criadas.length) return;
+      const nova = religarAposUsar(this.alternativas[k], salvasAntes, criadas);
       this._gravar(this.alternativas.map((a, x) => (x === k ? nova : a)));
     };
     this.dispatchEvent(new CustomEvent('viab:usar-alternativa', {
