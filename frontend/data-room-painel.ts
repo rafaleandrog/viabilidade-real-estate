@@ -51,9 +51,10 @@ export class ViabDataRoom extends LitElement {
     ]);
     if (!respostaAindaVale(id, this.estudo?.id)) return; // estudo trocou enquanto isto estava em voo
     const avisos: string[] = [];
-    if (emp.status === 'fulfilled') this.docsEmpreendimento = emp.value?.dados || [];
+    // O wrapper da API devolve `{ erro }` em vez de lançar: resposta com erro é falha, não lista vazia.
+    if (emp.status === 'fulfilled' && !emp.value?.erro) this.docsEmpreendimento = emp.value?.dados || [];
     else { this.docsEmpreendimento = null; avisos.push('Não foi possível carregar os documentos do Empreendimento.'); }
-    if (ape.status === 'fulfilled') this.docsApelo = ape.value?.documentos || [];
+    if (ape.status === 'fulfilled' && !ape.value?.erro) this.docsApelo = ape.value?.documentos || [];
     else { this.docsApelo = null; avisos.push('Não foi possível carregar as fontes do Apelo Comercial.'); }
     this.avisos = avisos;
     this.carregando = false;
