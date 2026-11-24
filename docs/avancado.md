@@ -215,15 +215,41 @@ mantém as suas:
 
 ### Cenários
 
-Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** e compare a
-variação de TIR, VPL e exposição máxima contra o cenário real, com o gráfico **Fluxo acumulado —
+Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** (preço de
+venda e custo de obra, em %) e compare o cenário com o real, com o gráfico **Fluxo acumulado —
 cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é fixo: ele cobre o
 fluxo acumulado da base e o de todas as posições dos dois controles, então mover um controle move
 a curva, não a escala, e a ordem de grandeza da variação fica visível. Quando o cenário real não tem
 exposição (exposição máxima 0), a variação da exposição aparece como **n/d**. Os cenários ficam salvos no
-estudo. Salvar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
-análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação continua
-disponível, sem os botões **Salvar cenário** e **Remover**.
+estudo.
+
+A tabela **Cenários salvos** começa pela linha travada do cenário real e compara cada cenário salvo
+com ela em seis indicadores: VGV, Resultado, Margem, VPL, TIR e Exposição máxima, cada um com a
+variação em relação ao real (o Payback aparece ao lado, sem variação). Resultado é o fluxo de caixa
+livre acumulado no fim do horizonte, e Margem é Resultado ÷ VGV, a mesma leitura de caixa do Resumo.
+
+O botão **Gerar otimista, base e pessimista** cria de uma vez os três cenários clássicos. Ele abre
+um diálogo com os três já preenchidos, editáveis antes de salvar:
+
+| Cenário | Preço de venda | Custo de obra |
+|---|---|---|
+| Otimista | limite de alta da faixa de preço | limite de queda da faixa de custo |
+| Base | 0% | 0% |
+| Pessimista | limite de queda da faixa de preço | limite de alta da faixa de custo |
+
+As faixas são as dos benchmarks de sensibilidade de preço e de custo de obra (as mesmas que limitam
+os controles); sem benchmark configurado, ±15%. O Base reproduz o estudo real. **Salvar os três**
+grava os três como cenários comuns, que podem ser removidos como qualquer outro. Se um deles falhar,
+o diálogo continua aberto só com os que faltam e o botão passa a dizer **Salvar os que faltam**:
+tentar de novo não regrava os que a tela recebeu como gravados. Se a conexão cair depois de o
+servidor gravar e antes de a resposta chegar, a tela não tem como saber, e esse cenário pode
+aparecer em dobro — confira a lista antes de tentar de novo. Enquanto uma gravação está em andamento, **Salvar
+cenário** e **Gerar otimista, base e pessimista** ficam desabilitados.
+
+Salvar, gerar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
+análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação e a
+tabela continuam disponíveis, sem os botões **Salvar cenário**, **Gerar otimista, base e
+pessimista** e **Remover**.
 
 ### Análise de mercado e Apelo Comercial
 

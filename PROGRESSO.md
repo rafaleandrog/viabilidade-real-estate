@@ -4,6 +4,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-24 — Cenários do Avançado: otimista, base e pessimista com um clique
+
+- Botão **Gerar otimista, base e pessimista** na aba Cenários do Avançado (só para quem escreve).
+  Abre um diálogo com os três pré-preenchidos pelas faixas dos benchmarks de sensibilidade de preço
+  e de custo de obra (±15% sem benchmark): otimista = preço no limite de alta e obra no de queda;
+  base = 0 e 0; pessimista = o contrário. Os valores são editáveis antes de salvar, e os três são
+  gravados pelo mesmo `POST` do Salvar, como cenários comuns.
+- A tabela de cenários salvos passa a comparar seis indicadores contra o real: VGV, Resultado e
+  Margem (novos) e VPL, TIR e Exposição máxima (já existiam). Margem = Resultado ÷ VGV, a mesma
+  leitura de caixa do Resumo.
+- Funções puras em `frontend/cenarios-padrao.ts` (`faixaDoBenchmark`, que passou a ser a única régua
+  das faixas, `cenariosPadrao` e `indicadoresCenario`); teste de que o Base reproduz o estudo nos
+  seis indicadores; dois casos de render (quem escreve e quem não escreve).
+- Recorte decidido pelo dono: a velocidade de vendas como terceira alavanca fica fora (exigiria
+  coluna nova no `schema.json`) e virou a issue 971. Sem schema, migração nem `versao`.
+
 ## 2026-11-24 — Criar um Avançado a partir de um Preliminar: planejador e rota (fatia 2 de 4)
 
 - Entrega: `POST /estudos/:id/derivar-avancado` (`backend/rotas/derivar-avancado.ts`). A função pura
