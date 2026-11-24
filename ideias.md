@@ -17,6 +17,8 @@ Ideia que não cabe numa linha deixou de ser ideia — abra a issue.
 - **Inadimplência, distrato e PDD na carteira própria**: hoje toda parcela é recebida; uma premissa de perda esperada e de distrato (Lei 13.786/2018) mudaria o caixa da carteira e daria sentido à coobrigação na antecipação.
 - **Coobrigação na antecipação de recebíveis**: distinguir cessão com e sem coobrigação, que só muda número quando houver inadimplência no motor.
 - **Resultado após funding na Análise Financeira**: uma linha ao lado do Resultado desalavancado, deduzindo os juros do financiamento à produção.
+- **Links importantes do projeto, lidos do canal**: registrar os hyperlinks citados no canal do projeto (projetos arquitetônicos e urbanísticos no Drive, por exemplo) e vinculá-los ao projeto ou ao estudo a que se referem, com um rótulo que diga o que cada link é.
+- **KML e KMZ do projeto salvos e vinculados no app**: baixar o arquivo do Drive, guardá-lo no app e vinculá-lo ao projeto ou ao estudo, para o módulo geo poder usá-lo sem depender de o link do Drive continuar valendo.
 
 - **CRM de captação de investidores**: pipeline de investidores do projeto, com histórico de negociação, pedidos de documento e term sheets, como o da OSPA Capital. Desejo futuro, sem previsão de entrar no escopo.
 - **Matching do projeto com investidores**: cruzar o estudo com a tese de fundos, gestoras e family offices (região, cap rate, LTV), como a OSPA Capital faz. Desejo futuro, sem previsão de entrar no escopo.
