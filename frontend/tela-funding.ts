@@ -19,7 +19,7 @@ import {
 } from './funding-motor.js';
 import './viab-num.js';
 import './funding-alternativas-painel.js';
-import { indicadoresEstrutura, type IndicadoresEstrutura, type PlanoUsarAlternativa } from './funding-alternativas.js';
+import { indicadoresEstrutura, passosDoPlano, type IndicadoresEstrutura, type PlanoUsarAlternativa } from './funding-alternativas.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Sub-aba "Viabilidade → Funding" (#355, item 48 da Rodada 7).
@@ -790,17 +790,12 @@ export class ViabFunding extends LitElement {
     this.criando = true;
     try {
       let ordem = this._proximaOrdem();
-      for (const op of plano.criar) {
-        const r = await criarFundingOperacao(this.estudo.id, { ...op, ordem: ordem++ });
-        if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível criar a operação.', 'erro'); return; }
-      }
-      for (const u of plano.atualizar) {
-        const r = await atualizarFundingOperacao(this.estudo.id, u.id as number, u.campos);
-        if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível atualizar a operação.', 'erro'); return; }
-      }
-      for (const id of plano.remover) {
-        const r = await removerFundingOperacao(this.estudo.id, id as number);
-        if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível remover a operação.', 'erro'); return; }
+      // Remover → atualizar → criar: a ordem que o servidor aceita (teto de retorno do equity).
+      for (const passo of passosDoPlano(plano, this.operacoes)) {
+        const r = passo.acao === 'remover' ? await removerFundingOperacao(this.estudo.id, passo.id as number)
+          : passo.acao === 'atualizar' ? await atualizarFundingOperacao(this.estudo.id, passo.id as number, passo.campos)
+          : await criarFundingOperacao(this.estudo.id, { ...passo.op, ordem: ordem++ });
+        if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível aplicar a estrutura.', 'erro'); return; }
       }
       urbiVerso.notificar(`Estrutura "${nome}" aplicada ao funding.`, 'sucesso');
     } finally {
@@ -1179,7 +1174,7 @@ export class ViabFunding extends LitElement {
             ${a.id === 'financiamento_producao' ? this._renderAbaFinanciamentoProducao()
               : a.id === 'comparar' ? (this.abaAtiva !== 'comparar' ? nothing : html`<viab-funding-alternativas
                   .estudoId=${this.estudo?.id ?? null} .editavel=${this.editavel}
-                  .salvas=${this.operacoes} .simular=${this._simularEstrutura}
+                  .salvas=${this.operacoes} .simular=${this._simularEstrutura} .dataInicio=${this.dataInicio}
                   @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome)}
                 ></viab-funding-alternativas>`)
               : a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}

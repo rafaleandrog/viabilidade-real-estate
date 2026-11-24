@@ -138,8 +138,8 @@ cedida), a **Taxa / retorno** e o **Início**. O início só é editável quando
 específico**; numa operação ancorada ao cronograma ele aparece só para leitura, porque o app o
 recalcula pela âncora. **+ Dívida** e **+ Equity** acrescentam operações novas.
 
-As alternativas ficam guardadas **só no navegador deste usuário**, por estudo: não vão para o
-servidor, outras pessoas não as veem e limpar os dados do navegador as apaga. Sem armazenamento
+As alternativas ficam guardadas **só neste navegador**, por estudo: não vão para o
+servidor, outras pessoas e outros navegadores não as veem e limpar os dados do navegador as apaga. Sem armazenamento
 disponível, elas funcionam na sessão aberta e se perdem ao sair.
 
 A tabela **Comparação** tem uma coluna **Funding salvo**, de referência, e uma por alternativa, com
@@ -156,7 +156,7 @@ Uma alternativa idêntica ao funding salvo reproduz exatamente a coluna de refer
 como **igual ao salvo**. Com permissão de edição, **Usar esta** abre uma confirmação que diz quantas
 operações serão criadas, alteradas e removidas; ao confirmar, o funding do estudo passa a ser o da
 alternativa. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
-**desligado** e seus parâmetros ficam preservados. Depois de aplicar, a página recarrega e a
+**desligado** e seus parâmetros ficam preservados. Depois de aplicar, os dados do funding são recarregados e a
 alternativa continua guardada para novas comparações.
 
 ### Onde o funding aparece

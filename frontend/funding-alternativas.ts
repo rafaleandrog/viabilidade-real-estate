@@ -94,6 +94,49 @@ export interface PlanoUsarAlternativa {
   remover: IdOp[];
 }
 
+/** Um passo de gravação do plano, na ordem em que o servidor o aceita. */
+export type PassoPlano =
+  | { acao: 'remover'; id: IdOp }
+  | { acao: 'atualizar'; id: IdOp; campos: Partial<OperacaoFunding> }
+  | { acao: 'criar'; op: OperacaoFunding };
+
+/** Chaves que começam com `__` são marcadores de tela e nunca chegam ao servidor. */
+const semMarcadoresDeTela = <T extends object>(o: T): T => {
+  const r: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) if (!k.startsWith('__')) r[k] = v;
+  return r as T;
+};
+
+/**
+ * Ordem de gravação: REMOVER, depois ATUALIZAR, por último CRIAR. O servidor
+ * confere o teto de retorno do equity (100% por modo) a cada gravação, então
+ * trocar um equity de 80% por outro de 80% só passa se o antigo sair antes de
+ * o novo entrar. Dentro de "atualizar", com `salvas` informadas, as operações
+ * que baixam `valor`/`pct_retorno` vêm antes das que sobem.
+ */
+export function passosDoPlano(plano: PlanoUsarAlternativa, salvas: OperacaoFunding[] = []): PassoPlano[] {
+  const porId = new Map<IdOp, OperacaoFunding>();
+  for (const s of salvas) if (s.id != null) porId.set(s.id, s);
+  const delta = (u: PlanoUsarAlternativa['atualizar'][number]): number => {
+    const salva = porId.get(u.id) as any;
+    let d = 0;
+    for (const k of ['valor', 'pct_retorno']) {
+      const novo = (u.campos as any)[k];
+      if (typeof novo === 'number' && salva && typeof salva[k] === 'number') d += novo - salva[k];
+    }
+    return d;
+  };
+  const atualizar = plano.atualizar
+    .map((u, i) => ({ u, i, d: delta(u) }))
+    .sort((a, b) => (a.d < 0 ? -1 : 0) - (b.d < 0 ? -1 : 0) || a.i - b.i)
+    .map((x) => x.u);
+  return [
+    ...plano.remover.map((id): PassoPlano => ({ acao: 'remover', id })),
+    ...atualizar.map((u): PassoPlano => ({ acao: 'atualizar', id: u.id, campos: u.campos })),
+    ...plano.criar.map((op): PassoPlano => ({ acao: 'criar', op })),
+  ];
+}
+
 export function planoVazio(p: PlanoUsarAlternativa): boolean {
   return p.criar.length === 0 && p.atualizar.length === 0 && p.remover.length === 0;
 }
@@ -118,14 +161,14 @@ export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: Alternativa
   for (const op of alt.operacoes) {
     const salva = op.id != null ? porId.get(op.id) : undefined;
     if (!salva || salva.tipo !== op.tipo) {
-      const { id: _id, ...semId } = clonar(op);
+      const { id: _id, ...semId } = semMarcadoresDeTela(clonar(op));
       plano.criar.push(semId as OperacaoFunding);
       continue;
     }
     mantidas.add(salva.id as IdOp);
     const campos: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(op)) {
-      if (k === 'id') continue;
+      if (k === 'id' || k.startsWith('__')) continue;
       if (!igual((salva as any)[k], v)) campos[k] = clonar(v);
     }
     if (Object.keys(campos).length) plano.atualizar.push({ id: salva.id as IdOp, campos: campos as Partial<OperacaoFunding> });

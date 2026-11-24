@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct } from './viab-format.js';
+import { rotuloMesRelativo } from './fluxo-shared.js';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, novaOperacaoAlternativa, planoUsarAlternativa, planoVazio,
@@ -40,7 +41,7 @@ const efetivas = (alt: AlternativaFunding): OperacaoFunding[] =>
 
 const ancorada = (o: OperacaoFunding): boolean => {
   const ev = (o as any).cronograma_evento;
-  return !!ev && ev !== 'customizado';
+  return (!!ev && ev !== 'customizado') || (o as any).fase_ancora_id != null;
 };
 
 /** O campo que carrega o "tamanho" da operação, por tipo (R$ ou %). */
@@ -61,7 +62,9 @@ export class ViabFundingAlternativas extends LitElement {
   @property() estudoId: number | string | null = null;
   @property({ type: Boolean }) editavel = false;
   @property({ attribute: false }) salvas: OperacaoFunding[] = [];
-  @property({ attribute: false }) simular: (ops: OperacaoFunding[]) => IndicadoresEstrutura | null = () => null;
+  /** Obrigatório: sem o simulador a tabela sairia toda em "—" sem erro nenhum. */
+  @property({ attribute: false }) simular!: (ops: OperacaoFunding[]) => IndicadoresEstrutura | null;
+  @property() dataInicio: string | null = null;
 
   @state() private alternativas: AlternativaFunding[] = [];
   @state() private usarIdx: number | null = null;
@@ -114,6 +117,7 @@ export class ViabFundingAlternativas extends LitElement {
     const chave = JSON.stringify(ops);
     if (this._cache.has(chave)) return this._cache.get(chave) ?? null;
     let r: IndicadoresEstrutura | null = null;
+    if (typeof this.simular !== 'function') throw new Error('viab-funding-alternativas: `simular` não informado');
     try { r = this.simular(ops); } catch { r = null; }
     if (this._cache.size > 24) this._cache.clear();
     this._cache.set(chave, r);
@@ -143,7 +147,16 @@ export class ViabFundingAlternativas extends LitElement {
   private _incluirOp(i: number, j: number, incluir: boolean) {
     const op = this.alternativas[i].operacoes[j];
     if (op.tipo === 'financiamento_producao') this._alterarOp(i, j, { ativo: incluir });
-    else this._alterarOp(i, j, { __fora: !incluir });
+    else if (incluir) {
+      // Re-incluir apaga o marcador em vez de deixar `__fora: false` na operação.
+      this._alterar(i, (a) => ({
+        ...a, operacoes: a.operacoes.map((o, k) => {
+          if (k !== j) return o;
+          const { __fora: _f, ...resto } = o as OpAlt;
+          return resto as OperacaoFunding;
+        }),
+      }));
+    } else this._alterarOp(i, j, { __fora: true });
   }
 
   private _addOp(i: number, tipo: 'divida' | 'equity') {
@@ -206,7 +219,7 @@ export class ViabFundingAlternativas extends LitElement {
                 .valor=${o.inicio_mes ?? 0}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._alterarOp(i, j, { inicio_mes: e.detail.valor ?? 0 })}
               ></viab-num>`
-            : html`<span class="nota">${EVENTOS_ROTULO[ev ?? ''] ?? ev}: ${(o.inicio_mes ?? 0) + 1}º mês (pelo Cronograma)</span>`}
+            : html`<span class="nota">${ev && ev !== 'customizado' ? `${EVENTOS_ROTULO[ev] ?? ev}: ` : ''}${rotuloMesRelativo(this.dataInicio, o.inicio_mes ?? 0)} 🔒 (pelo Cronograma)</span>`}
       </td>
     </tr>`;
   }
@@ -223,7 +236,7 @@ export class ViabFundingAlternativas extends LitElement {
             @click=${() => this._addOp(i, 'divida')}>Dívida</urbi-botao>
           <urbi-botao variante="secundario" pequeno icone="fa-solid fa-plus"
             @click=${() => this._addOp(i, 'equity')}>Equity</urbi-botao>
-          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover alternativa"
+          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover alternativa'} title="Remover alternativa"
             @click=${() => this._remover(i)}></urbi-botao>
         </div>
         <div class="rolagem">
@@ -237,12 +250,13 @@ export class ViabFundingAlternativas extends LitElement {
       </urbi-card>`;
   }
 
-  private _celula(ind: IndicadoresEstrutura | null, k: keyof IndicadoresEstrutura): TemplateResult {
-    if (!ind) return html`<td class="num">—</td>`;
-    const v = ind[k];
-    if (v === null) return html`<td class="num">—</td>`;
-    if (k === 'tirAlavancada') return html`<td class="num">${fmtPct(v)}</td>`;
-    return html`<td class="num ${v < 0 ? 'neg' : ''}">${fmtR$(v)}</td>`;
+  /** `base` é o indicador do funding salvo: a célula de alternativa que difere dele leva `difere` (gancho do caso de render). */
+  private _celula(ind: IndicadoresEstrutura | null, k: keyof IndicadoresEstrutura, base?: IndicadoresEstrutura | null): TemplateResult {
+    const v = ind ? ind[k] : null;
+    if (v === null || v === undefined) return html`<td class="num vazio">—</td>`;
+    const difere = base != null && base[k] !== v ? 'difere' : '';
+    if (k === 'tirAlavancada') return html`<td class="num com-valor ${difere}">${fmtPct(v)}</td>`;
+    return html`<td class="num com-valor ${difere} ${v < 0 ? 'neg' : ''}">${fmtR$(v)}</td>`;
   }
 
   private _tabelaComparativa(): TemplateResult {
@@ -275,7 +289,7 @@ export class ViabFundingAlternativas extends LitElement {
               ${linhas.map((l) => html`<tr>
                 <td>${l.rotulo}</td>
                 ${this._celula(salvo, l.chave)}
-                ${colunas.map((c) => this._celula(c.ind, l.chave))}
+                ${colunas.map((c) => this._celula(c.ind, l.chave, salvo))}
               </tr>`)}
             </tbody>
           </table>

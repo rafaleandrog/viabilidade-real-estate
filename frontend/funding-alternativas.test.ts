@@ -6,7 +6,7 @@ import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFundin
 import { mesRepasse } from './fluxo-shared.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, gravarAlternativas, indicadoresEstrutura, lerAlternativas,
-  novaOperacaoAlternativa, planoUsarAlternativa, planoVazio, type AlternativaFunding,
+  novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, type AlternativaFunding,
 } from './funding-alternativas.js';
 
 const CRONO = [
@@ -186,4 +186,36 @@ test('plano: operação nova ancorada ao cronograma é criada preservando o cron
   assert.equal(plano.criar[0].id, undefined);
   assert.deepEqual(plano.atualizar, []);
   assert.deepEqual(plano.remover, []);
+});
+
+test('plano: marcadores de tela (`__*`) nunca entram — nem em criar nem em atualizar', () => {
+  // Desmarcar e remarcar "Incluir" deixava `__fora: false` na operação.
+  const alt = alternativaDoSalvo(SALVAS, 'X');
+  (alt.operacoes[0] as any).__fora = false;
+  assert.ok(planoVazio(planoUsarAlternativa(SALVAS, alt)), 'alternativa idêntica segue igual ao salvo');
+  alt.operacoes[0].valor = 7_000_000;
+  const nova = { ...novaOperacaoAlternativa('equity', 'N'), __fora: false } as any;
+  alt.operacoes.push(nova);
+  const p = planoUsarAlternativa(SALVAS, alt);
+  assert.deepEqual(p.atualizar, [{ id: alt.operacoes[0].id, campos: { valor: 7_000_000 } }]);
+  assert.ok(p.criar.every((o) => Object.keys(o).every((k) => !k.startsWith('__'))));
+});
+
+test('passosDoPlano: remover → atualizar → criar; reduções antes de aumentos', () => {
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 100, pct_retorno: 80 },
+    { id: 2, tipo: 'equity', nome: 'B', valor: 100, pct_retorno: 10 },
+    { id: 3, tipo: 'equity', nome: 'C', valor: 5, pct_retorno: 5 },
+  ] as any;
+  const plano = {
+    criar: [{ tipo: 'equity', nome: 'N', pct_retorno: 80 }] as any,
+    atualizar: [
+      { id: 2, campos: { pct_retorno: 40 } },   // sobe
+      { id: 1, campos: { pct_retorno: 20 } },   // baixa
+    ],
+    remover: [3],
+  };
+  const passos = passosDoPlano(plano, salvas);
+  assert.deepEqual(passos.map((p) => p.acao), ['remover', 'atualizar', 'atualizar', 'criar']);
+  assert.deepEqual(passos.filter((p) => p.acao === 'atualizar').map((p: any) => p.id), [1, 2]);
 });
