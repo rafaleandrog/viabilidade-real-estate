@@ -16,7 +16,7 @@ registro é um indicador identificado por `campo`, e há três famílias:
 | Família | Indicadores | O que guardam |
 |---|---|---|
 | **Meta** | `margem_liquida`, `roi`, `custo_obras_vgv`, `resultado_final`, `margem_bruta` e, só no Loteamento, `eficiencia_aproveitamento` | **Valor** e **Regra** (*atingir ou superar* ou *não exceder*), mais os limites do medidor |
-| **Sensibilidade** | `preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras` | **Var + (%)** e **Var − (%)** |
+| **Sensibilidade** | `preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras` e, para os cenários do Avançado, `velocidade` | **Var + (%)** e **Var − (%)** |
 
 O indicador `margem_bruta` existe no conjunto, mas nenhuma tela o lê hoje: o app não calcula uma
 margem bruta, e o medidor correspondente fica declaradamente sem fonte.
@@ -35,7 +35,10 @@ Os benchmarks aparecem em três lugares dos estudos:
    completo, sem arredondar antes.
 2. **Variações dos cenários.** Na análise de sensibilidade de Cenários, **Var +** e **Var −** do
    indicador de sensibilidade da variável escolhida são as variações de Bull e Bear (10 % quando
-   não há benchmark). Não há sobrescrita por estudo.
+   não há benchmark). Não há sobrescrita por estudo. Nos Cenários do Avançado, **Var +** e
+   **Var −** de `preco`, `custo_obras` e `velocidade` (velocidade de vendas) são os limites dos
+   controles e os valores do otimista e do pessimista (15 % quando não há benchmark; a velocidade
+   fica sempre entre −90 % e +500 %).
 3. **Piso do preço sugerido.** O **Valor** de `resultado_final` é o piso que o preço sugerido por
    m² precisa atingir (ver [Fórmulas da Proforma](formulas)).
 
@@ -44,7 +47,9 @@ Os benchmarks aparecem em três lugares dos estudos:
 A tela fica na aba **Benchmark** do Painel e em *Admin → Apps → viabilidade → Benchmarks*, com as
 fichas **Loteamento** e **Incorporação** e três seções — **Indicador de Benchmark**, **Indicador de
 Sensibilidade** e **Faixas do medidor**. Na primeira abertura por quem pode escrever, os indicadores
-padrão que faltam são semeados nos dois tipos. Só o `admin` do app escreve. Detalhe em
+padrão que faltam são semeados nos dois tipos. Uma instância cujos benchmarks já existiam não ganha
+sozinha um indicador padrão novo, como `velocidade`: crie-o por **Novo indicador**, com o campo
+`velocidade`, e ele aparece na seção de sensibilidade. Só o `admin` do app escreve. Detalhe em
 [Administração](administracao).
 
 ## Instruções para não humanos

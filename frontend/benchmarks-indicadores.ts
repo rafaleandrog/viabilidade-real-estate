@@ -73,10 +73,10 @@ export const ROTULOS_INDICADOR: Record<IndicadorSuportado, string> = {
 
 // backend/rotas/benchmarks.ts:34-37 declara estes 4 como indicadores de
 // SENSIBILIDADE (as variáveis estressadas na Análise de Sensibilidade da
-// Proforma): não têm meta nem faixa, `valor`/`regra_comparacao` não se
+// Proforma), e `velocidade` é a dos Cenários do Avançado (#971): não têm meta nem faixa, `valor`/`regra_comparacao` não se
 // aplicam. Não é "decidir se entram" — já não entram, por construção; o que
 // falta é registrar o motivo em vez de descartar em silêncio.
-const CAMPOS_SENSIBILIDADE = new Set(['custo_obras', 'preco', 'permuta_fisica', 'permuta_financeira']);
+const CAMPOS_SENSIBILIDADE = new Set(['custo_obras', 'preco', 'permuta_fisica', 'permuta_financeira', 'velocidade']);
 
 // #453: o campo que calculava "margem bruta" media receita líquida / VGV —
 // não é margem, e foi renomeado. Enquanto não existir um indicador de margem

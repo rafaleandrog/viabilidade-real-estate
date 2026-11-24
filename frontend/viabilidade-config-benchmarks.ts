@@ -10,12 +10,14 @@ import './viab-num.js';
 
 // Indicadores de SENSIBILIDADE = as 4 variáveis estressadas na Proforma. Os demais
 // `campo` são metas de benchmark. Rótulos amigáveis na seção de sensibilidade.
-const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras']);
-const ROTULO_SENS: Record<string, string> = {
+// #971: `velocidade` é a sensibilidade dos Cenários do Avançado (velocidade de vendas).
+export const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras', 'velocidade']);
+export const ROTULO_SENS: Record<string, string> = {
   preco: 'Preço R$/m²',
   permuta_fisica: 'Permuta física',
   permuta_financeira: 'Permuta financeira',
   custo_obras: 'Custo de obras',
+  velocidade: 'Velocidade de vendas',
 };
 
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
