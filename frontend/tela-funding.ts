@@ -18,7 +18,8 @@ import {
   type FundingCalc, type OperacaoFunding, type TipoOperacao, type SerieOperacao,
 } from './funding-motor.js';
 import './viab-num.js';
-import './funding-alternativas-painel.js'; import { indicadoresEstrutura, type IndicadoresEstrutura, type PlanoUsarAlternativa } from './funding-alternativas.js';
+import './funding-alternativas-painel.js';
+import { indicadoresEstrutura, type IndicadoresEstrutura, type PlanoUsarAlternativa } from './funding-alternativas.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Sub-aba "Viabilidade → Funding" (#355, item 48 da Rodada 7).
@@ -730,6 +731,7 @@ export class ViabFunding extends LitElement {
     `;
   }
 
+  /** Painel "visão do investidor" — o que dá nome ao documento do autor (planilha `fluxo_investidor_FORMULAS`). */
   private _renderIndicadores(o: any): TemplateResult {
     const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id));
     if (!serie) return html`${nothing}`;
@@ -807,8 +809,6 @@ export class ViabFunding extends LitElement {
       await this._carregar();
     }
   }
-
-  /** Painel "visão do investidor" — o que dá nome ao documento do autor (planilha `fluxo_investidor_FORMULAS`). */
 
   /**
    * §37 — indicadores de resumo do Financiamento à produção. Lidos de
