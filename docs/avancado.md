@@ -216,29 +216,39 @@ mantém as suas:
 ### Cenários
 
 Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** (preço de
-venda e custo de obra, em %) e compare o cenário com o real, com o gráfico **Fluxo acumulado —
-cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é fixo: ele cobre o
-fluxo acumulado da base e o de todas as posições dos dois controles, então mover um controle move
+venda, custo de obra e velocidade de vendas, em %) e compare o cenário com o real, com o gráfico
+**Fluxo acumulado — cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é
+fixo: ele cobre o fluxo acumulado da base e o de todas as posições dos três controles, então mover um controle move
 a curva, não a escala, e a ordem de grandeza da variação fica visível. Quando o cenário real não tem
 exposição (exposição máxima 0), a variação da exposição aparece como **n/d**. Os cenários ficam salvos no
 estudo.
 
-A tabela **Cenários salvos** começa pela linha travada do cenário real e compara cada cenário salvo
-com ela em seis indicadores: VGV, Resultado, Margem, VPL, TIR e Exposição máxima, cada um com a
+A **velocidade de vendas** encolhe ou alonga a curva de vendas de cada receita sem mudar a forma
+dela nem o mês da primeira venda: com velocidade **+v**, vende-se `(1 + v)` vezes mais por mês e o
+prazo de vendas vira `prazo ÷ (1 + v)`. Uma curva de 10 meses a 10% ao mês vira, com +50%, 6,7 meses
+a 15% ao mês; com −50%, 20 meses a 5% ao mês. As unidades vendidas e o valor contratado são os
+mesmos; muda quando o dinheiro entra (e, com ele, juros de carteira, repasse e corretagem, que
+acompanham as vendas). Alongada, a venda pode passar do fim da janela de vendas do Cronograma: no
+cenário ela continua valendo, e o fluxo se estende até a última venda. A velocidade aceita de −90%
+(prazo dez vezes maior) a +500%.
+
+A tabela **Cenários salvos** mostra as três alavancas de cada cenário (preço, custo de obra e
+velocidade), começa pela linha travada do cenário real e compara cada cenário salvo com ela em seis
+indicadores: VGV, Resultado, Margem, VPL, TIR e Exposição máxima, cada um com a
 variação em relação ao real (o Payback aparece ao lado, sem variação). Resultado é o fluxo de caixa
 livre acumulado no fim do horizonte, e Margem é Resultado ÷ VGV, a mesma leitura de caixa do Resumo.
 
 O botão **Gerar otimista, base e pessimista** cria de uma vez os três cenários clássicos. Ele abre
 um diálogo com os três já preenchidos, editáveis antes de salvar:
 
-| Cenário | Preço de venda | Custo de obra |
-|---|---|---|
-| Otimista | limite de alta da faixa de preço | limite de queda da faixa de custo |
-| Base | 0% | 0% |
-| Pessimista | limite de queda da faixa de preço | limite de alta da faixa de custo |
+| Cenário | Preço de venda | Custo de obra | Velocidade de vendas |
+|---|---|---|---|
+| Otimista | limite de alta da faixa de preço | limite de queda da faixa de custo | limite de alta da faixa de velocidade |
+| Base | 0% | 0% | 0% |
+| Pessimista | limite de queda da faixa de preço | limite de alta da faixa de custo | limite de queda da faixa de velocidade |
 
-As faixas são as dos benchmarks de sensibilidade de preço e de custo de obra (as mesmas que limitam
-os controles); sem benchmark configurado, ±15%. O Base reproduz o estudo real. **Salvar os três**
+As faixas são as dos benchmarks de sensibilidade de preço, de custo de obra e de velocidade (as
+mesmas que limitam os controles); sem benchmark configurado, ±15%. O Base reproduz o estudo real. **Salvar os três**
 grava os três como cenários comuns, que podem ser removidos como qualquer outro. Se um deles falhar,
 o diálogo continua aberto só com os que faltam e o botão passa a dizer **Salvar os que faltam**:
 tentar de novo não regrava os que a tela recebeu como gravados. Se a conexão cair depois de o

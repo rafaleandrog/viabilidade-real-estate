@@ -2105,7 +2105,7 @@ export function consolidarCarteiraClientes(
  * Cobre o "pior caso" por SAFRA sem iterar mês a mês: como entrada e
  * parcelamento (fora de "ao longo da obra") têm deslocamento CONSTANTE a
  * partir do mês da venda, o pior caso é sempre a ÚLTIMA safra (`periodo.fim`
- * — o fim do Após-chaves). "Ao longo da obra" já é absoluto (ancorado no
+ * — o fim do Após-chaves; na curva de cenário, a última venda, #971). "Ao longo da obra" já é absoluto (ancorado no
  * Cronograma da Obra, não no mês da venda — #190/#191), então seu horizonte
  * não depende da safra.
  */
@@ -2116,7 +2116,7 @@ export function ultimoMesRecebivelLinha(
   // aba Viabilidade → Financeiro). Omitir vira TS2554, não silêncio.
   jurosTabelaAaEstudo: number,
 ): number {
-  // A última safra é o fim da janela Pós-chaves DESTE Grupo (1 a 12 meses).
+  // A última safra é o fim da janela Pós-chaves DESTE Grupo (1 a 12 meses) — ou a última venda da curva de cenário (#971).
   const periodo = periodoAbsorcao(cronograma, mesesPosChaves(linha?.absorcao));
   if (!periodo) return 0;
   const ultimoMesVenda = janelaVendasDaCurva(linha?.absorcao, periodo)!.fim;

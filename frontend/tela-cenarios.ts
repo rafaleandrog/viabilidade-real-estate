@@ -16,7 +16,7 @@ import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
 import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
-import { faixaDoBenchmark, cenariosPadrao, indicadoresCenario, ordemDaTentativa, gravarCenariosPadrao, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
+import { faixaDoBenchmark, faixaDaVelocidade, cenariosPadrao, indicadoresCenario, ordemDaTentativa, gravarCenariosPadrao, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   type FundingCalc, type OperacaoFunding,
@@ -248,7 +248,7 @@ export class ViabTelaCenarios extends LitElement {
         operacoesFunding: this.operacoes,
       };
       this.faixaPreco = faixaDoBenchmark(bm?.dados || [], 'preco');
-      this.faixaCusto = faixaDoBenchmark(bm?.dados || [], 'custo_obras');
+      this.faixaCusto = faixaDoBenchmark(bm?.dados || [], 'custo_obras'); this.faixaVelocidade = faixaDaVelocidade(bm?.dados || []);
       this.cenarios = cens?.erro ? [] : (cens.dados || []);
       this.cacheCalc.clear();  // baseConfig novo invalida tudo que estava memorizado
     } catch (e: any) {
@@ -350,28 +350,40 @@ export class ViabTelaCenarios extends LitElement {
 
   /**
    * #747: as séries (em R$ milhões) que delimitam o eixo Y do card — a base e
-   * os QUATRO cantos das faixas dos sliders (`faixaPreco` × `faixaCusto`).
+   * os OITO cantos das faixas dos sliders (`faixaPreco` × `faixaCusto` × `faixaVelocidade`, #971).
    * Passa por `_calc`, então os cantos ficam no mesmo memo dos sliders.
    */
   private _envelopeCenarios(base: FluxoCalc): number[][] {
+    // #971: com a velocidade de vendas são TRÊS alavancas, e os cantos, oito.
+    const vMin = this.faixaVelocidade.min;
+    const vMax = this.faixaVelocidade.max;
     const cantos: CenarioParams[] = [
-      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.min },
-      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.max },
-      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.min },
-      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.max },
+      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.min, velocidadeVendasPct: vMin },
+      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.min, velocidadeVendasPct: vMax },
+      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.max, velocidadeVendasPct: vMin },
+      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.max, velocidadeVendasPct: vMax },
+      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.min, velocidadeVendasPct: vMin },
+      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.min, velocidadeVendasPct: vMax },
+      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.max, velocidadeVendasPct: vMin },
+      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.max, velocidadeVendasPct: vMax },
     ];
     return [base, ...cantos.map((c) => this._calc(c))]
       .map((c) => c.fluxoAcumulado.map((v) => v / ESCALA_MILHOES));
   }
 
+  /** #971: velocidade de vendas do cenário simulado, em % (o terceiro controle). */
+  @state() private velPct = 0;
+  /** #971: faixa do controle de velocidade, do benchmark `velocidade` (`faixaDaVelocidade`). */
+  private faixaVelocidade: Faixa = { min: -15, max: 15 };
+
   /** Sliders fora do zero — há um cenário alternativo a comparar com a base. */
   private get _alterado(): boolean {
-    return this.precoPct !== 0 || this.custoPct !== 0;
+    return this.precoPct !== 0 || this.custoPct !== 0 || this.velPct !== 0;
   }
 
   private _rotuloCenario(): string {
     const p = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
-    return `Cenário · preço ${p(this.precoPct)} · obra ${p(this.custoPct)}`;
+    return `Cenário · preço ${p(this.precoPct)} · obra ${p(this.custoPct)} · vendas ${p(this.velPct)}`;
   }
 
   // #185: marcos do cronograma (Lançamento/Início/Fim de Obra) + Payback e
@@ -403,10 +415,10 @@ export class ViabTelaCenarios extends LitElement {
     // o GRÁFICO continua mostrando as duas séries mesmo coincidindo (#354): o
     // autor quer as duas linhas sempre visíveis, para não sumir a série
     // simulada quando o slider volta a 0%.
-    const base = this._calc({ precoVendaPct: 0, custoObraPct: 0 });
+    const base = this._calc({ precoVendaPct: 0, custoObraPct: 0, velocidadeVendasPct: 0 });
     const alterado = this._alterado;
     const cenario = alterado
-      ? this._calc({ precoVendaPct: this.precoPct, custoObraPct: this.custoPct })
+      ? this._calc({ precoVendaPct: this.precoPct, custoObraPct: this.custoPct, velocidadeVendasPct: this.velPct })
       : base;
     this.ultimoCalc = cenario;
     // #186: Mensal/Anual só reagrupa as COLUNAS do gráfico e da tabela — os
@@ -431,7 +443,7 @@ export class ViabTelaCenarios extends LitElement {
     const comparacao = emMilhoes(comparacaoCenario(
       base, cenario, alterado ? this._rotuloCenario() : 'Cenário simulado', periodos,
     ));
-    // #747: o eixo Y é ESTÁTICO — o envelope da base e dos quatro cantos das
+    // #747: o eixo Y é ESTÁTICO — o envelope da base e dos oito cantos das
     // faixas dos sliders (assimétricas, dos benchmarks), arredondado para fora.
     // Sem `min-y`/`max-y` o primitivo refaz o domínio a cada pixel do slider,
     // e o que anda na tela é o eixo, não o dado.
@@ -494,9 +506,10 @@ export class ViabTelaCenarios extends LitElement {
       <urbi-card titulo="Parâmetros do cenário">
         ${this._slider('Preço de venda (R$/m²)', this.precoPct, this.faixaPreco, (v) => this.precoPct = v)}
         ${this._slider('Custo de obra (R$/m²)', this.custoPct, this.faixaCusto, (v) => this.custoPct = v)}
+        ${this._slider('Velocidade de vendas', this.velPct, this.faixaVelocidade, (v) => this.velPct = v)}
         <div class="reset">
           <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-rotate-left"
-            ?desabilitado=${!alterado} @click=${() => { this.precoPct = 0; this.custoPct = 0; }}>
+            ?desabilitado=${!alterado} @click=${() => { this.precoPct = 0; this.custoPct = 0; this.velPct = 0; }}>
             Voltar à base
           </urbi-botao>
         </div>
@@ -537,9 +550,9 @@ export class ViabTelaCenarios extends LitElement {
     if (!this.editavel || this.salvando || this.gerando || !this.estudo?.id) return;
     this.salvando = true;
     try {
-      const nome = this.nomeNovo.trim() || `Preço ${this.precoPct >= 0 ? '+' : ''}${this.precoPct}% · Obra ${this.custoPct >= 0 ? '+' : ''}${this.custoPct}%`;
+      const nome = this.nomeNovo.trim() || `Preço ${this.precoPct >= 0 ? '+' : ''}${this.precoPct}% · Obra ${this.custoPct >= 0 ? '+' : ''}${this.custoPct}% · Vendas ${this.velPct >= 0 ? '+' : ''}${this.velPct}%`;
       const res = await criarCenario(this.estudo.id, {
-        nome, preco_venda_pct: this.precoPct, custo_obra_pct: this.custoPct,
+        nome, preco_venda_pct: this.precoPct, custo_obra_pct: this.custoPct, velocidade_vendas_pct: this.velPct,
         ordem: this._reservarOrdens(1),
       });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cenário', 'erro'); return; }
@@ -592,6 +605,7 @@ export class ViabTelaCenarios extends LitElement {
                 <th>Cenário</th>
                 <th class="cen-estreita">Preço venda</th>
                 <th class="cen-estreita">Custo obra</th>
+                <th class="cen-estreita">Velocidade</th>
                 <th>VGV</th>
                 <th class="cen-var" aria-label="Variação de VGV vs. cenário real" scope="col"></th>
                 <th>Resultado</th>
@@ -635,6 +649,7 @@ export class ViabTelaCenarios extends LitElement {
         <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
         <td class="cen-estreita">—</td>
         <td class="cen-estreita">—</td>
+        <td class="cen-estreita">—</td>
         ${this._celulasIndicadores(base, null)}
         <td class=${base.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(base.vpl)}</td>
         <td class="cen-var"></td>
@@ -674,7 +689,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _linhaCenario(c: any, base: FluxoCalc): TemplateResult {
-    const calc = this._calc({ precoVendaPct: n(c.preco_venda_pct), custoObraPct: n(c.custo_obra_pct) });
+    const calc = this._calc({ precoVendaPct: n(c.preco_venda_pct), custoObraPct: n(c.custo_obra_pct), velocidadeVendasPct: n(c.velocidade_vendas_pct) });
     const pctTxt = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
     const tir = calc.tir === null ? '—' : `${fmtPct(calc.tir)}`;
     return html`
@@ -682,6 +697,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${c.nome || 'Cenário'}</td>
         <td class="cen-estreita">${pctTxt(n(c.preco_venda_pct))}</td>
         <td class="cen-estreita">${pctTxt(n(c.custo_obra_pct))}</td>
+        <td class="cen-estreita">${pctTxt(n(c.velocidade_vendas_pct))}</td>
         ${this._celulasIndicadores(calc, base)}
         <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}</td>
         <td class="cen-var">${this._badgeVar(calc.vpl, base.vpl, true)}</td>
@@ -731,7 +747,7 @@ export class ViabTelaCenarios extends LitElement {
   /** #889: abre o diálogo com os três cenários pré-preenchidos pelas faixas dos benchmarks. */
   private _abrirGerarPadrao = () => {
     if (!this.editavel) return;
-    this.rascunhoPadrao = cenariosPadrao(this.faixaPreco, this.faixaCusto);
+    this.rascunhoPadrao = cenariosPadrao(this.faixaPreco, this.faixaCusto, this.faixaVelocidade);
   };
 
   /**
@@ -753,7 +769,7 @@ export class ViabTelaCenarios extends LitElement {
     return inicio;
   }
 
-  private _editarPadrao(i: number, campo: 'precoVendaPct' | 'custoObraPct', valor: number | null) {
+  private _editarPadrao(i: number, campo: 'precoVendaPct' | 'custoObraPct' | 'velocidadeVendasPct', valor: number | null) {
     if (!this.rascunhoPadrao) return;
     this.rascunhoPadrao = this.rascunhoPadrao.map((c, j) => j === i ? { ...c, [campo]: valor ?? 0 } : c);
   }
@@ -801,7 +817,7 @@ export class ViabTelaCenarios extends LitElement {
         <p class="gerar-ajuda">As variações vêm das faixas de sensibilidade dos benchmarks
           (±${FAIXA_PADRAO_PCT}% quando não configuradas). Ajuste antes de salvar.</p>
         <table class="gerar-padrao-tab">
-          <thead><tr><th>Cenário</th><th>Preço de venda (%)</th><th>Custo de obra (%)</th></tr></thead>
+          <thead><tr><th>Cenário</th><th>Preço de venda (%)</th><th>Custo de obra (%)</th><th>Velocidade de vendas (%)</th></tr></thead>
           <tbody>
             ${rascunho.map((c, i) => html`
               <tr data-cenario=${c.nome}>
@@ -812,6 +828,9 @@ export class ViabTelaCenarios extends LitElement {
                 <td><viab-num label="" casas-decimais="2" .valor=${c.custoObraPct}
                   ?desabilitado=${this.gerando}
                   @urbi:input-numero-change=${(e: CustomEvent) => this._editarPadrao(i, 'custoObraPct', e.detail.valor)}></viab-num></td>
+                <td><viab-num label="" casas-decimais="2" .valor=${c.velocidadeVendasPct}
+                  ?desabilitado=${this.gerando}
+                  @urbi:input-numero-change=${(e: CustomEvent) => this._editarPadrao(i, 'velocidadeVendasPct', e.detail.valor)}></viab-num></td>
               </tr>`)}
           </tbody>
         </table>

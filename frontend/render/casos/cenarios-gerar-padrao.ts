@@ -35,7 +35,8 @@ export const PARAMS_TELA = {
   // mostrar exatamente estes limites, com o sinal de cada alavanca.
   faixaPreco: { min: -20, max: 10 },
   faixaCusto: { min: -5, max: 8 },
-  cenarios: [{ id: 7, nome: 'Pessimista', preco_venda_pct: -20, custo_obra_pct: 8, ordem: 0 }],
+  faixaVelocidade: { min: -30, max: 25 },
+  cenarios: [{ id: 7, nome: 'Pessimista', preco_venda_pct: -20, custo_obra_pct: 8, velocidade_vendas_pct: -30, ordem: 0 }],
   colapso: {},
   visao: 'mensal',
   precoPct: 0,
@@ -48,7 +49,7 @@ export interface MedidaGerarPadrao {
   /** Cabeçalhos com texto da tabela de cenários salvos, na ordem. */
   colunas: string[];
   /** Linhas do diálogo depois do clique: nome, preço e custo pré-preenchidos. */
-  dialogo: { nome: string; preco: number | null; custo: number | null }[];
+  dialogo: { nome: string; preco: number | null; custo: number | null; velocidade: number | null }[];
 }
 
 export async function medirGerarPadrao(raiz: HTMLElement): Promise<MedidaGerarPadrao> {
@@ -67,6 +68,7 @@ export async function medirGerarPadrao(raiz: HTMLElement): Promise<MedidaGerarPa
         nome: (tr.querySelector('td')?.textContent ?? '').trim(),
         preco: nums[0]?.valor ?? null,
         custo: nums[1]?.valor ?? null,
+        velocidade: nums[2]?.valor ?? null,
       };
     });
   }

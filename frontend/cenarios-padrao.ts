@@ -7,12 +7,12 @@
 // as colunas da tabela de cenários salvos. Ficam aqui, e não no componente,
 // para o sinal de cada alavanca e a conta de cada indicador serem testáveis.
 //
-// As alavancas são as duas que o cenário salvo guarda (`preco_venda_pct` e
-// `custo_obra_pct`). A velocidade de vendas ficou de fora por decisão do dono:
-// exigiria coluna nova no schema.
+// As alavancas são as três que o cenário salvo guarda: `preco_venda_pct`,
+// `custo_obra_pct` e `velocidade_vendas_pct` (#971).
 // ─────────────────────────────────────────────────────────────────────────
 
 import type { FluxoCalc } from './fluxo-caixa-motor.js';
+import { VELOCIDADE_VENDAS_MIN, VELOCIDADE_VENDAS_MAX } from './fluxo-shared.js';
 
 /** Faixa de variação de uma alavanca, em %: `min ≤ 0 ≤ max`. */
 export interface Faixa { min: number; max: number; }
@@ -40,22 +40,37 @@ export interface CenarioPadrao {
   nome: string;
   precoVendaPct: number;
   custoObraPct: number;
+  /** #971: vende-se `(1 + v)` vezes mais por mês, e o prazo de vendas vira `prazo ÷ (1 + v)`. */
+  velocidadeVendasPct: number;
+}
+
+/**
+ * #971: a faixa da velocidade de vendas, do benchmark de sensibilidade
+ * `velocidade` (±15% sem ele), limitada à faixa que o motor e a API aceitam —
+ * um benchmark de −95% não pode levar o controle aonde a gravação recusaria.
+ */
+export function faixaDaVelocidade(benchmarks: any[]): Faixa {
+  const f = faixaDoBenchmark(benchmarks, 'velocidade');
+  return {
+    min: Math.max(f.min, VELOCIDADE_VENDAS_MIN),
+    max: Math.min(f.max, VELOCIDADE_VENDAS_MAX),
+  };
 }
 
 /**
  * Os três cenários, nesta ordem:
  *  - **Otimista:** preço no limite de cima da faixa de preço, custo de obra no
- *    limite de baixo da faixa de custo;
- *  - **Base:** as duas alavancas em zero, o próprio estudo;
- *  - **Pessimista:** preço no limite de baixo, custo de obra no de cima.
+ *    limite de baixo da faixa de custo, velocidade no limite de cima;
+ *  - **Base:** as três alavancas em zero, o próprio estudo;
+ *  - **Pessimista:** preço e velocidade no limite de baixo, custo de obra no de cima.
  *
  * `+ 0` normaliza o `-0` de uma faixa sem lado negativo.
  */
-export function cenariosPadrao(faixaPreco: Faixa, faixaCusto: Faixa): CenarioPadrao[] {
+export function cenariosPadrao(faixaPreco: Faixa, faixaCusto: Faixa, faixaVelocidade: Faixa): CenarioPadrao[] {
   return [
-    { nome: 'Otimista', precoVendaPct: faixaPreco.max + 0, custoObraPct: faixaCusto.min + 0 },
-    { nome: 'Base', precoVendaPct: 0, custoObraPct: 0 },
-    { nome: 'Pessimista', precoVendaPct: faixaPreco.min + 0, custoObraPct: faixaCusto.max + 0 },
+    { nome: 'Otimista', precoVendaPct: faixaPreco.max + 0, custoObraPct: faixaCusto.min + 0, velocidadeVendasPct: faixaVelocidade.max + 0 },
+    { nome: 'Base', precoVendaPct: 0, custoObraPct: 0, velocidadeVendasPct: 0 },
+    { nome: 'Pessimista', precoVendaPct: faixaPreco.min + 0, custoObraPct: faixaCusto.max + 0, velocidadeVendasPct: faixaVelocidade.min + 0 },
   ];
 }
 
@@ -141,6 +156,7 @@ export async function gravarCenariosPadrao(
     try {
       const res = await criar({
         nome: c.nome, preco_venda_pct: c.precoVendaPct, custo_obra_pct: c.custoObraPct,
+        velocidade_vendas_pct: c.velocidadeVendasPct,
         ordem: ordemInicial + gravados,
       });
       if (res?.erro) { erro = res.mensagem || `Erro ao salvar o cenário ${c.nome}`; break; }

@@ -10,7 +10,7 @@ import type { MedidaGerarPadrao } from './casos/cenarios-gerar-padrao.js';
 const pular = await motivoParaPular();
 
 const COLUNAS = [
-  'Cenário', 'Preço venda', 'Custo obra', 'VGV', 'Resultado', 'Margem',
+  'Cenário', 'Preço venda', 'Custo obra', 'Velocidade', 'VGV', 'Resultado', 'Margem',
   'VPL', 'TIR', 'Payback', 'Exposição máx.',
 ];
 
@@ -26,11 +26,11 @@ test('Cenários do Avançado: quem escreve gera os três cenários pré-preenchi
   assert.ok(m, 'o caso não devolveu a medida extra — `medir()` não rodou' + relato(a));
   assert.equal(m!.temBotao, true, relato(a));
   assert.deepEqual(m!.colunas, COLUNAS, relato(a));
-  // Faixas do caso: preço −20..+10, custo −5..+8.
+  // Faixas do caso: preço −20..+10, custo −5..+8, velocidade −30..+25.
   assert.deepEqual(m!.dialogo, [
-    { nome: 'Otimista', preco: 10, custo: -5 },
-    { nome: 'Base', preco: 0, custo: 0 },
-    { nome: 'Pessimista', preco: -20, custo: 8 },
+    { nome: 'Otimista', preco: 10, custo: -5, velocidade: 25 },
+    { nome: 'Base', preco: 0, custo: 0, velocidade: 0 },
+    { nome: 'Pessimista', preco: -20, custo: 8, velocidade: -30 },
   ], relato(a));
 });
 

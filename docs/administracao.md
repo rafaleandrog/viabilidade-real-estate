@@ -102,16 +102,18 @@ tipo de empreendimento, escolhido nas fichas **Loteamento** e **Incorporação**
 - **Indicador de Benchmark** — os indicadores de meta, com **Valor** e **Regra** (*atingir ou
   superar* ou *não exceder*): `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`,
   `resultado_final` e, só no Loteamento, `eficiencia_aproveitamento`.
-- **Indicador de Sensibilidade** — as quatro variáveis que a análise de sensibilidade estressa
-  (`preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras`), com **Var + (%)** e **Var − (%)**,
-  as variações padrão dos cenários Bull e Bear.
+- **Indicador de Sensibilidade** — as quatro variáveis que a análise de sensibilidade da Proforma
+  estressa (`preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras`) e a velocidade de vendas
+  dos Cenários do Avançado (`velocidade`), com **Var + (%)** e **Var − (%)**: as variações padrão dos
+  cenários Bull e Bear e os limites dos controles e do otimista e do pessimista nos Cenários do Avançado.
 - **Faixas do medidor** — para os mesmos indicadores de meta, **Mín**, **Faixa 1 até**, **Faixa 2
   até** e **Máx**: os limites e cortes do velocímetro da aba Gráficos; em branco, as faixas saem
   automaticamente da meta.
 
 Na primeira abertura por quem pode escrever, o app semeia sozinho, nos dois tipos, os indicadores
-padrão que ainda faltam — os de meta e os quatro de sensibilidade. **Novo indicador** cria um com
-identificador próprio; **Remover** apaga. Só o `admin` do app escreve; os demais veem a aba do
+padrão que ainda faltam — os de meta e os cinco de sensibilidade. Uma instância cujos benchmarks já
+existiam não ganha sozinha um indicador padrão novo: crie-o por **Novo indicador**, que cria um com
+identificador próprio (por exemplo `velocidade`); **Remover** apaga. Só o `admin` do app escreve; os demais veem a aba do
 Painel em modo de leitura. O que cada indicador valida está em [Benchmarks](benchmarks).
 
 ### Curvas de distribuição
