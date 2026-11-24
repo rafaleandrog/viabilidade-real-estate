@@ -7,6 +7,7 @@ import {
   CATEGORIAS_DATA_ROOM,
   checklistDataRoom,
   type CategoriaDataRoom,
+  deveRecarregarDataRoom,
 } from './data-room.js';
 
 const total = (g: Record<CategoriaDataRoom, unknown[]>) =>
@@ -110,4 +111,12 @@ test('categoriaSemTipo', () => {
   assert.equal(categoriaSemTipo('projeto'), false);
   assert.equal(categoriaSemTipo('comercial'), false);
   assert.equal(categoriaSemTipo('outros'), false);
+});
+
+test('deveRecarregarDataRoom: só na volta (inativa -> ativa) com carga prévia', () => {
+  assert.equal(deveRecarregarDataRoom(false, true, true), true);
+  assert.equal(deveRecarregarDataRoom(false, true, false), false); // nunca carregou: o fluxo normal cuida
+  assert.equal(deveRecarregarDataRoom(true, true, true), false);   // já estava ativa
+  assert.equal(deveRecarregarDataRoom(true, false, true), false);  // saindo
+  assert.equal(deveRecarregarDataRoom(false, false, true), false);
 });

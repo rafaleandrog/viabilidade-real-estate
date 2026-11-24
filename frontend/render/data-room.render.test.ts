@@ -20,9 +20,12 @@ test('Data room: a sub-aba monta o painel com as 6 categorias e o checklist', { 
   assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
 
   const m = a.extra?.['900'] as
-    | { secoes: string[]; nomes: string[]; checklist: string[]; semTipo: string[] }
+    | { ativa: boolean; arquivoApelo: string[]; secoes: string[]; nomes: string[]; checklist: string[]; semTipo: string[] }
     | undefined;
   assert.ok(m, 'o caso não devolveu a medida extra' + relato(a));
+  assert.equal(m!.ativa, true, 'o painel deve receber ativa=true quando a sub-aba Data room é a ativa' + relato(a));
+  assert.deepEqual(m!.arquivoApelo, ['arquivo no Apelo Comercial'],
+    'a fonte do Apelo com arquivo diz onde abrir, sem prometer link' + relato(a));
   assert.deepEqual(
     m!.secoes, ['terreno', 'juridico', 'projeto', 'comercial', 'financeiro', 'outros'],
     'as 6 seções, na ordem' + relato(a),

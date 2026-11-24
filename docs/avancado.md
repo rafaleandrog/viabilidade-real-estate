@@ -42,8 +42,11 @@ Acumulado** e os **Indicadores vs. benchmark** — a página de leitura do estud
 
 A sub-aba **Data room** reúne, num só lugar, os documentos já anexados ao estudo, agrupados em seis
 categorias, na ordem **Terreno**, **Jurídico**, **Projeto**, **Comercial**, **Financeiro** e
-**Outros**. Cada documento aparece com o nome, o tipo e, quando há arquivo para abrir, o link
-**Abrir**; as fontes do Apelo Comercial que são só texto aparecem sem link.
+**Outros**. Cada documento aparece com o nome e o tipo. Os anexos de Informações trazem o link
+**Abrir**; as fontes do Apelo Comercial aparecem sem link — as que têm arquivo indicam
+"arquivo no Apelo Comercial" e o arquivo se abre no próprio Apelo Comercial, e as que são só texto
+mostram apenas o texto. Ao voltar à sub-aba, a lista é recarregada e mostra o que foi anexado nesse
+intervalo.
 
 O mapa das categorias é fixo: imagem principal, render e planta (de Informações) entram em
 **Projeto**; anúncios, população e mercado (do Apelo Comercial) entram em **Comercial**; a fonte do

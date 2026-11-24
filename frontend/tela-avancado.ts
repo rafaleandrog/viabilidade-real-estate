@@ -328,7 +328,7 @@ export class ViabTelaAvancado extends LitElement {
         case 'tipologias':
           return html`<viab-empreendimento-tipologias .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-empreendimento-tipologias>`;
         case 'data-room':
-          return html`<viab-data-room .estudo=${this.estudo}></viab-data-room>`;
+          return html`<viab-data-room .estudo=${this.estudo} .ativa=${this.subAtiva['empreendimento'] === 'data-room'}></viab-data-room>`;
         case 'informacoes':
         default:
           return html`<viab-empreendimento-info .estudo=${this.estudo} .editavel=${this._editavelPremissas} .podeEditar=${this.podeEditar}></viab-empreendimento-info>`;

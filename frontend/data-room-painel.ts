@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { buscarApelo, listarDocumentosEmpreendimento } from './viabilidade-api.js';
 import { respostaAindaVale, precisaCarregar } from './viab-imagem-principal.js';
 import {
-  agruparDataRoom, categoriaSemTipo, CATEGORIAS_DATA_ROOM, checklistDataRoom,
+  agruparDataRoom, categoriaSemTipo, CATEGORIAS_DATA_ROOM, checklistDataRoom, deveRecarregarDataRoom,
   type CategoriaDataRoom, type ItemDataRoom,
 } from './data-room.js';
 
@@ -14,12 +14,15 @@ import {
 @customElement('viab-data-room')
 export class ViabDataRoom extends LitElement {
   @property({ type: Object }) estudo: any = null;
+  /** true quando a sub-aba Data room é a visível; a volta a ela recarrega. */
+  @property({ type: Boolean }) ativa = false;
 
   @state() private carregando = true;
   @state() private docsEmpreendimento: any[] | null = null;
   @state() private docsApelo: any[] | null = null;
   @state() private avisos: string[] = [];
   private idCarregado: number | null = null;
+  private ativaAntes = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     :host { display: block; }
@@ -36,15 +39,20 @@ export class ViabDataRoom extends LitElement {
   `];
 
   updated() {
+    const voltou = deveRecarregarDataRoom(this.ativaAntes, this.ativa, this.idCarregado != null);
+    this.ativaAntes = this.ativa;
     if (precisaCarregar(this.estudo?.id, this.idCarregado)) {
       this.idCarregado = this.estudo.id;
+      this._carregar();
+    } else if (voltou && this.estudo?.id != null) {
       this._carregar();
     }
   }
 
   private async _carregar() {
     const id = this.estudo?.id;
-    this.carregando = true;
+    // Recarga ao voltar à sub-aba mantém a lista na tela (sem piscar o loading).
+    if (this.docsEmpreendimento === null && this.docsApelo === null) this.carregando = true;
     const [emp, ape] = await Promise.allSettled([
       listarDocumentosEmpreendimento(id),
       buscarApelo(id),
@@ -71,7 +79,11 @@ export class ViabDataRoom extends LitElement {
       <li class="doc">
         <span class="nome">${i.nome}</span>
         <span class="tipo">${i.rotuloTipo}${i.soTexto ? ' · só texto' : ''}</span>
-        ${i.url ? html`<a href=${i.url} target="_blank" rel="noopener">Abrir</a>` : nothing}
+        ${i.url
+          ? html`<a href=${i.url} target="_blank" rel="noopener">Abrir</a>`
+          : i.origem === 'apelo' && !i.soTexto
+            ? html`<urbi-botao class="arquivo-apelo" variante="texto" pequeno @click=${() => this._ir('apelo')}>arquivo no Apelo Comercial</urbi-botao>`
+            : nothing}
       </li>`;
   }
 

@@ -54,12 +54,14 @@ export const caso = {
   },
   /** Roda no navegador: lê o que o data room desenhou. */
   async medir(raiz: HTMLElement): Promise<{
-    secoes: string[]; nomes: string[]; checklist: string[]; semTipo: string[];
+    ativa: boolean; arquivoApelo: string[]; secoes: string[]; nomes: string[]; checklist: string[]; semTipo: string[];
   }> {
     const av = raiz.querySelector('viab-tela-avancado') as any;
     const painel = av?.shadowRoot?.querySelector('viab-data-room') as any;
     const cards = Array.from(painel?.shadowRoot?.querySelectorAll('urbi-card[data-categoria]') ?? []) as HTMLElement[];
     return {
+      ativa: painel?.ativa === true,
+      arquivoApelo: Array.from(painel?.shadowRoot?.querySelectorAll('.arquivo-apelo') ?? []).map((n: any) => n.textContent.trim()),
       secoes: cards.map((c) => c.getAttribute('data-categoria') || ''),
       nomes: Array.from(painel?.shadowRoot?.querySelectorAll('li.doc .nome') ?? []).map((n: any) => n.textContent.trim()),
       checklist: Array.from(painel?.shadowRoot?.querySelectorAll('.check li') ?? []).map((n: any) => n.textContent.trim().replace(/\s+/g, ' ')),

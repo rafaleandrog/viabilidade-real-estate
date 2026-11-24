@@ -147,6 +147,12 @@ export function checklistDataRoom(
   return saida;
 }
 
+/** Recarrega ao VOLTAR à sub-aba (inativa -> ativa) quando já houve carga: os documentos
+ *  podem ter sido anexados em Informações ou no Apelo Comercial enquanto o painel esteve oculto. */
+export function deveRecarregarDataRoom(ativaAntes: boolean, ativaAgora: boolean, jaCarregou: boolean): boolean {
+  return !ativaAntes && ativaAgora && jaCarregou;
+}
+
 export function categoriaSemTipo(c: CategoriaDataRoom): boolean {
   return CATEGORIAS_SEM_TIPO.includes(c);
 }
