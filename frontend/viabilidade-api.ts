@@ -157,8 +157,11 @@ export function atualizarBenchmark(id: number, dados: Record<string, any>): Prom
 export function removerBenchmark(id: number): Promise<any> {
   return urbiVerso.api(`/benchmarks/${id}`, { method: 'DELETE' });
 }
-export function semearBenchmarks(): Promise<any> {
-  return urbiVerso.api(`/benchmarks/semear`, { method: 'POST' });
+/** Semeia os indicadores padrão que faltam; com `campos`, só esses (#971). */
+export function semearBenchmarks(campos?: string[]): Promise<any> {
+  return urbiVerso.api(`/benchmarks/semear`, campos
+    ? { method: 'POST', body: JSON.stringify({ campos }) }
+    : { method: 'POST' });
 }
 
 // ── Config ──

@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   faixaDoBenchmark, cenariosPadrao, indicadoresCenario, FAIXA_PADRAO_PCT,
-  proximaOrdem, gravarCenariosPadrao, ordemDaTentativa,
+  proximaOrdem, gravarCenariosPadrao, ordemDaTentativa, faixaDaVelocidade,
 } from './cenarios-padrao.js';
 import { calcularFluxo, aplicarCenario, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 // A configuração dos casos de render é usada só como um estudo qualquer com
@@ -46,18 +46,25 @@ test('faixaDoBenchmark: lado ausente cai no padrão só daquele lado', () => {
   assert.deepEqual(faixaDoBenchmark(bm, 'preco'), { min: -15, max: 12 });
 });
 
-test('cenariosPadrao: otimista sobe o preço e baixa a obra; pessimista o contrário; base zerada', () => {
-  const [oti, base, pes] = cenariosPadrao({ min: -20, max: 10 }, { min: -5, max: 8 });
-  assert.deepEqual(oti, { nome: 'Otimista', precoVendaPct: 10, custoObraPct: -5 });
-  assert.deepEqual(base, { nome: 'Base', precoVendaPct: 0, custoObraPct: 0 });
-  assert.deepEqual(pes, { nome: 'Pessimista', precoVendaPct: -20, custoObraPct: 8 });
+test('cenariosPadrao: otimista sobe o preço e a velocidade e baixa a obra; pessimista o contrário; base zerada', () => {
+  const [oti, base, pes] = cenariosPadrao({ min: -20, max: 10 }, { min: -5, max: 8 }, { min: -30, max: 25 });
+  assert.deepEqual(oti, { nome: 'Otimista', precoVendaPct: 10, custoObraPct: -5, velocidadeVendasPct: 25 });
+  assert.deepEqual(base, { nome: 'Base', precoVendaPct: 0, custoObraPct: 0, velocidadeVendasPct: 0 });
+  assert.deepEqual(pes, { nome: 'Pessimista', precoVendaPct: -20, custoObraPct: 8, velocidadeVendasPct: -30 });
   // O sinal de cada alavanca, dito explicitamente.
-  assert.ok(oti.precoVendaPct > 0 && oti.custoObraPct < 0);
-  assert.ok(pes.precoVendaPct < 0 && pes.custoObraPct > 0);
+  assert.ok(oti.precoVendaPct > 0 && oti.custoObraPct < 0 && oti.velocidadeVendasPct > 0);
+  assert.ok(pes.precoVendaPct < 0 && pes.custoObraPct > 0 && pes.velocidadeVendasPct < 0);
+});
+
+test('#971 faixaDaVelocidade: do benchmark `velocidade`, ±15% sem ele, e nunca além da faixa do motor e da API', () => {
+  assert.deepEqual(faixaDaVelocidade([]), { min: -15, max: 15 });
+  assert.deepEqual(faixaDaVelocidade([{ campo: 'velocidade', variacao_positiva_pct: 40, variacao_negativa_pct: 25 }]), { min: -25, max: 40 });
+  // Um benchmark de −95%/+900% não leva o controle aonde a gravação recusaria.
+  assert.deepEqual(faixaDaVelocidade([{ campo: 'velocidade', variacao_positiva_pct: 900, variacao_negativa_pct: 95 }]), { min: -90, max: 500 });
 });
 
 test('cenariosPadrao: faixa sem um dos lados não gera -0', () => {
-  const [oti, , pes] = cenariosPadrao({ min: -0, max: 10 }, { min: -0, max: 0 });
+  const [oti, , pes] = cenariosPadrao({ min: -0, max: 10 }, { min: -0, max: 0 }, { min: -0, max: 0 });
   assert.ok(Object.is(pes.precoVendaPct, 0));
   assert.ok(Object.is(oti.custoObraPct, 0));
   assert.ok(Object.is(pes.custoObraPct, 0));
@@ -77,12 +84,12 @@ test('indicadoresCenario: margem nula sem VGV, exposição em módulo', () => {
 
 test('#889 critério 2: o cenário "Base" reproduz o estudo exatamente nos seis indicadores', () => {
   const real = indicadoresCenario(calcularFluxo(CONFIG));
-  const [, base] = cenariosPadrao(faixaDoBenchmark([], 'preco'), faixaDoBenchmark([], 'custo_obras'));
+  const [, base] = cenariosPadrao(faixaDoBenchmark([], 'preco'), faixaDoBenchmark([], 'custo_obras'), faixaDaVelocidade([]));
   const comoCenario = indicadoresCenario(calcularFluxo(aplicarCenario(CONFIG, base)));
   assert.deepEqual(comoCenario, real);
   // Controle: o estudo tem número de verdade, e um cenário alterado sai diferente.
   assert.ok(real.vgv > 0 && real.resultado !== 0);
-  const [oti] = cenariosPadrao(faixaDoBenchmark([], 'preco'), faixaDoBenchmark([], 'custo_obras'));
+  const [oti] = cenariosPadrao(faixaDoBenchmark([], 'preco'), faixaDoBenchmark([], 'custo_obras'), faixaDaVelocidade([]));
   const otimista = indicadoresCenario(calcularFluxo(aplicarCenario(CONFIG, oti)));
   assert.ok(otimista.vgv > real.vgv);
   assert.ok(otimista.resultado > real.resultado);
@@ -95,7 +102,13 @@ test('#889 fiação: a aba Cenários usa a régua, os padrões e os indicadores 
   const tela = readFileSync(join(raiz, 'frontend/tela-cenarios.ts'), 'utf8');
   assert.match(tela, /faixaDoBenchmark\(bm\?\.dados \|\| \[\], 'preco'\)/);
   assert.match(tela, /faixaDoBenchmark\(bm\?\.dados \|\| \[\], 'custo_obras'\)/);
-  assert.match(tela, /cenariosPadrao\(this\.faixaPreco, this\.faixaCusto\)/);
+  assert.match(tela, /cenariosPadrao\(this\.faixaPreco, this\.faixaCusto, this\.faixaVelocidade\)/);
+  // #971: a velocidade chega ao motor, à gravação e ao controle.
+  assert.match(tela, /this\.faixaVelocidade = faixaDaVelocidade\(bm\?\.dados \|\| \[\]\)/);
+  assert.match(tela, /velocidadeVendasPct: this\.velPct \}\)/);
+  assert.match(tela, /velocidadeVendasPct: n\(c\.velocidade_vendas_pct\)/);
+  assert.match(tela, /velocidade_vendas_pct: this\.velPct,/);
+  assert.match(tela, /this\._slider\('Velocidade de vendas', this\.velPct, this\.faixaVelocidade,/);
   assert.match(tela, /indicadoresCenario\(calc\)/);
   // Régua única de `ordem` para as duas gravações, que só cresce (lista velha não repete ordem).
   assert.match(tela, /gravarCenariosPadrao\(rascunho, this\._reservarOrdens\(rascunho\.length\),/);
@@ -120,14 +133,14 @@ test('proximaOrdem: maior ordem salva mais um, sem empatar depois de uma remoç�
   assert.equal(proximaOrdem([{ ordem: '4' }, { ordem: null }, { ordem: 'x' }]), 5);
 });
 
-const TRES = cenariosPadrao({ min: -10, max: 10 }, { min: -5, max: 5 });
+const TRES = cenariosPadrao({ min: -10, max: 10 }, { min: -5, max: 5 }, { min: -20, max: 20 });
 
 test('gravarCenariosPadrao: grava os três em sequência, com ordem a partir da inicial', async () => {
   const corpos: any[] = [];
   const r = await gravarCenariosPadrao(TRES, 7, async (d) => { corpos.push(d); return { id: corpos.length }; });
   assert.deepEqual(r, { gravados: 3, pendentes: [], erro: null });
   assert.deepEqual(corpos.map((c) => [c.nome, c.ordem]), [['Otimista', 7], ['Base', 8], ['Pessimista', 9]]);
-  assert.deepEqual(corpos[2], { nome: 'Pessimista', preco_venda_pct: -10, custo_obra_pct: 5, ordem: 9 });
+  assert.deepEqual(corpos[2], { nome: 'Pessimista', preco_venda_pct: -10, custo_obra_pct: 5, velocidade_vendas_pct: -20, ordem: 9 });
 });
 
 test('gravarCenariosPadrao: erro devolvido pela API para a sequência e deixa só os que faltam', async () => {

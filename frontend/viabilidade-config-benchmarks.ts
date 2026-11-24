@@ -7,15 +7,18 @@ import {
   urbiVerso, listarBenchmarks, atualizarBenchmark, removerBenchmark, criarBenchmark, semearBenchmarks,
 } from './viabilidade-api.js';
 import './viab-num.js';
+import { semeaduraNecessaria } from './benchmarks-semeadura.js';
 
 // Indicadores de SENSIBILIDADE = as 4 variáveis estressadas na Proforma. Os demais
 // `campo` são metas de benchmark. Rótulos amigáveis na seção de sensibilidade.
-const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras']);
-const ROTULO_SENS: Record<string, string> = {
+// #971: `velocidade` é a sensibilidade dos Cenários do Avançado (velocidade de vendas).
+export const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras', 'velocidade']);
+export const ROTULO_SENS: Record<string, string> = {
   preco: 'Preço R$/m²',
   permuta_fisica: 'Permuta física',
   permuta_financeira: 'Permuta financeira',
   custo_obras: 'Custo de obras',
+  velocidade: 'Velocidade de vendas',
 };
 
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
@@ -43,6 +46,8 @@ export class ViabConfigBenchmarks extends LitElement {
   // #13: garante uma única tentativa de auto-seed por instância (evita re-semear
   // ao trocar de tipo se um tipo ficar legitimamente vazio após o seed).
   private _semeadoTentado = false;
+  // #971: a semeadura do indicador que falta (`velocidade`) só vale na 1ª carga.
+  private _carregouUmaVez = false;
 
   static styles = [estiloConteudo, css`
     .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -68,10 +73,16 @@ export class ViabConfigBenchmarks extends LitElement {
       let itens = res?.dados || [];
       // #13: auto-seed silencioso no 1º acesso (sem botão). Seed é idempotente e
       // admin-only no backend — só tenta para quem pode escrever (não somenteLeitura).
-      if (itens.length === 0 && !this.somenteLeitura && !this._semeadoTentado) {
+      // #971: também com a lista preenchida, quando falta um indicador padrão novo
+      // (`velocidade`) — e aí semeia SÓ ele, e só na PRIMEIRA carga da tela: a
+      // recarga depois de Remover não pode desfazer a remoção (`semeaduraNecessaria`).
+      const primeiraCarga = !this._carregouUmaVez;
+      this._carregouUmaVez = true;
+      const semeadura = semeaduraNecessaria(itens, primeiraCarga);
+      if (semeadura && !this.somenteLeitura && !this._semeadoTentado) {
         this._semeadoTentado = true;
         try {
-          await semearBenchmarks();
+          await semearBenchmarks(semeadura.campos);
           res = await listarBenchmarks(this.tipo);
           itens = res?.dados || [];
         } catch (e) { console.error(e); }
@@ -99,7 +110,7 @@ export class ViabConfigBenchmarks extends LitElement {
         <p class="sec">
           Duas seções: os <strong>indicadores de meta</strong> (comparação verde/vermelho) e os
           <strong>indicadores de sensibilidade</strong> — as variáveis estressadas nos cenários
-          Bear/Base/Bull da Proforma. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
+          Bear/Base/Bull da Proforma e nos Cenários do Avançado. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
         </p>
 
         ${this.tipoFixo ? nothing : html`
@@ -132,7 +143,7 @@ export class ViabConfigBenchmarks extends LitElement {
 
             <section class="secao">
               <h3>Indicador de Sensibilidade</h3>
-              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma.</p>
+              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma e nos Cenários do Avançado (velocidade de vendas).</p>
               <urbi-tabela
                 .colunas=${this._colunasSensibilidade()}
                 .linhas=${this._itensSensibilidade()}

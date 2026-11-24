@@ -40,12 +40,22 @@ const INDICADORES_SENSIBILIDADE: BenchmarkPadrao[] = CAMPOS_SENSIBILIDADE.map((c
   campo, valor: 0, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 10, variacao_negativa_pct: 10,
 }));
 
+// #971: sensibilidade dos CENÁRIOS do Avançado — a faixa do controle de
+// velocidade de vendas e do otimista/pessimista. Fica fora de
+// `CAMPOS_SENSIBILIDADE` de propósito: aquela lista é a das variáveis da
+// Proforma do Preliminar, e a velocidade não existe lá (o Preliminar não tem tempo).
+export const CAMPOS_SENSIBILIDADE_CENARIOS = ['velocidade'] as const;
+const INDICADORES_SENSIBILIDADE_CENARIOS: BenchmarkPadrao[] = CAMPOS_SENSIBILIDADE_CENARIOS.map((campo) => ({
+  campo, valor: 0, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 15, variacao_negativa_pct: 15,
+}));
+
 export function benchmarksPadrao(tipo: string): BenchmarkPadrao[] {
   const base = [...INDICADORES_COMUNS];
   if (tipo === 'loteamento') {
     base.push({ campo: 'eficiencia_aproveitamento', valor: 40, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 10, variacao_negativa_pct: 10 });
   }
   base.push(...INDICADORES_SENSIBILIDADE);
+  base.push(...INDICADORES_SENSIBILIDADE_CENARIOS);
   return base;
 }
 
@@ -157,16 +167,36 @@ rotasBenchmarks.delete('/benchmarks/:id', async (req: Request, res: Response) =>
   }
 });
 
-// POST /benchmarks/semear — cria os indicadores padrão que ainda faltam (admin, idempotente)
+/**
+ * Os indicadores padrão de `tipo` que ainda faltam (`jaTem`), restritos a
+ * `campos` quando a lista vem. #971: a tela semeia só `velocidade` numa
+ * instalação que já tinha benchmarks — semear tudo traria de volta indicador
+ * padrão que o admin apagou de propósito.
+ */
+export function padroesFaltantes(tipo: string, jaTem: Set<string>, campos?: string[]): BenchmarkPadrao[] {
+  return benchmarksPadrao(tipo).filter((p) => !jaTem.has(p.campo) && (!campos || campos.includes(p.campo)));
+}
+
+/** `campos` do corpo do semear: ausente → `undefined` (todos); lista de textos → ela; outra coisa → `null` (inválido). */
+export function camposDoSemear(corpo: unknown): string[] | undefined | null {
+  const c = (corpo as any)?.campos;
+  if (c === undefined) return undefined;
+  if (!Array.isArray(c) || c.some((x) => typeof x !== 'string')) return null;
+  return c;
+}
+
+// POST /benchmarks/semear — cria os indicadores padrão que ainda faltam (admin, idempotente).
+// Corpo opcional `{ campos: string[] }` restringe aos indicadores listados (#971).
 rotasBenchmarks.post('/benchmarks/semear', async (req: Request, res: Response) => {
   try {
     if (!exigirAdmin(req, res)) return;
+    const campos = camposDoSemear(req.body);
+    if (campos === null) { erro(res, 400, 'CAMPOS_INVALIDOS', '`campos` deve ser uma lista de textos'); return; }
     let criados = 0;
     for (const tipo of TIPOS) {
       const existentesRes = await req.dados!.listar('benchmarks', { filtros: { tipo_empreendimento: tipo }, por_pagina: 200 });
       const jaTem = new Set(existentesRes.dados.map((b) => String(b.campo)));
-      for (const padrao of benchmarksPadrao(tipo)) {
-        if (jaTem.has(padrao.campo)) continue;
+      for (const padrao of padroesFaltantes(tipo, jaTem, campos)) {
         await req.dados!.criar('benchmarks', { tipo_empreendimento: tipo, ...padrao });
         criados++;
       }

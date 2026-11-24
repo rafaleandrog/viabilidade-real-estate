@@ -4,6 +4,46 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-24 — Velocidade de vendas nos cenários: o benchmark (fatia 3 de 3, fecha a issue 971)
+
+- Benchmark padrão de sensibilidade `velocidade` (±15%), nos dois tipos, numa lista própria
+  (`CAMPOS_SENSIBILIDADE_CENARIOS`): a das variáveis da Proforma do Preliminar fica como estava.
+- A tela de benchmarks o mostra na seção de sensibilidade, como "Velocidade de vendas"; os
+  medidores o descartam com o motivo de sensibilidade.
+- Instância que já tinha benchmarks: o auto-semear só rodava com a lista vazia, então `velocidade`
+  nunca nasceria (achado P2 do App do Codex). A tela passa a semear SÓ `velocidade` quando ele
+  falta (`semeaduraNecessaria`), e `POST /benchmarks/semear` aceita `{ campos }` para isso — semear
+  tudo traria de volta indicador padrão apagado. Só na primeira carga da tela (achado seguinte do
+  App): a recarga depois de Remover não desfaz a remoção; na próxima abertura, ele volta com ±15%.
+- Teste existente alterado: as contagens de `benchmarksPadrao` (10 → 11 no Loteamento, 9 → 10 na
+  Incorporação), consequência do indicador novo aprovado pelo dono.
+
+## 2026-11-24 — Velocidade de vendas nos cenários: banco, API e tela (fatia 2 de 3)
+
+- `avancado_cenarios.velocidade_vendas_pct` (decimal(6,2), padrão 0), sem migração e sem mudar a
+  `versao`, pela regra do repositório. A API grava o campo (POST com 0 de padrão, PATCH) e recusa
+  fora de −90% a +500% com `400 VELOCIDADE_VENDAS_INVALIDA`; a duplicação de estudo o copia pela
+  mesma lista de campos. O motor aceita a mesma faixa (`VELOCIDADE_VENDAS_MIN`/`_MAX`).
+- Tela Cenários: terceiro controle (faixa do benchmark `velocidade`, ±15% sem ele, limitada à faixa
+  aceita), coluna Velocidade na tabela e no diálogo dos três cenários (o otimista acelera, o
+  pessimista desacelera), eixo fixo do gráfico pelos 8 cantos das três alavancas.
+- Testes existentes alterados, por consequência do desenho aprovado pelo dono: as chamadas de
+  `cenariosPadrao` ganharam a faixa de velocidade, e as expectativas dos casos de render ganharam a
+  coluna Velocidade.
+
+## 2026-11-24 — Velocidade de vendas nos cenários: o motor (fatia 1 de 3)
+
+- Definição do dono (opção B): velocidade +v vende `(1 + v)` vezes mais por mês, e o prazo de vendas
+  vira `prazo ÷ (1 + v)`, mantendo a forma da curva e o mês da primeira venda. `v > −100%`.
+- `curvaComVelocidade` (`frontend/fluxo-shared.ts`) reamostra o trecho ativo da curva mensal
+  (da primeira à última venda) pelo acumulado linear dentro do mês; o último mês fecha com o resto.
+  `aplicarCenario` a aplica a cada linha de receita quando `velocidadeVendasPct ≠ 0`; com 0 a linha
+  é a mesma, sem trocar a referência da curva.
+- A janela de vendas da curva de cenário (marca `janelaLivre`, só em memória) vai do início de
+  sempre até a ÚLTIMA venda (`janelaVendasDaCurva`), em `absorcaoMensal` e no horizonte de recebíveis
+  (`ultimoMesRecebivelLinha`). Medido sem isso: −50% descartava metade das vendas.
+- Sem tela nem schema nesta fatia: o campo só chega à tela na fatia 2. Ver a issue 971.
+
 ## 2026-11-24 — Criar um Avançado a partir de um Preliminar: o botão e o relatório na tela (fatia 3 de 4)
 
 - Entrega: botão **Criar estudo Avançado a partir deste** no cabeçalho do estudo (`frontend/tela-estudo.ts`),

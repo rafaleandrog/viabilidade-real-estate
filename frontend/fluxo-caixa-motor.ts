@@ -20,7 +20,7 @@ import {
   areaPrivativaTotalLinhas, resolverCustoTotal, totalConstrucaoCustos, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, eMarketing, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
-  mesRepasse, ultimoMesFunding,
+  mesRepasse, ultimoMesFunding, janelaVendasDaCurva, absorcaoComVelocidade,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte, type ImpostoReceita,
 } from './fluxo-shared.js';
 
@@ -2105,7 +2105,7 @@ export function consolidarCarteiraClientes(
  * Cobre o "pior caso" por SAFRA sem iterar mês a mês: como entrada e
  * parcelamento (fora de "ao longo da obra") têm deslocamento CONSTANTE a
  * partir do mês da venda, o pior caso é sempre a ÚLTIMA safra (`periodo.fim`
- * — o fim do Após-chaves). "Ao longo da obra" já é absoluto (ancorado no
+ * — o fim do Após-chaves; na curva de cenário, a última venda, #971). "Ao longo da obra" já é absoluto (ancorado no
  * Cronograma da Obra, não no mês da venda — #190/#191), então seu horizonte
  * não depende da safra.
  */
@@ -2116,10 +2116,10 @@ export function ultimoMesRecebivelLinha(
   // aba Viabilidade → Financeiro). Omitir vira TS2554, não silêncio.
   jurosTabelaAaEstudo: number,
 ): number {
-  // A última safra é o fim da janela Pós-chaves DESTE Grupo (1 a 12 meses).
+  // A última safra é o fim da janela Pós-chaves DESTE Grupo (1 a 12 meses) — ou a última venda da curva de cenário (#971).
   const periodo = periodoAbsorcao(cronograma, mesesPosChaves(linha?.absorcao));
   if (!periodo) return 0;
-  const ultimoMesVenda = periodo.fim;
+  const ultimoMesVenda = janelaVendasDaCurva(linha?.absorcao, periodo)!.fim;
   const fp = linha?.fluxo_pagamento ?? null;
   if (!fp) return ultimoMesVenda; // sem config → à vista no mês da venda (#190/#191 não se aplicam)
 
@@ -2677,14 +2677,14 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Parâmetros de um cenário: variações percentuais (deltas) aplicadas sobre a
- * configuração-base. `0` = cenário-base (sem alteração).
+ * Parâmetros de um cenário: variações percentuais (deltas) aplicadas sobre a configuração-base. `0` = cenário-base (sem alteração).
  *  - `precoVendaPct`: varia o preço/m² de TODAS as tipologias de receita.
  *  - `custoObraPct`: varia o orçamento das linhas de custo do grupo `obra`.
  */
 export interface CenarioParams {
   precoVendaPct: number;
   custoObraPct: number;
+  velocidadeVendasPct?: number; // #971: vende (1+v)× mais por mês, prazo ÷ (1+v) — `curvaComVelocidade`. Ausente = 0.
 }
 
 /**
@@ -2700,7 +2700,7 @@ export function aplicarCenario(config: FluxoConfig, params: CenarioParams): Flux
   return {
     ...config,
     linhasReceita: (config.linhasReceita ?? []).map((l) => ({
-      ...l,
+      ...l, ...absorcaoComVelocidade(l, config.cronograma ?? [], n(params?.velocidadeVendasPct)),
       tipologias: (l.tipologias ?? []).map((t: any) => ({ ...t, preco_m2: n(t?.preco_m2) * fPreco })),
     })),
     linhasCusto: (config.linhasCusto ?? []).map((c) => (
