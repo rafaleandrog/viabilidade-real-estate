@@ -162,6 +162,25 @@ export function deveRecarregarDataRoom(ativaAntes: boolean, ativaAgora: boolean,
   return !ativaAntes && ativaAgora && jaCarregou;
 }
 
+/**
+ * De que fontes cada categoria depende. Outros recebe das duas (tipo "outro" ou
+ * desconhecido do Apelo e categoria desconhecida do Empreendimento), então a
+ * falha de qualquer uma delas deixa Outros incompleta.
+ */
+export const FONTES_DA_CATEGORIA: Record<CategoriaDataRoom, OrigemDataRoom[]> = {
+  terreno: [],
+  juridico: [],
+  projeto: ['empreendimento'],
+  comercial: ['apelo'],
+  financeiro: [],
+  outros: ['empreendimento', 'apelo'],
+};
+
+/** A categoria depende de alguma fonte que não carregou. */
+export function categoriaIncompleta(c: CategoriaDataRoom, indisponiveis: FontesIndisponiveis): boolean {
+  return FONTES_DA_CATEGORIA[c].some((f) => indisponiveis[f] === true);
+}
+
 export function categoriaSemTipo(c: CategoriaDataRoom): boolean {
   return CATEGORIAS_SEM_TIPO.includes(c);
 }

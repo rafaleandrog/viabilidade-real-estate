@@ -1,9 +1,6 @@
 // Variação com a rota do Apelo falhando: o checklist do Comercial deve sair "não verificado".
-// Caso de render: a sub-aba Data room de Empreendimento no Avançado. Monta a
-// `viab-tela-avancado` (e não o componente solto) porque o que se prova aqui é
-// a FIAÇÃO — a sub-aba existe, o `case` de `_renderSubConteudo` monta o
-// `viab-data-room` — e o carregamento real das duas rotas (documentos do
-// empreendimento e fontes do apelo comercial, uma delas só de texto).
+// Monta a `viab-tela-avancado` em Empreendimento › Data room com a rota de
+// documentos do Empreendimento respondendo e a do Apelo Comercial devolvendo erro.
 
 import '../../tela-avancado.js';
 import { ESTUDO } from './dados.js';
@@ -13,10 +10,6 @@ const DOCS_EMPREENDIMENTO = [
   { id: 2, categoria: 'planta', nome_arquivo: 'planta-tipo.pdf', documento: 'd2', url: '/u/2', ordem: 1 },
 ];
 
-const DOCS_APELO = [
-  { id: 7, tipo_dado: 'mercado', nome_arquivo: 'mercado.pdf', documento: 'd7', texto_adicional: null },
-  { id: 8, tipo_dado: 'anuncios', nome_arquivo: null, documento: null, texto_adicional: 'Anúncios coletados na região' },
-];
 
 export const caso = {
   nome: 'data-room-falha',

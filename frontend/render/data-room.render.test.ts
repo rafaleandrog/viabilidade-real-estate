@@ -51,5 +51,6 @@ test('Data room: rota do Apelo falha -> checklist dela "não verificado", não "
   assert.ok(m!.checklist.some((t) => t.startsWith('✓ Planta')), 'a fonte que carregou segue verificada' + relato(a));
   assert.ok(m!.checklist.some((t) => t.includes('Render') && t.includes('pendente')), 'Render segue pendente' + relato(a));
   assert.ok(!m!.checklist.some((t) => t.includes('Mercado') && t.includes('pendente')), 'Mercado não é pendente' + relato(a));
-  assert.ok(m!.semTipo.some((t) => t.includes('Não foi possível carregar estes documentos')), 'categoria sem itens avisa a falha' + relato(a));
+  assert.equal(m!.semTipo.filter((t) => t.includes('Não foi possível carregar estes documentos')).length, 2,
+    'Comercial e Outros (que recebe do Apelo) avisam a falha' + relato(a));
 });

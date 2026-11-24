@@ -9,6 +9,7 @@ import {
   type CategoriaDataRoom,
   deveRecarregarDataRoom,
   respostaDaCargaVale,
+  categoriaIncompleta,
 } from './data-room.js';
 
 const total = (g: Record<CategoriaDataRoom, unknown[]>) =>
@@ -140,4 +141,14 @@ test('respostaDaCargaVale: só a carga mais recente do estudo atual atualiza a t
   assert.equal(respostaDaCargaVale(1, 2, 7, 7), false);  // superada, mesmo estudo: descartada
   assert.equal(respostaDaCargaVale(2, 2, 7, 8), false);  // estudo trocado: descartada
   assert.equal(respostaDaCargaVale(1, 2, 7, 8), false);
+});
+
+test('categoriaIncompleta: Outros depende das duas fontes; Projeto só do Empreendimento; Comercial só do Apelo', () => {
+  const apeloFora = { apelo: true };
+  assert.equal(categoriaIncompleta('outros', apeloFora), true);
+  assert.equal(categoriaIncompleta('comercial', apeloFora), true);
+  assert.equal(categoriaIncompleta('projeto', apeloFora), false);
+  assert.equal(categoriaIncompleta('outros', { empreendimento: true }), true);
+  assert.equal(categoriaIncompleta('terreno', { empreendimento: true, apelo: true }), false);
+  assert.equal(categoriaIncompleta('outros', {}), false);
 });
