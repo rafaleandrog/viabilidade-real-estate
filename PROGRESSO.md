@@ -17,6 +17,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   (`ultimoMesRecebivelLinha`). Medido sem isso: −50% descartava metade das vendas.
 - Sem tela nem schema nesta fatia: o campo só chega à tela na fatia 2. Ver a issue 971.
 
+## 2026-11-24 — Criar um Avançado a partir de um Preliminar: o botão e o relatório na tela (fatia 3 de 4)
+
+- Entrega: botão **Criar estudo Avançado a partir deste** no cabeçalho do estudo (`frontend/tela-estudo.ts`),
+  visível só num estudo que não é Avançado e a que o usuário pode editar (`podeCriarAvancado`, em
+  `frontend/relatorio-derivacao.ts`). Abre um `urbi-modal` de confirmação (o que vai, o que fica a
+  completar, o Preliminar não muda, a área aberta como referência), com carregando e erro da API num
+  `urbi-banner` de erro. Ao criar, navega para o estudo novo e mostra o relatório (alertas primeiro,
+  botão para fechar); recarregar a página não o mostra, e o aviso diz que ele não volta à tela (o texto fica gravado
+  no campo `notas` do estudo, lido só pela API). Com Premissas não salvas, o modal avisa e o Criar fica
+  desabilitado (`podeConfirmarCriacao`), porque a rota deriva do estudo gravado.
+- Cliente: `derivarAvancado` em `frontend/viabilidade-api.ts` (a contagem de funções do wrapper em
+  `frontend/api-caminho-relativo.test.ts` subiu de 82 para 83, depois de as asserções de caminho passarem).
+- Testes: `frontend/relatorio-derivacao.test.ts` (módulo, regra do botão e fiação lida do fonte) e quatro
+  casos de render em Chromium (`frontend/render/estudo-derivar-avancado.render.test.ts`): botão para o
+  editor, sem botão para o leitor, modal e relatório. Guia: `docs/preliminar.md` e `docs/README.md`.
+- As quatro fatias da issue estão entregues. **Falta:** o teste do dono na instância Pinguim.
 ## 2026-11-24 — O tipo do estudo não muda mais depois de criado (fatia 4 de 4 da issue 833)
 
 - Decisão do dono (24/11): `PATCH /estudos/:id` recusa com `422 TIPO_TRAVADO` um `tipo_empreendimento`

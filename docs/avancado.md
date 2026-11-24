@@ -351,7 +351,7 @@ levado e como — e **o que não foi ou mudou de valor**: cada diferença entre 
 o do Avançado (por arredondamento das áreas), cada custo percentual cuja base própria
 do Avançado dá outro valor, cada permuta que não coube em unidades inteiras, a área aberta mantida como referência, sem
 alerta, e a permuta financeira sem VGV vendável. Os itens com `alerta: true` são os que pedem
-conferência. O mesmo relatório é gravado nas notas do estudo novo, depois das notas da origem. Ficam de
+conferência. O mesmo relatório é gravado no campo `notas` do estudo novo, depois das notas da origem; a tela não exibe esse campo, então ele só é lido pela API. Ficam de
 fora, e o relatório diz: documentos, membros, cenários de sensibilidade, a cascata de áreas do
 Loteamento, a data de início (quando o Preliminar não tem) e os juros de tabela (0% até preencher).
 

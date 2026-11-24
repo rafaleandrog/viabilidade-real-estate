@@ -8,8 +8,12 @@ import './tela-preliminar.js';
 import './tela-avancado.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus, atualizarEstudo,
-  listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
+  listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios, derivarAvancado,
 } from './viabilidade-api.js';
+import {
+  guardarRelatorio, consumirRelatorio, ordenarAlertasPrimeiro, resumirRelatorio, podeCriarAvancado, podeConfirmarCriacao,
+  type ItemRelatorioDerivacao,
+} from './relatorio-derivacao.js';
 
 import { premissasNaoSalvas, reaplicarRascunho, estudoDepoisDaRecarga, avisarSaidaSeNaoSalvo, transicaoDescartaRascunho } from './premissas-rascunho.js';
 import { SequenciaDeCargas } from './estudo-carga.js';
@@ -56,6 +60,12 @@ export class ViabTelaEstudo extends LitElement {
   @state() private editarNome = '';
   @state() private editarErro = '';
   @state() private salvandoNome = false;
+  // Criar um estudo Avançado a partir deste Preliminar: modal de confirmação e, no estudo NOVO, o
+  // relatório da derivação (guardado por `guardarRelatorio` e consumido uma vez em `_carregar`).
+  @state() private derivarAberto = false;
+  @state() private derivando = false;
+  @state() private derivarErro = '';
+  @state() private relatorioDerivacao: ItemRelatorioDerivacao[] | null = null;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -67,6 +77,11 @@ export class ViabTelaEstudo extends LitElement {
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
     .apoio-nome { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec); }
+    .derivar-lista { margin: 4px 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+    .relatorio-derivacao { margin-bottom: 16px; }
+    .relatorio-itens { margin: 8px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+    .relatorio-alerta { font-weight: 600; }
+    .relatorio-nota { color: var(--cor-texto-sec); }
   `];
 
   connectedCallback() {
@@ -93,7 +108,10 @@ export class ViabTelaEstudo extends LitElement {
   };
 
   updated(changed: Map<string, unknown>) {
-    if (changed.has('estudoId')) this._carregar();
+    if (changed.has('estudoId')) {
+      this.relatorioDerivacao = null;
+      this._carregar();
+    }
   }
 
   private _cargas = new SequenciaDeCargas();
@@ -119,6 +137,10 @@ export class ViabTelaEstudo extends LitElement {
           this.estudo = estudoDepoisDaRecarga(estudo, this.estudo, this._estudoSalvo);
           this._estudoSalvo = estudo;
           this.membros = estudo.membros || [];
+          // Estudo recém-criado por "Criar estudo Avançado a partir deste": o relatório vem de
+          // `guardarRelatorio` e só a primeira abertura o mostra.
+          const relatorio = consumirRelatorio(id);
+          if (relatorio) this.relatorioDerivacao = relatorio;
         }
       } catch (e) {
         console.error('Erro ao carregar estudo:', e);
@@ -173,6 +195,8 @@ export class ViabTelaEstudo extends LitElement {
               title="Renomear estudo"></urbi-botao>` : nothing}
         </div>
 
+        ${this._renderRelatorioDerivacao()}
+
         ${this.estudo.nivel_analise === 'avancado'
           ? html`
             <viab-tela-avancado
@@ -202,6 +226,7 @@ export class ViabTelaEstudo extends LitElement {
       ${this.mostrarMembros ? this._renderMembros(p) : nothing}
       ${this.confirmarStatus ? this._renderConfirmStatus() : nothing}
       ${this.editarAlvo ? this._renderEditarNome() : nothing}
+      ${this.derivarAberto ? this._renderDerivarAvancado() : nothing}
     `;
   }
 
@@ -220,11 +245,124 @@ export class ViabTelaEstudo extends LitElement {
         ${p.podeAprovar && st === 'arquivado'
           ? html`<urbi-botao pequeno variante="secundario" @click=${() => this._status('rascunho')}>Reabrir</urbi-botao>`
           : nothing}
+        ${podeCriarAvancado(this.estudo, p)
+          ? html`<urbi-botao pequeno variante="secundario" icone="fa-solid fa-diagram-project"
+              @click=${this._abrirDerivar}>Criar estudo Avançado a partir deste</urbi-botao>`
+          : nothing}
         <urbi-botao pequeno variante="secundario" icone="fa-solid fa-users"
           @click=${() => { this.mostrarMembros = true; this._carregarUsuarios(); }}>Membros</urbi-botao>
       </div>
     `;
   }
+
+  /** Modal de confirmação de "Criar estudo Avançado a partir deste" (só Preliminar, só editor). */
+  private _renderDerivarAvancado(): TemplateResult {
+    const naoSalvas = premissasNaoSalvas(this.estudo, this._estudoSalvo);
+    return html`
+      <urbi-modal title="Criar estudo Avançado a partir deste" maxWidth="560px"
+        @urbi-modal:close=${this._fecharDerivar}>
+        <div class="form-campos">
+          <div>
+            <strong>O que vai para o Avançado</strong>
+            <ul class="derivar-lista">
+              <li>O catálogo de produtos vira tipologias, com um grupo de receita.</li>
+              <li>Os custos das Premissas, o imposto e a data de início.</li>
+              <li>A análise de mercado e o apelo comercial.</li>
+            </ul>
+          </div>
+          <div>
+            <strong>O que fica a completar no Avançado</strong>
+            <ul class="derivar-lista">
+              <li>Cronograma, absorção e plano de pagamento.</li>
+              <li>Juros de tabela, funding e cenários.</li>
+            </ul>
+          </div>
+          <div class="apoio-nome">
+            Este estudo Preliminar não muda. A área privativa aberta fica como referência: ela continua
+            registrada nas Premissas e não entra no valor das tipologias do Avançado.
+          </div>
+
+          ${naoSalvas ? html`<urbi-banner variante="alerta" class="derivar-nao-salvo">
+            Há alterações não salvas nas Premissas. O estudo Avançado é criado a partir do que está SALVO,
+            e essas alterações ficariam de fora. Salve as Premissas antes de criar.
+          </urbi-banner>` : nothing}
+          ${this.derivarErro ? html`<urbi-banner variante="erro">${this.derivarErro}</urbi-banner>` : nothing}
+
+          <div class="form-acoes">
+            <urbi-botao variante="fantasma" ?desabilitado=${this.derivando}
+              @click=${this._fecharDerivar}>Cancelar</urbi-botao>
+            <urbi-botao variante="primario"
+              ?carregando=${this.derivando}
+              ?desabilitado=${!podeConfirmarCriacao(naoSalvas, this.derivando)}
+              @click=${this._criarAvancado}>Criar</urbi-botao>
+          </div>
+        </div>
+      </urbi-modal>
+    `;
+  }
+
+  /** Relatório da derivação, no estudo NOVO: alertas primeiro, com botão para fechar. */
+  private _renderRelatorioDerivacao(): TemplateResult | typeof nothing {
+    const itens = this.relatorioDerivacao;
+    if (!itens || itens.length === 0) return nothing;
+    const { total, alertas } = resumirRelatorio(itens);
+    return html`
+      <div class="relatorio-derivacao">
+        <urbi-banner variante=${alertas > 0 ? 'alerta' : 'info'}>
+          <strong>Estudo criado a partir de um Preliminar:</strong>
+          ${total} ${total === 1 ? 'item' : 'itens'} no relatório,
+          ${alertas} ${alertas === 1 ? 'alerta' : 'alertas'}.
+          <ul class="relatorio-itens">
+            ${ordenarAlertasPrimeiro(itens).map((i) => html`
+              <li>
+                ${i.alerta ? html`<span class="relatorio-alerta">Alerta: </span>` : nothing}
+                <strong>${i.origem}</strong> → ${i.destino}: ${i.regra}.
+                ${i.nota ? html`<span class="relatorio-nota">${i.nota}</span>` : nothing}
+              </li>`)}
+          </ul>
+          <div class="relatorio-nota">
+            Este relatório aparece só agora, ao abrir o estudo novo: depois de fechado, ou ao recarregar a
+            página, ele não volta à tela.
+          </div>
+          <urbi-botao slot="acao" pequeno variante="fantasma"
+            @click=${() => { this.relatorioDerivacao = null; }}>Entendi, fechar</urbi-botao>
+        </urbi-banner>
+      </div>
+    `;
+  }
+
+  private _abrirDerivar = () => {
+    this.derivarErro = '';
+    this.derivarAberto = true;
+  };
+
+  private _fecharDerivar = () => {
+    if (this.derivando) return;
+    this.derivarAberto = false;
+  };
+
+  private _criarAvancado = async () => {
+    if (!podeConfirmarCriacao(premissasNaoSalvas(this.estudo, this._estudoSalvo), this.derivando)) return;
+    this.derivando = true;
+    this.derivarErro = '';
+    try {
+      const res = await derivarAvancado(this.estudoId);
+      if (res?.erro) { this.derivarErro = res.mensagem || 'Erro ao criar o estudo Avançado'; return; }
+      const novoId = Number(res?.estudo?.id);
+      if (!Number.isFinite(novoId) || novoId <= 0) {
+        this.derivarErro = 'O servidor não devolveu o estudo criado.';
+        return;
+      }
+      guardarRelatorio(novoId, res.relatorio);
+      this.derivarAberto = false;
+      urbiVerso.notificar('Estudo Avançado criado (rascunho).', 'sucesso');
+      urbiVerso.navegarSub(`/detalhe/${novoId}`);
+    } catch (e: any) {
+      this.derivarErro = e?.message || 'Erro ao criar o estudo Avançado';
+    } finally {
+      this.derivando = false;
+    }
+  };
 
   private _renderMembros(p: any): TemplateResult {
     // As regras moram em `membros-regras.ts`, as mesmas que o servidor aplica

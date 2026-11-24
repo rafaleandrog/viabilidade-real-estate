@@ -65,7 +65,9 @@ por m² recalculados a cada edição. Em **Resultado** ficam a **Proforma** comp
 **Cenários** — a sensibilidade Bear, Base e Bull da variável escolhida, em tabela e em faixas —
 com exportação para PDF e Excel. **Gráficos** traz a faixa de KPIs, a cascata do resultado, a
 cadeia de áreas e os indicadores contra benchmark. **Análise de Mercado** é a avaliação qualitativa
-do imóvel por IA, a partir de documentos anexados. Ver [Estudo Preliminar](preliminar).
+do imóvel por IA, a partir de documentos anexados. Para levar o estudo adiante, o botão **Criar estudo
+Avançado a partir deste** gera um Avançado novo, pré-preenchido, sem alterar o Preliminar. Ver
+[Estudo Preliminar](preliminar).
 
 ### Estudo Avançado
 
