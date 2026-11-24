@@ -156,3 +156,12 @@ export function deveRecarregarDataRoom(ativaAntes: boolean, ativaAgora: boolean,
 export function categoriaSemTipo(c: CategoriaDataRoom): boolean {
   return CATEGORIAS_SEM_TIPO.includes(c);
 }
+
+/** A resposta de uma carga só vale se for a mais recente (`seq === seqAtual`) e o estudo
+ *  não tiver trocado. Duas cargas do mesmo estudo podem se sobrepor; a mais velha, ao
+ *  terminar por último, não pode sobrescrever a lista nova. */
+export function respostaDaCargaVale(
+  seq: number, seqAtual: number, idPedido: number | undefined, idAtual: number | undefined,
+): boolean {
+  return seq === seqAtual && idPedido === idAtual;
+}

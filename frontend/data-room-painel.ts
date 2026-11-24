@@ -2,9 +2,9 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { buscarApelo, listarDocumentosEmpreendimento } from './viabilidade-api.js';
-import { respostaAindaVale, precisaCarregar } from './viab-imagem-principal.js';
+import { precisaCarregar } from './viab-imagem-principal.js';
 import {
-  agruparDataRoom, categoriaSemTipo, CATEGORIAS_DATA_ROOM, checklistDataRoom, deveRecarregarDataRoom,
+  agruparDataRoom, categoriaSemTipo, CATEGORIAS_DATA_ROOM, checklistDataRoom, deveRecarregarDataRoom, respostaDaCargaVale,
   type CategoriaDataRoom, type ItemDataRoom,
 } from './data-room.js';
 
@@ -23,6 +23,10 @@ export class ViabDataRoom extends LitElement {
   @state() private avisos: string[] = [];
   private idCarregado: number | null = null;
   private ativaAntes = false;
+  /** Contador de requisição: só a carga mais recente desta instância atualiza a tela. */
+  private seqCarga = 0;
+  /** true depois da primeira carga terminar (mesmo com falha): recarga não pisca o loading. */
+  private cargaConcluida = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     :host { display: block; }
@@ -43,6 +47,7 @@ export class ViabDataRoom extends LitElement {
     this.ativaAntes = this.ativa;
     if (precisaCarregar(this.estudo?.id, this.idCarregado)) {
       this.idCarregado = this.estudo.id;
+      this.cargaConcluida = false;
       this._carregar();
     } else if (voltou && this.estudo?.id != null) {
       this._carregar();
@@ -51,13 +56,15 @@ export class ViabDataRoom extends LitElement {
 
   private async _carregar() {
     const id = this.estudo?.id;
-    // Recarga ao voltar à sub-aba mantém a lista na tela (sem piscar o loading).
-    if (this.docsEmpreendimento === null && this.docsApelo === null) this.carregando = true;
+    const seq = ++this.seqCarga;
+    // Recarga depois de uma carga concluída mantém a lista na tela (sem piscar o loading).
+    if (!this.cargaConcluida) this.carregando = true;
     const [emp, ape] = await Promise.allSettled([
       listarDocumentosEmpreendimento(id),
       buscarApelo(id),
     ]);
-    if (!respostaAindaVale(id, this.estudo?.id)) return; // estudo trocou enquanto isto estava em voo
+    // Descarta se o estudo trocou ou se uma carga mais nova do mesmo estudo já foi disparada.
+    if (!respostaDaCargaVale(seq, this.seqCarga, id, this.estudo?.id)) return;
     const avisos: string[] = [];
     // O wrapper da API devolve `{ erro }` em vez de lançar: resposta com erro é falha, não lista vazia.
     if (emp.status === 'fulfilled' && !emp.value?.erro) this.docsEmpreendimento = emp.value?.dados || [];
@@ -65,6 +72,7 @@ export class ViabDataRoom extends LitElement {
     if (ape.status === 'fulfilled' && !ape.value?.erro) this.docsApelo = ape.value?.documentos || [];
     else { this.docsApelo = null; avisos.push('Não foi possível carregar as fontes do Apelo Comercial.'); }
     this.avisos = avisos;
+    this.cargaConcluida = true;
     this.carregando = false;
   }
 

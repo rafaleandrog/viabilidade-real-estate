@@ -8,6 +8,7 @@ import {
   checklistDataRoom,
   type CategoriaDataRoom,
   deveRecarregarDataRoom,
+  respostaDaCargaVale,
 } from './data-room.js';
 
 const total = (g: Record<CategoriaDataRoom, unknown[]>) =>
@@ -119,4 +120,11 @@ test('deveRecarregarDataRoom: só na volta (inativa -> ativa) com carga prévia'
   assert.equal(deveRecarregarDataRoom(true, true, true), false);   // já estava ativa
   assert.equal(deveRecarregarDataRoom(true, false, true), false);  // saindo
   assert.equal(deveRecarregarDataRoom(false, false, true), false);
+});
+
+test('respostaDaCargaVale: só a carga mais recente do estudo atual atualiza a tela', () => {
+  assert.equal(respostaDaCargaVale(2, 2, 7, 7), true);   // resposta atual aceita
+  assert.equal(respostaDaCargaVale(1, 2, 7, 7), false);  // superada, mesmo estudo: descartada
+  assert.equal(respostaDaCargaVale(2, 2, 7, 8), false);  // estudo trocado: descartada
+  assert.equal(respostaDaCargaVale(1, 2, 7, 8), false);
 });
