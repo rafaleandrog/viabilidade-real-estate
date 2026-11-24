@@ -36,7 +36,7 @@ resultado ou indicador nenhum. Continuam no schema porque removê-las é mudanç
 | Tabela | O que guarda |
 |---|---|
 | `avancado_cronograma` | Os eventos do cronograma por estudo (planejamento, pré-lançamento, lançamento, obra, pós-obra) com `inicio_mes` a partir de zero e `duracao_meses`. Único por `[estudo_id, evento]`. |
-| `avancado_tipologias` | O catálogo de tipologias do estudo: nome, tipo de unidade, área privativa (fechada e aberta), dormitórios, vagas, `quantidade` (total de unidades) e `preco_m2` de referência. Desacoplado da receita. A coluna `unidades_permutadas` continua no schema, mas o app não a lê nem a escreve: a fonte da permuta física do Avançado é a linha de custo Preço / Permuta física. |
+| `avancado_tipologias` | O catálogo de tipologias do estudo: nome, tipo de unidade, área privativa (fechada e aberta; a derivação de um Preliminar deixa a aberta em zero, porque ela é só referência), dormitórios, vagas, `quantidade` (total de unidades) e `preco_m2` de referência. Desacoplado da receita. A coluna `unidades_permutadas` continua no schema, mas o app não a lê nem a escreve: a fonte da permuta física do Avançado é a linha de custo Preço / Permuta física. |
 | `avancado_fases` | A fase de vendas, dona da **absorção** (`absorcao` JSON) e do **fluxo de pagamento** (`fluxo_pagamento` JSON). |
 | `avancado_alocacoes` | A alocação de venda: `unidades` de uma `tipologia_id` numa `fase_id`, a um `preco_m2`. Pode haver várias por tipologia. A trava de saldo vale no estudo inteiro: Σ unidades alocadas da tipologia em todas as fases ≤ `quantidade` do catálogo. Trocar a tipologia de uma alocação segue as regras de criá-la: o saldo conferido é o da tipologia nova, e o `preco_m2` passa a ser o dela, salvo preço informado na mesma edição. A permuta física sai de dentro dessas alocações: Σ unidades em permuta física da tipologia ≤ Σ unidades alocadas, conferido ao gravar a permuta e ao reduzir ou excluir alocação ou grupo. |
 | `avancado_linhas_custo` | As linhas de custo, nos cinco grupos (terreno, obra, diretos, indireto, financeiro), com unidade de orçamento, valor canônico e ancoragem ao cronograma. |
@@ -142,7 +142,7 @@ membro.
 
 As referências entre as linhas novas são montadas pelos ids criados: `tipologia_id` e `fase_id` das
 alocações e `permuta_tipologia_id` das linhas de permuta física apontam para as linhas do estudo novo,
-nunca para o Preliminar. O que mudou de valor na passagem — o VGV bruto por área aberta e por
+nunca para o Preliminar. O que mudou de valor na passagem — o VGV bruto por
 arredondamento de área, e os custos percentuais cuja base é outra no Avançado — vai no relatório da
 resposta e nas notas do estudo novo.
 

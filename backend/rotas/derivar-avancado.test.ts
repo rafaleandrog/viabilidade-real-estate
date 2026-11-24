@@ -9,6 +9,7 @@ import {
 } from './derivar-avancado.js';
 import { cronogramaPadrao, recalcularTravados } from './avancado.js';
 import { calcularFluxo } from '../../frontend/fluxo-caixa-motor.js';
+import { calcularProforma } from '../../frontend/proforma.js';
 import { validarReconciliacaoCamadas } from '../../frontend/fluxo-invariantes.js';
 import esquemaApp from '../../schema.json';
 
@@ -103,14 +104,13 @@ const unica = (plano: PlanoDerivacao, cat: string, sub?: string) => {
   return r[0];
 };
 const identidadeFecha = (c: PlanoDerivacao['conferencia']): boolean =>
-  centavos(c.vgvAvancado) - centavos(c.vgvPreliminarBruto) === centavos(c.diferencaAreaAberta) + centavos(c.diferencaQuantizacao);
+  centavos(c.vgvAvancado) - centavos(c.vgvPreliminarBruto) === centavos(c.diferencaQuantizacao);
 
 // ── 1 ──
 test('1: Incorporação R+NR sem área aberta — VGV igual ao centavo, tipologias, alocações e obrigatórias', () => {
   const plano = planejarDerivacao(estudoInc(), catalogoBase(), OPTS);
   assert.equal(plano.conferencia.vgvPreliminarBruto, 63_000_000);
   assert.equal(plano.conferencia.vgvAvancado, plano.conferencia.vgvPreliminarBruto);
-  assert.equal(plano.conferencia.diferencaAreaAberta, 0);
   assert.equal(plano.conferencia.diferencaQuantizacao, 0);
 
   assert.deepEqual(plano.tipologias.map((t) => t.tipo_unidade), ['apartamento', 'apartamento', 'loja']);
@@ -138,28 +138,41 @@ test('1: Incorporação R+NR sem área aberta — VGV igual ao centavo, tipologi
 });
 
 // ── 2 ──
-test('2: área aberta — identidade das diferenças ao centavo e item de relatório', () => {
+test('2: área aberta é só referência — tipologias com aberta 0, VGV igual ao centavo, item informativo', () => {
   const plano = planejarDerivacao(estudoInc({ area_pvt_r_aberta: '600.00' }), catalogoBase(), OPTS);
-  assert.equal(plano.conferencia.diferencaAreaAberta, 5_999_000);
+  assert.ok(plano.tipologias.every((t) => t.area_privativa_aberta_m2 === 0));
+  assert.equal(plano.conferencia.vgvAvancado, plano.conferencia.vgvPreliminarBruto);
   assert.ok(identidadeFecha(plano.conferencia));
-  assert.deepEqual(plano.tipologias.map((t) => t.area_privativa_aberta_m2), [13.33, 20, 0]);
-  const item = plano.relatorio.find((r) => /Área privativa aberta residencial/.test(r.origem) && r.destino.includes('área privativa aberta'));
+  const item = plano.relatorio.find((r) => /Área privativa aberta/.test(r.origem));
   assert.ok(item, 'a área aberta precisa de item de relatório');
-  assert.ok(plano.relatorio.some((r) => r.origem === 'VGV bruto' && r.alerta === true && /área aberta/.test(r.regra)),
-    'o VGV maior por causa da área aberta é declarado, nunca "igual"');
+  assert.equal(item!.destino, 'Premissas do estudo');
+  assert.match(item!.regra, /informação de referência/);
+  assert.notEqual(item!.alerta, true, 'o item é informativo, sem alerta');
+  assert.ok(!plano.relatorio.some((r) => r.origem === 'VGV bruto'), 'não há diferença de VGV a declarar');
+  assert.equal(Number(plano.copiaEstudo.area_pvt_r_aberta), 600, 'a área aberta continua nos dados do estudo');
 });
 
-test('2b: família com área aberta e sem tipologia — alerta, nada é rateado', () => {
-  const soResidencial = catalogoBase().slice(0, 2);
-  const plano = planejarDerivacao(
+test('2b: sem área aberta, nenhum item de área aberta; só no NR também vira item informativo', () => {
+  const sem = planejarDerivacao(estudoInc(), catalogoBase(), OPTS);
+  assert.ok(!sem.relatorio.some((r) => /Área privativa aberta/.test(r.origem)));
+  const soNr = planejarDerivacao(
     estudoInc({ area_pvt_nr_aberta: '100.00', area_pvt_r_fechada: '4500.00', area_pvt_nr_fechada: '0.00' }),
-    soResidencial, OPTS,
+    catalogoBase().slice(0, 2), OPTS,
   );
-  const alerta = plano.relatorio.find((r) => r.alerta === true && /não residencial/.test(r.origem));
-  assert.ok(alerta, 'área aberta sem tipologia na família tem de virar alerta');
-  assert.ok(/não a representa/.test(alerta!.nota ?? ''));
-  assert.equal(plano.conferencia.diferencaAreaAberta, 0);
-  assert.ok(plano.tipologias.every((t) => t.area_privativa_aberta_m2 === 0));
+  const item = soNr.relatorio.find((r) => /Área privativa aberta/.test(r.origem));
+  assert.ok(item);
+  assert.notEqual(item!.alerta, true);
+  assert.ok(soNr.tipologias.every((t) => t.area_privativa_aberta_m2 === 0));
+});
+
+test('2c: Construção com área aberta sai em R$ igual ao Preliminar e o relatório explica a base', () => {
+  const estudo = estudoInc({ area_pvt_r_aberta: '600.00' });
+  const p = calcularProforma({ ...estudo, nivel_analise: 'preliminar', produtos: catalogoBase() } as any);
+  const plano = planejarDerivacao(estudo, catalogoBase(), OPTS);
+  const c = unica(plano, 'Construção');
+  assert.equal(c.orcamento_unidade, 'rs');
+  assert.equal(c.orcamento_valor, p.construcao);
+  assert.ok(plano.relatorio.some((r) => r.alerta === true && /área privativa aberta/.test(r.nota ?? '')));
 });
 
 // ── 3 ──
@@ -375,7 +388,7 @@ test('12: equivalência com o motor — o VGV e o VGV vendável que o motor publ
   const r = calcularFluxo(configDoPlano(estudo, plano));
 
   assert.equal(r.vgvTotal, plano.conferencia.vgvAvancado);
-  // 3 unidades do 1º produto saem da venda: 3 × (100 + 13,33) m² × R$ 10.000.
+  // 3 unidades do 1º produto saem da venda: 3 × 100 m² × R$ 10.000 (a área aberta não entra).
   const t0 = plano.tipologias[0];
   const permutado = Math.round(3 * (t0.area_privativa_m2 + t0.area_privativa_aberta_m2) * t0.preco_m2 * 100) / 100;
   assert.equal(r.vgvPermutaFisica, permutado);

@@ -304,8 +304,9 @@ O que a rota leva:
 - as colunas do estudo (menos as de permuta física, que não viajam), o catálogo de produtos, a análise
   de mercado, o apelo comercial e os imóveis vinculados, como na duplicação;
 - **uma tipologia por produto** do catálogo efetivo (`apartamento` ou `loja` na Incorporação, `lote` no
-  Loteamento), com a área por unidade em 2 casas e a área aberta rateada por unidade, proporcional à
-  área fechada de cada produto da família;
+  Loteamento), com a área por unidade em 2 casas. A área privativa aberta é só informação de referência: não
+  entra no valor das tipologias (todas nascem com área aberta zero) e continua registrada nas
+  Premissas do estudo;
 - **um grupo de receita** com 100% das unidades e o plano de absorção e de pagamento com que um grupo
   novo nasce, mais o cronograma padrão do Avançado;
 - as **linhas de Custos** equivalentes aos custos do Preliminar, com a unidade de cada uma: R$ para o
@@ -321,9 +322,9 @@ O que a rota leva:
 
 O `relatorio` é a lista de `{ origem, destino, regra, nota?, alerta? }` que diz, em português, o que foi
 levado e como — e **o que não foi ou mudou de valor**: cada diferença entre o VGV bruto do Preliminar e
-o do Avançado (por área aberta e por arredondamento das áreas), cada custo percentual cuja base própria
-do Avançado dá outro valor, cada permuta que não coube em unidades inteiras, a área aberta sem produto
-para recebê-la e a permuta financeira sem VGV vendável. Os itens com `alerta: true` são os que pedem
+o do Avançado (por arredondamento das áreas), cada custo percentual cuja base própria
+do Avançado dá outro valor, cada permuta que não coube em unidades inteiras, a área aberta mantida como referência, sem
+alerta, e a permuta financeira sem VGV vendável. Os itens com `alerta: true` são os que pedem
 conferência. O mesmo relatório é gravado nas notas do estudo novo, depois das notas da origem. Ficam de
 fora, e o relatório diz: documentos, membros, cenários de sensibilidade, a cascata de áreas do
 Loteamento, a data de início (quando o Preliminar não tem) e os juros de tabela (0% até preencher).

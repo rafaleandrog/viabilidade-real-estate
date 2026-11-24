@@ -12,8 +12,8 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
   vez); `executarDerivacao` grava tudo numa transação, na ordem das dependências, e vincula o criador
   como editor. Inscrição em eventos e evento `estudo_criado` saem depois do commit. O Preliminar não é
   alterado.
-- A conferência do VGV bruto fecha ao centavo: a diferença entre o Avançado e o Preliminar é a soma de
-  `diferencaAreaAberta` e `diferencaQuantizacao`, e cada uma, quando não é zero, vira item do relatório
+- A conferência do VGV bruto fecha ao centavo: a diferença entre o Avançado e o Preliminar é só
+  `diferencaQuantizacao` (arredondamento das áreas), que, quando não é zero, vira item do relatório
   (nunca um "igual" que não é). Percentuais cuja base própria do Avançado dá outro valor também são
   declarados, com os dois valores.
 - Testes em `backend/rotas/derivar-avancado.test.ts`: o plano item a item, a equivalência com

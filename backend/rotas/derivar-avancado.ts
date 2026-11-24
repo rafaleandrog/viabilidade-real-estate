@@ -100,7 +100,6 @@ export interface CustoPlanejado {
 export interface ConferenciaVgv {
   vgvPreliminarBruto: number;
   vgvAvancado: number;
-  diferencaAreaAberta: number;
   diferencaQuantizacao: number;
 }
 
@@ -206,30 +205,14 @@ export function planejarDerivacao(
     };
   });
 
-  // Área aberta: rateada por unidade, proporcional à área fechada da família.
+  // Área aberta: informação de referência. Não entra no valor das tipologias (todas nascem com
+  // aberta 0): continua registrada nas Premissas do estudo e o relatório diz isso.
   if (!lot) {
-    const abertaPorFamilia: Record<Familia, number> = {
-      R: Math.max(0, n(estudo.area_pvt_r_aberta)),
-      NR: Math.max(0, n(estudo.area_pvt_nr_aberta)),
-    };
-    const rotuloFamilia: Record<Familia, string> = { R: 'residencial', NR: 'não residencial' };
-    for (const fam of ['R', 'NR'] as Familia[]) {
-      const aberta = abertaPorFamilia[fam];
-      if (aberta <= 0) continue;
-      const indices = tipologias.map((_, i) => i).filter((i) => familias[i] === fam);
-      const base = indices.reduce((s, i) => s + tipologias[i].area_privativa_m2 * tipologias[i].quantidade, 0);
-      const origem = `Área privativa aberta ${rotuloFamilia[fam]} (${m2txt(aberta)})`;
-      if (indices.length === 0 || base <= 0) {
-        item(origem, 'Tipologias › área privativa aberta', 'não levada',
-          'Não há produto desta família no catálogo para receber a área aberta; o Avançado não a representa.', true);
-        continue;
-      }
-      for (const i of indices) {
-        tipologias[i].area_privativa_aberta_m2 = round2(aberta * tipologias[i].area_privativa_m2 / base);
-      }
-      item(origem, 'Tipologias › área privativa aberta',
-        'rateada por unidade, proporcional à área fechada de cada produto',
-        'No Avançado a área aberta é valorizada ao mesmo preço da fechada; o Preliminar não a valoriza.');
+    const aberta = Math.max(0, n(estudo.area_pvt_r_aberta)) + Math.max(0, n(estudo.area_pvt_nr_aberta));
+    if (aberta > 0) {
+      item(`Área privativa aberta (${m2txt(aberta)})`, 'Premissas do estudo',
+        'mantida como informação de referência',
+        'A área aberta não entra no valor das tipologias do Avançado e continua registrada nos dados do estudo.');
     }
   }
 
@@ -249,14 +232,8 @@ export function planejarDerivacao(
   const tipsMotor = tipologias.map((t, i) => ({ ...t, id: i + 1, tipologia_id: i + 1 }));
   const vgvAvancado = round2(tipsMotor.reduce((s, t) => s + vgvTipologia(t), 0));
   const vgvPreliminarBruto = round2(vgvBrutoDeProforma(p));
-  const diferencaAreaAberta = round2(tipologias.reduce((s, t) => s + t.quantidade * t.area_privativa_aberta_m2 * t.preco_m2, 0));
-  const diferencaQuantizacao = round2(vgvAvancado - vgvPreliminarBruto - diferencaAreaAberta);
-  const conferencia: ConferenciaVgv = { vgvPreliminarBruto, vgvAvancado, diferencaAreaAberta, diferencaQuantizacao };
-  if (centavos(diferencaAreaAberta) !== 0) {
-    item('VGV bruto', 'Receitas › VGV total',
-      `a área aberta soma ${brl(diferencaAreaAberta)} ao VGV`,
-      `Preliminar ${brl(vgvPreliminarBruto)}; Avançado ${brl(vgvAvancado)}.`, true);
-  }
+  const diferencaQuantizacao = round2(vgvAvancado - vgvPreliminarBruto);
+  const conferencia: ConferenciaVgv = { vgvPreliminarBruto, vgvAvancado, diferencaQuantizacao };
   if (centavos(diferencaQuantizacao) !== 0) {
     item('VGV bruto', 'Receitas › VGV total',
       `diferença de ${brl(diferencaQuantizacao)} por arredondamento das áreas a 2 casas`,
@@ -391,7 +368,7 @@ export function planejarDerivacao(
     if (unitario > 0) {
       const alt = round2(unitario * base);
       item(origem, destino, `levado em R$ (${brl(efetivo)})`,
-        `${brl(unitario)}/m² × ${m2txt(base)} do Avançado daria ${brl(alt)}; para não mudar o custo, o valor do Preliminar foi mantido em R$.`, true);
+        `${brl(unitario)}/m² × ${m2txt(base)} do Avançado daria ${brl(alt)}; para não mudar o custo, o valor do Preliminar foi mantido em R$.${unidade === 'rs_m2_priv' && (n(estudo.area_pvt_r_aberta) > 0 || n(estudo.area_pvt_nr_aberta) > 0) ? ' A base do Preliminar inclui a área privativa aberta, que não entra nas tipologias do Avançado.' : ''}`, true);
     }
     return emReais(g, cat, undefined, evento, efetivo, origem, destino);
   };
