@@ -425,14 +425,14 @@ export class ViabTelaCenarios extends LitElement {
     // KPIs (VPL/TIR/Payback/Exposição) seguem lendo o cálculo mensal, mesma
     // convenção de tela-fluxo-ver.ts.
     const periodos = this._periodos(Math.max(base.prazo, cenario.prazo));
-    const exibBase = periodos ? agregarFluxoPorPeriodos(base, periodos) : base;
-    const exibCenario = periodos ? agregarFluxoPorPeriodos(cenario, periodos) : cenario;
+    const periodosCenario = this._periodos(cenario.prazo); // #971: a tabela agrega pelo PRÓPRIO prazo (velocidade + encurta o cenário)
+    const exibCenario = periodosCenario ? agregarFluxoPorPeriodos(cenario, periodosCenario) : cenario;
     // #595: eixo e séries do card de comparação saem de uma função PURA
     // (`comparacaoCenario`), e não montados no template. Duas razões: o
     // alinhamento das duas séries ao eixo vira coisa testável (era ele que
     // podia quebrar o `path` e deixar só os pontos), e a cor deixa de viajar
     // como dado — ver a nota da função e o bloco CSS de `.graf urbi-grafico-linha`.
-    // Ela recebe os cálculos MENSAIS (não `exibBase`/`exibCenario`): na view
+    // Ela recebe os cálculos MENSAIS (não as séries já agregadas): na view
     // Anual o alinhamento tem que acontecer ANTES da amostragem de período,
     // porque `agregarFluxoPorPeriodos` preenche a cauda da série mais curta
     // com zeros (`serie[p.fim] ?? 0`) e a curva desabaria em vez de ficar
@@ -471,7 +471,7 @@ export class ViabTelaCenarios extends LitElement {
         <h3>${alterado ? 'Fluxo de caixa do cenário' : 'Fluxo de caixa do cenário real'}</h3>
         ${kpisFluxo(cenario, alterado ? base : null)}
         ${this._renderControlesFluxo()}
-        ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch), this._fundingDe(cenario, periodos))}
+        ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch), this._fundingDe(cenario, periodosCenario))}
       </section>
 
       ${this._renderCenariosSalvos(base)}

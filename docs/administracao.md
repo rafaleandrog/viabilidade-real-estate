@@ -112,8 +112,8 @@ tipo de empreendimento, escolhido nas fichas **Loteamento** e **Incorporação**
 
 Na primeira abertura por quem pode escrever, o app semeia sozinho, nos dois tipos, os indicadores
 padrão que ainda faltam — os de meta e os cinco de sensibilidade. Numa instância cujos benchmarks já
-existiam, a abertura da tela semeia só `velocidade`, se ele faltar; os outros apagados não voltam
-(um `velocidade` apagado volta, com ±15%, na próxima abertura). **Novo indicador** cria um com
+existiam, a abertura da tela semeia só `velocidade`, se ele faltar; os outros apagados não voltam,
+salvo se a lista de um tipo ficar vazia (um `velocidade` apagado volta, com ±15%, na próxima abertura). **Novo indicador** cria um com
 identificador próprio; **Remover** apaga. Só o `admin` do app escreve; os demais veem a aba do
 Painel em modo de leitura. O que cada indicador valida está em [Benchmarks](benchmarks).
 

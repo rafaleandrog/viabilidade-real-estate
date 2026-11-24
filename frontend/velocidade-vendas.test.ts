@@ -147,3 +147,28 @@ test('#971 motor: a velocidade só troca a curva de vendas — preço e custo do
   assert.notDeepEqual(com.linhasReceita[0].absorcao, so.linhasReceita[0].absorcao);
   assert.equal(so.linhasReceita[0].absorcao, DISTRIBUIDA);
 });
+
+// Achado P2 do App do Codex (PR 978, rodada 6): com velocidade positiva o
+// cenário termina antes do estudo; agregado pelos períodos do estudo (mais
+// longo), o acumulado do cenário saía 0 nos anos depois do seu fim.
+import { agregarFluxoPorPeriodos } from './fluxo-caixa-motor.js';
+import { periodosAnuais } from './fluxo-shared.js';
+import { readFileSync } from 'node:fs';
+
+test('#971 Anual: o cenário mais curto, agregado pelo próprio prazo, fecha no acumulado final dele', () => {
+  const cfg = config(DISTRIBUIDA);
+  const real = calcularFluxo(cfg);
+  const rapido = calcularFluxo(aplicarCenario(cfg, { precoVendaPct: 0, custoObraPct: 0, velocidadeVendasPct: 100 }));
+  assert.ok(rapido.prazo < real.prazo, `o cenário precisa ser mais curto (${rapido.prazo} × ${real.prazo})`);
+  const final = rapido.fluxoAcumulado[rapido.fluxoAcumulado.length - 1];
+  const proprio = agregarFluxoPorPeriodos(rapido, periodosAnuais(DATA_INICIO, rapido.prazo)!);
+  assert.equal(proprio.fluxoAcumulado[proprio.fluxoAcumulado.length - 1], final);
+  // A armadilha: pelos períodos do estudo, o último ano do cenário sai 0.
+  const doEstudo = agregarFluxoPorPeriodos(rapido, periodosAnuais(DATA_INICIO, real.prazo)!);
+  assert.notEqual(doEstudo.fluxoAcumulado[doEstudo.fluxoAcumulado.length - 1], final);
+  // Fiação: a tabela de Cenários agrega pelo prazo do próprio cenário.
+  const tela = readFileSync(new URL('./tela-cenarios.ts', import.meta.url), 'utf8');
+  assert.match(tela, /const periodosCenario = this\._periodos\(cenario\.prazo\);/);
+  assert.match(tela, /agregarFluxoPorPeriodos\(cenario, periodosCenario\)/);
+  assert.match(tela, /this\._fundingDe\(cenario, periodosCenario\)/);
+});

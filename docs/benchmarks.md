@@ -49,7 +49,8 @@ fichas **Loteamento** e **Incorporação** e três seções — **Indicador de B
 Sensibilidade** e **Faixas do medidor**. Na primeira abertura por quem pode escrever, os indicadores
 padrão que faltam são semeados nos dois tipos. Numa instância cujos benchmarks já existiam, a
 abertura da tela por quem pode escrever semeia só o indicador `velocidade` quando ele falta; os
-outros indicadores apagados não voltam. Apagado, o `velocidade` sai da tabela e volta, com ±15%,
+outros indicadores apagados não voltam, a não ser que a lista de um tipo fique vazia (aí o semear de
+sempre recria todos os padrão, nos dois tipos). Apagado, o `velocidade` sai da tabela e volta, com ±15%,
 na próxima abertura da tela — o mesmo valor que os Cenários usam sem ele. Só o `admin` do app escreve. Detalhe em
 [Administração](administracao).
 
