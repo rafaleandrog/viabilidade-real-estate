@@ -20,7 +20,7 @@ empresa, cenários de sensibilidade e uma leitura do mercado local.
 
 | Conceito | O que significa |
 |---|---|
-| **Tipo de empreendimento** | **Loteamento** (venda de lotes de uma gleba) ou **Incorporação** (venda de unidades construídas sobre um ou mais lotes). Define quais premissas, custos e indicadores aparecem. Só muda enquanto o estudo está em Rascunho. |
+| **Tipo de empreendimento** | **Loteamento** (venda de lotes de uma gleba) ou **Incorporação** (venda de unidades construídas sobre um ou mais lotes). Define quais premissas, custos e indicadores aparecem. Não muda depois de criado: para outro tipo, cria-se um estudo novo. |
 | **Nível de análise** | **Preliminar**: análise estática, sem dimensão temporal — a Proforma sai das premissas na hora. **Avançado**: cronograma, vendas por safra, custos distribuídos no tempo, funding e fluxo de caixa mensal, com TIR, VPL, payback e exposição máxima. Escolhido na criação e imutável depois. As bases dos dois níveis são equivalentes: ver [Fórmulas](formulas). |
 | **Terreno** | Vem do **Núcleo** da instância (uma gleba para Loteamento; um ou mais lotes para Incorporação, com a área somada) ou é **inserido manualmente** (nome e área digitados). A origem se escolhe na criação e o vínculo só muda em Rascunho. |
 | **Proforma** | A tabela de resultado do estudo: VGV, deduções da receita, custos diretos e indiretos, resultado e indicadores (margem, ROI, custo de obras sobre VGV). Ver [Fórmulas da Proforma](formulas). |
@@ -47,7 +47,7 @@ admin no app. A aba **Terrenos** mostra as glebas do Núcleo e os lotes que não
 
 1. Em **Estudos**, clique em **Criar estudo**.
 2. Informe o nome, a UF, o **tipo de empreendimento** e o **nível de análise**. O nível não muda
-   depois; o tipo só muda em Rascunho.
+   depois; o tipo também não muda; para outro tipo, cria-se um estudo novo.
 3. Escolha a origem do terreno: **Buscar terreno** (Núcleo) ou **Inserir novo** (manual). Se a
    instância ainda não liberou o Núcleo para o app, o modo Núcleo avisa e o manual continua
    disponível.

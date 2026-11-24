@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  areasParaTrocarDeTipo, pctAlvEfetivo, areaTotalDaLinha, areaMediaDaLinha, produtosComAreaDerivada,
+  pctAlvEfetivo, areaTotalDaLinha, areaMediaDaLinha, produtosComAreaDerivada,
   somaPctAlv, alocacaoAlv, validarSomaPctAlv, rotuloBaseProdutos,
 } from './produtos-alv.js';
 import { calcularProforma, produtosDoEstudo, alvDoLoteamento, baseProdutosM2, areaPrivativaFechadaIncorporacao, type ProformaInput } from './proforma.js';
@@ -200,26 +200,6 @@ test('#781: sem ALV (Terreno & Áreas ainda vazio) a regra da soma não se aplic
   assert.equal(validarSomaPctAlv([{ area_media_m2: 300, unidades: 250 }], 0, 'ALV').ok, true);
 });
 
-test('#781/#784: trocar o tipo do rascunho leva a área derivada, sem zerar o VGV', () => {
-  const produtos = [
-    { id: 1, pct_alv: 60, unidades: 150 },   // 45.000 m² / 150 = 300
-    { id: 2, pct_alv: 40, unidades: 100 },   // 30.000 m² / 100 = 300
-    { id: 3, area_media_m2: 80, unidades: 5 }, // legado: sem pct_alv, já tem área
-  ];
-  const saida = areasParaTrocarDeTipo(produtos, ALV);
-  assert.deepEqual(saida, [{ id: 1, area_media_m2: 300 }, { id: 2, area_media_m2: 300 }]);
-  // Linha recém-criada (sem unidades) não tem área derivável: fica como está, com o %.
-  assert.deepEqual(areasParaTrocarDeTipo([{ id: 9, pct_alv: 50, unidades: 0 }], ALV), []);
-  const inc = calcularProforma({
-    tipo_empreendimento: 'incorporacao',
-    produtos: produtos.map((p) => {
-      const a = saida.find((s) => s.id === p.id);
-      return { ...p, area_media_m2: a ? a.area_media_m2 : p.area_media_m2, pct_alv: null, preco_venda_m2: 1000 };
-    }),
-  } as ProformaInput);
-  assert.ok(inc.vgv > 0 && !inc.semProdutos, `vgv=${inc.vgv}`);
-});
-
 // ── #784: Incorporação — a base é a soma das áreas privativas FECHADAS ──
 
 // Terreno & Áreas: 6.000 m² residencial fechado + 2.000 m² não residencial
@@ -292,16 +272,6 @@ test('#784: produto legado da Incorporação (só area_media_m2) tem o % derivad
   assert.ok(perto(areaTotalDaLinha(legado, BASE_INC), 6000));
   // Sem base o legado segue com a própria área (não depende da cascata estar preenchida).
   assert.ok(perto(areaTotalDaLinha(legado, 0), 6000));
-});
-
-test('#784: trocar Incorporação → Loteamento leva a área derivada da base de ORIGEM', () => {
-  const produtos = [{ id: 1, pct_alv: 75, unidades: 60 }, { id: 2, pct_alv: 25, unidades: 20 }];
-  // Origem = Incorporação (base 8.000): 6.000/60 = 100 e 2.000/20 = 100. Com a ALV do
-  // Loteamento como base o resultado seria outro — é a diferença que a conversão evita.
-  assert.deepEqual(areasParaTrocarDeTipo(produtos, BASE_INC), [
-    { id: 1, area_media_m2: 100 }, { id: 2, area_media_m2: 100 },
-  ]);
-  assert.notDeepEqual(areasParaTrocarDeTipo(produtos, ALV), areasParaTrocarDeTipo(produtos, BASE_INC));
 });
 
 test('#784 revisão: o Avançado não deriva por pct_alv — a área guardada segue valendo', () => {
