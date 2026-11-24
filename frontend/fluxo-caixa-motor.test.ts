@@ -2102,7 +2102,9 @@ test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () =
   // #824: o repasse é o último componente e fica com o RESTO de cada safra
   // (2.378.978,36 − 356.846,75 − 356.846,75 = 1.665.284,86, não 1.665.284,85):
   // 12 safras somam 19.983.418,32 — Δ R$ 0,117 do oráculo, que antes era 0,003.
-  assert.ok(perto(r.repasseMensal[25], 0.70 * CALLIANDRA_G2.baseContratada, 0.15));
+  // Margem de R$ 0,50 por decisão do dono (24/11): o resto de arredondamento das
+  // safras não deve segurar o teste.
+  assert.ok(perto(r.repasseMensal[25], 0.70 * CALLIANDRA_G2.baseContratada, 0.50));
   assert.equal(r.receitaPorComponenteMensal.repasse[25], r.repasseMensal[25]);
   assert.equal(r.carteiraPorComponenteMensal.saldoARepassar[25], 0);
   assert.equal(soma(r.jurosMensal), 0);
