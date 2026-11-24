@@ -508,7 +508,7 @@ export class ViabTelaCenarios extends LitElement {
               @urbi:input-change=${(e: CustomEvent) => this.nomeNovo = e.detail.valor}
             ></urbi-input>
             <urbi-botao variante="primario" icone="fa-solid fa-floppy-disk"
-              ?desabilitado=${this.salvando} @click=${this._salvar}>Salvar cenário</urbi-botao>
+              ?desabilitado=${this.salvando || this.gerando} @click=${this._salvar}>Salvar cenário</urbi-botao>
           </div>` : nothing}
       </urbi-card>
     `;
@@ -534,13 +534,13 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _salvar = async () => {
-    if (!this.editavel || this.salvando || !this.estudo?.id) return;
+    if (!this.editavel || this.salvando || this.gerando || !this.estudo?.id) return;
     this.salvando = true;
     try {
       const nome = this.nomeNovo.trim() || `Preço ${this.precoPct >= 0 ? '+' : ''}${this.precoPct}% · Obra ${this.custoPct >= 0 ? '+' : ''}${this.custoPct}%`;
       const res = await criarCenario(this.estudo.id, {
         nome, preco_venda_pct: this.precoPct, custo_obra_pct: this.custoPct,
-        ordem: this.cenarios.length,
+        ordem: this._reservarOrdens(1),
       });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cenário', 'erro'); return; }
       this.nomeNovo = '';
@@ -549,8 +549,10 @@ export class ViabTelaCenarios extends LitElement {
       urbiVerso.notificar('Cenário salvo.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar o cenário', 'erro');
+    } finally {
+      // #889: no `finally`, e não depois do `try`: o `return` do erro da API saía sem liberar a trava.
+      this.salvando = false;
     }
-    this.salvando = false;
   };
 
   private _confirmarRemover = async () => {
@@ -578,7 +580,7 @@ export class ViabTelaCenarios extends LitElement {
           <h3>Cenários salvos</h3>
           ${this.editavel ? html`
             <urbi-botao class="gerar-padrao" variante="secundario" pequeno icone="fa-solid fa-wand-magic-sparkles"
-              ?desabilitado=${this.gerando} @click=${this._abrirGerarPadrao}>
+              ?desabilitado=${this.gerando || this.salvando} @click=${this._abrirGerarPadrao}>
               Gerar otimista, base e pessimista
             </urbi-botao>` : nothing}
         </div>
@@ -729,11 +731,26 @@ export class ViabTelaCenarios extends LitElement {
   private _abrirGerarPadrao = () => {
     if (!this.editavel) return;
     this.rascunhoPadrao = cenariosPadrao(this.faixaPreco, this.faixaCusto);
-    this.ordemRetomada = null;
   };
 
-  /** #889: a `ordem` livre deixada por uma gravação interrompida; `null` fora de uma nova tentativa. */
-  private ordemRetomada: number | null = null;
+  /**
+   * #889: a maior `ordem` já reservada por esta tela, mais um. Só cresce: a
+   * lista em memória pode estar velha (releitura que falhou), e a `ordem` de
+   * uma gravação nova nunca pode repetir uma que a tela já mandou gravar.
+   */
+  private ordemReservada = 0;
+
+  /**
+   * #889: a régua ÚNICA de `ordem` das duas gravações (Salvar cenário e Gerar
+   * os três): a próxima depois da lista e de tudo que a tela já reservou.
+   * Reserva `n` posições e devolve a primeira. Falha no meio deixa lacuna, que
+   * a ordenação por `ordem` tolera; repetição, não.
+   */
+  private _reservarOrdens(n: number): number {
+    const inicio = ordemDaTentativa(this.cenarios, this.ordemReservada);
+    this.ordemReservada = inicio + n;
+    return inicio;
+  }
 
   private _editarPadrao(i: number, campo: 'precoVendaPct' | 'custoObraPct', valor: number | null) {
     if (!this.rascunhoPadrao) return;
@@ -742,27 +759,25 @@ export class ViabTelaCenarios extends LitElement {
 
   /**
    * #889: grava os três como cenários comuns, pelo mesmo `POST` do Salvar, em
-   * sequência e com `ordem` depois da maior que já existe. Um erro no meio para
+   * sequência e com `ordem` pela régua única (`_reservarOrdens`). Um erro no meio para
    * a sequência e avisa; o diálogo fica só com os que faltam (tentar de novo não
    * duplica os já gravados), e a lista é relida. A trava `gerando` é liberada em
    * toda saída, inclusive se a releitura falhar.
    */
   private _salvarPadrao = async () => {
     const rascunho = this.rascunhoPadrao;
-    if (!this.editavel || this.gerando || !rascunho || !this.estudo?.id) return;
+    if (!this.editavel || this.gerando || this.salvando || !rascunho || !this.estudo?.id) return;
     const estudoId = this.estudo.id;
     this.gerando = true;
     try {
       const todos = rascunho.length === 3;
-      const r = await gravarCenariosPadrao(rascunho, ordemDaTentativa(this.cenarios, this.ordemRetomada),
+      const r = await gravarCenariosPadrao(rascunho, this._reservarOrdens(rascunho.length),
         (dados) => criarCenario(estudoId, dados));
       if (r.erro) {
         this.rascunhoPadrao = r.pendentes;
-        this.ordemRetomada = r.ordemLivre;
         urbiVerso.notificar(r.erro, 'erro');
       } else {
         this.rascunhoPadrao = null;
-        this.ordemRetomada = null;
         urbiVerso.notificar(todos ? 'Cenários otimista, base e pessimista salvos.' : 'Cenários salvos.', 'sucesso');
       }
       if (r.gravados > 0) {
@@ -770,7 +785,7 @@ export class ViabTelaCenarios extends LitElement {
         this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
       }
     } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Os cenários foram salvos, mas a lista não foi relida. Recarregue a página.', 'erro');
+      urbiVerso.notificar(e?.message || 'A lista de cenários não foi relida. Recarregue a página.', 'erro');
     } finally {
       this.gerando = false;
     }
@@ -802,7 +817,7 @@ export class ViabTelaCenarios extends LitElement {
           <urbi-botao variante="fantasma" ?desabilitado=${this.gerando}
             @click=${() => this.rascunhoPadrao = null}>Cancelar</urbi-botao>
           <urbi-botao class="gerar-salvar" variante="primario" icone="fa-solid fa-floppy-disk"
-            ?desabilitado=${this.gerando} @click=${this._salvarPadrao}>${rascunho.length === 3 ? 'Salvar os três' : 'Salvar os que faltam'}</urbi-botao>
+            ?desabilitado=${this.gerando || this.salvando} @click=${this._salvarPadrao}>${rascunho.length === 3 ? 'Salvar os três' : 'Salvar os que faltam'}</urbi-botao>
         </div>
       </urbi-modal>
     `;

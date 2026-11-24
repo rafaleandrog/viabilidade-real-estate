@@ -106,14 +106,13 @@ export function proximaOrdem(cenarios: { ordem?: unknown }[]): number {
 }
 
 /**
- * A `ordem` de partida de uma gravação: a próxima depois dos salvos e, numa
- * nova tentativa depois de falha parcial, nunca abaixo da que a tentativa
- * anterior deixou livre (`retomada`). Sem isso, se a releitura da lista também
- * falhar, a lista em memória fica velha e a nova tentativa reaproveita uma
- * `ordem` já gravada.
+ * A `ordem` de partida de uma gravação: a próxima depois dos salvos e nunca
+ * abaixo da que a tela já reservou (`reservada`). Sem isso, se a releitura da
+ * lista falhar, a lista em memória fica velha e uma gravação seguinte
+ * reaproveita uma `ordem` já gravada.
  */
-export function ordemDaTentativa(cenarios: { ordem?: unknown }[], retomada: number | null): number {
-  return Math.max(proximaOrdem(cenarios), retomada ?? 0);
+export function ordemDaTentativa(cenarios: { ordem?: unknown }[], reservada: number | null): number {
+  return Math.max(proximaOrdem(cenarios), reservada ?? 0);
 }
 
 export interface ResultadoGravacao {

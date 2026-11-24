@@ -97,8 +97,15 @@ test('#889 fiação: a aba Cenários usa a régua, os padrões e os indicadores 
   assert.match(tela, /faixaDoBenchmark\(bm\?\.dados \|\| \[\], 'custo_obras'\)/);
   assert.match(tela, /cenariosPadrao\(this\.faixaPreco, this\.faixaCusto\)/);
   assert.match(tela, /indicadoresCenario\(calc\)/);
-  assert.match(tela, /gravarCenariosPadrao\(rascunho, ordemDaTentativa\(this\.cenarios, this\.ordemRetomada\),/);
-  assert.match(tela, /this\.ordemRetomada = r\.ordemLivre;/);
+  // Régua única de `ordem` para as duas gravações, que só cresce (lista velha não repete ordem).
+  assert.match(tela, /gravarCenariosPadrao\(rascunho, this\._reservarOrdens\(rascunho\.length\),/);
+  assert.match(tela, /ordem: this\._reservarOrdens\(1\),/);
+  assert.match(tela, /const inicio = ordemDaTentativa\(this\.cenarios, this\.ordemReservada\);\s*this\.ordemReservada = inicio \+ n;/);
+  assert.doesNotMatch(tela, /ordem: this\.cenarios\.length/);
+  // As duas gravações se excluem.
+  assert.match(tela, /if \(!this\.editavel \|\| this\.salvando \|\| this\.gerando \|\| !this\.estudo\?\.id\) return;/);
+  assert.match(tela, /if \(!this\.editavel \|\| this\.gerando \|\| this\.salvando \|\| !rascunho/);
+  assert.match(tela, /finally \{[^}]*this\.salvando = false;\s*\}/);
   assert.match(tela, /this\.rascunhoPadrao = r\.pendentes;/);
   // A trava do botão é liberada em toda saída (finally), inclusive se reler a lista lançar.
   assert.match(tela, /finally \{\s*this\.gerando = false;\s*\}/);
