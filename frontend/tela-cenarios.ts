@@ -16,7 +16,7 @@ import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
 import { calcularVariacao, exposicaoSemBase, MOTIVO_SEM_BASE, TEXTO_VARIACAO_SEM_BASE } from './cenario-variacao.js';
-import { faixaDoBenchmark, cenariosPadrao, indicadoresCenario, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
+import { faixaDoBenchmark, cenariosPadrao, indicadoresCenario, proximaOrdem, gravarCenariosPadrao, FAIXA_PADRAO_PCT, type Faixa, type CenarioPadrao } from './cenarios-padrao.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   type FundingCalc, type OperacaoFunding,
@@ -570,6 +570,8 @@ export class ViabTelaCenarios extends LitElement {
     // ⚠️ #596: esta tabela já teve uma coluna extra condicional ("Resultado
     // após custo financ.", só com operação de Funding). Ela saiu — a tabela
     // não ramifica mais por presença de funding.
+    // #889: a coluna "Resultado" de hoje é OUTRA grandeza — o fluxo de caixa
+    // livre acumulado (`indicadoresCenario`), sem custo financeiro descontado.
     return html`
       <section class="secao-cenarios">
         <div class="cen-topo">
@@ -735,39 +737,36 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   /**
-   * #889: grava os três como cenários comuns, pelo mesmo `POST` do Salvar,
-   * em sequência e com `ordem` depois dos que já existem. Um erro no meio
-   * para a sequência e avisa; o que já foi gravado fica, e a lista é relida.
+   * #889: grava os três como cenários comuns, pelo mesmo `POST` do Salvar, em
+   * sequência e com `ordem` depois da maior que já existe. Um erro no meio para
+   * a sequência e avisa; o diálogo fica só com os que faltam (tentar de novo não
+   * duplica os já gravados), e a lista é relida. A trava `gerando` é liberada em
+   * toda saída, inclusive se a releitura falhar.
    */
   private _salvarPadrao = async () => {
     const rascunho = this.rascunhoPadrao;
     if (!this.editavel || this.gerando || !rascunho || !this.estudo?.id) return;
+    const estudoId = this.estudo.id;
     this.gerando = true;
-    let gravados = 0;
     try {
-      for (const [i, c] of rascunho.entries()) {
-        const res = await criarCenario(this.estudo.id, {
-          nome: c.nome, preco_venda_pct: c.precoVendaPct, custo_obra_pct: c.custoObraPct,
-          ordem: this.cenarios.length + i,
-        });
-        if (res?.erro) {
-          urbiVerso.notificar(res.mensagem || `Erro ao salvar o cenário ${c.nome}`, 'erro');
-          break;
-        }
-        gravados++;
-      }
-      if (gravados === rascunho.length) {
+      const r = await gravarCenariosPadrao(rascunho, proximaOrdem(this.cenarios),
+        (dados) => criarCenario(estudoId, dados));
+      if (r.erro) {
+        this.rascunhoPadrao = r.pendentes;
+        urbiVerso.notificar(r.erro, 'erro');
+      } else {
         this.rascunhoPadrao = null;
         urbiVerso.notificar('Cenários otimista, base e pessimista salvos.', 'sucesso');
       }
+      if (r.gravados > 0) {
+        const cens = await listarCenarios(estudoId);
+        this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
+      }
     } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar os cenários', 'erro');
+      urbiVerso.notificar(e?.message || 'Erro ao reler os cenários', 'erro');
+    } finally {
+      this.gerando = false;
     }
-    if (gravados > 0) {
-      const cens = await listarCenarios(this.estudo.id);
-      this.cenarios = cens?.erro ? this.cenarios : (cens.dados || []);
-    }
-    this.gerando = false;
   };
 
   private _renderGerarPadrao(): TemplateResult {

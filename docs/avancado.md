@@ -239,7 +239,8 @@ um diálogo com os três já preenchidos, editáveis antes de salvar:
 
 As faixas são as dos benchmarks de sensibilidade de preço e de custo de obra (as mesmas que limitam
 os controles); sem benchmark configurado, ±15%. O Base reproduz o estudo real. **Salvar os três**
-grava os três como cenários comuns, que podem ser removidos como qualquer outro.
+grava os três como cenários comuns, que podem ser removidos como qualquer outro. Se um deles falhar,
+o diálogo continua aberto só com os que faltam, e tentar de novo não duplica os já gravados.
 
 Salvar, gerar e remover cenário seguem a régua de escrita do estudo — `editor` em Rascunho e Em
 análise, só `aprovador` em Aprovado, Reprovado e Arquivado; para quem não pode, a simulação e a

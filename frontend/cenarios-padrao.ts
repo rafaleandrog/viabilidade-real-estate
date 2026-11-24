@@ -90,3 +90,55 @@ export function indicadoresCenario(c: FluxoCalc): IndicadoresCenario {
     exposicao: Math.abs(c.exposicaoMaxima),
   };
 }
+
+/**
+ * A `ordem` do primeiro cenário a gravar depois dos que já existem: o maior
+ * `ordem` salvo mais um (0 com a lista vazia). Usar `cenarios.length` empata
+ * quando um cenário do meio foi removido, e a lista é ordenada só por `ordem`.
+ */
+export function proximaOrdem(cenarios: { ordem?: unknown }[]): number {
+  let maior = -1;
+  for (const c of cenarios ?? []) {
+    const o = Number(c?.ordem);
+    if (Number.isFinite(o) && o > maior) maior = o;
+  }
+  return Math.floor(maior) + 1;
+}
+
+export interface ResultadoGravacao {
+  /** Quantos foram gravados, na ordem do rascunho. */
+  gravados: number;
+  /** O que falta gravar: vazio quando todos entraram. Tentar de novo usa só isto. */
+  pendentes: CenarioPadrao[];
+  /** Mensagem do primeiro erro, ou `null`. */
+  erro: string | null;
+}
+
+/**
+ * Grava os cenários em sequência por `criar` (o `POST` de cenário), com `ordem`
+ * a partir de `ordemInicial`, e para no primeiro erro — devolvido pela API
+ * (`{ erro: true, mensagem }`) ou lançado. Os já gravados saem de `pendentes`,
+ * para uma nova tentativa não os duplicar.
+ */
+export async function gravarCenariosPadrao(
+  rascunho: CenarioPadrao[],
+  ordemInicial: number,
+  criar: (dados: Record<string, unknown>) => Promise<any>,
+): Promise<ResultadoGravacao> {
+  let gravados = 0;
+  let erro: string | null = null;
+  for (const c of rascunho) {
+    try {
+      const res = await criar({
+        nome: c.nome, preco_venda_pct: c.precoVendaPct, custo_obra_pct: c.custoObraPct,
+        ordem: ordemInicial + gravados,
+      });
+      if (res?.erro) { erro = res.mensagem || `Erro ao salvar o cenário ${c.nome}`; break; }
+    } catch (e: any) {
+      erro = e?.message || `Erro ao salvar o cenário ${c.nome}`;
+      break;
+    }
+    gravados++;
+  }
+  return { gravados, pendentes: rascunho.slice(gravados), erro };
+}

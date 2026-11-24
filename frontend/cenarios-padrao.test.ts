@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   faixaDoBenchmark, cenariosPadrao, indicadoresCenario, FAIXA_PADRAO_PCT,
+  proximaOrdem, gravarCenariosPadrao,
 } from './cenarios-padrao.js';
 import { calcularFluxo, aplicarCenario, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 // A configuração dos casos de render é usada só como um estudo qualquer com
@@ -96,6 +97,44 @@ test('#889 fiação: a aba Cenários usa a régua, os padrões e os indicadores 
   assert.match(tela, /faixaDoBenchmark\(bm\?\.dados \|\| \[\], 'custo_obras'\)/);
   assert.match(tela, /cenariosPadrao\(this\.faixaPreco, this\.faixaCusto\)/);
   assert.match(tela, /indicadoresCenario\(calc\)/);
+  assert.match(tela, /gravarCenariosPadrao\(rascunho, proximaOrdem\(this\.cenarios\),/);
+  assert.match(tela, /this\.rascunhoPadrao = r\.pendentes;/);
+  // A trava do botão é liberada em toda saída (finally), inclusive se reler a lista lançar.
+  assert.match(tela, /finally \{\s*this\.gerando = false;\s*\}/);
   // A régua antiga, local ao componente, não pode voltar como segunda fonte.
   assert.doesNotMatch(tela, /private _faixa\(/);
+});
+
+test('proximaOrdem: maior ordem salva mais um, sem empatar depois de uma remoção', () => {
+  assert.equal(proximaOrdem([]), 0);
+  // Três cenários, o do meio (ordem 1) removido: length daria 2 e empataria com o último.
+  assert.equal(proximaOrdem([{ ordem: 0 }, { ordem: 2 }]), 3);
+  assert.equal(proximaOrdem([{ ordem: '4' }, { ordem: null }, { ordem: 'x' }]), 5);
+});
+
+const TRES = cenariosPadrao({ min: -10, max: 10 }, { min: -5, max: 5 });
+
+test('gravarCenariosPadrao: grava os três em sequência, com ordem a partir da inicial', async () => {
+  const corpos: any[] = [];
+  const r = await gravarCenariosPadrao(TRES, 7, async (d) => { corpos.push(d); return { id: corpos.length }; });
+  assert.deepEqual(r, { gravados: 3, pendentes: [], erro: null });
+  assert.deepEqual(corpos.map((c) => [c.nome, c.ordem]), [['Otimista', 7], ['Base', 8], ['Pessimista', 9]]);
+  assert.deepEqual(corpos[2], { nome: 'Pessimista', preco_venda_pct: -10, custo_obra_pct: 5, ordem: 9 });
+});
+
+test('gravarCenariosPadrao: erro devolvido pela API para a sequência e deixa só os que faltam', async () => {
+  let n = 0;
+  const r = await gravarCenariosPadrao(TRES, 0, async () => (++n === 2 ? { erro: true, mensagem: 'falhou' } : {}));
+  assert.equal(n, 2);
+  assert.equal(r.gravados, 1);
+  assert.equal(r.erro, 'falhou');
+  assert.deepEqual(r.pendentes.map((c) => c.nome), ['Base', 'Pessimista']);
+});
+
+test('gravarCenariosPadrao: exceção lançada também para e preserva os pendentes', async () => {
+  let n = 0;
+  const r = await gravarCenariosPadrao(TRES, 0, async () => { if (++n === 3) throw new Error('rede'); return {}; });
+  assert.equal(r.gravados, 2);
+  assert.equal(r.erro, 'rede');
+  assert.deepEqual(r.pendentes.map((c) => c.nome), ['Pessimista']);
 });
