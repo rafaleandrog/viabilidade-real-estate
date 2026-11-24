@@ -5,7 +5,7 @@ import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { fundingDoEstudo, receitaLiquidaComCorretagemMensal, type OperacaoFunding } from './funding-motor.js';
 import { mesRepasse } from './fluxo-shared.js';
 import {
-  MAX_ALTERNATIVAS, alternativaDoSalvo, gravarAlternativas, indicadoresEstrutura, lerAlternativas,
+  MAX_ALTERNATIVAS, alternativaDoSalvo, errosDoEstadoFinal, gravarAlternativas, indicadoresEstrutura, lerAlternativas, limparCacheAlternativas,
   novaOperacaoAlternativa, passosDoPlano, planoUsarAlternativa, planoVazio, type AlternativaFunding,
 } from './funding-alternativas.js';
 
@@ -144,6 +144,7 @@ function storageFalso(): Storage {
 }
 
 test('localStorage: ida e volta, por estudo', () => {
+  limparCacheAlternativas();
   const st = storageFalso();
   const alts = [alternativaDoSalvo(SALVAS, 'A', 'a')];
   assert.equal(gravarAlternativas(7, alts, st), true);
@@ -330,4 +331,55 @@ test('passosDoPlano: troca cruzada termina com cada equity no modo e no pct da a
   const final = simularServidor(salvas, passos);
   assert.deepEqual(final.map((o) => [o.id, o.modo_retorno, o.pct_retorno]),
     [[1, 'resultado_final', 60], [2, 'permuta_financeira', 30]]);
+});
+
+// ── estado final e cache em memória ─────────────────────────────────
+
+const eq = (pct: number, modo?: string, extra: Record<string, unknown> = {}) =>
+  ({ ...novaOperacaoAlternativa('equity', `E${pct}`), pct_retorno: pct, ...(modo ? { modo_retorno: modo } : {}), ...extra }) as OperacaoFunding;
+const altCom = (...ops: OperacaoFunding[]): AlternativaFunding => ({ id: 'x', nome: 'X', operacoes: ops });
+
+test('errosDoEstadoFinal: soma 120% num modo → um erro; modo padrão é permuta_financeira', () => {
+  const erros = errosDoEstadoFinal(altCom(eq(70), eq(50, 'permuta_financeira')));
+  assert.equal(erros.length, 1);
+  assert.match(erros[0], /Permuta financeira.*120\.00%/);
+});
+
+test('errosDoEstadoFinal: 100 em cada um de dois modos → sem erro', () => {
+  assert.deepEqual(errosDoEstadoFinal(altCom(eq(100, 'permuta_financeira'), eq(100, 'resultado_final'))), []);
+});
+
+test('errosDoEstadoFinal: operação fora ou Financiamento inativo não conta', () => {
+  assert.deepEqual(errosDoEstadoFinal(altCom(eq(70), eq(50, undefined, { __fora: true }))), []);
+  const fin = { tipo: 'financiamento_producao', nome: 'F', ativo: false, valor: -5 } as unknown as OperacaoFunding;
+  assert.deepEqual(errosDoEstadoFinal(altCom(fin)), []);
+});
+
+test('errosDoEstadoFinal: retorno ou valor negativo e retorno acima de 100 por operação', () => {
+  assert.equal(errosDoEstadoFinal(altCom(eq(-5))).length, 1);
+  assert.equal(errosDoEstadoFinal(altCom(eq(10, undefined, { valor: -1 }))).length, 1);
+  assert.ok(errosDoEstadoFinal(altCom(eq(101))).length >= 1);
+});
+
+test('alternativas: sem storage utilizável, gravar e ler devolve da memória', () => {
+  limparCacheAlternativas();
+  const lanca = { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); } } as unknown as Storage;
+  const alts = [alternativaDoSalvo(SALVAS, 'A', 'a')];
+  assert.equal(gravarAlternativas(31, alts, lanca), false);
+  assert.deepEqual(lerAlternativas(31, lanca), alts);
+  assert.deepEqual(lerAlternativas(31, null), alts);
+  assert.deepEqual(lerAlternativas(32, lanca), []);
+  limparCacheAlternativas();
+  assert.deepEqual(lerAlternativas(31, lanca), []);
+});
+
+test('alternativas: storage normal tem precedência sobre a memória e mantém o comportamento antigo', () => {
+  limparCacheAlternativas();
+  const st = storageFalso();
+  const a = [alternativaDoSalvo(SALVAS, 'A', 'a')];
+  assert.equal(gravarAlternativas(33, a, st), true);
+  assert.deepEqual(lerAlternativas(33, st), a);
+  st.setItem('viab:funding-alternativas:33', '{não é json');
+  assert.deepEqual(lerAlternativas(33, st), []);
+  limparCacheAlternativas();
 });

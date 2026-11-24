@@ -6,7 +6,7 @@ import { rotuloMesRelativo } from './fluxo-shared.js';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
   MAX_ALTERNATIVAS, alternativaDoSalvo, novaOperacaoAlternativa, planoUsarAlternativa, planoVazio,
-  lerAlternativas, gravarAlternativas,
+  lerAlternativas, gravarAlternativas, errosDoEstadoFinal,
   type AlternativaFunding, type IndicadoresEstrutura, type PlanoUsarAlternativa,
 } from './funding-alternativas.js';
 import './viab-num.js';
@@ -174,9 +174,9 @@ export class ViabFundingAlternativas extends LitElement {
     if (i == null || !this.alternativas[i]) return;
     const alt = this.alternativas[i];
     const plano = this._plano(alt);
-    if (planoVazio(plano)) return;
+    if (planoVazio(plano) || errosDoEstadoFinal(alt).length) return;
     this.dispatchEvent(new CustomEvent('viab:usar-alternativa', {
-      detail: { plano, nome: alt.nome }, bubbles: true, composed: true,
+      detail: { plano, nome: alt.nome, erros: errosDoEstadoFinal(alt) }, bubbles: true, composed: true,
     }));
   }
 
@@ -239,6 +239,10 @@ export class ViabFundingAlternativas extends LitElement {
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover alternativa'} title="Remover alternativa"
             @click=${() => this._remover(i)}></urbi-botao>
         </div>
+        ${errosDoEstadoFinal(a).length ? html`<urbi-banner variante="alerta" icone="fa-solid fa-triangle-exclamation">
+          <strong>Esta alternativa não pode ser usada:</strong>
+          <ul>${errosDoEstadoFinal(a).map((m) => html`<li>${m}</li>`)}</ul>
+        </urbi-banner>` : nothing}
         <div class="rolagem">
           <table class="ops">
             <thead><tr>
@@ -263,6 +267,7 @@ export class ViabFundingAlternativas extends LitElement {
     const salvo = this._simular(this.salvas);
     const colunas = this.alternativas.map((a) => ({
       a, ind: this._simular(efetivas(a)), igual: planoVazio(this._plano(a)),
+      invalida: errosDoEstadoFinal(a).length > 0,
     }));
     const linhas: { rotulo: string; chave: keyof IndicadoresEstrutura }[] = [
       { rotulo: 'Exposição máxima', chave: 'exposicaoMaxima' },
@@ -281,7 +286,7 @@ export class ViabFundingAlternativas extends LitElement {
               ${colunas.map((c, i) => html`<th class="num">
                 ${c.a.nome}${c.igual ? html`<span class="igual">igual ao salvo</span>` : nothing}
                 ${this.editavel ? html`<urbi-botao variante="primario" pequeno icone="fa-solid fa-check"
-                  ?desabilitado=${c.igual}
+                  ?desabilitado=${c.igual || c.invalida}
                   @click=${() => { this.usarIdx = i; }}>Usar esta</urbi-botao>` : nothing}
               </th>`)}
             </tr></thead>
@@ -328,7 +333,7 @@ export class ViabFundingAlternativas extends LitElement {
     return html`
       <p class="nota">
         Monte até ${MAX_ALTERNATIVAS} estruturas de capital e compare com o funding salvo. As alternativas
-        ficam guardadas só neste navegador e nada é gravado no estudo até você escolher "Usar esta".
+        ficam guardadas só neste navegador (sem armazenamento, duram até recarregar a página) e nada é gravado no estudo até você escolher "Usar esta".
       </p>
       <div class="acao">
         <urbi-botao variante="secundario" pequeno icone="fa-solid fa-plus"

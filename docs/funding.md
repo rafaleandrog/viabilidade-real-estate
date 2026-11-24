@@ -140,7 +140,7 @@ recalcula pela âncora. **+ Dívida** e **+ Equity** acrescentam operações nov
 
 As alternativas ficam guardadas **só neste navegador**, por estudo: não vão para o
 servidor, outras pessoas e outros navegadores não as veem e limpar os dados do navegador as apaga. Sem armazenamento
-disponível, elas funcionam na sessão aberta e se perdem ao sair.
+disponível, elas duram até recarregar a página (trocar de aba do Funding não as perde).
 
 A tabela **Comparação** tem uma coluna **Funding salvo**, de referência, e uma por alternativa, com
 quatro indicadores, todos calculados com o mesmo motor da página:
@@ -155,7 +155,8 @@ quatro indicadores, todos calculados com o mesmo motor da página:
 Uma alternativa idêntica ao funding salvo reproduz exatamente a coluna de referência e é marcada
 como **igual ao salvo**. Com permissão de edição, **Usar esta** abre uma confirmação que diz quantas
 operações serão criadas, alteradas e removidas; ao confirmar, o funding do estudo passa a ser o da
-alternativa. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
+alternativa. **Usar esta** fica desabilitado, com um aviso na alternativa, quando ela passa de 100% de
+retorno de equity num mesmo modo de retorno (ou tem valor ou retorno negativo): nada é gravado. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
 **desligado** e seus parâmetros ficam preservados. Depois de aplicar, os dados do funding são recarregados e a
 alternativa continua guardada para novas comparações.
 

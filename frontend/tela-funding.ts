@@ -785,8 +785,10 @@ export class ViabFunding extends LitElement {
   };
 
   /** "Usar esta": aplica o plano da alternativa pelas rotas de operação e recarrega a tela. */
-  private async _usarAlternativa(plano: PlanoUsarAlternativa, nome: string) {
+  private async _usarAlternativa(plano: PlanoUsarAlternativa, nome: string, erros: string[] = []) {
     if (!this.editavel || this.criando) return;
+    // Defesa: estado final inválido para o servidor não grava nenhum passo.
+    if (erros.length) { urbiVerso.notificar(`Estrutura "${nome}" não aplicada: ${erros.join(' ')}`, 'erro'); return; }
     this.criando = true;
     try {
       let ordem = this._proximaOrdem();
@@ -1175,7 +1177,7 @@ export class ViabFunding extends LitElement {
               : a.id === 'comparar' ? (this.abaAtiva !== 'comparar' ? nothing : html`<viab-funding-alternativas
                   .estudoId=${this.estudo?.id ?? null} .editavel=${this.editavel}
                   .salvas=${this.operacoes} .simular=${this._simularEstrutura} .dataInicio=${this.dataInicio}
-                  @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome)}
+                  @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome, e.detail.erros)}
                 ></viab-funding-alternativas>`)
               : a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}
           </urbi-hospedeiro>`)}

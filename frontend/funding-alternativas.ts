@@ -202,20 +202,84 @@ export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: Alternativa
   return plano;
 }
 
+// ── validação do estado final ──────────────────────────────────────
+
+const ROTULO_MODO: Record<string, string> = {
+  permuta_financeira: 'Permuta financeira',
+  resultado_final: 'Resultado final',
+};
+
+/**
+ * Espelho das regras do servidor (`somaRetornoExcede` e `validarCamposOperacao`
+ * de `backend/rotas/funding.ts`) sobre o ESTADO FINAL da alternativa, antes de
+ * gravar qualquer passo. Considera só as operações incluídas (as marcadas
+ * `__fora` e o Financiamento à produção com `ativo === false` não entram, como
+ * na simulação). Espelha: soma de `pct_retorno` dos equities por modo <= 100
+ * (tolerância 100.01; modo padrão permuta_financeira), `pct_retorno` e `valor`
+ * negativos e `pct_retorno` acima de 100. Devolve uma mensagem por problema.
+ */
+export function errosDoEstadoFinal(alt: AlternativaFunding): string[] {
+  const erros: string[] = [];
+  const incluidas = (alt.operacoes as (OperacaoFunding & { __fora?: boolean })[])
+    .filter((o) => !o.__fora && !(o.tipo === 'financiamento_producao' && o.ativo === false));
+  const porModo = new Map<string, number>();
+  for (const o of incluidas) {
+    const nome = o.nome || ROTULO_TIPO_ERRO[o.tipo] || o.tipo;
+    const valor = Number((o as any).valor);
+    if (Number.isFinite(valor) && valor < 0) erros.push(`"${nome}": o valor não pode ser negativo.`);
+    if (o.tipo !== 'equity') continue;
+    const pct = Number((o as any).pct_retorno) || 0;
+    if (pct < 0) erros.push(`"${nome}": o retorno não pode ser negativo.`);
+    if (pct > 100) erros.push(`"${nome}": o retorno não pode passar de 100%.`);
+    const modo = String((o as any).modo_retorno ?? 'permuta_financeira');
+    porModo.set(modo, (porModo.get(modo) ?? 0) + pct);
+  }
+  for (const [modo, total] of porModo) {
+    if (total > 100.01) {
+      erros.push(`Equity em "${ROTULO_MODO[modo] ?? modo}": o retorno soma ${total.toFixed(2)}% e não pode passar de 100%.`);
+    }
+  }
+  return erros;
+}
+
+const ROTULO_TIPO_ERRO: Record<string, string> = {
+  financiamento_producao: 'Financiamento à produção', divida: 'Dívida', equity: 'Equity', antecipacao_recebiveis: 'Antecipação',
+};
+
 // ── persistência local ──────────────────────────────────────────────
 
 const chaveDe = (estudoId: number | string): string => `viab:funding-alternativas:${estudoId}`;
+
+/**
+ * Cache em memória do módulo, por estudo: sem `localStorage` (bloqueado, cota
+ * cheia) as alternativas sobrevivem à troca de aba, que desmonta o painel, até
+ * recarregar a página.
+ */
+const memoria = new Map<string, AlternativaFunding[]>();
+
+/** Só para teste: esvazia o cache em memória. */
+export function limparCacheAlternativas(): void {
+  memoria.clear();
+}
 
 function storagePadrao(): Storage | null {
   try { return globalThis.localStorage ?? null; } catch { return null; }
 }
 
-/** Lê as alternativas do estudo; qualquer falha ou dado inválido vira `[]`. */
+const daMemoria = (estudoId: number | string): AlternativaFunding[] =>
+  (memoria.get(chaveDe(estudoId)) ?? []).slice(0, MAX_ALTERNATIVAS);
+
+/** Lê as alternativas do estudo; storage ausente, que lança ou sem a chave cai na memória; dado inválido vira `[]`. */
 export function lerAlternativas(estudoId: number | string, storage?: Storage | null): AlternativaFunding[] {
+  let bruto: string | null | undefined;
   try {
     const st = storage === undefined ? storagePadrao() : storage;
-    const bruto = st?.getItem(chaveDe(estudoId));
-    if (!bruto) return [];
+    bruto = st?.getItem(chaveDe(estudoId));
+  } catch {
+    return memoria.has(chaveDe(estudoId)) ? daMemoria(estudoId) : [];
+  }
+  if (!bruto) return memoria.has(chaveDe(estudoId)) ? daMemoria(estudoId) : [];
+  try {
     const dado = JSON.parse(bruto);
     if (!Array.isArray(dado)) return [];
     return dado
@@ -226,14 +290,16 @@ export function lerAlternativas(estudoId: number | string, storage?: Storage | n
   }
 }
 
-/** Grava as alternativas (no máximo `MAX_ALTERNATIVAS`); devolve `false` se o storage falhou. */
+/** Grava as alternativas (no máximo `MAX_ALTERNATIVAS`) no cache e no storage; devolve `false` se o storage falhou. */
 export function gravarAlternativas(
   estudoId: number | string, alts: AlternativaFunding[], storage?: Storage | null,
 ): boolean {
+  const corte = alts.slice(0, MAX_ALTERNATIVAS);
+  memoria.set(chaveDe(estudoId), corte.map((a) => clonar(a)));
   try {
     const st = storage === undefined ? storagePadrao() : storage;
     if (!st) return false;
-    st.setItem(chaveDe(estudoId), JSON.stringify(alts.slice(0, MAX_ALTERNATIVAS)));
+    st.setItem(chaveDe(estudoId), JSON.stringify(corte));
     return true;
   } catch {
     return false;
