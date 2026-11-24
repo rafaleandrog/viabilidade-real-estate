@@ -155,8 +155,10 @@ quatro indicadores, todos calculados com o mesmo motor da página:
 Uma alternativa idêntica ao funding salvo reproduz exatamente a coluna de referência e é marcada
 como **igual ao salvo**. Com permissão de edição, **Usar esta** abre uma confirmação que diz quantas
 operações serão criadas, alteradas e removidas; ao confirmar, o funding do estudo passa a ser o da
-alternativa. **Usar esta** fica desabilitado, com um aviso na alternativa, quando ela passa de 100% de
-retorno de equity num mesmo modo de retorno (ou tem valor ou retorno negativo): nada é gravado. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
+alternativa. Operação com **Incluir** desmarcado sai do funding ao aplicar. **Usar esta** fica
+desabilitado, com um aviso na alternativa, quando ela passa de 100% de retorno de equity num mesmo
+modo de retorno ou fere outra regra das operações (valor, taxa ou prazo negativo, percentual acima de
+100, carência maior que a amortização): nada é gravado. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
 **desligado** e seus parâmetros ficam preservados. Depois de aplicar, os dados do funding são recarregados e a
 alternativa continua guardada para novas comparações.
 

@@ -176,6 +176,9 @@ export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: Alternativa
   const mantidas = new Set<IdOp>();
 
   for (const op of alt.operacoes) {
+    // Operação dispensada na tela (`__fora`) é AUSENTE da alternativa: a salva
+    // é removida (o Financiamento à produção, desligado) e a nova não é criada.
+    if ((op as { __fora?: boolean }).__fora) continue;
     const salva = op.id != null ? porId.get(op.id) : undefined;
     if (!salva || salva.tipo !== op.tipo) {
       const { id: _id, ...semId } = semMarcadoresDeTela(clonar(op));
@@ -275,16 +278,16 @@ export function validarOperacaoComoServidor(dados: Record<string, any>): string 
 /**
  * Espelho das regras do servidor (`somaRetornoExcede` e `validarCamposOperacao`
  * de `backend/rotas/funding.ts`) sobre o ESTADO FINAL da alternativa, antes de
- * gravar qualquer passo. Considera só as operações incluídas (as marcadas
- * `__fora` e o Financiamento à produção com `ativo === false` não entram, como
- * na simulação). Aplica `validarOperacaoComoServidor` a cada uma e soma
+ * gravar qualquer passo. Considera as operações que ficam gravadas: todas menos
+ * as marcadas `__fora`, que o plano remove. O Financiamento à produção desligado
+ * continua gravado e o servidor o valida inteiro no PATCH, então ele entra. Aplica `validarOperacaoComoServidor` a cada uma e soma
  * `pct_retorno` dos equities por modo <= 100 (tolerância 100.01; modo padrão
  * permuta_financeira). Devolve uma mensagem por problema.
  */
 export function errosDoEstadoFinal(alt: AlternativaFunding): string[] {
   const erros: string[] = [];
   const incluidas = (alt.operacoes as (OperacaoFunding & { __fora?: boolean })[])
-    .filter((o) => !o.__fora && !(o.tipo === 'financiamento_producao' && o.ativo === false));
+    .filter((o) => !o.__fora);
   const porModo = new Map<string, number>();
   for (const o of incluidas) {
     const nome = o.nome || ROTULO_TIPO_ERRO[o.tipo] || o.tipo;

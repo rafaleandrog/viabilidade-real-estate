@@ -349,10 +349,28 @@ test('errosDoEstadoFinal: 100 em cada um de dois modos → sem erro', () => {
   assert.deepEqual(errosDoEstadoFinal(altCom(eq(100, 'permuta_financeira'), eq(100, 'resultado_final'))), []);
 });
 
-test('errosDoEstadoFinal: operação fora ou Financiamento inativo não conta', () => {
+test('errosDoEstadoFinal: operação fora não conta; Financiamento desligado continua validado', () => {
+  // A operação `__fora` sai da gravação (o plano a remove), então não soma.
   assert.deepEqual(errosDoEstadoFinal(altCom(eq(70), eq(50, undefined, { __fora: true }))), []);
+  // O Financiamento desligado continua gravado, e o PATCH do servidor o valida inteiro.
   const fin = { tipo: 'financiamento_producao', nome: 'F', ativo: false, valor: -5 } as unknown as OperacaoFunding;
-  assert.deepEqual(errosDoEstadoFinal(altCom(fin)), []);
+  assert.equal(errosDoEstadoFinal(altCom(fin)).length, 1);
+});
+
+test('planoUsarAlternativa: operação marcada fora é removida, e a nova marcada fora não é criada', () => {
+  const salvas = [
+    { id: 1, tipo: 'equity', nome: 'A', valor: 1, pct_retorno: 70 },
+    { id: 2, tipo: 'financiamento_producao', nome: 'F', valor: 0, ativo: true },
+  ] as any;
+  const alt: any = { id: 'a', nome: 'x', operacoes: [
+    { ...salvas[0], __fora: true },
+    { ...salvas[1], __fora: true },
+    { tipo: 'divida', nome: 'nova', valor: 10, __fora: true },
+  ] };
+  const plano = planoUsarAlternativa(salvas, alt);
+  assert.deepEqual(plano.remover, [1]);
+  assert.deepEqual(plano.atualizar, [{ id: 2, campos: { ativo: false } }]);
+  assert.deepEqual(plano.criar, []);
 });
 
 test('errosDoEstadoFinal: retorno ou valor negativo e retorno acima de 100 por operação', () => {
