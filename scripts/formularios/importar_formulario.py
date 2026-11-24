@@ -320,6 +320,12 @@ def _validar_avancado(m, erros, avisos):
     sem_nome('funding.equity', 'Equity')
     sem_nome('funding.antecipacao', 'Antecipação de recebíveis')
     sem_nome('cenarios', 'Cenário')
+    # A API recusa a velocidade fora de −90% a +500% (VELOCIDADE_VENDAS_INVALIDA); recusar aqui evita
+    # criar o estudo e só descobrir no POST do cenário, com o estudo já meio escrito.
+    for n, c in sorted(m['cenarios'].items()):
+        v = c.get('velocidade_vendas_pct')
+        if v is not None and (not isinstance(v, (int, float)) or isinstance(v, bool) or not -90 <= v <= 500):
+            E(f'Cenário {n}: velocidade de vendas deve ficar entre −90% e +500% (veio {v})')
     sem_nome('funding.financiamento_producao', 'Financiamento à produção')
 
     def sem_chave(lista, rotulo, chaves):
@@ -1021,10 +1027,11 @@ def reler(api, m, eid):
     for c in ped:
         g = gravados.get(str(c['nome']))
         if g is None:
+            div.append(f'cenário {c["nome"]}: pedido e não encontrado entre os gravados')
             continue
         for col in ('preco_venda_pct', 'custo_obra_pct', 'velocidade_vendas_pct'):
-            pedido, lido = float(c.get(col) or 0), g.get(col)
-            if lido is None or abs(float(lido) - pedido) > 0.005:
+            pedido, lido = c.get(col) or 0, g.get(col)
+            if lido is None or not igual(pedido, lido):
                 div.append(f'cenário {c["nome"]}: {col} pedido {pedido:g}, gravado {lido}')
     return div
 

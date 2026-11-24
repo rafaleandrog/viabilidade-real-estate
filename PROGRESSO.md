@@ -9,7 +9,8 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - A seção Cenários dos dois formulários Avançado (Incorporação e Loteamento) ganhou o campo
   "Velocidade de vendas", em %, na faixa que a API aceita (−90% a +500%). O importador o envia no
   `POST` de cenário (0 quando vazio) e, na releitura, confere preço, custo de obra e velocidade de
-  cada cenário gravado contra o pedido — antes conferia só a quantidade.
+  cada cenário pedido contra o gravado de mesmo nome (cenário sem par é divergência) — antes
+  conferia só a quantidade. A validação, antes de escrever, recusa velocidade fora da faixa.
 - Os exemplos preenchidos passam a usar vendas +20% no otimista e −20% no pessimista. Os
   formulários e exemplos do Preliminar não mudaram (não têm cenários salvos).
 
