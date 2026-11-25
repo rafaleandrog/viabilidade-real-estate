@@ -309,8 +309,13 @@ for (const [padrao, cfg] of PADROES) {
 
     assert.equal(nome('Fluxo de Caixa Livre Mensal').vpl, c.vpl);
     assert.equal(nome('Fluxo de Caixa Livre Acumulado').vpl, c.vpl);
-    assert.equal(nome('Fluxo de Caixa Mensal').vpl, c.vpl + funding.vplLiquido);
-    assert.equal(nome('Fluxo de Caixa Acumulado').vpl, c.vpl + funding.vplLiquido);
+    // Ao centavo, não por igualdade exata de float: a linha publica o VPL
+    // alavancado arredondado a 2 casas, e a soma crua difere no último bit
+    // (alteração autorizada pelo dono na #983).
+    const aoCentavo = (a: number | undefined, b: number, rotulo: string) =>
+      assert.ok(a !== undefined && Math.abs(a - b) < 0.005, `${rotulo}: ${a} ≠ ${b} ao centavo`);
+    aoCentavo(nome('Fluxo de Caixa Mensal').vpl, c.vpl + funding.vplLiquido, 'Fluxo de Caixa Mensal');
+    aoCentavo(nome('Fluxo de Caixa Acumulado').vpl, c.vpl + funding.vplLiquido, 'Fluxo de Caixa Acumulado');
 
     // Os KPIs (`kpisFluxo`) leem `FluxoCalc`, que o funding não toca: TIR, VPL
     // e Payback são os desalavancados por §8.1.
