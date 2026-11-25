@@ -127,6 +127,41 @@ A aba mostra, em **Resultado da antecipação**:
 Quem compra assume o risco das parcelas. Como o app não modela inadimplência, a cessão com ou sem
 coobrigação dá os mesmos números, e não há campo para isso.
 
+### Comparar estruturas
+
+A aba **Comparar estruturas** põe até três estruturas de capital alternativas lado a lado com o
+funding salvo, sem mexer no estudo. **Nova alternativa a partir do funding salvo** copia as operações
+atuais para um cartão que você altera à vontade: o nome da alternativa e, em cada operação, **Incluir**
+(tira a operação da alternativa; no financiamento à produção, desliga), o **Nome**, o **Valor** (em
+reais; no financiamento à produção, o percentual financiado; na antecipação, o percentual da carteira
+cedida), a **Taxa / retorno** e o **Início**. O início só é editável quando a operação usa um **Mês
+específico**; numa operação ancorada ao cronograma ele aparece só para leitura, porque o app o
+recalcula pela âncora. **+ Dívida** e **+ Equity** acrescentam operações novas.
+
+As alternativas ficam guardadas **só neste navegador**, por estudo: não vão para o
+servidor, outras pessoas e outros navegadores não as veem e limpar os dados do navegador as apaga. Sem armazenamento
+disponível, elas duram até recarregar a página (trocar de aba do Funding não as perde).
+
+A tabela **Comparação** tem uma coluna **Funding salvo**, de referência, e uma por alternativa, com
+quatro indicadores, todos calculados com o mesmo motor da página:
+
+- **Exposição máxima**: o pior ponto do caixa acumulado do projeto já com o funding — o quanto de
+  capital próprio a estrutura exige no pior momento;
+- **TIR alavancada (% a.a.)**: a TIR do fluxo com o funding; fica em "—" quando o fluxo não troca
+  de sinal;
+- **Custo financeiro do funding**: tudo que o projeto paga às operações menos tudo que recebe delas;
+- **Resultado após funding**: a soma do fluxo com o funding.
+
+Uma alternativa idêntica ao funding salvo reproduz exatamente a coluna de referência e é marcada
+como **igual ao salvo**. Com permissão de edição, **Usar esta** abre uma confirmação que diz quantas
+operações serão criadas, alteradas e removidas; ao confirmar, o funding do estudo passa a ser o da
+alternativa. Operação com **Incluir** desmarcado sai do funding ao aplicar. **Usar esta** fica
+desabilitado, com um aviso na alternativa, quando ela passa de 100% de retorno de equity num mesmo
+modo de retorno ou fere outra regra das operações (valor, taxa ou prazo negativo, percentual acima de
+100, carência igual ou maior que a amortização, nome vazio ou com mais de 100 caracteres, número inválido): nada é gravado. O **Financiamento à produção** nunca é removido: se a alternativa o dispensa, ele é
+**desligado** e seus parâmetros ficam preservados. Depois de aplicar, os dados do funding são recarregados e a
+alternativa continua guardada para novas comparações.
+
 ### Onde o funding aparece
 
 - **Resultados → Fluxo de Caixa**: as liberações e aportes como receita, as parcelas e retornos
