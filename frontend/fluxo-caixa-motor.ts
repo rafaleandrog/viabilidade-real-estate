@@ -23,7 +23,7 @@ import {
   mesRepasse, ultimoMesFunding, janelaVendasDaCurva, absorcaoComVelocidade,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte, type ImpostoReceita,
 } from './fluxo-shared.js';
-
+import { pedacosSafraLegado, partirPedaco } from './safra-legado.js';
 const n = (v: any): number => Number(v) || 0;
 
 /** #260: quantiza a 2 casas — contrato C7, valor monetário resultado de fórmula. */
@@ -2251,38 +2251,38 @@ export function recebimentoBrutoMensal(
 
     if (semConfig) { deposita(mesVenda, venda); continue; }
 
-    // Entrada — cada linha parcelável a partir do mês da venda. #227: o
-    // desconto comercial (ex.: 5% no pagamento à vista) reduz o valor ANTES
-    // da formação do recebível — a base é a venda bruta contratada, e a
-    // dedução se aplica só à fração desta entrada, nunca ao total da linha.
-    for (const e of entradas) {
-      const totalBruto = venda * (n(e?.pct) / 100);
-      if (totalBruto <= 0) continue;
-      const total = totalBruto * (1 - n(e?.descontoPct) / 100);
-      const nParc = Math.max(1, Math.round(n(e?.parcelas) || 1));
-      for (let k = 0; k < nParc; k++) deposita(mesVenda + k, total / nParc);
-    }
-
-    // Parcelamento — cada linha ao longo da obra ou por periodicidade.
-    for (const p of parcelasLinhas) {
-      const total = venda * (n(p?.pct) / 100);
-      if (total <= 0) continue;
-      if (p?.ao_longo_obra) {
-        // #190/#191 — "Ao longo da obra": vencimentos ancorados no CRONOGRAMA
-        // da obra (a cada `intervalo` meses, conforme a periodicidade), não
-        // contados a partir do mês da venda (ver `vencimentosAoLongoObra`).
-        // Σ das parcelas = `total` sempre.
-        const vencimentos = vencimentosAoLongoObra(cronograma, mesVenda, p?.periodicidade);
-        for (const mes of vencimentos) deposita(mes, total / vencimentos.length);
-      } else {
-        const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
-        const nParc = Math.max(1, Math.round(n(p?.parcelas) || 1));
-        for (let k = 1; k <= nParc; k++) deposita(mesVenda + intervalo * k, total / nParc);
-      }
-    }
-
-    // Repasse — % derivado, concentrado na entrega (independe do mês da venda).
-    deposita(Math.max(mesRepasse, mesVenda), venda * (pctRepasse / 100));
+    // Entrada, parcelamento e repasse da safra.
+    //
+    // #227: o desconto comercial (ex.: 5% no pagamento à vista) reduz o valor
+    // ANTES da formação do recebível — a base é a venda bruta contratada, e a
+    // dedução se aplica só à fração da entrada que a declara, nunca ao total
+    // da linha.
+    //
+    // #190/#191 — "Ao longo da obra": os vencimentos são ancorados no
+    // CRONOGRAMA da obra (a cada `intervalo` meses, conforme a periodicidade),
+    // não contados a partir do mês da venda (ver `vencimentosAoLongoObra`).
+    //
+    // Arredondamento: cada pedaço (uma linha de entrada, uma de parcelamento, o
+    // repasse) nasce em centavos, e o ÚLTIMO pedaço com valor fica com o RESTO,
+    // para Σ recebido = líquido contratado da safra ao centavo (o mesmo desenho
+    // do plano por componentes, `partesDaSafra`). Dentro de um pedaço, a última
+    // parcela também fica com o resto. A repartição mora em `safra-legado.ts`.
+    //
+    // Sem o resto, cada parcela arredondava a própria fatia e a soma das fatias
+    // de uma safra de centavos fracionados (curva de vendas com percentuais
+    // como 33,33%) saía alguns centavos acima ou abaixo do contratado, e a
+    // invariante de Receita Bruta acusava a diferença mesmo sem cenário
+    // nenhum. O número de referência é o de `vendaLiquidaContratadaMensal`
+    // (venda bruta da safra menos o desconto comercial dela). Sem fluxo
+    // configurado a venda entra à vista, e nada disto se aplica.
+    //
+    // O repasse é o % derivado e fica concentrado na entrega, independente do
+    // mês da venda; um recebimento que cairia fora do horizonte é avisado por
+    // `deposita` e não computado.
+    const pedacos = pedacosSafraLegado(venda, mesVenda, entradas, parcelasLinhas, pctRepasse, mesRepasse,
+      (p) => INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1,
+      (p) => vencimentosAoLongoObra(cronograma, mesVenda, p?.periodicidade));
+    for (const pedaco of pedacos) partirPedaco(pedaco).forEach((v, k) => deposita(pedaco.meses[k], v));
   }
   return saida.map(round2); // #260 — C7
 }
