@@ -14,8 +14,15 @@ import { parseNumeroBR, textoCampoEdicao, textoCampoRepouso } from './viab-forma
 //
 // A flag `atenuado` (bug #15) deixa o campo em cinza para sinalizar que o dado
 // não está sendo usado no cálculo naquele momento.
+// #908: contador para o `id` do <input>, único por instância.
+let _seqCampo = 0;
+
 @customElement('viab-num')
 export class ViabNum extends LitElement {
+  // O <label> e o <input> moram no MESMO shadow root, então `for`/`id` resolve
+  // ali dentro; o `id` único por instância evita colisão se o componente um
+  // dia passar a renderizar em light DOM.
+  private readonly _idCampo = `viab-num-${++_seqCampo}`;
   @property() label = '';
   @property({ type: Number }) valor: number | null = null;
   @property() sufixo = '';
@@ -123,9 +130,10 @@ export class ViabNum extends LitElement {
   render() {
     return html`
       <div class="campo">
-        ${this.label ? html`<label>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
+        ${this.label ? html`<label for=${this._idCampo}>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
         <div class="input-wrap ${this.erro ? 'tem-erro' : ''}">
           <input
+            id=${this._idCampo}
             type="text"
             inputmode="decimal"
             .value=${this._display()}
