@@ -2262,13 +2262,13 @@ export function recebimentoBrutoMensal(
     // CRONOGRAMA da obra (a cada `intervalo` meses, conforme a periodicidade),
     // não contados a partir do mês da venda (ver `vencimentosAoLongoObra`).
     //
-    // Arredondamento: cada pedaço (uma linha de entrada, uma de parcelamento, o
-    // repasse) nasce em centavos, e o ÚLTIMO pedaço com valor fica com o RESTO,
-    // para Σ recebido = líquido contratado da safra ao centavo (o mesmo desenho
-    // do plano por componentes, `partesDaSafra`). Dentro de um pedaço, a última
-    // parcela também fica com o resto. A repartição mora em `safra-legado.ts`.
+    // Arredondamento: os pedaços (cada linha de entrada, cada parcelamento, o
+    // repasse) repartem o líquido contratado da safra por ARREDONDAMENTO
+    // ACUMULADO, para Σ recebido = líquido contratado ao centavo, sem pedaço
+    // negativo e sem centavo perdido em safra minúscula. As parcelas de cada
+    // pedaço seguem a mesma regra. A repartição mora em `safra-legado.ts`.
     //
-    // Sem o resto, cada parcela arredondava a própria fatia e a soma das fatias
+    // Sem isso, cada parcela arredondava a própria fatia e a soma das fatias
     // de uma safra de centavos fracionados (curva de vendas com percentuais
     // como 33,33%) saía alguns centavos acima ou abaixo do contratado, e a
     // invariante de Receita Bruta acusava a diferença mesmo sem cenário

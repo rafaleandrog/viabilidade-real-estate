@@ -6,7 +6,7 @@ import type { EventoCrono } from './fluxo-shared.js';
 
 // Plano de pagamento LEGADO (entrada, parcelas e repasse, sem `componentes`) com
 // curva de vendas de percentuais fracionados: a Receita Bruta conserva ao
-// centavo, porque o último pedaço de cada safra fica com o resto.
+// centavo, porque cada safra é repartida por arredondamento acumulado.
 
 const CRONO: EventoCrono[] = [
   { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
