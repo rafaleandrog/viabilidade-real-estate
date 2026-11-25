@@ -58,6 +58,7 @@ trabalho avança (ou que está fora). Ele não autoriza substituir o que já exi
 `referencia/` é consultivo** (§ Contexto de negócio). A regra de toda sessão está em `.claude/rules/rumo-ao-estado-da-arte.md`,
 a rotina agendada na skill `rumo-ao-estado-da-arte`, e o painel do dia é a issue "Estado da Arte: painel". A exceção de merge
 da rotina está em § Merge.
+O arquivo `.claude/estado-da-arte/PAUSA` (se existir) pausa a rotina agendada: só o autor o cria ou remove.
 
 ## Estado do backlog — ✅ RODADA 15 CONCLUÍDA (2026-10-02) · ✅ RODADA 14 CONCLUÍDA (2026-09-25)
 
