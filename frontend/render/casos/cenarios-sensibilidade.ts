@@ -73,6 +73,8 @@ export const caso = {
     // opção nenhuma — mesma natureza documentada em modal-pagamento.ts,
     // kpis-resumo.ts e grupo-badge-legado.ts. É o seletor de variável
     // estressada.
+
+    'urbi-icone.classe',
     'urbi-select.label',
     'urbi-select.opcoes',
   ],

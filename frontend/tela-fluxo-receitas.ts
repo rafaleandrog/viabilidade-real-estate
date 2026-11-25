@@ -181,6 +181,8 @@ export class ViabFluxoReceitas extends LitElement {
     .pag-secao { margin-bottom: 14px; }
     /* #585 rodada 5: aviso de linha que ainda nao passou pelo motor canonico.
        (Sem crase neste bloco, pelo mesmo motivo declarado logo abaixo.) */
+    /* Ícone dos dois avisos do modal (no lugar do emoji). */
+    .icone-aviso { color: var(--cor-alerta); margin-right: 6px; }
     .plano-legado {
       border-left: 2px solid var(--cor-alerta);
       padding-left: 10px; max-width: 70ch;
@@ -983,14 +985,14 @@ export class ViabFluxoReceitas extends LitElement {
               — valor único do estudo, editado em <strong>Viabilidade → Financeiro</strong>. Vale
               para entrada parcelada, parcelamento, repasse e carteira própria de todas as linhas de receita.</p>
             ${planoLegado ? html`
-              <p class="sec plano-legado">⚠️ <strong>Neste Grupo os juros ainda nao estao
+              <p class="sec plano-legado"><urbi-icone class="icone-aviso" classe="fa-solid fa-triangle-exclamation"></urbi-icone><strong>Neste Grupo os juros ainda nao estao
                 valendo.</strong> O plano de pagamento dele nunca foi aplicado, entao o calculo
                 usa o formato antigo, que soma entrada, parcelamento e repasse
                 <strong>sem juros</strong> — qualquer que seja a taxa do estudo. Clicar em
                 <strong>Aplicar</strong>, aqui embaixo, grava o plano no formato atual e poe a
                 taxa do estudo em vigor nesta linha.</p>` : nothing}
             ${f.espelhoDivergente ? html`
-              <p class="sec espelho-divergente">⚠️ <strong>O plano desta linha foi gravado com
+              <p class="sec espelho-divergente"><urbi-icone class="icone-aviso" classe="fa-solid fa-triangle-exclamation"></urbi-icone><strong>O plano desta linha foi gravado com
                 componentes que as linhas abaixo não descrevem.</strong> O cálculo usa os
                 componentes gravados, e por isso as linhas abaixo ficam só para leitura.
                 <strong>Aplicar</strong> mantém o plano como está.</p>` : nothing}
