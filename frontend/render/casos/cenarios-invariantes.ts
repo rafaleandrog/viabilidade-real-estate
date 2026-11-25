@@ -28,6 +28,8 @@ export const caso = {
   aceitaNaoReproduzido: [
     'urbi-card.titulo',
     'urbi-badge.cor',
+
+    'urbi-icone.classe',
     'urbi-select.label',
     'urbi-select.opcoes',
   ],
