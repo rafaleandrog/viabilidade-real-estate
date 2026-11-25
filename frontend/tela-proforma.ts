@@ -617,7 +617,7 @@ export class ViabTelaProforma extends LitElement {
     // troca por "—" não depende de cor nenhuma.
     if (lot) kpis.push({ rot: 'Vendável / gleba', val: fmtPctOuIndef(p.eficienciaPct), variante: '' });
     if (permuta) kpis.push({ rot: permuta.rot, val: permuta.val, variante: '' });
-    // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
+    // Texto colorido nos 3 níveis do velocímetro do benchmark (o ícone de faixa
     // fica só nos badges da análise de sensibilidade).
     // #571: VGV ≤ 0 (ex.: permuta física capa 100% da base) — os dois vêm
     // `null` do motor, e `fmtPctOuIndef` mostra "—", nunca "0,0%".
@@ -818,6 +818,9 @@ export class ViabTelaProforma extends LitElement {
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS seguem a mesma cor do
     // cenário, por classe `cen-*` (ver o CSS) — exceto quando o valor é negativo.
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
+    const ROTULO_FAIXA: Record<string, string> = {
+      erro: 'Benchmark: faixa ruim', alerta: 'Benchmark: faixa de alerta', sucesso: 'Benchmark: faixa boa',
+    };
     const pBear = proforma('bear'), pBase = proforma('base'), pBull = proforma('bull');
     // #730: o cabeçalho declara o ESTRESSE aplicado (`Bear −10% Preço de
     // venda`), não só o nome do cenário — `rotuloEstresse` usa o mesmo
@@ -888,8 +891,12 @@ export class ViabTelaProforma extends LitElement {
       const txt = fmt(m, valNum);
       if (m.badge) {
         const faixa = m.bmCampo ? varianteFaixa(this._bm(m.bmCampo), valNum) : '';
+        // A cor sozinha não chega ao leitor de tela: o nome da faixa vai no
+        // `title` e no `aria-label` do ícone.
+        const rotFaixa = ROTULO_FAIXA[faixa];
         const bola = faixa
-          ? html`<urbi-icone class="bola-faixa faixa-${faixa}" classe="fa-solid fa-circle" title="Faixa do benchmark"></urbi-icone>`
+          ? html`<urbi-icone class="bola-faixa faixa-${faixa}" classe="fa-solid fa-circle"
+              role="img" title=${rotFaixa} aria-label=${rotFaixa}></urbi-icone>`
           : nothing;
         return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola}${txt}</urbi-badge></div></td>`;
       }

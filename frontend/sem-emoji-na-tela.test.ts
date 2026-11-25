@@ -33,13 +33,16 @@ function fontesVersionados(): string[] {
 }
 
 export function emojisNoTexto(arquivo: string, fonte: string): string[] {
-  if (!EMOJI.test(fonte)) return [];
   const sf = ts.createSourceFile(arquivo, fonte, ts.ScriptTarget.Latest, true);
   const achados: string[] = [];
   const visitar = (n: ts.Node) => {
     if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)
       || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) {
-      const texto = n.getText(sf).replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+      // O texto CRU (como está no fonte) e o texto INTERPRETADO (`n.text`, com
+      // escapes resolvidos): `'\u{1F512}'` não tem emoji no fonte, mas tem na tela.
+      const limpar = (t: string) => t.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+      const cru = limpar(n.getText(sf));
+      const texto = EMOJI.test(cru) ? cru : limpar(n.text);
       if (EMOJI.test(texto)) {
         const { line } = sf.getLineAndCharacterOfPosition(n.getStart(sf));
         const trecho = texto.split('\n').find((l) => EMOJI.test(l))!.trim().slice(0, 80);
@@ -66,6 +69,8 @@ test('controle: a varredura acha emoji em literal e ignora comentário', () => {
   assert.equal(emojisNoTexto('a.ts', "const a = '🔒';").length, 1);
   assert.equal(emojisNoTexto('a.ts', 'const a = html`<span>📅 ${x}</span>`;').length, 1);
   assert.equal(emojisNoTexto('a.ts', "const a = `<p>⚠️ aviso</p>`;").length, 1);
+  assert.equal(emojisNoTexto('a.ts', "const a = '\\u{1F512}';").length, 1);
+  assert.equal(emojisNoTexto('a.ts', "const a = '\\uD83D\\uDD12';").length, 1);
   assert.equal(emojisNoTexto('a.ts', '// 🔒 comentário\nconst a = 1;').length, 0);
   assert.equal(emojisNoTexto('a.ts', 'const c = css`/* ⚠️ nota */ .a { color: red; }`;').length, 0);
   assert.equal(emojisNoTexto('a.ts', 'const h = html`<!-- ⭐ --><b>ok</b>`;').length, 0);
