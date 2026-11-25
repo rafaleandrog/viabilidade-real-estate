@@ -19,6 +19,7 @@ Ideia que não cabe numa linha deixou de ser ideia — abra a issue.
 - **Resultado após funding na Análise Financeira**: uma linha ao lado do Resultado desalavancado, deduzindo os juros do financiamento à produção.
 - **Links importantes do projeto, lidos do canal**: registrar os hyperlinks citados no canal do projeto (projetos arquitetônicos e urbanísticos no Drive, por exemplo) e vinculá-los ao projeto ou ao estudo a que se referem, com um rótulo que diga o que cada link é.
 - **KML e KMZ do projeto salvos e vinculados no app**: baixar o arquivo do Drive, guardá-lo no app e vinculá-lo ao projeto ou ao estudo, para o módulo geo poder usá-lo sem depender de o link do Drive continuar valendo.
+- **Criar estudos automaticamente a partir do Slack e da Cozinha**: levar a ficha da planilha de `referencia/formularios/` para mensagens de canal (uma por seção, `chave técnica: valor`), com o app gravando um rascunho; a investigação, os testes e os caminhos possíveis (padrão do `dd`, Cozinha como saída ou como hub) estão em `historico/automacao-estudos-slack-cozinha-2026-11-24.md`. Pausada pelo autor.
 
 - **CRM de captação de investidores**: pipeline de investidores do projeto, com histórico de negociação, pedidos de documento e term sheets, como o da OSPA Capital. Desejo futuro, sem previsão de entrar no escopo.
 - **Matching do projeto com investidores**: cruzar o estudo com a tese de fundos, gestoras e family offices (região, cap rate, LTV), como a OSPA Capital faz. Desejo futuro, sem previsão de entrar no escopo.
