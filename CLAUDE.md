@@ -11,6 +11,8 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 **Fontes de verdade:**
 - `PROGRESSO.md` — estado atual, o que foi feito, pendências
 - `INSTRUCOES-CODE.md` — master plan e contratos inegociáveis da plataforma
+- `.claude/estado-da-arte/estado-da-arte.md` — o **destino** do app (versão final ideal, aprovada pelo autor); leia também
+  `aprendizados.md` (como o autor decide) e `config.md` (números da rotina), na mesma pasta. Ver § Rumo ao Estado da Arte
 - `schema.json` — schema de dados atual (genesis da app)
 - `docs/*.md` — a documentação **servida** na instância (12 guias, `README.md` = visão geral); ver
   § Documentação da app
@@ -47,6 +49,15 @@ nesta sessão; a primeira pergunta que valer a pena não é "que skill preciso" 
 variáveis eu já configurei".
 
 ---
+
+## Rumo ao Estado da Arte
+
+O destino do app mora em `.claude/estado-da-arte/estado-da-arte.md` e só muda por PR que o autor mergeia. **Antes de planejar
+qualquer mudança, leia esse arquivo e o `aprendizados.md` da mesma pasta** e diga em uma linha qual item do Estado da Arte o
+trabalho avança (ou que está fora). Ele não autoriza substituir o que já existe, e **não altera a regra de que
+`referencia/` é consultivo** (§ Contexto de negócio). A regra de toda sessão está em `.claude/rules/rumo-ao-estado-da-arte.md`,
+a rotina agendada na skill `rumo-ao-estado-da-arte`, e o painel do dia é a issue "Estado da Arte: painel". A exceção de merge
+da rotina está em § Merge.
 
 ## Estado do backlog — ✅ RODADA 15 CONCLUÍDA (2026-10-02) · ✅ RODADA 14 CONCLUÍDA (2026-09-25)
 
