@@ -352,7 +352,7 @@ export class ViabFluxoReceitas extends LitElement {
               Plano não migrado
             </urbi-badge>` : nothing}
           ${!dis ? html`
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover fase'} title="Remover fase"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover grupo'} title="Remover grupo"
               @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}></urbi-botao>` : nothing}
         </div>
 
@@ -458,7 +458,7 @@ export class ViabFluxoReceitas extends LitElement {
         <td class="num">${fmtR$(precoTotal, false)}</td>
         ${dis ? nothing : html`
           <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover tipologia da fase'} title="Remover tipologia da fase"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover tipologia do grupo'} title="Remover tipologia do grupo"
               @click=${() => { this.confirmRemover = { tipo: 'alocacao', fase: f, aloc: a }; }}></urbi-botao>
           </td>`}
       </tr>
