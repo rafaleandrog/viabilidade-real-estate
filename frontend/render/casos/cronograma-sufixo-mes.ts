@@ -63,6 +63,8 @@ export const caso = {
     'urbi-card.titulo',
     'urbi-checkbox.label',
     'urbi-checkbox.marcado',
+
+    'urbi-icone.classe',
     'urbi-input-data.label',
     'urbi-input-data.obrigatorio',
     'urbi-input.placeholder',

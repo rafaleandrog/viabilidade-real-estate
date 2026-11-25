@@ -431,6 +431,8 @@ export class ViabFluxoCustos extends LitElement {
     .orc-permuta-fisica viab-num { width: 90px; }
     .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec); font-size: 0.85rem; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec); }
+    /* Cadeado das colunas travadas: urbi-icone, no lugar do emoji. */
+    .cadeado { font-size: 0.75rem; margin-left: 4px; }
     /* #261: só nas colunas Início/Duração, mesma largura reservada de
        .campo-mes — sem isso, a coluna "pulava" de largura entre linhas
        travadas (.mes-calc, sem largura própria) e editáveis (.campo-mes,
@@ -886,10 +888,10 @@ export class ViabFluxoCustos extends LitElement {
         render: (c: any) => {
           if (eCorretagem(c)) return html`
             <span class="mes-calc" title="A corretagem é paga integralmente no mês em que a unidade é vendida">
-              Mês da venda <span>🔒</span></span>`;
+              Mês da venda <urbi-icone class="cadeado" classe="fa-solid fa-lock"></urbi-icone></span>`;
           if (ePermutaFisica(c)) return html`
             <span class="mes-calc" title="A entrega da unidade não segue curva de distribuição — é a transferência da tipologia selecionada">
-              Entrega de unidades <span>🔒</span></span>`;
+              Entrega de unidades <urbi-icone class="cadeado" classe="fa-solid fa-lock"></urbi-icone></span>`;
           if (ePermutaFinanceira(c)) {
             // #459: a distribuição é travada (sai conforme a receita entra), mas
             // a BASE é escolha da linha — dois checkboxes independentes (a EVI
@@ -903,7 +905,7 @@ export class ViabFluxoCustos extends LitElement {
             return html`
               <div class="dist-preco">
                 <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio">
-                  Receita das vendas <span>🔒</span></span>
+                  Receita das vendas <urbi-icone class="cadeado" classe="fa-solid fa-lock"></urbi-icone></span>
                 ${ePct ? html`
                   <div class="permuta-flags">
                     <span class="sec">Deduzir das permutas financeiras:</span>
@@ -975,7 +977,7 @@ export class ViabFluxoCustos extends LitElement {
           if (regime === 'fixo_obra') {
             // Construção: cronograma fixo em "Obra" (sem seletor) — #120.
             return html`<span class="mes-calc"><strong>Obra</strong>
-              <span title="Cronograma fixo na Obra">🔒</span></span>`;
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Cronograma fixo na Obra"></urbi-icone></span>`;
           }
           // #167: além dos 5 eventos fixos, ancora numa fase do Cronograma
           // (tipo='cronograma', lista separada da de Receitas desde o #168).
@@ -1012,21 +1014,21 @@ export class ViabFluxoCustos extends LitElement {
             // Início derivado do cronograma (evento Obra), bloqueado — #120.
             const obra = this._eventoObra;
             const ini = obra ? Number(obra.inicio_mes) : Number(c.inicio_mes) || 0;
-            return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, ini)}
-              <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
+            return html`<span class="mes-calc mes-crono"><urbi-icone classe="fa-regular fa-calendar"></urbi-icone>${rotuloMesRelativo(this.dataInicio, ini)}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Derivado do cronograma (Obra)"></urbi-icone></span>`;
           }
           if (regime === 'fase_ancora') {
             // Início derivado da fase-âncora do Cronograma, bloqueado — #167.
             const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
-            return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
-              <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
+            return html`<span class="mes-calc mes-crono"><urbi-icone classe="fa-regular fa-calendar"></urbi-icone>${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}></urbi-icone></span>`;
           }
           if (regime === 'evento_fixo') {
-            return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
-              <span title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}>🔒</span></span>`;
+            return html`<span class="mes-calc mes-crono"><urbi-icone classe="fa-regular fa-calendar"></urbi-icone>${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}></urbi-icone></span>`;
           }
           return html`
-            <span class="campo-mes">📅
+            <span class="campo-mes"><urbi-icone classe="fa-regular fa-calendar"></urbi-icone>
               <viab-num casas-decimais="0" sufixo="º mês" ?desabilitado=${dis}
                 .valor=${Number(c.inicio_mes) || 1}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { inicio_mes: e.detail.valor })}
@@ -1043,8 +1045,8 @@ export class ViabFluxoCustos extends LitElement {
             // Duração derivada do cronograma (evento Obra), bloqueada — #120.
             const obra = this._eventoObra;
             const dur = obra ? Number(obra.duracao_meses) : Number(c.duracao_meses) || 1;
-            return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
-              <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
+            return html`<span class="mes-calc mes-crono"><urbi-icone classe="fa-regular fa-clock"></urbi-icone>${dur} ${dur === 1 ? 'mês' : 'meses'}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Derivado do cronograma (Obra)"></urbi-icone></span>`;
           }
           // #249: simétrico ao Início — duração também trava quando ancorada a
           // uma fase ou a um evento fixo (antes só Construção bloqueava aqui;
@@ -1054,16 +1056,16 @@ export class ViabFluxoCustos extends LitElement {
           if (regime === 'fase_ancora') {
             const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
             const dur = Number(c.duracao_meses) || 1;
-            return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
-              <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
+            return html`<span class="mes-calc mes-crono"><urbi-icone classe="fa-regular fa-clock"></urbi-icone>${dur} ${dur === 1 ? 'mês' : 'meses'}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}></urbi-icone></span>`;
           }
           if (regime === 'evento_fixo') {
             const dur = Number(c.duracao_meses) || 1;
-            return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
-              <span title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}>🔒</span></span>`;
+            return html`<span class="mes-calc mes-crono"><urbi-icone classe="fa-regular fa-clock"></urbi-icone>${dur} ${dur === 1 ? 'mês' : 'meses'}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}></urbi-icone></span>`;
           }
           return html`
-            <span class="campo-mes">🕐
+            <span class="campo-mes"><urbi-icone classe="fa-regular fa-clock"></urbi-icone>
               <viab-num casas-decimais="0" sufixo="meses" ?desabilitado=${dis}
                 .valor=${Number(c.duracao_meses) || 1}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { duracao_meses: e.detail.valor })}

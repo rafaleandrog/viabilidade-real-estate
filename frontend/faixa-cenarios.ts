@@ -19,6 +19,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { FaixaCenarios } from './faixa-cenarios-motor.js';
 import { fmtPct } from './viab-format.js';
+import { ICONE_CENARIO } from './sensibilidade-tabela.js';
 
 @customElement('viab-faixa-cenarios')
 export class ViabFaixaCenarios extends LitElement {
@@ -82,6 +83,7 @@ export class ViabFaixaCenarios extends LitElement {
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
+    .valores urbi-icone { margin-right: 4px; }
     .valores .bear { color: var(--cor-erro); }
     .valores .base { color: var(--cor-texto-forte); font-weight: 700; }
     .valores .bull { color: var(--cor-info); }
@@ -118,9 +120,9 @@ export class ViabFaixaCenarios extends LitElement {
           ${m.base !== null ? html`<div class="marcador base" style="left: ${m.base}%;"></div>` : nothing}
         </div>
         <div class="valores">
-          <span class="bear">📉 ${v(f.valores.bear)}</span>
-          <span class="base">📊 ${v(f.valores.base)}</span>
-          <span class="bull">🚀 ${v(f.valores.bull)}</span>
+          <span class="bear"><urbi-icone classe=${ICONE_CENARIO.bear}></urbi-icone>${v(f.valores.bear)}</span>
+          <span class="base"><urbi-icone classe=${ICONE_CENARIO.base}></urbi-icone>${v(f.valores.base)}</span>
+          <span class="bull"><urbi-icone classe=${ICONE_CENARIO.bull}></urbi-icone>${v(f.valores.bull)}</span>
         </div>
         <div class="extremos"><span>${fmtPct(f.min)}</span><span>${f.estendida ? 'escala estendida · ' : ''}${fmtPct(f.max)}</span></div>
       </div>

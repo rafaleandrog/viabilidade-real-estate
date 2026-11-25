@@ -78,25 +78,14 @@ export function faixaDoValor(b: any, faixas: FaixaMedidor[], val: number): Faixa
   return achada ?? faixas[faixas.length - 1];
 }
 
-// Bola colorida (🟢/🟡/🔴) da faixa — para usar como emoji de status em urbi-badge.
-const BOLA: Record<string, string> = {
-  [COR.erro]: '🔴',
-  [COR.alerta]: '🟡',
-  [COR.sucesso]: '🟢',
-};
-
-// Variante (sucesso/alerta/erro) da faixa — para colorir o texto de urbi-kpi com
-// os 3 níveis do velocímetro (sem emoji). Todas já suportadas pelo urbi-kpi.
+// Variante (sucesso/alerta/erro) da faixa — colore o texto de urbi-kpi e o
+// ícone de status (`urbi-icone` círculo) com os 3 níveis do velocímetro. A tela
+// não usa emoji: o status é um ícone da plataforma pintado por token.
 const VARIANTE: Record<string, string> = {
   [COR.erro]: 'erro',
   [COR.alerta]: 'alerta',
   [COR.sucesso]: 'sucesso',
 };
-
-export function bolaFaixa(b: any, val: number | null): string {
-  const cor = corFaixa(b, val);
-  return cor ? (BOLA[cor] ?? '') : '';
-}
 
 export function varianteFaixa(b: any, val: number | null): string {
   const cor = corFaixa(b, val);

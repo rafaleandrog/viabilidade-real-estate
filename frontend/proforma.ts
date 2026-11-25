@@ -970,8 +970,8 @@ export function calcularProforma(e: ProformaInput): Proforma {
  * A função continua existindo, e não vira um alias apagado, porque os call
  * sites (`tela-graficos.ts`, `tela-premissas.ts`) e os testes de fiação que os
  * guardam já a nomeiam — trocar por acesso cru economizaria uma indireção às
- * custas de reabrir todos esses call sites sem necessidade. `varianteFaixa`,
- * `bolaFaixa` e `montarMedidor` aceitam `null` desde a #571.
+ * custas de reabrir todos esses call sites sem necessidade. `varianteFaixa`
+ * e `montarMedidor` aceitam `null` desde a #571.
  */
 export function eficienciaParaFaixa(p: Proforma): number | null {
   return p.eficienciaMedida ? p.eficienciaPct : null;

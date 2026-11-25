@@ -51,6 +51,8 @@ export const caso = {
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
+
+    'urbi-icone.classe',
     'urbi-select.opcoes',
     'urbi-select.label',
     'urbi-checkbox.label',
