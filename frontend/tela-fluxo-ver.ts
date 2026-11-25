@@ -20,6 +20,9 @@ import {
   tabelaPermutaFisica,
 } from './fluxo-tabela.js';
 import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
+import { exportarDossiePDF } from './dossie.js';
+import { dossieAvancado } from './dossie-montar.js';
+import { carregarComplementosAvancado } from './dossie-carga.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
   indicadoresOperacao, tranchesDeInvestimento, eDivida,
@@ -991,6 +994,7 @@ export class ViabFluxoVer extends LitElement {
       extra: html`
         <urbi-botao variante="secundario" pequeno icone="fa-solid fa-download" @click=${this._csv}>CSV</urbi-botao>
         <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${this._pdf}>PDF</urbi-botao>
+        <urbi-botao data-acao="dossie" variante="secundario" pequeno icone="fa-solid fa-file-lines" @click=${this._dossie}>Dossiê do projeto</urbi-botao>
       `,
     });
   }
@@ -1039,5 +1043,25 @@ export class ViabFluxoVer extends LitElement {
     const ok = exportarFluxoPDF(this.estudo, c, this.dados?.dataInicio ?? null,
       this.visao === 'anual' ? 'Anos' : 'Meses', this._fundingExportavel(), this.divergencias, this.permutaFisica);
     if (!ok) urbiVerso.notificar('Permita pop-ups para exportar o PDF.', 'alerta');
+  };
+
+  // Dossiê do projeto (PDF para investidor). Sempre do PROJETO INTEIRO — `calcProjeto` e
+  // `fundingCalcProjeto`, como os cards ROI do projeto, Retorno por parte e Visão do investidor —,
+  // e não da fase filtrada nem da view mensal/anual da tabela. A janela abre antes de as rotas dos
+  // complementos (cenários salvos, mercado, Apelo) responderem, para o pop-up não ser bloqueado.
+  private _dossie = async () => {
+    const d = this.dados;
+    const calc = this.calcProjeto ?? this.calc;
+    if (!d || !calc) return;
+    try {
+      const ok = await exportarDossiePDF(async () => dossieAvancado({
+        estudo: this.estudo, dados: d, calc, config: this._configFluxo(d.receitas),
+        operacoes: this.operacoes, fundingCalc: this.fundingCalcProjeto,
+        ...(await carregarComplementosAvancado(this.estudo.id)),
+      }));
+      if (!ok) urbiVerso.notificar('Permita pop-ups para gerar o dossiê em PDF.', 'alerta');
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao gerar o dossiê do projeto', 'erro');
+    }
   };
 }

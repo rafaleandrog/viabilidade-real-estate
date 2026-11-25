@@ -1,6 +1,6 @@
 ---
 titulo: Exportação
-descricao: O que sai em PDF, Excel e CSV — a Proforma do Preliminar e o Fluxo de Caixa do Avançado —, com a mesma notação de sinal da tela.
+descricao: O que sai em PDF, Excel e CSV — a Proforma do Preliminar, o Fluxo de Caixa do Avançado e o Dossiê do projeto para investidor —, com a mesma notação de sinal e os mesmos números da tela.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -10,8 +10,9 @@ descricao: O que sai em PDF, Excel e CSV — a Proforma do Preliminar e o Fluxo 
 
 ## O que é
 
-Dois blocos são exportáveis: a **Proforma** do estudo Preliminar (PDF e Excel) e o **Fluxo de
-Caixa** do estudo Avançado (CSV e PDF). Como a Proforma e o fluxo são calculados no frontend, a
+Três saídas são exportáveis: a **Proforma** do estudo Preliminar (PDF e Excel), o **Fluxo de
+Caixa** do estudo Avançado (CSV e PDF) e o **Dossiê do projeto** (PDF, nos dois níveis), que
+apresenta o estudo a quem vai investir. Como a Proforma e o fluxo são calculados no frontend, a
 exportação também é: nada é recalculado na hora de exportar, o que garante fidelidade ao que está
 na tela.
 
@@ -67,9 +68,38 @@ tela.
 
 A Proforma do Avançado não tem exportação própria.
 
+### Dossiê do projeto
+
+Um PDF para apresentar o projeto a um investidor, montado do que o estudo já tem, sem redigitar. O
+botão **Dossiê do projeto** fica ao lado de **Exportar PDF** na sub-aba **Proforma** de
+**Resultado** (Preliminar) e ao lado de **CSV** e **PDF** nas sub-abas **Fluxo de Caixa** e
+**Análise Financeira** de **Resultados** (Avançado). Como nos outros PDFs, a janela de impressão
+abre ao clicar e o navegador oferece "Salvar como PDF"; permita pop-ups.
+
+Cada nível leva as seções que tem, e **seção sem dado não aparece** — nem o título:
+
+| Seção | Preliminar | Avançado |
+|---|---|---|
+| **Identificação do empreendimento** — UF, matrícula, terreno, áreas, número de unidades e a tabela de tipologias | do catálogo de Produtos | a área privativa e as unidades das linhas de receita, e a tabela do catálogo de tipologias, com as unidades do catálogo (que podem incluir unidades ainda sem linha de receita) |
+| **Indicadores principais** | os da Proforma: VGV, receita líquida, resultado, margem sobre VGV, custo de obras sobre VGV, ROI, investimento e a área permutada | os do Fluxo de Caixa: VGV potencial, receita bruta, resultado, margem de caixa, TIR, VPL, payback, exposição máxima, juros de clientes, carteira máxima e ROI do projeto, mais, quando existirem, Equity Multiple, Yield e LTV de cada dívida |
+| **Cenários** | a sensibilidade ao preço de venda (Bear, Base e Bull), com a variação do benchmark | os cenários salvos, ao lado do cenário real: alavancas, VGV potencial, resultado, margem de caixa, VPL, TIR, payback e exposição |
+| **Estrutura de funding** | — | as operações, o Fluxo de Caixa Livre contra o Fluxo de Caixa e, havendo dívida ou equity, o retorno por parte |
+| **Análise de mercado** | — | projeto contra mercado e indicadores macro, só onde o dado tem origem informada |
+| **Apelo Comercial** | só com análise rodada (aparece como "Análise de Mercado do Imóvel (IA)") | só com análise rodada |
+
+Os números são os da tela, pelos mesmos formatadores: o dossiê não recalcula nada que a tela não
+calcule. O Avançado sai sempre do **projeto inteiro** — o filtro de fase e a visão mensal ou anual
+da tabela não o alteram, como nos cards de ROI do projeto e Visão do investidor. Os valores em R$
+saem com duas casas, como nos KPIs do PDF da Proforma, e não nos inteiros da coluna R$ da Proforma.
+Na visão do investidor (Equity Multiple, Yield e LTV), o que a tela mostraria como "—" sai sem a
+linha; nos demais indicadores e nas tabelas sai "—".
+
+Se a leitura do Apelo, dos cenários salvos ou da análise de mercado falhar, a seção correspondente
+deixa de sair, e o resto do dossiê é gerado.
+
 ### Cores do PDF
 
-Os dois PDFs saem sempre nas cores do **tema claro** da instância (papel claro, texto escuro),
+Os três PDFs saem sempre nas cores do **tema claro** da instância (papel claro, texto escuro),
 qualquer que seja o tema escolhido na tela: escuro, sépia ou cyberpunk não mudam o documento
 impresso. As barras positivas e negativas do gráfico do fluxo e as linhas de erro e de alerta do
 relatório de reconciliação usam as cores de sucesso, erro e alerta desse tema. Se o navegador não
@@ -81,10 +111,14 @@ Não há rota de exportação: os arquivos são montados no cliente a partir dos
 tela lê (`GET /estudos/:id` e as rotas do Avançado). Um cliente que queira reproduzir um arquivo
 precisa reproduzir o motor de cálculo, descrito em [Fórmulas da Proforma](formulas).
 
-No PDF, todo texto vindo de dado (nome do estudo, tipologia, linha de custo, mensagem de
-reconciliação, rótulo de mês) sai como texto literal: caracteres como `<` e `&` aparecem na página
+O dossiê não tem rota própria: além dos dados que a tela já carregou, ele lê o Apelo Comercial
+(`GET /estudos/:id/apelo-comercial`), e, no Avançado, os cenários salvos
+(`GET /estudos/:id/avancado/cenarios`) e a análise de mercado (`GET /estudos/:id/analise-mercado`).
+
+No PDF, todo texto vindo de dado (nome do estudo, tipologia, linha de custo, nome de cenário ou de
+operação de funding, texto de mercado e de Apelo, mensagem de reconciliação, rótulo de mês) sai como texto literal: caracteres como `<` e `&` aparecem na página
 como estão, nunca interpretados como marcação.
 
 ## Veja também
 
-- [Fórmulas da Proforma](formulas) · [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado)
+- [Fórmulas da Proforma](formulas) · [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado) · [Funding](funding) · [Análise de mercado](analise-mercado) · [Apelo comercial](apelo-comercial)
