@@ -328,9 +328,22 @@ test('Avançado: a identificação traz terreno, área privativa e a tipologia d
   const d = dossieAvancado(entrada);
   const k = kpis(d, 'identificacao');
   assert.equal(k['Área do terreno'], `${fmtNum(3_000)} m²`);
-  assert.equal(k['Área privativa total'], `${fmtNum(areaPrivativaTotalLinhas(RECEITAS))} m²`);
-  assert.equal(k['Nº de unidades'], '10');
-  assert.deepEqual(tabela(d, 'identificacao', 'Tipologias')!.linhas[0], ['Dois quartos', '2', '1', fmtNum(100, 2), '10', fmtR$(10_000)]);
+  assert.equal(k['Área privativa nas receitas'], `${fmtNum(areaPrivativaTotalLinhas(RECEITAS))} m²`);
+  assert.equal(k['Unidades nas receitas'], '10');
+  assert.deepEqual(tabela(d, 'identificacao', 'Catálogo de tipologias')!.linhas[0], ['Dois quartos', '2', '1', fmtNum(100, 2), '10', fmtR$(10_000)]);
+});
+
+test('Avançado: catálogo maior que as receitas — cada bloco diz a sua base, e os números não se confundem', () => {
+  const { entrada } = montarAvancado(FUNDING);
+  // 10 unidades alocadas às receitas; o catálogo tem 25 (15 ainda sem linha de receita).
+  entrada.dados = { ...entrada.dados, tipologias: [{ ...TIPOLOGIAS[0], quantidade: 25 }] };
+  const d = dossieAvancado(entrada);
+  const k = kpis(d, 'identificacao');
+  assert.equal(k['Unidades nas receitas'], '10', 'o KPI soma as linhas de receita, não o catálogo');
+  assert.equal(k['Nº de unidades'], undefined, 'rótulo sem base não pode voltar');
+  const t = tabela(d, 'identificacao', 'Catálogo de tipologias')!;
+  assert.ok(t.colunas.includes('Unidades no catálogo'));
+  assert.equal(t.linhas[0][4], '25');
 });
 
 test('Escape de ponta a ponta: nome do estudo, do cenário, da tipologia, da operação, de mercado e do Apelo', () => {

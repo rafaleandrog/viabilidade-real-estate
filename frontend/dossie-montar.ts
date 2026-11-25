@@ -222,7 +222,7 @@ export interface EntradaDossieAvancado {
   operacoes: OperacaoFunding[];
   /** O funding sobre `calc` (`fundingCalcProjeto`); `null` sem operações. */
   fundingCalc: FundingCalc | null;
-  /** Cenários salvos (`GET /estudos/:id/cenarios`). */
+  /** Cenários salvos (`GET /estudos/:id/avancado/cenarios`). */
   cenarios: any[];
   /** `GET /estudos/:id/analise-mercado`: `{ analise, regiao }`; `null` sem resposta. */
   mercado?: { analise: any; regiao: any } | null;
@@ -239,14 +239,18 @@ function secaoIdentificacaoAvancado(e: EntradaDossieAvancado): DossieSecao | nul
   if (texto(estudo?.uf)) kpis.push({ rotulo: 'UF', valor: texto(estudo.uf) });
   if (texto(estudo?.matricula)) kpis.push({ rotulo: 'Matrícula', valor: texto(estudo.matricula) });
   if (terreno > 0) kpis.push({ rotulo: 'Área do terreno', valor: `${fmtNum(terreno)} m²` });
-  if (area > 0) kpis.push({ rotulo: 'Área privativa total', valor: `${fmtNum(area)} m²` });
-  if (unidades > 0) kpis.push({ rotulo: 'Nº de unidades', valor: fmtNum(unidades) });
+  // Os KPIs somam as LINHAS DE RECEITA (o que entra no fluxo e no VGV); a tabela
+  // abaixo é o CATÁLOGO, que pode ter unidades ainda não alocadas a uma linha.
+  // Cada bloco diz a sua base no rótulo, para os dois números não parecerem o
+  // mesmo dado em desacordo.
+  if (area > 0) kpis.push({ rotulo: 'Área privativa nas receitas', valor: `${fmtNum(area)} m²` });
+  if (unidades > 0) kpis.push({ rotulo: 'Unidades nas receitas', valor: fmtNum(unidades) });
   const tipologias = dados.tipologias.filter((t: any) => texto(t?.nome) !== '' || n(t?.quantidade) > 0);
   return secao({
     id: 'identificacao', titulo: 'Identificação do empreendimento', kpis,
     tabelas: [{
-      titulo: 'Tipologias',
-      colunas: ['Tipologia', 'Dorm.', 'Vagas', 'Área privativa (m²)', 'Unidades', 'Preço (R$/m²)'],
+      titulo: 'Catálogo de tipologias',
+      colunas: ['Tipologia', 'Dorm.', 'Vagas', 'Área privativa (m²)', 'Unidades no catálogo', 'Preço (R$/m²)'],
       linhas: tipologias.map((t: any) => [
         texto(t.nome) || 'Tipologia', fmtNum(n(t.dormitorios)), fmtNum(n(t.vagas)),
         fmtNum(n(t.area_privativa_m2) + n(t.area_privativa_aberta_m2), 2), fmtNum(n(t.quantidade)), fmtR$(n(t.preco_m2)),

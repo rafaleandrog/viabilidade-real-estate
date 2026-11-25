@@ -80,7 +80,7 @@ Cada nível leva as seções que tem, e **seção sem dado não aparece** — ne
 
 | Seção | Preliminar | Avançado |
 |---|---|---|
-| **Identificação do empreendimento** — UF, matrícula, terreno, áreas, número de unidades e a tabela de tipologias | do catálogo de Produtos | do catálogo de tipologias |
+| **Identificação do empreendimento** — UF, matrícula, terreno, áreas, número de unidades e a tabela de tipologias | do catálogo de Produtos | a área privativa e as unidades das linhas de receita, e a tabela do catálogo de tipologias, com as unidades do catálogo (que podem incluir unidades ainda sem linha de receita) |
 | **Indicadores principais** | os da Proforma: VGV, receita líquida, resultado, margem sobre VGV, custo de obras sobre VGV, ROI, investimento e a área permutada | os do Fluxo de Caixa: VGV potencial, receita bruta, resultado, margem de caixa, TIR, VPL, payback, exposição máxima, juros de clientes, carteira máxima e ROI do projeto, mais, quando existirem, Equity Multiple, Yield e LTV de cada dívida |
 | **Cenários** | a sensibilidade ao preço de venda (Bear, Base e Bull), com a variação do benchmark | os cenários salvos, ao lado do cenário real: alavancas, VGV potencial, resultado, margem de caixa, VPL, TIR, payback e exposição |
 | **Estrutura de funding** | — | as operações, o Fluxo de Caixa Livre contra o Fluxo de Caixa e, havendo dívida ou equity, o retorno por parte |
