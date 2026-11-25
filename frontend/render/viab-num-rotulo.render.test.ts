@@ -23,6 +23,7 @@ test('viab-num: o rótulo visível é o nome acessível do input', { skip: pular
   assert.equal(m!.comRotulo.length, 1, 'o input não tem <label> associado' + relato(a));
   assert.match(m!.comRotulo[0], /^Área do terreno$/i, relato(a));
   assert.deepEqual(m!.comObrigatorio, ['Preço por m²'], 'campo obrigatório sem rótulo associado' + relato(a));
+  assert.equal(m!.asteriscoAriaHidden, 'true', 'o asterisco de obrigatório entrou no nome acessível' + relato(a));
   // Sem rótulo: nenhum nome inventado.
   assert.equal(m!.semRotuloLabels, 0, relato(a));
   assert.equal(m!.semRotuloAriaLabel, null, relato(a));

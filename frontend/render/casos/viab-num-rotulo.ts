@@ -13,6 +13,7 @@ export interface MedidaRotuloNum {
   semRotuloLabels: number;
   semRotuloAriaLabel: string | null;
   idsDistintos: boolean;
+  asteriscoAriaHidden: string | null;
 }
 
 export const caso = {
@@ -41,11 +42,14 @@ export const caso = {
     const c = input('c');
     return {
       comRotulo: nomes(a),
-      // O asterisco é aria-hidden: o nome acessível não pode carregá-lo — e
-      // `labels` expõe o textContent bruto, então conferimos o nó à parte.
+      // O asterisco é aria-hidden: o nome acessível não pode carregá-lo. Como
+      // `labels` expõe o textContent bruto, o `*` é aparado aqui e o
+      // `aria-hidden` do nó é conferido em `asteriscoAriaHidden`.
       comObrigatorio: nomes(input('b')).map((t) => t.replace(/\*$/, '').trim()),
       semRotuloLabels: c.labels?.length ?? 0,
       semRotuloAriaLabel: c.getAttribute('aria-label'),
+      asteriscoAriaHidden:
+        raiz.querySelector('viab-num#b')!.shadowRoot!.querySelector('label .req')?.getAttribute('aria-hidden') ?? null,
       idsDistintos: new Set([a.id, input('b').id, c.id, input('d').id]).size === 4 && !!a.id,
     };
   },
