@@ -27,7 +27,7 @@ import './viab-num.js';
 //
 // #41 — cada evento padrão exibe sua cor de token distinta na lista e no gantt.
 // #42 — CRUD de fases extras posicionadas no gantt.
-// #43 — ⭐ sobre o evento Lançamento (sempre 1 mês); 🔑 ao fim da barra de Obra.
+// #43 — estrela sobre o evento Lançamento (sempre 1 mês); chave ao fim da barra de Obra.
 
 @customElement('viab-fluxo-cronograma')
 export class ViabFluxoCronograma extends LitElement {
@@ -126,7 +126,13 @@ export class ViabFluxoCronograma extends LitElement {
        urbi-checkbox e urbi-botao), então aquela regra não pinta nada e alargá-la
        junto seria mexer no que não se mede. */
     .campo-mes viab-num { width: auto; min-width: 10ch; max-width: 24ch; }
-    .cadeado { opacity: 0.7; font-size: 0.75rem; }
+    .cadeado { color: var(--cor-texto-sec); font-size: 0.75rem; }
+    /* Marcadores do Gantt (estrela no Lançamento, chave no fim da Obra): ícone
+       da plataforma dentro de foreignObject, no lugar de emoji em <text>. */
+    .marcador-gantt { display: flex; align-items: center; justify-content: center;
+      width: 100%; height: 100%; font-size: 11px; line-height: 1; }
+    .marcador-gantt.estrela { color: var(--cor-alerta); }
+    .marcador-gantt.chave { color: var(--cor-texto-sec); }
     td.periodo { color: var(--cor-texto-sec); white-space: nowrap; }
 
     .secao-titulo {
@@ -310,7 +316,7 @@ export class ViabFluxoCronograma extends LitElement {
               .valor=${inicioExibido}
               @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharEvento(ev.evento, { inicio_mes: e.detail.valor })}
             ></viab-num>
-            ${travadoIni ? html`<span class="cadeado" title="Calculado automaticamente">🔒</span>` : nothing}
+            ${travadoIni ? html`<urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Calculado automaticamente"></urbi-icone>` : nothing}
           </span>
         </td>
         <td>
@@ -321,7 +327,7 @@ export class ViabFluxoCronograma extends LitElement {
               .valor=${duracaoExibida}
               @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharEvento(ev.evento, { duracao_meses: e.detail.valor })}
             ></viab-num>
-            ${travadoDur ? html`<span class="cadeado" title="Duração fixa">🔒</span>` : nothing}
+            ${travadoDur ? html`<urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Duração fixa"></urbi-icone>` : nothing}
           </span>
         </td>
         <td class="periodo">${rotuloPeriodo(dataInicio, inicioExibido, duracaoExibida)}</td>
@@ -525,16 +531,17 @@ export class ViabFluxoCronograma extends LitElement {
   }
 
   // Gantt em SVG puro: eventos fixos (barras) + fases extras (tracejadas).
-  // #43 — ⭐ sobre o evento Lançamento (1 mês); 🔑 ao fim da barra de Obra.
+  // #43 — estrela sobre o evento Lançamento (1 mês); chave ao fim da barra de Obra.
+  // Os dois são `urbi-icone` num foreignObject: a tela não desenha emoji.
   private _renderGantt(dataInicio: string | null): TemplateResult {
-    const todasLinhas: Array<{ label: string; inicio: number; duracao: number; cor: string; tracejado: boolean; marcador?: string }> = [
+    const todasLinhas: Array<{ label: string; inicio: number; duracao: number; cor: string; tracejado: boolean; marcador?: 'estrela' | 'chave' }> = [
       ...this.crono.map((ev) => ({
         label: EVENTO_LABEL[ev.evento] || ev.evento,
         inicio: Number(ev.inicio_mes),
         duracao: Number(ev.duracao_meses),
         cor: EVENTO_COR[ev.evento] || 'var(--cor-texto-sec)',
         tracejado: false,
-        marcador: ev.evento === 'lancamento' ? '⭐' : ev.evento === 'obra' ? '🔑' : undefined,
+        marcador: ev.evento === 'lancamento' ? 'estrela' as const : ev.evento === 'obra' ? 'chave' as const : undefined,
       })),
       ...this.fases.map((f, i) => ({
         label: f.nome || `Fase ${i + 1}`,
@@ -565,6 +572,14 @@ export class ViabFluxoCronograma extends LitElement {
     for (let m = 0; m <= fim; m += passo) ticks.push(m);
 
     const corTexto = 'var(--cor-texto-sec)';
+    const LADO_MARCADOR = 14;
+    const marcadorGantt = (xIni: number, y: number, tipo: 'estrela' | 'chave', classe: string, rotulo: string) => svg`
+      <foreignObject x=${xIni} y=${y + (rowH - LADO_MARCADOR) / 2} width=${LADO_MARCADOR} height=${LADO_MARCADOR}>
+        ${html`<div class="marcador-gantt ${tipo}" title=${rotulo}><urbi-icone classe=${classe}></urbi-icone></div>`}
+      </foreignObject>`;
+    // Estrela à esquerda do início do Lançamento; chave logo depois do fim da Obra.
+    const estrela = (x: number, y: number) => marcadorGantt(x - 4 - LADO_MARCADOR, y, 'estrela', 'fa-solid fa-star', 'Lançamento');
+    const chave = (xFim: number, y: number) => marcadorGantt(xFim + 4, y, 'chave', 'fa-solid fa-key', 'Entrega das chaves');
     const corGrade = 'var(--cor-borda-sutil)';
 
     return html`
@@ -590,20 +605,14 @@ export class ViabFluxoCronograma extends LitElement {
               ${umMes && !tracejado
                 ? svg`
                   <circle cx=${x + 4} cy=${y + rowH / 2} r="6" fill=${cor} />
-                  ${marcador === '⭐' ? svg`
-                    <text x=${x - 4} y=${y + rowH / 2 + 4} font-size="13" text-anchor="end"
-                      dominant-baseline="middle">⭐</text>` : nothing}`
+                  ${marcador === 'estrela' ? estrela(x, y) : nothing}`
                 : svg`
                   <rect x=${x} y=${y + 6} width=${w} height=${rowH - 12} rx="3" fill=${cor}
                     opacity=${tracejado ? '0.55' : '0.9'}
                     stroke=${tracejado ? cor : 'none'} stroke-width=${tracejado ? '1.5' : '0'}
                     stroke-dasharray=${tracejado ? '4 3' : 'none'} />
-                  ${marcador === '🔑' ? svg`
-                    <text x=${xFim + 4} y=${y + rowH / 2 + 4} font-size="12"
-                      dominant-baseline="middle">🔑</text>` : nothing}
-                  ${marcador === '⭐' ? svg`
-                    <text x=${x - 4} y=${y + rowH / 2 + 4} font-size="13" text-anchor="end"
-                      dominant-baseline="middle">⭐</text>` : nothing}`}
+                  ${marcador === 'chave' ? chave(xFim, y) : nothing}
+                  ${marcador === 'estrela' ? estrela(x, y) : nothing}`}
             `;
           })}
         </svg>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { montarMedidor, bolaFaixa, varianteFaixa } from './medidor-faixas.js';
+import { montarMedidor, varianteFaixa } from './medidor-faixas.js';
 
 test('configurado: 3 faixas vermelho/amarelo/verde (atingir_ou_superar)', () => {
   const c = montarMedidor(
@@ -49,22 +49,22 @@ test('sem meta e sem config: null (não desenha medidor)', () => {
   assert.equal(montarMedidor({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), null);
 });
 
-test('bolaFaixa: bola da faixa em que o valor cai (config 3 faixas)', () => {
+test('varianteFaixa: faixa em que o valor cai (config 3 faixas)', () => {
   const b = { regra_comparacao: 'atingir_ou_superar', medidor_min: 0, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 };
-  assert.equal(bolaFaixa(b, 10), '🔴');  // ≤20 → faixa baixa (ruim)
-  assert.equal(bolaFaixa(b, 25), '🟡');  // 20–30 → alerta
-  assert.equal(bolaFaixa(b, 40), '🟢');  // 30–50 → boa
-  assert.equal(bolaFaixa(b, 999), '🟢'); // acima do máx → última faixa
+  assert.equal(varianteFaixa(b, 10), 'erro');     // ≤20 → faixa baixa (ruim)
+  assert.equal(varianteFaixa(b, 25), 'alerta');   // 20–30 → alerta
+  assert.equal(varianteFaixa(b, 40), 'sucesso');  // 30–50 → boa
+  assert.equal(varianteFaixa(b, 999), 'sucesso'); // acima do máx → última faixa
 });
 
-test('bolaFaixa: nao_exceder inverte (verde embaixo)', () => {
+test('varianteFaixa: nao_exceder inverte (verde embaixo)', () => {
   const b = { regra_comparacao: 'nao_exceder', medidor_min: 0, medidor_faixa1_ate: 30, medidor_faixa2_ate: 40, medidor_max: 60 };
-  assert.equal(bolaFaixa(b, 10), '🟢');
-  assert.equal(bolaFaixa(b, 55), '🔴');
+  assert.equal(varianteFaixa(b, 10), 'sucesso');
+  assert.equal(varianteFaixa(b, 55), 'erro');
 });
 
-test('bolaFaixa: sem medidor válido → vazio', () => {
-  assert.equal(bolaFaixa({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), '');
+test('varianteFaixa: sem medidor válido → vazio', () => {
+  assert.equal(varianteFaixa({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), '');
 });
 
 test('varianteFaixa: variante (sucesso/alerta/erro) da faixa, sem emoji', () => {
@@ -134,7 +134,6 @@ test('#451: fallback automático nunca sinaliza fora da escala, mesmo com valor 
 test('#571: val null → sem medidor, sem bola, sem variante — mesmo com benchmark configurado', () => {
   const bConfigurado = { regra_comparacao: 'atingir_ou_superar', medidor_min: 0, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 };
   assert.equal(montarMedidor(bConfigurado, null), null);
-  assert.equal(bolaFaixa(bConfigurado, null), '');
   assert.equal(varianteFaixa(bConfigurado, null), '');
 });
 
@@ -146,7 +145,6 @@ test('#571: val null no fallback automático também não desenha nada', () => {
 // arredondar antes de comparar.
 test('#899 fallback atingir_ou_superar: igual à meta é verde; logo abaixo é vermelho', () => {
   const b = { regra_comparacao: 'atingir_ou_superar', valor: 25 };
-  assert.equal(bolaFaixa(b, 25), '🟢');
   assert.equal(varianteFaixa(b, 25), 'sucesso');
   assert.equal(varianteFaixa(b, 25.000001), 'sucesso');
   assert.equal(varianteFaixa(b, 24.999999), 'erro');
@@ -178,11 +176,11 @@ test('#899 configurado: valor no corte vai para a faixa melhor nas duas regras',
 
 // Fiação (classe 1): as telas que colorem KPI/medidor por benchmark chamam as
 // funções puras; apagar a chamada na tela deixa a pura verde, e aqui vermelho.
-test('#899 fiação: telas usam varianteFaixa/bolaFaixa e o cálculo usa faixaDoValor', async () => {
+test('#899 fiação: telas usam varianteFaixa e o cálculo usa faixaDoValor', async () => {
   const { readFileSync } = await import('node:fs');
   const le = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   assert.match(le('frontend/tela-proforma.ts'), /varianteFaixa\(co, p\.custoObrasVgvPct\)/);
-  assert.match(le('frontend/tela-proforma.ts'), /bolaFaixa\(this\._bm\(m\.bmCampo\), valNum\)/);
+  assert.match(le('frontend/tela-proforma.ts'), /varianteFaixa\(this\._bm\(m\.bmCampo\), valNum\)/);
   assert.match(le('frontend/tela-premissas.ts'), /varianteFaixa\(ml, p\.margemLiquidaPct\)/);
   assert.match(le('frontend/medidor-faixas.ts'), /return faixaDoValor\(b, cfg\.faixas, val\)\.cor/);
 });

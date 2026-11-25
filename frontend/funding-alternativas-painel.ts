@@ -76,6 +76,7 @@ export class ViabFundingAlternativas extends LitElement {
     :host { display: block; }
     .acao { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin: 0 0 12px; }
+    .nota .cadeado { font-size: 0.85em; margin: 0 2px; }
     .alt { margin-bottom: 16px; }
     .alt-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .alt-cab urbi-input { min-width: 220px; }
@@ -240,7 +241,8 @@ export class ViabFundingAlternativas extends LitElement {
                 .valor=${o.inicio_mes ?? 0}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._alterarOp(i, j, { inicio_mes: e.detail.valor ?? 0 })}
               ></viab-num>`
-            : html`<span class="nota">${ev && ev !== 'customizado' ? `${EVENTOS_ROTULO[ev] ?? ev}: ` : ''}${rotuloMesRelativo(this.dataInicio, o.inicio_mes ?? 0)} 🔒 (pelo Cronograma)</span>`}
+            : html`<span class="nota">${ev && ev !== 'customizado' ? `${EVENTOS_ROTULO[ev] ?? ev}: ` : ''}${rotuloMesRelativo(this.dataInicio, o.inicio_mes ?? 0)}
+                <urbi-icone class="cadeado" classe="fa-solid fa-lock"></urbi-icone> (pelo Cronograma)</span>`}
       </td>
     </tr>`;
   }

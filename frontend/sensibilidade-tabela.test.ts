@@ -107,11 +107,11 @@ test('#730: ordenar por amplitude é por MÓDULO decrescente, com a ordem do pro
 });
 
 test('#730: o cabeçalho declara o estresse — sentido invertido para variável custo-like, base sem Δ', () => {
-  assert.equal(rotuloEstresse('bear', 'Preço de venda', 10, 15, false), '📉 Bear −10% Preço de venda');
-  assert.equal(rotuloEstresse('bull', 'Preço de venda', 10, 15, false), '🚀 Bull +15% Preço de venda');
-  assert.equal(rotuloEstresse('bear', 'Custo de obra', 10, 15, true), '📉 Bear +10% Custo de obra');
-  assert.equal(rotuloEstresse('bull', 'Custo de obra', 10, 15, true), '🚀 Bull −15% Custo de obra');
-  assert.equal(rotuloEstresse('base', 'Custo de obra', 10, 15, true), '📊 Base');
+  assert.equal(rotuloEstresse('bear', 'Preço de venda', 10, 15, false), 'Bear −10% Preço de venda');
+  assert.equal(rotuloEstresse('bull', 'Preço de venda', 10, 15, false), 'Bull +15% Preço de venda');
+  assert.equal(rotuloEstresse('bear', 'Custo de obra', 10, 15, true), 'Bear +10% Custo de obra');
+  assert.equal(rotuloEstresse('bull', 'Custo de obra', 10, 15, true), 'Bull −15% Custo de obra');
+  assert.equal(rotuloEstresse('base', 'Custo de obra', 10, 15, true), 'Base');
 });
 
 test('#730 fiação: a aba Cenários monta a tabela pelo módulo — sete colunas, Δ% dos dois lados, amplitude e o grupo recolhido', () => {
