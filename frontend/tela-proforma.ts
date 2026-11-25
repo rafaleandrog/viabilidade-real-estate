@@ -3,6 +3,9 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { SEM_PRODUTOS_ICONE, SEM_PRODUTOS_MENSAGEM, SEM_PRODUTOS_SUBMENSAGEM } from './sem-produtos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
+import { exportarDossiePDF } from './dossie.js';
+import { dossiePreliminar } from './dossie-montar.js';
+import { carregarApelo } from './dossie-carga.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, produtosDoEstudo, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { rotuloPermutaFisica, rotuloPermutaFinanceira } from './rotulos-permuta.js';
@@ -508,6 +511,7 @@ export class ViabTelaProforma extends LitElement {
           <div class="barra-acoes">
             <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-excel" @click=${() => this._exportar('excel')}>Exportar Excel</urbi-botao>
             <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${() => this._exportar('pdf')}>Exportar PDF</urbi-botao>
+            <urbi-botao data-acao="dossie" variante="secundario" pequeno icone="fa-solid fa-file-lines" @click=${this._dossie}>Dossiê do projeto</urbi-botao>
           </div>
         </urbi-card>
       `)
@@ -938,4 +942,18 @@ export class ViabTelaProforma extends LitElement {
     if (formato === 'excel') exportarExcel(this.estudo, p, lot);
     else if (!exportarPDF(this.estudo, p, lot)) urbiVerso.notificar('Permita pop-ups para exportar em PDF.', 'alerta');
   }
+
+  // Dossiê do projeto (PDF para investidor): a MESMA entrada que a tela dá a `calcularProforma`,
+  // mais o Apelo Comercial, lido pela rota da própria aba. A janela abre ANTES de a rota responder
+  // (`exportarDossiePDF`), para o pop-up não ser bloqueado.
+  private _dossie = async () => {
+    try {
+      const ok = await exportarDossiePDF(async () => dossiePreliminar({
+        estudo: this.estudo, entrada: this._entrada(), benchmarks: this.benchmarks, apelo: await carregarApelo(this.estudo.id),
+      }));
+      if (!ok) urbiVerso.notificar('Permita pop-ups para gerar o dossiê em PDF.', 'alerta');
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao gerar o dossiê do projeto', 'erro');
+    }
+  };
 }
