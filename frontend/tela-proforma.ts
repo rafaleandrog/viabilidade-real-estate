@@ -13,7 +13,7 @@ import { rotuloAlavanca, ehCustoLike, variaveisSensibilidade } from './variaveis
 import { fmtVariacao } from './cenario-variacao.js';
 import {
   LINHAS_SENSIBILIDADE, calcularLinha, particionarInvariantes, rotuloInvariantes, ordenarPorAmplitude,
-  rotuloEstresse, type LinhaCalculada,
+  rotuloEstresse, ICONE_CENARIO, type LinhaCalculada,
 } from './sensibilidade-tabela.js';
 // ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
 // unificação da notação de sinal (registro dos PRs 617/618, achado 10 da
@@ -26,7 +26,7 @@ import {
   ehLinhaReceitaOuResultado, celulaProforma, pctVgvProforma,
 } from './exportar.js';
 export { ehLinhaReceitaOuResultado, celulaProforma };
-import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
+import { varianteFaixa } from './medidor-faixas.js';
 import { kpiAreaPermutada } from './kpi-area-permutada.js';
 import { montarFaixaCenarios } from './faixa-cenarios-motor.js';
 import './faixa-cenarios.js';
@@ -378,6 +378,13 @@ export class ViabTelaProforma extends LitElement {
        coluna (BUG7-12 — antes centralizados). */
     .pf.sens .sens-cab { display: flex; justify-content: flex-end; }
     .pf.sens td .sens-cab { padding: 2px 0; }
+    /* Ícone do cenário no cabeçalho e bola da faixa do benchmark (no lugar dos
+       emojis): urbi-icone pintado por token. */
+    .pf.sens .icone-cen, .pf.sens .bola-faixa { margin-right: 4px; }
+    .pf.sens .bola-faixa { font-size: 0.7em; }
+    .pf.sens .faixa-erro { color: var(--cor-erro); }
+    .pf.sens .faixa-alerta { color: var(--cor-alerta); }
+    .pf.sens .faixa-sucesso { color: var(--cor-sucesso); }
     /* #78 — larguras fixas por colgroup (mesma geometria nas duas tabelas de
        sensibilidade: monetária e indicadores) para os cenários bear/base/bull
        alinharem entre si. */
@@ -614,7 +621,7 @@ export class ViabTelaProforma extends LitElement {
     // troca por "—" não depende de cor nenhuma.
     if (lot) kpis.push({ rot: 'Vendável / gleba', val: fmtPctOuIndef(p.eficienciaPct), variante: '' });
     if (permuta) kpis.push({ rot: permuta.rot, val: permuta.val, variante: '' });
-    // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
+    // Texto colorido nos 3 níveis do velocímetro do benchmark (o ícone de faixa
     // fica só nos badges da análise de sensibilidade).
     // #571: VGV ≤ 0 (ex.: permuta física capa 100% da base) — os dois vêm
     // `null` do motor, e `fmtPctOuIndef` mostra "—", nunca "0,0%".
@@ -815,8 +822,11 @@ export class ViabTelaProforma extends LitElement {
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS seguem a mesma cor do
     // cenário, por classe `cen-*` (ver o CSS) — exceto quando o valor é negativo.
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
+    const ROTULO_FAIXA: Record<string, string> = {
+      erro: 'Benchmark: faixa ruim', alerta: 'Benchmark: faixa de alerta', sucesso: 'Benchmark: faixa boa',
+    };
     const pBear = proforma('bear'), pBase = proforma('base'), pBull = proforma('bull');
-    // #730: o cabeçalho declara o ESTRESSE aplicado (`📉 Bear −10% Preço de
+    // #730: o cabeçalho declara o ESTRESSE aplicado (`Bear −10% Preço de
     // venda`), não só o nome do cenário — `rotuloEstresse` usa o mesmo
     // `custoLike` que montou os fatores acima.
     const rotuloVar = rotuloAlavanca(varSensAtual, lot);
@@ -854,7 +864,7 @@ export class ViabTelaProforma extends LitElement {
         <col style="width: 8%" />
         <col style="width: 17%" />
       </colgroup>`;
-    const thCenario = (c: typeof cenarios[0]) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`;
+    const thCenario = (c: typeof cenarios[0]) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}><urbi-icone class="icone-cen" classe=${ICONE_CENARIO[c.id]}></urbi-icone>${c.rot}</urbi-badge></div></th>`;
     // O cabeçalho é uma função porque só a tabela MONETÁRIA ordena: o `th`
     // continua `columnheader` (é onde `aria-sort` vale) e o controle é um
     // `<button>` dentro dele; nas outras duas tabelas a coluna é só rótulo.
@@ -884,8 +894,15 @@ export class ViabTelaProforma extends LitElement {
       const valNum = m.f(c);
       const txt = fmt(m, valNum);
       if (m.badge) {
-        const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
-        return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
+        const faixa = m.bmCampo ? varianteFaixa(this._bm(m.bmCampo), valNum) : '';
+        // A cor sozinha não chega ao leitor de tela: o nome da faixa vai no
+        // `title` e no `aria-label` do ícone.
+        const rotFaixa = ROTULO_FAIXA[faixa];
+        const bola = faixa
+          ? html`<urbi-icone class="bola-faixa faixa-${faixa}" classe="fa-solid fa-circle"
+              role="img" title=${rotFaixa} aria-label=${rotFaixa}></urbi-icone>`
+          : nothing;
+        return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola}${txt}</urbi-badge></div></td>`;
       }
       // #568: `neg` é o que faz um Resultado negativo aparecer vermelho
       // mesmo na coluna Base — e é a única marca desta tabela que depende

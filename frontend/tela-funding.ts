@@ -217,6 +217,9 @@ export class ViabFunding extends LitElement {
     .ind-card.pos .val { color: var(--cor-sucesso); }
     .ind-card.neg .val { color: var(--cor-erro); }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin-top: 8px; }
+    /* Ícones no lugar de emoji: aviso (triângulo) e campo travado (cadeado). */
+    .icone-aviso { color: var(--cor-alerta); margin-right: 6px; }
+    .cadeado { font-size: 0.75em; margin-left: 4px; color: var(--cor-texto-sec); }
 
     /* §39 — mesmo padrão de gráfico SVG inline da antiga tela-capital-stack.ts. */
     .grafico-card { margin-top: 12px; }
@@ -516,7 +519,8 @@ export class ViabFunding extends LitElement {
         ? this._num(o, 'inicio_mes', 'Mês', 'º mês', 0)
         : html`<div class="sel-campo">
             <span class="sel-rotulo">Início derivado</span>
-            <span>${rotuloMesRelativo(this.dataInicio, Number(this._valor(o, 'inicio_mes')) || 0)} 🔒</span>
+            <span>${rotuloMesRelativo(this.dataInicio, Number(this._valor(o, 'inicio_mes')) || 0)}
+              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Derivado do Cronograma"></urbi-icone></span>
           </div>`}
     `;
   }
@@ -752,7 +756,7 @@ export class ViabFunding extends LitElement {
           ${eDivida(o.tipo) ? card('Saldo final', fmtR$Kpi(ind.saldoFinal), Math.abs(ind.saldoFinal) < 0.01 ? '' : 'neg') : nothing}
         </div>
         ${eDivida(o.tipo) && Math.abs(ind.saldoFinal) >= 0.01
-          ? html`<p class="nota">⚠️ A dívida não zera: no mês da quitação contratual ainda resta
+          ? html`<p class="nota"><urbi-icone class="icone-aviso" classe="fa-solid fa-triangle-exclamation"></urbi-icone>A dívida não zera: no mês da quitação contratual ainda resta
               saldo devedor.</p>`
           : nothing}
       </div>

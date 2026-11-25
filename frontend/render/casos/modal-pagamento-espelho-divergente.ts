@@ -39,6 +39,8 @@ export const caso = {
   aceitaNaoReproduzido: [
     'urbi-botao.icone',
     'urbi-botao.variante',
+
+    'urbi-icone.classe',
     'urbi-select.opcoes',
     'urbi-select.label',
     'urbi-checkbox.label',

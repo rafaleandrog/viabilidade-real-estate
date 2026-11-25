@@ -130,15 +130,27 @@ export function ordenarPorAmplitude(linhas: LinhaCalculada[]): LinhaCalculada[] 
 }
 
 /**
- * O cabeçalho declara o ESTRESSE, não só o nome do cenário: `📉 Bear −10%
- * Preço de venda`, não `📉 Bear`. Para uma variável custo-like o Bear é uma
+ * Ícone de cada cenário (classe FontAwesome do `<urbi-icone>`), no lugar dos
+ * emojis que a tela usava: a tela não desenha emoji, só ícone da plataforma.
+ * Uma fonte só para o cabeçalho da sensibilidade e a faixa de cenários.
+ */
+export const ICONE_CENARIO = {
+  bear: 'fa-solid fa-arrow-trend-down',
+  base: 'fa-solid fa-chart-simple',
+  bull: 'fa-solid fa-arrow-trend-up',
+} as const;
+
+/**
+ * O cabeçalho declara o ESTRESSE, não só o nome do cenário: `Bear −10%
+ * Preço de venda`, não `Bear`. Para uma variável custo-like o Bear é uma
  * ALTA (+X%) e o Bull uma queda — o mesmo sentido de `ehCustoLike` que a
- * tela usa para montar os fatores. A base é a referência: só `📊 Base`.
+ * tela usa para montar os fatores. A base é a referência: só `Base`. O ícone
+ * do cenário vem à parte, de `ICONE_CENARIO`.
  */
 export function rotuloEstresse(
   id: 'bear' | 'base' | 'bull', rotuloVariavel: string, varNeg: number, varPos: number, custoLike: boolean,
 ): string {
-  if (id === 'base') return '📊 Base';
-  if (id === 'bear') return `📉 Bear ${custoLike ? '+' : '−'}${varNeg}% ${rotuloVariavel}`;
-  return `🚀 Bull ${custoLike ? '−' : '+'}${varPos}% ${rotuloVariavel}`;
+  if (id === 'base') return 'Base';
+  if (id === 'bear') return `Bear ${custoLike ? '+' : '−'}${varNeg}% ${rotuloVariavel}`;
+  return `Bull ${custoLike ? '−' : '+'}${varPos}% ${rotuloVariavel}`;
 }
