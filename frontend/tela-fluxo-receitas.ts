@@ -352,7 +352,7 @@ export class ViabFluxoReceitas extends LitElement {
               Plano não migrado
             </urbi-badge>` : nothing}
           ${!dis ? html`
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover fase'} title="Remover fase"
               @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}></urbi-botao>` : nothing}
         </div>
 
@@ -458,7 +458,7 @@ export class ViabFluxoReceitas extends LitElement {
         <td class="num">${fmtR$(precoTotal, false)}</td>
         ${dis ? nothing : html`
           <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover tipologia da fase'} title="Remover tipologia da fase"
               @click=${() => { this.confirmRemover = { tipo: 'alocacao', fase: f, aloc: a }; }}></urbi-botao>
           </td>`}
       </tr>
@@ -1013,7 +1013,7 @@ export class ViabFluxoReceitas extends LitElement {
                   <viab-num label="Desconto" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${n(e.descontoPct)}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'descontoPct', ev.detail.valor ?? 0)}></viab-num>
                   ${!dis && f.entrada.length > 1 ? html`
-                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover entrada'} title="Remover entrada"
                       @click=${() => this._delLinha('entrada', i)}></urbi-botao>` : nothing}
                 </div>`)}
               ${!dis ? html`
@@ -1063,7 +1063,7 @@ export class ViabFluxoReceitas extends LitElement {
                   <urbi-checkbox label="Ao longo da obra" ?desabilitado=${dis} ?marcado=${p.ao_longo_obra}
                     @urbi:checkbox-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'ao_longo_obra', ev.detail.marcado)}></urbi-checkbox>
                   ${!dis && f.parcelas.length > 1 ? html`
-                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover parcelamento'} title="Remover parcelamento"
                       @click=${() => this._delLinha('parcelas', i)}></urbi-botao>` : nothing}
                 </div>`;
               })}
