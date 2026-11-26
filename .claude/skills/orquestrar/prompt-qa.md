@@ -22,7 +22,7 @@ feche com `incompleto: versão instalada <x>, esperada <versão>`.
 **ADAPTADO — a `versao` não prova a build neste repo.** Aqui ela só sobe com migração nova, então uma
 release de código sai com a MESMA `versao` e muda só o sha da tag (`viabilidade-a<x.y.z>_<sha8>`).
 Igual não prova que a build do PR está instalada. Compare também o sha de build da app com o
-`<sha8>` da tag `<tag>` — se a lista de apps não expõe o sha, ou ele diverge, ou não conseguir
+`<sha8>` da tag `<tag>` (o sufixo depois do `_`; não é marcador a preencher) — se a lista de apps não expõe o sha, ou ele diverge, ou não conseguir
 confirmar, feche com `incompleto: build instalada não confirmada, esperada <sha8>`.
 
 <- módulo de canal: a versão é a do módulo, lida na lista de
