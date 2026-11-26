@@ -1058,7 +1058,7 @@ export class ViabFluxoVer extends LitElement {
         estudo: this.estudo, dados: d, calc, config: this._configFluxo(d.receitas),
         operacoes: this.operacoes, fundingCalc: this.fundingCalcProjeto,
         ...(await carregarComplementosAvancado(this.estudo.id)),
-      }));
+      }), `${this.estudo.id}:avancado`);
       if (!ok) urbiVerso.notificar('Permita pop-ups para gerar o dossiê em PDF.', 'alerta');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao gerar o dossiê do projeto', 'erro');

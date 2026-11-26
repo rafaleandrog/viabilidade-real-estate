@@ -75,8 +75,9 @@ botão **Dossiê do projeto** fica ao lado de **Exportar PDF** na sub-aba **Prof
 **Resultado** (Preliminar) e ao lado de **CSV** e **PDF** nas sub-abas **Fluxo de Caixa** e
 **Análise Financeira** de **Resultados** (Avançado). Como nos outros PDFs, a janela de impressão
 abre ao clicar e o navegador oferece "Salvar como PDF"; permita pop-ups. Enquanto o dossiê
-está sendo montado, um novo clique no botão não abre outra janela: traz para a frente a que já
-está montando.
+de um estudo está sendo montado, um novo clique no mesmo botão não abre outra janela: pede ao
+navegador que traga para a frente a que já está montando. Se essa janela for fechada, ou se o
+clique for no dossiê de outro estudo, a janela nova abre normalmente.
 
 Cada nível leva as seções que tem, e **seção sem dado não aparece** — nem o título:
 

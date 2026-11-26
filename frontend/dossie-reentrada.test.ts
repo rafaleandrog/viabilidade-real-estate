@@ -103,3 +103,39 @@ test('reentrada: o fim da montagem antiga não solta a trava da janela nova', as
     await b;
   });
 });
+
+test('reentrada: a trava é por chave — outro estudo abre o próprio dossiê durante a montagem', async () => {
+  const j1 = janelaMock();
+  const j2 = janelaMock();
+  await comMocks([j1, j2], async (aberturas) => {
+    const g = portao();
+    let montouB = false;
+    const a = exportarDossiePDF(async () => { await g.p; return DADOS; }, '1:preliminar');
+    assert.equal(await exportarDossiePDF(async () => { montouB = true; return DADOS; }, '2:preliminar'), true);
+    assert.equal(aberturas(), 2);
+    assert.equal(montouB, true);
+    assert.equal(j1.focos, 0);
+    // A mesma chave continua travada enquanto a montagem dela não termina.
+    assert.equal(await exportarDossiePDF(async () => DADOS, '1:preliminar'), true);
+    assert.equal(aberturas(), 2);
+    assert.equal(j1.focos, 1);
+    g.libera();
+    await a;
+  });
+});
+
+// Fiação: cada botão passa a sua chave. Sem ela, os dois níveis e todos os estudos voltariam a
+// dividir uma trava só — a função pura continuaria verde e só a tela erraria.
+test('reentrada: os dois botões do dossiê passam a chave do estudo e do nível', async () => {
+  const { readFileSync } = await import('node:fs');
+  const casos: Array<[string, string]> = [
+    ['frontend/tela-proforma.ts', '`${this.estudo.id}:preliminar`'],
+    ['frontend/tela-fluxo-ver.ts', '`${this.estudo.id}:avancado`'],
+  ];
+  for (const [arquivo, chave] of casos) {
+    const fonte = readFileSync(arquivo, 'utf8');
+    const chamadas = fonte.split('exportarDossiePDF(').length - 1;
+    assert.equal(chamadas, 1, `${arquivo}: uma chamada a exportarDossiePDF`);
+    assert.ok(fonte.includes(`}), ${chave});`), `${arquivo}: a chamada passa ${chave}`);
+  }
+});

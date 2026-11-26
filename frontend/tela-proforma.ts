@@ -969,7 +969,7 @@ export class ViabTelaProforma extends LitElement {
     try {
       const ok = await exportarDossiePDF(async () => dossiePreliminar({
         estudo: this.estudo, entrada: this._entrada(), benchmarks: this.benchmarks, apelo: await carregarApelo(this.estudo.id),
-      }));
+      }), `${this.estudo.id}:preliminar`);
       if (!ok) urbiVerso.notificar('Permita pop-ups para gerar o dossiê em PDF.', 'alerta');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao gerar o dossiê do projeto', 'erro');
