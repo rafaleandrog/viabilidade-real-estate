@@ -145,7 +145,7 @@ export class ViabNum extends LitElement {
   render() {
     return html`
       <div class="campo">
-        ${this.label ? html`<label for=${this._idCampo}>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
+        ${this.label.trim() ? html`<label for=${this._idCampo}>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
         <div class="input-wrap ${this.erro ? 'tem-erro' : ''}">
           <input
             id=${this._idCampo}

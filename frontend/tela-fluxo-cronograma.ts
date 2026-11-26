@@ -425,6 +425,8 @@ export class ViabFluxoCronograma extends LitElement {
     // o valor digitado; nada vai ao backend até "Salvar cronograma".
     const draft = this.draftFases[f.id];
     const nomeExibido = draft?.nome ?? (f.nome || '');
+    // #908: nome acessível dos steppers — aparado, com ordem da fase quando vazio (nomes iguais não se repetem).
+    const nomeAcessivel = String(nomeExibido).trim() || `Fase ${idx + 1}`;
     const inicioExibido = draft?.inicio_mes ?? Number(f.inicio_mes ?? 0);
     const duracaoExibida = draft?.duracao_meses ?? Number(f.duracao_meses ?? 12);
     const temRascunho = draft !== undefined;
@@ -443,7 +445,7 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="º mês" passo="1"
-              rotulo-acessivel="Início de ${nomeExibido || 'Fase'}"
+              rotulo-acessivel="Início de ${nomeAcessivel}"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido) : ''}
               ?desabilitado=${bloqueado}
               .valor=${inicioExibido}
@@ -454,7 +456,7 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="meses" passo="1"
-              rotulo-acessivel="Duração de ${nomeExibido || 'Fase'}"
+              rotulo-acessivel="Duração de ${nomeAcessivel}"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido + duracaoExibida - 1) : ''}
               ?desabilitado=${bloqueado}
               .valor=${duracaoExibida}
