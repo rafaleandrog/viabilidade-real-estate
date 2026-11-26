@@ -12,7 +12,11 @@ no `schema.json` nem na `versao`.
 - **`mesDaAncora` e `operacaoComRascunho`** em `frontend/fluxo-shared.ts`: o primeiro é o mesmo
   contrato de `ancorarLinhaCusto` restrito ao mês (`customizado`, evento ausente e cronograma vazio
   devolvem `null`); o segundo monta a operação que a prévia simula — gravada + rascunho, com o mês
-  derivado **só** quando o rascunho toca `cronograma_evento` e não há `fase_ancora_id`.
+  derivado quando há rascunho (qualquer campo) e não há `fase_ancora_id`, porque `resolverInicio`
+  rederiva o mês em **todo** PATCH, com a âncora gravada quando o corpo não a traz. A primeira
+  versão derivava só quando o rascunho tocava `cronograma_evento`, e um rascunho que mudasse só o
+  valor de uma operação com mês defasado mostrava um mês e gravava outro (achado do App do Codex
+  na revisão).
 - **`tela-funding.ts`**: `_recalcular` usa `operacaoComRascunho`; o "Início derivado" de
   `_renderAncora` mostra o mês que a simulação usa (`_mesSimulado`). O PATCH não mudou.
 - **Paridade com o servidor** em `backend/rotas/funding-ancora-paridade.test.ts` (cinco eventos,
@@ -25,8 +29,9 @@ no `schema.json` nem na `versao`.
   trocar a de `_mesSimulado` deixa vermelho no texto do mês.
 - **Observação fora do escopo** (já no painel): o servidor não reancora operações de funding quando
   o Cronograma muda; por isso a operação sem rascunho segue com o mês gravado.
-- De passagem, dois endereços `arquivo:linha` que o guard acusou na `main` (`casos/ind-funding.ts`
-  e `referencia/padrao-incorporacao.md`) tiveram o número de linha corrigido.
+- Dois endereços `arquivo:linha` (`casos/ind-funding.ts` e `referencia/padrao-incorporacao.md`)
+  tiveram o número de linha corrigido: as linhas que este PR acrescenta a `tela-funding.ts` e a
+  `fluxo-shared.ts` deslocaram os símbolos citados, e o guard de endereços acusou.
 
 ## 2026-11-26 — Funding R16, fase 1: núcleo de cálculo da Estrutura de capital (issue 1006)
 

@@ -207,20 +207,25 @@ export function mesDaAncora(evento: string, crono: EventoCrono[]): number | null
 }
 
 /**
- * A operação de funding como a prévia a simula: gravada + rascunho, e — só
- * quando o rascunho toca a âncora (`cronograma_evento`) — o `inicio_mes`
- * derivado do Cronograma, como o servidor faria ao gravar. Operação sem
- * rascunho de âncora fica com o mês gravado: as outras telas simulam com ele, e
- * derivar aqui faria esta aba contar outra história quando o Cronograma mudou
- * depois de a operação ser salva. Fase-âncora (`fase_ancora_id`) não é
- * recalculada: o servidor a resolve, e a tela não a oferece.
+ * A operação de funding como a prévia a simula: gravada + rascunho, e — quando
+ * há rascunho, isto é, quando o Salvar vai mandar um PATCH — o `inicio_mes`
+ * derivado do Cronograma, como o servidor faz em TODO PATCH (`resolverInicio`
+ * resolve a âncora do corpo ou, sem ela, a gravada). Assim um rascunho que só
+ * muda o valor de uma operação ancorada com mês defasado já mostra o mês que o
+ * Salvar vai gravar. Operação sem rascunho fica com o mês gravado: as outras
+ * telas simulam com ele, e derivar aqui faria esta aba contar outra história
+ * quando o Cronograma mudou depois de a operação ser salva. Fase-âncora
+ * (`fase_ancora_id`) não é recalculada: o servidor a resolve, e a tela não a
+ * oferece. Os `??` repetem os do servidor: campo nulo no rascunho cai no gravado.
  */
 export function operacaoComRascunho<T extends Record<string, any>>(
   gravada: T, rascunho: Record<string, any> | undefined, crono: EventoCrono[],
 ): T {
   const efetiva: Record<string, any> = { ...gravada, ...(rascunho ?? {}) };
-  if (!rascunho || !('cronograma_evento' in rascunho) || efetiva.fase_ancora_id) return efetiva as T;
-  const mes = mesDaAncora(String(efetiva.cronograma_evento ?? 'customizado'), crono);
+  if (!rascunho || Object.keys(rascunho).length === 0) return efetiva as T;
+  if (rascunho.fase_ancora_id ?? gravada.fase_ancora_id) return efetiva as T;
+  const evento = String(rascunho.cronograma_evento ?? gravada.cronograma_evento ?? 'customizado');
+  const mes = mesDaAncora(evento, crono);
   if (mes !== null) efetiva.inicio_mes = mes;
   return efetiva as T;
 }

@@ -38,11 +38,28 @@ test('rascunho que troca a âncora entra com o mês derivado', () => {
   assert.equal(ef.cronograma_evento, 'lancamento');
 });
 
-test('operação sem rascunho de âncora simula com o mês gravado, mesmo com cronograma diferente', () => {
+test('operação sem rascunho simula com o mês gravado, mesmo com cronograma diferente', () => {
   // gravada em obra com mês 5, cronograma diz obra = 13: o servidor não reancora
   // operações de funding, e as outras telas usam o 5.
   assert.equal(operacaoComRascunho(GRAVADA, undefined, CRONO).inicio_mes, 5);
-  assert.equal(operacaoComRascunho(GRAVADA, { valor: 1_000 }, CRONO).inicio_mes, 5);
+  assert.equal(operacaoComRascunho(GRAVADA, {}, CRONO).inicio_mes, 5);
+});
+
+test('rascunho que só muda o valor de operação ancorada já usa o mês que o Salvar vai gravar', () => {
+  // `resolverInicio` deriva o mês em todo PATCH, com a âncora gravada quando o
+  // corpo não a traz: salvar só o valor grava obra = 13, não o 5 defasado.
+  const ef = operacaoComRascunho(GRAVADA, { valor: 1_000 }, CRONO);
+  assert.equal(ef.inicio_mes, 13);
+  assert.equal((ef as Record<string, unknown>).valor, 1_000);
+  // customizado gravado: nada a derivar, vale o mês gravado
+  const custom = { ...GRAVADA, cronograma_evento: 'customizado' };
+  assert.equal(operacaoComRascunho(custom, { valor: 1_000 }, CRONO).inicio_mes, 5);
+});
+
+test('campo nulo no rascunho cai no gravado, como os `??` do servidor', () => {
+  assert.equal(operacaoComRascunho(GRAVADA, { cronograma_evento: null }, CRONO).inicio_mes, 13);
+  const comFase = { ...GRAVADA, fase_ancora_id: 9, inicio_mes: 30 };
+  assert.equal(operacaoComRascunho(comFase, { fase_ancora_id: null, valor: 1 }, CRONO).inicio_mes, 30);
 });
 
 test('trocar para customizado volta a valer o mês digitado do rascunho, ou o gravado', () => {

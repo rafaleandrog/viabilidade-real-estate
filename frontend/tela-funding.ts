@@ -302,9 +302,9 @@ export class ViabFunding extends LitElement {
   // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
   // fundingDoEstudo) · scripts/conferir-estudo.ts:153.
   /** Prévia sobre o DRAFT: o que está sendo digitado já aparece nos indicadores.
-   * Rascunho que troca a âncora entra com o mês derivado do Cronograma, o mesmo
-   * que o servidor vai gravar (`operacaoComRascunho`); operação sem rascunho de
-   * âncora simula com o `inicio_mes` gravado, como as outras telas. */
+   * Operação ancorada com rascunho entra com o mês derivado do Cronograma, o
+   * mesmo que o servidor vai gravar no PATCH (`operacaoComRascunho`); operação
+   * sem rascunho simula com o `inicio_mes` gravado, como as outras telas. */
   private _recalcular() {
     if (!this.calc) { this.funding = null; return; }
     const efetivas = this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)) as OperacaoFunding[];
@@ -508,8 +508,8 @@ export class ViabFunding extends LitElement {
     ></viab-num>`;
   }
 
-  /** O mês que a simulação usa para a operação: o derivado do rascunho de
-   * âncora quando há um, o gravado caso contrário — a mesma regra de `_recalcular`. */
+  /** O mês que a simulação usa para a operação: o derivado da âncora quando há
+   * rascunho, o gravado caso contrário — a mesma regra de `_recalcular`. */
   private _mesSimulado(o: any): number {
     return Number(operacaoComRascunho(o, this.draft[o.id], this.crono).inicio_mes) || 0;
   }
