@@ -676,6 +676,8 @@ export class ViabTelaProforma extends LitElement {
                 <td>
                   ${r.toggle
                     ? html`<button class="toggle" title="Expandir/recolher"
+                        aria-expanded=${!this.colapso[r.toggle!]}
+                        aria-label=${`${this.colapso[r.toggle!] ? 'Expandir' : 'Recolher'} ${r.l}`}
                         @click=${() => this._toggle(r.toggle!)}><urbi-icone classe=${this.colapso[r.toggle!] ? 'fa-solid fa-caret-right' : 'fa-solid fa-caret-down'}></urbi-icone></button>`
                     : nothing}
                   ${r.l}

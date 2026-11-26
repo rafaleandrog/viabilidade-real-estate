@@ -110,4 +110,7 @@ test('fiação: os ícones que substituíram emoji estão nas telas', () => {
   assert.match(le('frontend/tela-proforma.ts'), /'fa-solid fa-caret-right'/);
   assert.match(le('frontend/tela-proforma.ts'), /classe="fa-solid fa-arrow-down"/);
   assert.match(le('frontend/data-room-painel.ts'), /classe="fa-solid fa-check"/);
+  // O ícone de presente é a única marca textual desse estado: sem rótulo, o
+  // leitor de tela não distingue "presente" de um item sem marca.
+  assert.match(le('frontend/data-room-painel.ts'), /fa-check" role="img" aria-label="Presente:"/);
 });
