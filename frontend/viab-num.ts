@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { customElement, property, state } from 'lit/decorators.js';
 import { parseNumeroBR, textoCampoEdicao, textoCampoRepouso } from './viab-format.js';
 
@@ -24,6 +25,9 @@ export class ViabNum extends LitElement {
   // dia passar a renderizar em light DOM.
   private readonly _idCampo = `viab-num-${++_seqCampo}`;
   @property() label = '';
+  // #908: nome acessível para quando NÃO há `label` visível (campo em célula de
+  // tabela, cujo rótulo é a <td>/<th> vizinha). Com `label`, o `label` manda.
+  @property({ attribute: 'rotulo-acessivel' }) rotuloAcessivel = '';
   @property({ type: Number }) valor: number | null = null;
   @property() sufixo = '';
   // #197: rótulo secundário, inline após o sufixo — mês correspondente ao
@@ -127,16 +131,21 @@ export class ViabNum extends LitElement {
     return this._foco ? this._rascunho : this._fmtAgrupado(this.valor);
   }
 
+  // Rótulo efetivo: o `label` visível; na falta dele, o `rotulo-acessivel`.
+  private _nomeAcessivel(): string {
+    return this.label.trim() || this.rotuloAcessivel.trim();
+  }
+
   // Nome acessível dos botões do stepper: com rótulo, "Aumentar <rótulo>".
   private _rotuloPasso(verbo: 'Aumentar' | 'Diminuir'): string {
-    const rotulo = this.label.trim();
+    const rotulo = this._nomeAcessivel();
     return rotulo ? `${verbo} ${rotulo}` : verbo;
   }
 
   render() {
     return html`
       <div class="campo">
-        ${this.label ? html`<label for=${this._idCampo}>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
+        ${this.label.trim() ? html`<label for=${this._idCampo}>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
         <div class="input-wrap ${this.erro ? 'tem-erro' : ''}">
           <input
             id=${this._idCampo}
@@ -145,6 +154,7 @@ export class ViabNum extends LitElement {
             .value=${this._display()}
             placeholder=${this.placeholder}
             ?disabled=${this.desabilitado}
+            aria-label=${ifDefined(!this.label.trim() && this.rotuloAcessivel.trim() ? this.rotuloAcessivel.trim() : undefined)}
             aria-required=${this.obrigatorio ? 'true' : 'false'}
             aria-invalid=${this.erro ? 'true' : 'false'}
             @focus=${this._onFocus}
