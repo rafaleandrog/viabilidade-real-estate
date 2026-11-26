@@ -724,7 +724,9 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > gravado com `evento: 'pos_obra'` — é dado em coluna `json`, reconhecido por esse nome pelo backend
 > (`backend/rotas/avancado.ts:217`), e renomeá-lo seria mudança de dado com migração.
 >
-> ⚠️ **A duração constante e o rótulo "12 meses fixos" acima deixaram de valer (#798).** Decisão do
+> ⚠️ **Esta nota (#798) foi superada pela #998: a janela voltou a ser de 12 meses fixos.** Histórico:
+>
+> **A duração constante e o rótulo "12 meses fixos" acima deixaram de valer (#798).** Decisão do
 > autor de 2026-10-01: a janela Pós-chaves passa a ser **do Grupo**, de 1 a 12 meses, com 12 como
 > padrão — campo opcional `absorcao.pos_chaves_meses`, lido por `mesesPosChaves` só no modo
 > `distribuido` (curva `personalizado`/`linear` legada continua com 12). `APOS_CHAVES_MESES` virou
@@ -732,6 +734,11 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > "Pós-chaves" e um campo **Janela Pós-chaves**; o atalho **À vista, mês único (1º mês das chaves)**
 > é 0% nos três primeiros períodos com janela de 1 mês. Estudo sem o campo mantém os 12 meses e o
 > mesmo resultado. A EVI, que trava 12 literal em `cfINC!J`, continua reproduzível no padrão.
+>
+> **Superação (#998, 2026-11-26).** O autor retirou o campo **Janela Pós-chaves** e o atalho "mês
+> único": o prazo do Pós-chaves vale 12 meses em todos os casos, `pos_chaves_meses` não é mais lido,
+> validado nem gravado (valor antigo no JSON é ignorado), e a tabela de Absorção volta a mostrar só
+> os três períodos informados e o Pós-chaves derivado.
 >
 > ⚠️ **Enquanto isso, `pos_obra.duracao_meses` continua editável e não faz o que o nome promete.**
 > O evento nasce com `duracao_meses: 12` e `travado_duracao: false`
@@ -993,7 +1000,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > (`frontend/fluxo-absorcao-editor.ts`) zera apenas o valor **do formulário**, ao abrir o modal — e
 > guarda o valor cru em `form.lido`, justamente para que esse zero conte como **edição** e não seja
 > engolido pelo no-op da #431. Salvar os parâmetros do Cronograma **não toca no JSON de absorção**
-> (`backend/rotas/avancado.ts:576-578`, `tem_pre_lancamento` do PATCH de parâmetros): o bloco `pre_lancamento` persistido continua lá, com o
+> (`backend/rotas/avancado.ts:569-571`, `tem_pre_lancamento` do PATCH de parâmetros): o bloco `pre_lancamento` persistido continua lá, com o
 > percentual antigo.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
@@ -1003,7 +1010,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > Pré-lançamento que desative a fase passa a vender 80%.
 >
 > ✅ **Desde a #429, "e ninguém é avisado" deixou de valer.** O percentual da faixa vazia entra em
-> `pctDescartado` (`frontend/fluxo-shared.ts:625`, o incremento dentro de `espalhar`) e o
+> `pctDescartado` (`frontend/fluxo-shared.ts:583`, o incremento dentro de `espalhar`) e o
 > painel de Reconciliação acusa
 > `ABSORCAO_NAO_FECHA`. O comportamento **não** mudou: o percentual continua não sendo computado e
 > continua não sendo redistribuído — a camada denuncia, não corrige.
@@ -1871,7 +1878,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:88`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:844`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:836`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
@@ -3272,7 +3279,7 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
 (`frontend/tela-fluxo-custos.ts:940-941`). Quem classifica é a **subcategoria**: toda linha
 `Preço → Permuta financeira` é tratada como permuta **financeira** pelo motor
-(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:900-902`). A permuta **física** vem da linha de custo
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:858-860`). A permuta **física** vem da linha de custo
 `Preço → Permuta física` (`permuta_tipologia_id` + `permuta_quantidade`), e **não** de
 `unidades_permutadas` no catálogo de Tipologias: desde as #266/#267/#268 esse campo é dado
 histórico, sem fallback — sem a linha de custo, o KPI é 0 (§15.1). Usar `distribuicao_modo` como critério de migração

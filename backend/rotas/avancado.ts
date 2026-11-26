@@ -213,7 +213,7 @@ export function validarValoresCurva(valores: any): string | null {
  * Modelo vigente: **Distribuído** em até 4 períodos — Pré-lançamento (bloco
  * `pre_lancamento`, opcional — #330), Lançamento (`lancamento`), Durante a
  * obra (`obra`) e Pós-obra (derivado, nunca informado), este último numa
- * janela de `pos_chaves_meses` (1 a 12; ausente = 12). Modos legados
+ * janela fixa de 12 meses (`pos_chaves_meses` não existe mais; valor gravado é ignorado). Modos legados
  * (`linear`/`personalizado`) são tolerados na leitura, sem exigência de soma.
  *
  * #347: a soma dos períodos INFORMADOS (tudo exceto `pos_obra`, que é
@@ -233,17 +233,6 @@ export function validarAbsorcao(a: any): string | null {
       .filter((b: any) => b?.evento !== 'pos_obra')
       .reduce((s: number, b: any) => s + (Number(b?.pct) || 0), 0);
     if (soma > 100.01) return `a soma dos períodos informados não pode superar 100% (atual: ${soma.toFixed(2)}%)`;
-  }
-  // Duração da janela Pós-chaves do Grupo: opcional (ausente = 12, a janela de
-  // sempre); quando informada, inteiro de 1 a 12, e só no modo `distribuido` —
-  // o único em que o motor a lê (`mesesPosChaves`, frontend/fluxo-shared.ts).
-  // Num `personalizado` ela seria ignorada em silêncio, então é recusada.
-  if (a.pos_chaves_meses !== undefined && a.pos_chaves_meses !== null) {
-    const m = a.pos_chaves_meses;
-    if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 12) {
-      return 'absorcao.pos_chaves_meses deve ser um inteiro de 1 a 12';
-    }
-    if (modo !== 'distribuido') return 'absorcao.pos_chaves_meses só vale no modo distribuido';
   }
   return null;
 }

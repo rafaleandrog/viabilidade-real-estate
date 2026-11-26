@@ -4,6 +4,25 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-26 — Receitas do Avançado: janela Pós-chaves volta a ser fixa em 12 meses (issue 998)
+
+Pedido direto do autor: retirar o campo "Janela Pós-chaves" do modal de Absorção e de qualquer
+fórmula. Decisão na mesma conversa: o atalho "À vista, mês único" sai junto (só existia gravando
+janela = 1).
+
+- **Motor.** `mesesPosChaves` e `POS_CHAVES_MESES_MIN` foram removidos; `faixasAbsorcao` e
+  `periodoAbsorcao` perderam o parâmetro de janela e usam `APOS_CHAVES_MESES` (12).
+  `pos_chaves_meses` gravado em estudo antigo é ignorado pelo motor.
+- **Backend.** `validarAbsorcao` não valida mais o campo (nem recusa: é ignorado).
+- **Tela.** O modal perde a linha da janela e o atalho; `ehMesUnico`/`alternarMesUnico` saíram, e
+  aplicar o modal descarta a chave morta do JSON.
+- **Efeito em dados.** Estudo que tinha mês único (janela 1) ou janela ≠ 12 passa a ser calculado
+  com 12 meses; sem migração (o JSON é livre e a `versao` não muda).
+- **Render.** O caso `modal-absorcao-janela` saiu; `modal-absorcao` agora mede a ausência do campo e
+  do atalho.
+- Guias `docs/avancado.md` e `docs/modelo-de-dados.md` atualizados; a nota da #798 em
+  `referencia/padrao-incorporacao.md` ganhou a superação.
+
 ## 2026-11-24 — Velocidade de vendas nos formulários do Avançado (issue 981)
 
 - A seção Cenários dos dois formulários Avançado (Incorporação e Loteamento) ganhou o campo
