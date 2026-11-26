@@ -5,7 +5,7 @@ esquecido no prompt vira instrução literal para a filha. O texto entre as duas
 
 ---
 
-Implementar <#n> (leia o `CLAUDE.md` do repositório antes de tudo).
+/implementar <#n>
 
 Você é uma sessão de implementação de um arco coordenado por outra sessão (a coordenadora). Sua
 tarefa é implementar **<fase N — nome>** em `<owner/repo>` e abrir o PR. Não revise, não mergeie,
@@ -21,13 +21,8 @@ contexto; o escopo é o das issues acima.
 **Fora do escopo:** <o que não fazer nesta fase>.
 
 **Como trabalhar:**
-1. Siga o § Processo obrigatório de trabalho do `CLAUDE.md` deste repositório: branch própria
-   criada de `origin/main` (e `git branch --unset-upstream` logo depois), contrato lido no SDK
-   instalado, `bash scripts/validar-frontend.sh` (e `validar-backend.sh` se tocar backend, schema ou
-   migração), preflight do PR e abertura do PR. Push sempre `git push -u origin <branch>`; nunca
-   commite em `main`. Se a skill `/implementar` existir nesta sessão, pode usá-la no lugar disto.
-   <!-- ADAPTADO: este repositório não instalou o kit (sem `/implementar` nem `KIT.md`); o fluxo
-   equivalente é o do CLAUDE.md. Não "corrija" de volta. -->
+1. Siga a skill `/implementar`: ela lê o contrato no SDK instalado, cria a branch, roda o
+   empacotador e abre o PR. Push sempre `git push -u origin <branch>`; nunca commite em `main`.
 2. Doc e código no mesmo PR.
 3. Não mergeie, nem se pedirem no meio do trabalho: o merge é da revisão.
 4. Corpo do PR com `Closes #<n>` (uma keyword por issue) e a lista do que foi feito, item a item,
