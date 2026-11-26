@@ -192,6 +192,39 @@ export interface EventoCrono {
   duracao_meses: number;
 }
 
+/**
+ * Mês de início de uma âncora de evento do Cronograma — o mesmo contrato de
+ * `ancorarLinhaCusto` do servidor, restrito ao mês: `customizado`, evento
+ * ausente do cronograma (ex.: `pre_lancamento` num estudo sem pré-lançamento)
+ * ou cronograma ainda vazio devolvem `null`, e quem chama mantém o mês que já
+ * tem. A paridade com o servidor é travada por
+ * `backend/rotas/funding-ancora-paridade.test.ts`.
+ */
+export function mesDaAncora(evento: string, crono: EventoCrono[]): number | null {
+  if (evento === 'customizado') return null;
+  const ev = crono.find((e) => e.evento === evento);
+  return ev ? ev.inicio_mes : null;
+}
+
+/**
+ * A operação de funding como a prévia a simula: gravada + rascunho, e — só
+ * quando o rascunho toca a âncora (`cronograma_evento`) — o `inicio_mes`
+ * derivado do Cronograma, como o servidor faria ao gravar. Operação sem
+ * rascunho de âncora fica com o mês gravado: as outras telas simulam com ele, e
+ * derivar aqui faria esta aba contar outra história quando o Cronograma mudou
+ * depois de a operação ser salva. Fase-âncora (`fase_ancora_id`) não é
+ * recalculada: o servidor a resolve, e a tela não a oferece.
+ */
+export function operacaoComRascunho<T extends Record<string, any>>(
+  gravada: T, rascunho: Record<string, any> | undefined, crono: EventoCrono[],
+): T {
+  const efetiva: Record<string, any> = { ...gravada, ...(rascunho ?? {}) };
+  if (!rascunho || !('cronograma_evento' in rascunho) || efetiva.fase_ancora_id) return efetiva as T;
+  const mes = mesDaAncora(String(efetiva.cronograma_evento ?? 'customizado'), crono);
+  if (mes !== null) efetiva.inicio_mes = mes;
+  return efetiva as T;
+}
+
 const n = (v: any): number => Number(v) || 0;
 
 /**

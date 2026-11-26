@@ -3279,7 +3279,7 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
 (`frontend/tela-fluxo-custos.ts:940-941`). Quem classifica é a **subcategoria**: toda linha
 `Preço → Permuta financeira` é tratada como permuta **financeira** pelo motor
-(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:858-860`). A permuta **física** vem da linha de custo
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:891-893`). A permuta **física** vem da linha de custo
 `Preço → Permuta física` (`permuta_tipologia_id` + `permuta_quantidade`), e **não** de
 `unidades_permutadas` no catálogo de Tipologias: desde as #266/#267/#268 esse campo é dado
 histórico, sem fallback — sem a linha de custo, o KPI é 0 (§15.1). Usar `distribuicao_modo` como critério de migração

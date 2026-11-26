@@ -39,7 +39,12 @@ antecipação de recebíveis, o percentual da carteira cedida — nos dois o val
 **Início** e **Taxa / retorno** (na antecipação, a taxa de desconto). Para dívida e equity, o **Mês do aporte** é
 uma **âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras, com o mês
 derivado mostrado ao lado, só para leitura — ou um **Mês específico** digitado; assim a operação
-acompanha o cronograma quando ele muda. A janela do financiamento à produção vem sempre do Cronograma (a obra). Acima da lista há um
+acompanha o cronograma quando ele muda. Ao trocar a âncora, o mês derivado e os indicadores da
+operação mudam na hora, antes de salvar, com o mesmo mês que o Salvar vai gravar; um evento que o
+estudo não tem (Pré-lançamento num estudo sem pré-lançamento) mantém o mês que a operação já tinha.
+Sem uma troca de âncora em edição, vale o mês gravado — o mesmo que Fluxo de Caixa, Cenários e Resumo
+usam —, ainda que o Cronograma tenha mudado depois: o mês só é rederivado quando a operação é salva
+de novo. A janela do financiamento à produção vem sempre do Cronograma (a obra). Acima da lista há um
 aviso permanente: o app simula contratos privados e não valida a legalidade da captação — uma
 oferta ao público pode ter obrigações regulatórias próprias.
 

@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-26 — Funding R16, fase 2: mês da âncora do cronograma calculado no navegador (issue 1007)
+
+Segunda fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no servidor,
+no `schema.json` nem na `versao`.
+
+- **`mesDaAncora` e `operacaoComRascunho`** em `frontend/fluxo-shared.ts`: o primeiro é o mesmo
+  contrato de `ancorarLinhaCusto` restrito ao mês (`customizado`, evento ausente e cronograma vazio
+  devolvem `null`); o segundo monta a operação que a prévia simula — gravada + rascunho, com o mês
+  derivado **só** quando o rascunho toca `cronograma_evento` e não há `fase_ancora_id`.
+- **`tela-funding.ts`**: `_recalcular` usa `operacaoComRascunho`; o "Início derivado" de
+  `_renderAncora` mostra o mês que a simulação usa (`_mesSimulado`). O PATCH não mudou.
+- **Paridade com o servidor** em `backend/rotas/funding-ancora-paridade.test.ts` (cinco eventos,
+  `customizado` e um desconhecido, com e sem pré-lançamento e num cronograma deslocado); a função
+  sozinha em `frontend/funding-ancora-rascunho.test.ts`.
+- **Ligação** no caso de render `funding-ancora-rascunho`: operação gravada em `obra` com mês
+  defasado, rascunho troca para `lancamento`; exige o mês novo e o painel do investidor igual ao de
+  uma tela com a operação já gravada no mês novo; depois do Salvar, o mês exibido é o gravado.
+  Medido: trocar a chamada em `_recalcular` pela mescla antiga deixa o caso vermelho no painel;
+  trocar a de `_mesSimulado` deixa vermelho no texto do mês.
+- **Observação fora do escopo** (já no painel): o servidor não reancora operações de funding quando
+  o Cronograma muda; por isso a operação sem rascunho segue com o mês gravado.
+- De passagem, dois endereços `arquivo:linha` que o guard acusou na `main` (`casos/ind-funding.ts`
+  e `referencia/padrao-incorporacao.md`) tiveram o número de linha corrigido.
+
 ## 2026-11-26 — Funding R16, fase 1: núcleo de cálculo da Estrutura de capital (issue 1006)
 
 Primeira fase do arco da Rodada 16 (guarda-chuva: issue 1005). Nenhuma tela muda; o módulo novo não
