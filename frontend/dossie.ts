@@ -128,11 +128,20 @@ export function htmlDossie(dados: DadosDossie, temaCss = ''): string {
  * complementos (mercado, Apelo) vêm de rotas assíncronas, e abrir depois do `await` perderia o
  * gesto do clique — o navegador trataria como pop-up e bloquearia. Devolve `false` quando o
  * pop-up foi bloqueado (a tela avisa, como nas outras exportações); se a montagem falhar, a
- * janela é fechada e o erro sobe para a tela.
+ * janela é fechada e o erro sobe para a tela. Com uma montagem em curso, chamada nova NÃO abre outra
+ * janela: foca a que está montando e devolve `true` (a trava cai ao fim da montagem, com sucesso ou
+ * erro, e também quando o usuário fecha a janela em montagem).
  */
+let janelaEmMontagem: Window | null = null;
+
 export async function exportarDossiePDF(montar: () => Promise<DadosDossie> | DadosDossie): Promise<boolean> {
+  if (janelaEmMontagem && !janelaEmMontagem.closed) {
+    janelaEmMontagem.focus?.();
+    return true;
+  }
   const w = window.open('', '_blank');
   if (!w) return false;
+  janelaEmMontagem = w;
   try {
     w.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Dossiê do projeto</title></head><body><p>Montando o dossiê…</p></body></html>');
     w.document.close();
@@ -146,5 +155,7 @@ export async function exportarDossiePDF(montar: () => Promise<DadosDossie> | Dad
   } catch (e) {
     w.close();
     throw e;
+  } finally {
+    if (janelaEmMontagem === w) janelaEmMontagem = null;
   }
 }
