@@ -33,11 +33,12 @@ test('Modal de Absorção: a tabela, o gráfico e o aviso cabem em 1280/900/600p
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 
-  // Plano não migrado: o atalho "mês único" está travado — o clique em "Sim" não mexe na janela.
-  const g = a.extra?.['900'] as { janelaAntes: number | null; janelaDepois: number | null } | undefined;
+  // #998: sem campo de janela e sem atalho "mês único"; o Pós-chaves segue como derivado.
+  const g = a.extra?.['900'] as { campoJanela: number; atalhoMesUnico: number; derivado: number } | undefined;
   assert.ok(g, 'o caso não devolveu a medida extra — medir() não rodou' + relato(a));
-  assert.equal(g!.janelaAntes, 12, 'a janela padrão de 12 meses não chegou ao campo' + relato(a));
-  assert.equal(g!.janelaDepois, 12, '"mês único" foi aplicado num Grupo com plano não migrado' + relato(a));
+  assert.equal(g!.campoJanela, 0, 'o campo Janela Pós-chaves voltou ao modal' + relato(a));
+  assert.equal(g!.atalhoMesUnico, 0, 'o atalho "mês único" voltou ao modal' + relato(a));
+  assert.equal(g!.derivado, 1, 'o Pós-chaves derivado sumiu do modal' + relato(a));
 });
 
 test('Modal de Absorção: nenhum token sem valor e nenhum texto invisível', { skip: pular ?? false }, async () => {

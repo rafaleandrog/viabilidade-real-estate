@@ -141,15 +141,10 @@ do Cronograma: **Pré-lançamento** (quando o estudo tem essa fase), **Lançamen
 obra** e **Pós-chaves** — este último é o que sobra para fechar 100% e é calculado sozinho; o
 percentual gravado do Pós-chaves, inclusive num Grupo criado por API, é sempre esse valor derivado. Cada
 período espalha o seu percentual por igual pelos meses que tem. O Pós-chaves começa no mês seguinte
-à entrega e dura o que o Grupo definir em **Janela Pós-chaves**, de 1 a 12 meses (12 é o padrão);
-ele não depende da duração da fase Pós-obras do Cronograma, que é de custo. Uma janela curta
-concentra as vendas das chaves em poucos meses. O atalho **À vista, mês único (1º mês das chaves)**
-vende o Grupo inteiro no primeiro mês depois da entrega: ele zera os três primeiros períodos e põe
-a janela em 1 mês. Com o plano de pagamento do Grupo já aplicado, a venda feita depois da entrega
-é recebida à vista — exceto a parte da **carteira própria**, quando o plano tem uma, que continua
-financiada. Num Grupo com **Plano não migrado** o atalho fica
-indisponível até o **Fluxo de Pagamento** ser aplicado, porque o plano antigo não recebe à vista a
-venda posterior à entrega.
+à entrega e dura **12 meses fixos**, em todos os Grupos — não há campo para alterar esse prazo, e ele
+não depende da duração da fase Pós-obras do Cronograma, que é de custo. A venda feita depois da
+entrega é recebida à vista com o plano de pagamento do Grupo já aplicado — exceto a parte da
+**carteira própria**, quando o plano tem uma, que continua financiada.
 
 ### Funding
 

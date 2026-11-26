@@ -55,6 +55,7 @@ export const caso = {
   // a uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre.
   aceitaNaoReproduzido: [
     'urbi-badge.cor',
+    'urbi-botao.ariaLabel',
     'urbi-botao.desabilitado',
     'urbi-botao.icone',
     'urbi-botao.pequeno',

@@ -79,8 +79,8 @@ def avanc_inc(derivados):
         ex.update({f'tip{i}_nome': nome, f'tip{i}_tipo': tipo, f'tip{i}_priv': priv, f'tip{i}_aberta': ab,
                    f'tip{i}_dorm': dorm, f'tip{i}_vagas': vagas, f'tip{i}_un': un, f'tip{i}_preco': preco})
     ex.update(
-        gr1_nome='Residencial', gr1_pre=P(10), gr1_lanc=P(25), gr1_obra=P(45), gr1_janela=6, gr1_corr='Não', gr1_resid='imediato',
-        gr2_nome='Lojas', gr2_pre=0, gr2_lanc=0, gr2_obra=P(50), gr2_janela=12, gr2_corr='Não', gr2_resid='concentrado',
+        gr1_nome='Residencial', gr1_pre=P(10), gr1_lanc=P(25), gr1_obra=P(45), gr1_corr='Não', gr1_resid='imediato',
+        gr2_nome='Lojas', gr2_pre=0, gr2_lanc=0, gr2_obra=P(50), gr2_corr='Não', gr2_resid='concentrado',
         gr2_banco=P(40), gr2_cart_parc=60, gr2_cart_car=3,     # saldo de chaves das lojas: 40% banco, 60% carteira própria
         pg1_grupo='Residencial', pg1_linha='Entrada', pg1_pct=P(10), pg1_parc=1, pg1_desc=0,
         pg2_grupo='Residencial', pg2_linha='Parcelamento', pg2_pct=P(20), pg2_sinal=0, pg2_obra='Sim',
@@ -157,8 +157,8 @@ def avanc_lot(derivados):
     for i, (nome, _t, area, un, preco) in enumerate(LOTES, 1):
         ex.update({f'tip{i}_nome': nome, f'tip{i}_priv': area, f'tip{i}_aberta': 0, f'tip{i}_un': un, f'tip{i}_preco': preco})
     ex.update(
-        gr1_nome='Etapa 1', gr1_lanc=P(25), gr1_obra=P(60), gr1_janela=12, gr1_corr='Não', gr1_resid='imediato',
-        gr2_nome='Etapa 2', gr2_lanc=0, gr2_obra=P(50), gr2_janela=12, gr2_corr='Não', gr2_resid='imediato',
+        gr1_nome='Etapa 1', gr1_lanc=P(25), gr1_obra=P(60), gr1_corr='Não', gr1_resid='imediato',
+        gr2_nome='Etapa 2', gr2_lanc=0, gr2_obra=P(50), gr2_corr='Não', gr2_resid='imediato',
         pg1_grupo='Etapa 1', pg1_linha='Entrada', pg1_pct=P(10), pg1_parc=3, pg1_desc=0,
         pg2_grupo='Etapa 1', pg2_linha='Parcelamento', pg2_pct=P(90), pg2_parc=120, pg2_sinal=0, pg2_obra='Não',
         pg3_grupo='Etapa 2', pg3_linha='Entrada', pg3_pct=P(20), pg3_parc=1, pg3_desc=P(5),

@@ -4,7 +4,7 @@ import { keyed } from 'lit/directives/keyed.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtM2, fmtPctEntrada } from './viab-format.js';
 import {
-  rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado, APOS_CHAVES_MESES, POS_CHAVES_MESES_MIN,
+  rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado,
   erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis, vgvTipologia,
   tipologiasDestinoAlocacao, camposDoServidorNaAlocacao,
   type EventoCrono,
@@ -18,7 +18,7 @@ import {
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
 import {
-  absorcaoParaSalvar, absorcaoSubstituiCurva, alternarMesUnico, curvaNaoRepresentavel, ehMesUnico, formularioAbsorcao,
+  absorcaoParaSalvar, absorcaoSubstituiCurva, curvaNaoRepresentavel, formularioAbsorcao,
   type FormularioAbsorcao,
 } from './fluxo-absorcao-editor.js';
 import {
@@ -170,7 +170,6 @@ export class ViabFluxoReceitas extends LitElement {
     .modal-rodape { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     .modal-rodape .espaco { flex: 1; }
     .badges-par { display: inline-flex; gap: 6px; }
-    .mes-unico { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 
     /* Modal de pagamento */
     /* #490: era um grid de 2 colunas (240px + 1fr) — a primeira era só o
@@ -352,7 +351,7 @@ export class ViabFluxoReceitas extends LitElement {
               Plano não migrado
             </urbi-badge>` : nothing}
           ${!dis ? html`
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover grupo'} title="Remover grupo"
               @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}></urbi-botao>` : nothing}
         </div>
 
@@ -458,7 +457,7 @@ export class ViabFluxoReceitas extends LitElement {
         <td class="num">${fmtR$(precoTotal, false)}</td>
         ${dis ? nothing : html`
           <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover tipologia do grupo'} title="Remover tipologia do grupo"
               @click=${() => { this.confirmRemover = { tipo: 'alocacao', fase: f, aloc: a }; }}></urbi-botao>
           </td>`}
       </tr>
@@ -638,16 +637,7 @@ export class ViabFluxoReceitas extends LitElement {
     // ela é substituída — e é por isso que o aviso existe.
     const curva = curvaNaoRepresentavel(this.modalAbs?.absorcao);
     const temPre = this._temPreLancamento();
-    // A janela Pós-chaves é a do FORMULÁRIO (o que vai ser gravado), não a
-    // persistida — a faixa exibida acompanha a edição.
-    const faixas = faixasAbsorcao(this.crono, f.pos_chaves_meses);
-    const mesUnico = ehMesUnico(f);
-    // "À vista" só vale no contrato canônico de recebíveis: é ele que recebe à
-    // vista toda venda posterior à entrega (`componentesEfetivosSafra`). Num
-    // Grupo com "Plano não migrado" o ramo legado segue entrada, parcelas e
-    // repasse do plano antigo, e o atalho venderia num mês só recebendo ao
-    // longo de meses. Por isso ele fica indisponível até o plano ser aplicado.
-    const planoLegado = ramoLegadoDeRecebiveis(this.modalAbs?.fluxo_pagamento);
+    const faixas = faixasAbsorcao(this.crono);
     const posDerivado = pctPosChavesDerivado(this._absorcaoJson().blocos);
     const erroAbs = erroFormularioAbsorcao(f);
     // rot: formata o rótulo de período; retorna '—' para faixas vazias (fim < inicio).
@@ -664,17 +654,17 @@ export class ViabFluxoReceitas extends LitElement {
                 ${temPre ? html`
                 <tr>
                   <td>Pré-lançamento<br /><span class="sec">${rot(faixas?.pre_lancamento)}</span></td>
-                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis || mesUnico} .valor=${f.pre_lancamento_pct}
+                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.pre_lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pre_lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>` : nothing}
                 <tr>
                   <td>Lançamento<br /><span class="sec">${rot(faixas?.lancamento)}</span></td>
-                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis || mesUnico} .valor=${f.lancamento_pct}
+                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
                   <td>Durante a obra<br /><span class="sec">${rot(faixas?.obra)}</span></td>
-                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis || mesUnico} .valor=${f.obra_pct}
+                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.obra_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, obra_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
@@ -682,19 +672,11 @@ export class ViabFluxoReceitas extends LitElement {
                        duração da fase "Pós-obras" do Cronograma (#328), que é
                        livre e serve de âncora de CUSTO. Nomes parecidos, dois
                        conceitos diferentes — não confundir. -->
-                  <!-- A duração da janela é do GRUPO, editada aqui (1 a 12
-                       meses, padrão 12) — é o que impede o usuário de
-                       procurá-la no campo "Pós-obras" do Cronograma. -->
+                  <!-- A janela Pós-chaves dura 12 meses fixos (#998): não há
+                       campo para editá-la, e ela não muda com a duração de
+                       "Pós-obras" do Cronograma. -->
                   <td>Pós-chaves<br /><span class="sec">${rot(faixas?.pos_chaves)}</span></td>
                   <td><span class="derivado">${fmtPctEntrada(posDerivado)}</span></td>
-                </tr>
-                <tr class="janela-pos-chaves">
-                  <td>Janela Pós-chaves<br /><span class="sec">${mesUnico
-                    ? 'fixa em 1 mês pelo atalho "mês único"'
-                    : `de ${POS_CHAVES_MESES_MIN} a ${APOS_CHAVES_MESES} meses depois da entrega`}</span></td>
-                  <td><viab-num casas-decimais="0" passo="1" sufixo="meses" ?desabilitado=${dis || mesUnico}
-                    .valor=${f.pos_chaves_meses}
-                    @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pos_chaves_meses: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
               </tbody>
             </table>
@@ -714,28 +696,6 @@ export class ViabFluxoReceitas extends LitElement {
           </urbi-banner>` : nothing}
         ${erroAbs ? html`<urbi-banner variante="erro">${erroAbs}</urbi-banner>` : nothing}
         ${this.modalErro && this.modalErro !== erroAbs ? html`<urbi-banner variante="erro">${this.modalErro}</urbi-banner>` : nothing}
-
-        <!-- "À vista, mês único": atalho do formulário, não modo novo — 0% nos
-             três períodos e janela Pós-chaves de 1 mês (ehMesUnico). A venda
-             cai inteira no 1º mês das chaves e, por ser depois da entrega, é
-             recebida à vista. -->
-        <div class="mes-unico">
-          <span class="sec">À vista, mês único (1º mês das chaves)</span>
-          <span class="badges-par">
-            <urbi-badge cor="info" interativo ?ativo=${!mesUnico}
-              @click=${() => { if (!dis && mesUnico) this.absForm = alternarMesUnico(f, false); }}>Não</urbi-badge>
-            <urbi-badge cor="info" ?interativo=${!planoLegado} ?ativo=${mesUnico}
-              @click=${() => { if (!dis && !mesUnico && !planoLegado) this.absForm = alternarMesUnico(f, true); }}>Sim</urbi-badge>
-          </span>
-          ${planoLegado ? html`
-            <span class="sec nota-legado">Disponível depois de aplicar o Fluxo de Pagamento deste Grupo: com o
-              plano não migrado, a venda depois da entrega não é recebida à vista.</span>` : nothing}
-        </div>
-        ${planoLegado && mesUnico ? html`
-          <urbi-banner variante="alerta">
-            Este Grupo vende tudo no 1º mês das chaves, mas o plano de pagamento ainda não foi migrado:
-            o recebimento segue o plano antigo, não à vista. Abra Fluxo de Pagamento e clique em Aplicar.
-          </urbi-banner>` : nothing}
 
         <div class="modal-rodape">
           <span class="sec">Correção de estoque</span>
@@ -1013,7 +973,7 @@ export class ViabFluxoReceitas extends LitElement {
                   <viab-num label="Desconto" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${n(e.descontoPct)}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'descontoPct', ev.detail.valor ?? 0)}></viab-num>
                   ${!dis && f.entrada.length > 1 ? html`
-                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover entrada'} title="Remover entrada"
                       @click=${() => this._delLinha('entrada', i)}></urbi-botao>` : nothing}
                 </div>`)}
               ${!dis ? html`
@@ -1063,7 +1023,7 @@ export class ViabFluxoReceitas extends LitElement {
                   <urbi-checkbox label="Ao longo da obra" ?desabilitado=${dis} ?marcado=${p.ao_longo_obra}
                     @urbi:checkbox-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'ao_longo_obra', ev.detail.marcado)}></urbi-checkbox>
                   ${!dis && f.parcelas.length > 1 ? html`
-                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover parcelamento'} title="Remover parcelamento"
                       @click=${() => this._delLinha('parcelas', i)}></urbi-botao>` : nothing}
                 </div>`;
               })}

@@ -776,22 +776,13 @@ test('#609 CAMPOS_OPERACAO cobre os dois campos que a cópia precisa remapear', 
   }
 });
 
-test('validarAbsorcao: pos_chaves_meses opcional, inteiro de 1 a 12', () => {
+test('validarAbsorcao: pos_chaves_meses (campo removido, #998) é ignorado — não valida nem recusa', () => {
   const blocos = [{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 40 }];
-  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos }), null);           // ausente = 12
-  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: null }), null);
-  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: 1 }), null);
-  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: 12 }), null);
-  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: 0 }));
-  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: 13 }));
-  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: 2.5 }));
-  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: '3' }));
-  assert.ok(validarAbsorcao({ modo: 'personalizado', meses: [], pos_chaves_meses: 20 }));
-  // Só o modo distribuido tem janela configurável — em outro modo o campo seria ignorado.
-  assert.ok(validarAbsorcao({ modo: 'personalizado', meses: [], pos_chaves_meses: 3 }));
-  assert.ok(validarAbsorcao({ modo: 'linear', pos_chaves_meses: 3 }));
-  assert.ok(validarAbsorcao({ pos_chaves_meses: 3 }));
-  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: true }));
+  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos }), null);
+  for (const v of [null, 1, 12, 0, 13, 2.5, '3', true]) {
+    assert.equal(validarAbsorcao({ modo: 'distribuido', blocos, pos_chaves_meses: v }), null);
+  }
+  assert.equal(validarAbsorcao({ modo: 'linear', pos_chaves_meses: 3 }), null);
 });
 
 test('#850: validarFluxoPagamento recusa destino do saldo de chaves inválido, nos dois shapes', () => {

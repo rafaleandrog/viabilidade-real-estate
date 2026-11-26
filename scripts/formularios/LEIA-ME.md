@@ -16,7 +16,7 @@ impresso), `python3` com `openpyxl`, e `pnpm install` feito no repositório (os 
 
 1. **Valida a planilha, lista todos os problemas de uma vez e para antes de escrever.** Barra: duas unidades preenchidas no mesmo campo; Σ % dos
    produtos ≠ 100; grupo ou tipologia que não existe; alocado acima do catálogo; Σ do pagamento acima de 100; categoria de custo com
-   unidade que a tela não aceita; custo obrigatório ausente; valor na linha errada; item com dados e sem nome (tipologia, grupo, fase, dívida, equity, antecipação, cenário); nome repetido; janela pós-chaves fora de 1 a 12; permuta com valor zero;
+   unidade que a tela não aceita; custo obrigatório ausente; valor na linha errada; item com dados e sem nome (tipologia, grupo, fase, dívida, equity, antecipação, cenário); nome repetido; permuta com valor zero;
    repasse bancário abaixo de 100% sem o nº de parcelas da carteira própria; antecipação sem % cedido ou sem mês da cessão.
 2. **Cria o estudo** pelas rotas do app, na ordem que o app exige (parâmetros antes do cronograma, tipologias antes das alocações…).
 3. **Leva o pagamento ao formato canônico** (`aplicar-pagamento-canonico.ts`). Em instância com a normalização na API é um passo sem efeito.
