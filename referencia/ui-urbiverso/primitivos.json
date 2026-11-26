@@ -547,6 +547,14 @@
           "tipo": "Boolean",
           "reflete": false,
           "de": "UrbiBotaoVoltar"
+        },
+        {
+          "propriedade": "texto",
+          "atributo": "texto",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
         }
       ],
       "atributos_convencao": [],

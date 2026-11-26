@@ -4,6 +4,54 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-26 — Funding R16, fase 3: aba Operações em cartões e página da operação (issue 1008)
+
+Terceira fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no servidor,
+no motor, no `schema.json` nem na `versao`.
+
+- **Abas.** Saem Dívida, Equity e Antecipação; ficam Operações, Financiamento à produção e Comparar
+  estruturas (esta sai na fase 6). `ABAS` perdeu o campo `tipo` e `render()` não despacha mais por
+  tipo. Saíram a tabela compilada (`_colunasOperacoes`, `_rotuloInicio`), `_renderAbaTipo`,
+  `_opAtiva` e `opAtivaPorTipo`.
+- **Cartões.** `viab-funding-cartao` (`frontend/funding-cartao.ts`) só desenha; o conteúdo sai de
+  `dadosDoCartao` (`frontend/funding-cartao-dados.ts`, puro): badge com a cor do tipo, quatro termos,
+  "Leitura da operação" e quatro KPIs, com TIR alavancada e exposição máxima em "antes → depois".
+  `operacoesDeCartao` filtra os três tipos de cartão e ordena por senioridade. A operação do cartão
+  é a mesclada com o rascunho (`operacaoComRascunho`), a mesma de `_recalcular`.
+- **Cores.** `frontend/funding-cores.ts`: uma tabela tipo → N para os quatro tipos; o badge usa
+  `variante_N` e o CSS, `corCategorica(N − 1)`.
+- **Sequência.** `_recalcular` calcula `sequenciaDeEstrutura` e a guarda em `@state`; cada passo
+  roda `fundingDoEstudo` sobre o mesmo `calc` do recálculo, sem refazer o fluxo por passo.
+- **Leitura.** `leituraDaOperacao` passou a receber o formatador de mês (obrigatório); o cartão passa
+  `rotuloMesRelativo`, e as frases dizem "a partir de jan/27" em vez de "a partir do mês 1".
+- **Página da operação.** Estado interno `opAbertaId`; `urbi-botao-voltar texto="Operações"`, sem
+  `href` nem `auto-voltar`; o conteúdo é o `_renderOperacao` de hoje. Remover a aberta, ou abrir uma
+  que deixou de existir, volta à lista. O foco volta ao cartão de origem.
+- **Nova operação.** `urbi-modal` com um botão por tipo; cria por `_adicionar` e abre a página. Não
+  usa `urbiVerso.formulario()` (teste de fonte).
+- **Espelho de UI.** A prop `texto` do `urbi-botao-voltar` entrou à mão em
+  `referencia/ui-urbiverso/primitivos.json`, lida do SDK fixado (`93.0.0`), com nota no `LEIA.md` —
+  o mesmo precedente do `urbi-prosa`. Sem ela, o guard de props reprovava o atributo.
+- **Guias.** `docs/funding.md` reescrito no que mudou; `docs/formulas.md` e `docs/modelo-de-dados.md`
+  passam a dizer quatro exceções de exibição; uma frase em `docs/avancado.md`.
+- **Testes.** Novos: `funding-cartao-dados.test.ts` e o caso de render `funding-pagina-operacao`.
+  Reescritos no lugar novo: a partição de `funding-abas.test.ts`, os casos `funding-abas` e
+  `funding-sub-abas`; `funding-antecipacao`, `ind-funding` e `funding-ancora-rascunho` abrem a página
+  pelo clique no cartão. Inventários: `fmtPctEntrada` passa de `tela-funding.ts` (3, tabela) para
+  `funding-cartao-dados.ts` (4, termos); `fmtR$Mi` ganha o primeiro consumidor.
+- **Endereços.** O diff deslocou `tela-funding.ts`; foram corrigidas as citações em
+  `tela-resumo.ts`, `tela-fluxo-ver.ts`, `tela-cenarios.ts`, `scripts/conferir-estudo.ts`,
+  `casos/ind-funding.ts` e `CLAUDE.md` (o aviso regulatório). Várias já não apontavam para o símbolo
+  antes deste PR.
+- **Revisão, rodada 1.** O App do Codex achou que mover uma operação pelas setas (`_mover`) gravava
+  a ordem nova sem recalcular: os cartões trocavam de lugar com o "antes → depois" da ordem antiga.
+  `_mover` passou a chamar `_recalcular` logo depois de aplicar a ordem. De passagem, abrir a página
+  da operação passou a pôr o foco nela (o cartão focado sai da tela, e o foco caía no corpo do
+  documento). O caso `funding-pagina-operacao` cobre os dois, e cada um fica vermelho se a linha
+  sair.
+
+---
+
 ## 2026-11-26 — Funding R16, fase 2: mês da âncora do cronograma calculado no navegador (issue 1007)
 
 Segunda fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no servidor,

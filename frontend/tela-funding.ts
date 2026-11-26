@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtR$Kpi, fmtPct, fmtPctEntrada } from './viab-format.js';
+import { fmtR$, fmtR$Kpi, fmtPct } from './viab-format.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -19,7 +19,12 @@ import {
 } from './funding-motor.js';
 import './viab-num.js';
 import './funding-alternativas-painel.js';
-import { indicadoresEstrutura, passosDoPlano, type IndicadoresEstrutura, type PlanoUsarAlternativa } from './funding-alternativas.js';
+import './funding-cartao.js';
+import { passosDoPlano, type PlanoUsarAlternativa } from './funding-alternativas.js';
+import {
+  indicadoresEstrutura, sequenciaDeEstrutura, type IndicadoresEstrutura, type SequenciaEstrutura,
+} from './funding-estrutura.js';
+import { AVISO_SEM_LASTRO, TIPOS_DE_CARTAO, dadosDoCartao, operacoesDeCartao } from './funding-cartao-dados.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Sub-aba "Viabilidade → Funding" (#355, item 48 da Rodada 7).
@@ -76,33 +81,19 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'antecipacao_recebiveis', rotulo: 'Antecipação de recebíveis', icone: 'fa-solid fa-forward' },
 ];
 
-// #586: as abas da tela (quatro na #586, e a Antecipação na #851), com os nomes LITERAIS do pedido do autor
-// (2026-08-26, item 9) e nesta ordem. `Dívida` aqui é só "Dívida" — o rótulo do
-// TIPO continua "Dívida / Capital de giro" (`TIPOS` acima), que é o que aparece
-// no badge do card e na coluna Tipo da tabela de Operações. Os dois textos
-// coexistem de propósito: o do autor nomeia a aba, o do app nomeia o produto.
+// As abas da tela. As abas por tipo (Dívida, Equity, Antecipação) saíram por
+// decisão do dono: dívida, equity e antecipação viram CARTÕES na aba
+// Operações (`TIPOS_DE_CARTAO`, em `funding-cartao-dados.ts`), e clicar num
+// cartão abre a página da operação, dentro da própria aba. O Financiamento à
+// produção não tem cartão: é único por estudo e tem aba própria, roteada por
+// `id` em `render()`. Todo tipo de `TIPOS` tem lugar — cartão ou aba —, e
+// `frontend/funding-abas.test.ts` trava essa partição.
 //
-// `operacoes` não é um tipo — é a visão compilada, de leitura. Dívida e
-// Equity têm `tipo`, e é por ele que a aba filtra e a tabela navega.
-//
-// ⚠️ #587: `financiamento_producao` NÃO carrega `tipo` aqui de propósito —
-// desde a #586 ela usava o mesmo despacho genérico de Dívida/Equity
-// (`a.tipo ? _renderAbaTipo(a.tipo) : ...`), e agora tem render PRÓPRIO
-// (`_renderAbaFinanciamentoProducao`, roteado por `a.id` em `render()`).
-// Restringir o TIPO do campo para excluir `financiamento_producao` é o que
-// torna a rota genérica um erro de COMPILAÇÃO se alguém reatribuir `tipo` a
-// esta aba por engano — não só "deixar de chamar certo".
-/** Os tipos que vivem numa aba de LISTA (com "Adicionar"): todos menos o Financiamento à produção. */
-type TipoListavel = 'divida' | 'equity' | 'antecipacao_recebiveis';
-
-const ABAS: { id: string; label: string; icone: string; tipo?: TipoListavel }[] = [
+// Comparar estruturas ainda existe nesta fase; sai quando a aba Estrutura de
+// capital entrar.
+const ABAS: { id: string; label: string; icone: string }[] = [
   { id: 'operacoes', label: 'Operações', icone: 'fa-solid fa-table-list' },
   { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
-  { id: 'divida', label: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar', tipo: 'divida' },
-  { id: 'equity', label: 'Equity', icone: 'fa-solid fa-handshake', tipo: 'equity' },
-  // #851: o `id` é o próprio tipo, como nas duas acima — clicar na linha da
-  // tabela de Operações navega por `tipo`.
-  { id: 'antecipacao_recebiveis', label: 'Antecipação', icone: 'fa-solid fa-forward', tipo: 'antecipacao_recebiveis' },
   { id: 'comparar', label: 'Comparar estruturas', icone: 'fa-solid fa-scale-balanced' },
 ];
 
@@ -125,7 +116,6 @@ const EVENTOS_ANCORA: { valor: string; rotulo: string }[] = [
 ];
 
 const rotuloTipo = (t: string) => TIPOS.find((x) => x.valor === t)?.rotulo ?? t;
-const n = (v: any): number => Number(v) || 0;
 
 @customElement('viab-funding')
 export class ViabFunding extends LitElement {
@@ -139,12 +129,18 @@ export class ViabFunding extends LitElement {
   @state() private movendoId: number | null = null;
   @state() private removerId: number | null = null;
   @state() private criando = false;
-  // Sub-navegação DENTRO de uma aba de tipo (Dívida/Equity), quando há mais de
-  // uma operação do mesmo tipo — cada operação ganha sua própria sub-aba, em
-  // vez de todas empilhadas na mesma página. Chave é o `tipo`, valor é o `id`
-  // da operação ativa naquele tipo. Estado interno, mesma convenção de
-  // `abaAtiva` (não vai para a URL).
-  @state() private opAtivaPorTipo: Record<string, number> = {};
+  // A página da operação aberta dentro da aba Operações: o `id` dela, ou null
+  // na lista de cartões. Estado interno, mesma convenção de `abaAtiva` (não vai
+  // para a URL). Operação aberta que deixa de existir volta para a lista
+  // (`_operacaoAberta`).
+  @state() private opAbertaId: number | string | null = null;
+  // A janela "Nova operação", que pergunta o tipo.
+  @state() private escolhendoTipo = false;
+  // A sequência "antes → depois" por senioridade. Calculada em `_recalcular`,
+  // NUNCA em `render()`: são N+1 simulações a cada tecla.
+  @state() private sequencia: SequenciaEstrutura | null = null;
+  // Cartão a focar quando a lista voltar a ser desenhada (volta da página).
+  private focarCartaoId: number | string | null = null;
   // #587: guarda contra criar duas vezes o Financiamento à produção — a
   // criação é assíncrona, e `_carregar` pode ser chamado de novo (troca de
   // estudo) antes da primeira resposta voltar.
@@ -175,6 +171,17 @@ export class ViabFunding extends LitElement {
        (Sem crase neste comentário: ele mora dentro de um template literal, e
        uma crase aqui FECHA o css e quebra o arquivo — foi o que aconteceu.) */
     .acao-aba { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    /* Aba Operações: a grade de cartões e a página da operação. */
+    .cartoes {
+      display: grid; gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    }
+    .pagina-operacao .voltar { margin-bottom: 10px; }
+    /* A página recebe o foco ao abrir (o cartão que o tinha saiu da tela); o
+       Tab seguinte vai ao botão de voltar. Foco programático em contêiner não
+       pede anel. */
+    .pagina-operacao:focus { outline: none; }
+    .escolha-tipo { display: flex; flex-direction: column; gap: 8px; }
     .op-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .op-cab .espaco { flex: 1; }
     .op-cab urbi-input { min-width: 220px; }
@@ -232,13 +239,6 @@ export class ViabFunding extends LitElement {
     .grafico-legenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; margin-top: 6px; color: var(--cor-texto-sec); }
     .grafico-legenda .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
   `];
-
-  updated(mudou: Map<string, unknown>) {
-    if (mudou.has('estudo') && this.estudo?.id && !this.carregado) {
-      this.carregado = true;
-      this._carregar();
-    }
-  }
 
   private async _carregar() {
     this.carregando = true;
@@ -306,7 +306,7 @@ export class ViabFunding extends LitElement {
    * mesmo que o servidor vai gravar no PATCH (`operacaoComRascunho`); operação
    * sem rascunho simula com o `inicio_mes` gravado, como as outras telas. */
   private _recalcular() {
-    if (!this.calc) { this.funding = null; return; }
+    if (!this.calc) { this.funding = null; this.sequencia = null; return; }
     const efetivas = this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)) as OperacaoFunding[];
     // O horizonte de `this.calc` vem das operações GRAVADAS (`_carregar`). Com
     // rascunho, o fluxo-base é refeito com as efetivas — a montagem de
@@ -318,13 +318,22 @@ export class ViabFunding extends LitElement {
       ? receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.custos)
       : this.receitaLiquida;
     const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
-    this.funding = fundingDoEstudo(
-      efetivas, calc.fluxoMensal, receitaLiquida,
+    const simularFunding = (ops: OperacaoFunding[]) => fundingDoEstudo(
+      ops, calc.fluxoMensal, receitaLiquida,
       resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
       {
         custosRaw: this.custos, linhasCusto: calc.linhasCusto, cronograma: this.crono,
         recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
       },
+    );
+    this.funding = simularFunding(efetivas);
+    // A sequência "antes → depois" dos cartões: cada passo roda o funding do
+    // estudo sobre o MESMO fluxo do projeto (`calc`), com as operações mais
+    // seniores até aquela — sem refazer o fluxo por passo. Lista vazia é o
+    // projeto sem funding.
+    this.sequencia = sequenciaDeEstrutura(
+      efetivas,
+      (ops) => indicadoresEstrutura(calc, ops.length ? simularFunding(ops) : null),
     );
   }
 
@@ -458,10 +467,12 @@ export class ViabFunding extends LitElement {
       });
       if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível criar a operação.', 'erro'); return; }
       await this._carregar();
-      // A operação recém-criada vira a sub-aba ativa — sem isto, criar a
-      // segunda operação de um tipo deixaria a primeira em foco e a nova
-      // ficaria escondida atrás dela, sem nenhum indício.
-      if (r?.id != null) this.opAtivaPorTipo = { ...this.opAtivaPorTipo, [tipo]: r.id };
+      // A operação recém-criada abre na página dela, para a pessoa preencher
+      // os termos em seguida.
+      if (r?.id != null && tipo !== 'financiamento_producao') {
+        this.abaAtiva = 'operacoes';
+        this.opAbertaId = r.id;
+      }
     } finally {
       this.criando = false;
     }
@@ -487,6 +498,8 @@ export class ViabFunding extends LitElement {
     this.removerId = null;
     const r = await removerFundingOperacao(this.estudo.id, id);
     if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível remover.', 'erro'); return; }
+    // Remover a operação aberta volta para a lista de cartões.
+    if (String(this.opAbertaId) === String(id)) this.opAbertaId = null;
     await this._carregar();
   }
 
@@ -494,12 +507,17 @@ export class ViabFunding extends LitElement {
     if (this.movendoId) return;
     this.movendoId = id;
     try {
-      // #586: dentro do TIPO, não na lista global — cada aba mostra um tipo só,
+      // #586: dentro do TIPO, não na lista global — a `ordem` só decide a
+      // posição entre operações do mesmo tipo (a senioridade decide o resto),
       // e trocar com um vizinho de outro tipo não mudaria nada na tela.
       const nova = reordenarDentroDoTipo(this.operacoes, id, direcao);
       const mudaram = camadasComOrdemAlterada(this.operacoes, nova);
       if (mudaram.length === 0) return;
       this.operacoes = nova;
+      // A ordem dentro do tipo muda a sequência "antes → depois" dos cartões (e,
+      // entre antecipações do mesmo mês, o lastro que sobra): recalcula já, com
+      // a ordem nova, em vez de deixar os cartões com os números da antiga.
+      this._recalcular();
       for (const o of mudaram) {
         const r = await atualizarFundingOperacao(this.estudo.id, o.id, { ordem: o.ordem });
         if (r?.erro) { urbiVerso.notificar('Não foi possível reordenar.', 'erro'); await this._carregar(); return; }
@@ -745,10 +763,7 @@ export class ViabFunding extends LitElement {
             ${card('Tarifas', fmtR$Kpi(ind.tarifas), ind.tarifas > 0 ? 'neg' : '')}
             ${card('Custo efetivo', ind.custoEfetivoAnual === null ? '—' : `${fmtPct(ind.custoEfetivoAnual * 100)} a.a.`)}
           </div>` : html`
-          <p class="nota">Nenhuma parcela a ceder. Ou não há, até o mês da cessão, venda com parcela a
-            receber depois dele; ou o percentual cedido é zero; ou os Grupos de receita ainda estão
-            com o plano de pagamento no formato antigo — só os planos já aplicados entram no lastro
-            (abra o Fluxo de pagamento de cada Grupo, em Receitas, e clique em Aplicar).</p>`}
+          <p class="nota">${AVISO_SEM_LASTRO}</p>`}
       </div>
     `;
   }
@@ -952,151 +967,133 @@ export class ViabFunding extends LitElement {
     `;
   }
 
+  /** A operação aberta na página, se ainda existir e tiver cartão. Operação que
+   * deixou de existir (removida, outra aba, recarga) devolve undefined, e a aba
+   * volta para a lista sozinha. */
+  private _operacaoAberta(): any | undefined {
+    if (this.opAbertaId === null) return undefined;
+    return operacoesDeCartao(this.operacoes).find((o) => String(o.id) === String(this.opAbertaId));
+  }
+
+  private _abrirOperacao(id: number | string | null) {
+    if (id === null || id === undefined) return;
+    this.opAbertaId = id;
+  }
+
+  private _voltarParaOperacoes() {
+    this.focarCartaoId = this.opAbertaId;
+    this.opAbertaId = null;
+  }
+
+  /** Ao abrir a página, o foco vai para ela (o cartão focado saiu da tela, e
+   * sem isto o foco cairia no corpo do documento); ao voltar para a lista, o
+   * foco volta ao cartão de origem. */
+  protected updated(mudou: Map<string, unknown>) {
+    super.updated?.(mudou);
+    if (mudou.has('estudo') && this.estudo?.id && !this.carregado) {
+      this.carregado = true;
+      this._carregar();
+    }
+    if (mudou.has('opAbertaId') && mudou.get('opAbertaId') == null && this.opAbertaId !== null) {
+      (this.shadowRoot?.querySelector('div.pagina-operacao') as HTMLElement | null)?.focus();
+    }
+    if (this.focarCartaoId !== null && this.opAbertaId === null) {
+      const alvo = [...(this.shadowRoot?.querySelectorAll('viab-funding-cartao') ?? [])]
+        .find((c) => (c as HTMLElement).dataset.id === String(this.focarCartaoId)) as HTMLElement | undefined;
+      this.focarCartaoId = null;
+      alvo?.focus();
+    }
+  }
+
   /**
-   * #586, aba 1 — a tabela COMPILADA: todas as operações do estudo, dos três
-   * tipos, numa lista só. É de LEITURA; a edição continua na aba do tipo, e
-   * clicar numa linha leva para lá.
+   * Aba Operações: um cartão por operação de dívida, equity e antecipação, na
+   * ordem de senioridade, e "Nova operação" para quem edita. Clicar num cartão
+   * abre a página da operação no lugar da lista.
    *
-   * ⚠️ Interpretação declarada: o pedido do autor diz "tabela compilando as
-   * operações", e não diz se ela edita. Assumi leitura + navegação — está no
-   * corpo do PR para ele confirmar.
+   * Os termos e KPIs do cartão saem da operação MESCLADA com o rascunho (a
+   * mesma de `_recalcular`), para o cartão e a página nunca contarem histórias
+   * diferentes.
    */
   private _renderAbaOperacoes(): TemplateResult {
-    if (this.operacoes.length === 0) {
-      return html`<urbi-estado-vazio icone="fa-solid fa-coins"
-            mensagem="Nenhuma operação de funding. O Fluxo de Caixa é igual ao Livre."></urbi-estado-vazio>`;
-    }
-    return html`
-      <urbi-tabela
-        clicavel
-        .colunas=${this._colunasOperacoes()}
-        .linhas=${this.operacoes}
-        mensagem-vazio="Nenhuma operação de funding."
-        @urbi:tabela-click=${(e: CustomEvent) => {
-          const t = e.detail?.linha?.tipo;
-          if (t) this.abaAtiva = t;
-        }}
-      ></urbi-tabela>
-    `;
-  }
+    const aberta = this._operacaoAberta();
+    if (aberta) return this._renderPaginaOperacao(aberta);
 
-  /** Rótulo da coluna "Início" na tabela compilada — mesma leitura que
-   * `_renderAncora` faz no card: âncora de evento quando há uma, mês relativo
-   * quando o usuário escolheu "Mês específico". Espelha o card de propósito;
-   * duas leituras diferentes da mesma coluna divergiriam com o tempo. */
-  private _rotuloInicio(l: any): string {
-    const evento = String(l?.cronograma_evento ?? 'customizado');
-    if (evento !== 'customizado') {
-      return EVENTOS_ANCORA.find((e) => e.valor === evento)?.rotulo ?? evento;
-    }
-    return rotuloMesRelativo(this.dataInicio, n(l?.inicio_mes));
-  }
-
-  /** Colunas da tabela compilada. `Taxa` e `Retorno` são a mesma célula em
-   * significados diferentes por tipo: Dívida e Financiamento à produção têm
-   * taxa de juros; Equity não tem taxa, tem modo e % de retorno. Uma coluna com
-   * dois significados precisa dizer qual é qual — mesmo tratamento que a #443
-   * deu às colunas VGV/Margem do Painel, com `title` por linha. */
-  private _colunasOperacoes() {
-    return [
-      {
-        id: 'tipo', label: 'Tipo',
-        render: (l: any) => html`<urbi-badge>${rotuloTipo(l.tipo)}</urbi-badge>`,
-      },
-      { id: 'nome', label: 'Nome', valor: (l: any) => l.nome || '—' },
-      {
-        id: 'valor', label: 'Valor', alinhamento: 'direita',
-        valor: (l: any) => (l.tipo === 'financiamento_producao'
-          // O FàP não tem `valor` digitado: o principal sai do custo financiável
-          // pelo `percentual_financiavel` (§4.3). Mostrar 0 seria mentira.
-          ? `${n(l.percentual_financiavel)}% do custo`
-          // #851: a antecipação também não tem `valor` digitado — mostra o
-          // percentual cedido, que é o que o usuário escolheu.
-          : l.tipo === 'antecipacao_recebiveis'
-            ? `${fmtPctEntrada(n(l.pct_carteira_cedida))} da carteira`
-          : (n(l.valor) > 0 ? fmtR$(n(l.valor)) : '—')),
-      },
-      {
-        id: 'inicio', label: 'Início', alinhamento: 'centro',
-        valor: (l: any) => (l.tipo === 'financiamento_producao'
-          // A janela do FàP vem do Cronograma (marcosObra), não de `inicio_mes`.
-          ? 'Obra (cronograma)'
-          : this._rotuloInicio(l)),
-      },
-      {
-        id: 'taxa', label: 'Taxa / retorno', alinhamento: 'direita',
-        render: (l: any) => {
-          // % DIGITADA pelo usuário → `fmtPctEntrada` (2 casas), nunca `fmtPct`
-          // (1 casa, que é para % CALCULADO). Contrato de precisão do CLAUDE.md.
-          const texto = l.tipo === 'equity'
-            ? (n(l.pct_retorno) > 0 ? fmtPctEntrada(n(l.pct_retorno)) : '—')
-            : (n(l.taxa_anual) > 0 ? `${fmtPctEntrada(n(l.taxa_anual))} a.a.` : '—');
-          const titulo = l.tipo === 'equity'
-            ? `Equity — ${MODOS_RETORNO.find((m) => m.valor === l.modo_retorno)?.rotulo ?? 'retorno'}`
-            : l.tipo === 'antecipacao_recebiveis'
-              ? 'Taxa de desconto da antecipação, ao ano'
-              : 'Juros nominais da operação, ao ano';
-          return html`<span title=${titulo}>${texto}</span>`;
-        },
-      },
-    ];
-  }
-
-  /** A operação ATIVA na sub-navegação daquele tipo — a do estado, se ainda
-   * existir na lista atual, senão a primeira. Derivado a cada render, nunca
-   * precisa de limpeza explícita quando uma operação é removida ou recriada. */
-  private _opAtiva(tipo: string, lista: any[]): any {
-    const id = this.opAtivaPorTipo[tipo];
-    return lista.find((o) => o.id === id) ?? lista[0];
-  }
-
-  /** #586, abas Dívida e Equity — o botão de criar do tipo e as operações
-   * DAQUELE tipo, cada uma na sua sub-aba quando há mais de uma. Os
-   * `_renderCampos*` vêm inteiros, sem reescrita: a separação por tipo já
-   * existia na camada de campos, o que faltava era na navegação.
-   *
-   * ⚠️ #587: `financiamento_producao` SAIU da assinatura — não é mais
-   * "lista + botão adicionar", é operação única e fixa, com sua própria aba
-   * dedicada (`_renderAbaFinanciamentoProducao`). Restringir o TIPO em vez de
-   * só parar de chamar com `'financiamento_producao'` é a defesa da classe de
-   * defeito nº 1 do CLAUDE.md: um `ABAS` editado de volta para despachar FàP
-   * para cá vira `TS2345`, não lista vazia calada.
-   */
-  private _renderAbaTipo(tipo: TipoListavel): TemplateResult {
-    const lista = this._operacoesDoTipo(tipo);
-    const t = TIPOS.find((x) => x.valor === tipo)!;
+    const lista = operacoesDeCartao(this.operacoes);
+    const fap = this._operacaoFinanciamento();
+    const fapLigado = !!fap && fap.ativo !== false;
+    const passos = new Map((this.sequencia?.passos ?? []).map((p) => [String(p.operacao.id), p]));
     return html`
       ${this.editavel ? html`
         <div class="acao-aba">
-          <urbi-botao variante="secundario" pequeno icone=${t.icone}
+          <urbi-botao variante="primario" pequeno icone="fa-solid fa-plus"
             ?desabilitado=${this.criando}
-            title=${`Adicionar ${t.rotulo}`}
-            @click=${() => this._adicionar(tipo)}>Adicionar ${t.rotulo}</urbi-botao>
+            @click=${() => { this.escolhendoTipo = true; }}>Nova operação</urbi-botao>
         </div>` : nothing}
-
       ${lista.length === 0
-        ? html`<urbi-estado-vazio icone=${t.icone}
-            mensagem=${`Nenhuma operação de ${t.rotulo}.`}></urbi-estado-vazio>`
-        // Uma operação só: card direto, sem chrome de navegação por cima dela.
-        : lista.length === 1
-          ? this._renderOperacao(lista[0], 0, lista)
-          // Mais de uma: cada operação ganha sua própria sub-aba, em vez de
-          // ficarem empilhadas na mesma página — pedido do autor. Todas as
-          // sub-abas são MONTADAS (mesmo padrão da navegação de topo em
-          // `render()`), e `urbi-abas` decide qual mostrar; a troca só move
-          // qual `id` está em `opAtivaPorTipo`, nunca desmonta a operação.
-          : html`
-            <urbi-abas
-              .abas=${lista.map((o) => ({ id: String(o.id), label: o.nome || t.rotulo, icone: t.icone }))}
-              .ativa=${String(this._opAtiva(tipo, lista).id)}
-              @urbi:aba-selecionar=${(e: CustomEvent) => {
-                const id = Number(e.detail?.id);
-                this.opAtivaPorTipo = { ...this.opAtivaPorTipo, [tipo]: Number.isFinite(id) ? id : lista[0].id };
-              }}
-            >
-              ${lista.map((o, i) => html`
-                <urbi-hospedeiro slot=${String(o.id)}>${this._renderOperacao(o, i, lista)}</urbi-hospedeiro>`)}
-            </urbi-abas>`}
+        ? html`<urbi-estado-vazio icone="fa-solid fa-coins"
+            mensagem=${fapLigado
+              ? 'Nenhuma operação além do Financiamento à produção, que tem aba própria.'
+              : 'Nenhuma operação de funding. O Fluxo de Caixa é igual ao Livre.'}></urbi-estado-vazio>`
+        : html`
+          <div class="cartoes">
+            ${lista.map((o) => {
+              const efetiva = operacaoComRascunho(o, this.draft[o.id], this.crono) as OperacaoFunding & { id: number };
+              const dados = dadosDoCartao({
+                operacao: efetiva,
+                serie: this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id)) ?? null,
+                passo: passos.get(String(o.id)) ?? null,
+                vgvTotal: this.calc?.vgvTotal ?? 0,
+                dataInicio: this.dataInicio,
+                rotuloTipo: rotuloTipo(o.tipo),
+              });
+              return html`<viab-funding-cartao data-id=${String(o.id)} .dados=${dados}
+                @viab:abrir-operacao=${() => this._abrirOperacao(o.id)}></viab-funding-cartao>`;
+            })}
+          </div>`}
+    `;
+  }
+
+  /**
+   * A página da operação, dentro da aba Operações: o botão de voltar e o
+   * formulário de edição de hoje (`_renderOperacao`) — campos do tipo, painel
+   * de indicadores, setas de ordem, Remover e Salvar.
+   *
+   * O botão de voltar não leva `href` nem `auto-voltar`: `auto-voltar` chamaria
+   * o histórico do navegador e tiraria a pessoa da tela do estudo. A volta é só
+   * troca de estado interno.
+   */
+  private _renderPaginaOperacao(o: any): TemplateResult {
+    const irmaos = this._operacoesDoTipo(o.tipo);
+    const i = irmaos.findIndex((x) => String(x.id) === String(o.id));
+    return html`
+      <div class="pagina-operacao" tabindex="-1">
+        <div class="voltar">
+          <urbi-botao-voltar texto="Operações" @urbi:voltar=${(e: Event) => {
+            e.preventDefault();
+            this._voltarParaOperacoes();
+          }}></urbi-botao-voltar>
+        </div>
+        ${this._renderOperacao(o, i, irmaos)}
+      </div>
+    `;
+  }
+
+  /** A janela "Nova operação": um botão por tipo de cartão. Cria com os valores
+   * padrão (`_adicionar`) e abre a página da operação criada. */
+  private _renderEscolhaTipo(): TemplateResult {
+    return html`
+      <urbi-modal title="Nova operação" maxWidth="420px"
+        @urbi-modal:close=${() => { this.escolhendoTipo = false; }}>
+        <p>Que tipo de operação?</p>
+        <div class="escolha-tipo">
+          ${TIPOS_DE_CARTAO.map((tipo) => {
+            const t = TIPOS.find((x) => x.valor === tipo)!;
+            return html`<urbi-botao variante="secundario" icone=${t.icone}
+              ?desabilitado=${this.criando}
+              @click=${() => { this.escolhendoTipo = false; this._adicionar(tipo); }}>${t.rotulo}</urbi-botao>`;
+          })}
+        </div>
+      </urbi-modal>
     `;
   }
 
@@ -1207,9 +1204,11 @@ export class ViabFunding extends LitElement {
                   .salvas=${this.operacoes} .simular=${this._simularEstrutura} .dataInicio=${this.dataInicio}
                   @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome, e.detail.erros, e.detail.aoCriar)}
                 ></viab-funding-alternativas>`)
-              : a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}
+              : this._renderAbaOperacoes()}
           </urbi-hospedeiro>`)}
       </urbi-abas>
+
+      ${this.escolhendoTipo ? this._renderEscolhaTipo() : nothing}
 
       ${this.removerId !== null ? html`
         <urbi-modal title="Remover operação" maxWidth="420px"

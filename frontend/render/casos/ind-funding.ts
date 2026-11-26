@@ -1,9 +1,9 @@
 // Caso de render: o "Painel do investidor" do Funding (`.ind-card`,
-// `frontend/tela-funding.ts:185`) com uma operação de 9 DÍGITOS (#579 —
+// `frontend/tela-funding.ts:206`) com uma operação de 9 DÍGITOS (#579 —
 // "o VALOR salta para fora do quadro do KPI"). Markup próprio (sem shadow
 // DOM), mesma família de defeito/defesa de `fluxo-tabela.ts` .kpi-card.
 //
-// `_renderIndicadores(o)` (frontend/tela-funding.ts:757) lê
+// `_renderIndicadores(o)` (frontend/tela-funding.ts:772) lê
 // `this.funding.operacoes` — não basta forçar `this.operacoes`, o `FundingCalc`
 // precisa ser real (`fundingDoEstudo`, a mesma função que a tela chama em
 // `_recalcular`). A dívida-exemplo é `DIVIDA_GOLDEN`
@@ -13,7 +13,7 @@
 //
 // ⚠️ MEDIDO (#579 critério 3): ao contrário de `fluxo-tabela.ts` (onde a
 // track alargada e o `overflow-wrap` são REDUNDANTES — apagar um só não
-// derruba o teste), `.ind` (`frontend/tela-funding.ts:167`) NUNCA teve a
+// derruba o teste), `.ind` (`frontend/tela-funding.ts:205`) NUNCA teve a
 // track alargada — continua em `minmax(150px, 1fr)`, mais estreita que o
 // piso 180px do resto do inventário. Apagar só o `overflow-wrap` de
 // `.ind-card .val` já deixa este teste vermelho sozinho (2 achados, 900px)
@@ -22,7 +22,7 @@
 import '../../tela-funding.js';
 import { fundingDoEstudo, type OperacaoFunding } from '../../funding-motor.js';
 import { mesRepasse } from '../../fluxo-shared.js';
-import { CRONO, DATA_INICIO, CUSTOS, fluxo, forcarEstado } from './dados.js';
+import { CRONO, DATA_INICIO, CUSTOS, abrirCartao, fluxo, forcarEstado } from './dados.js';
 
 const OPERACAO: OperacaoFunding & { id: number } = {
   id: 1,
@@ -83,5 +83,8 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
+    // O painel "Visão do investidor" mora na página da operação, aberta pelo
+    // clique no cartão da aba Operações.
+    await abrirCartao(el, OPERACAO.id);
   },
 };
