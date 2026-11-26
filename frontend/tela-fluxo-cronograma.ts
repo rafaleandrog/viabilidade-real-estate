@@ -471,7 +471,8 @@ export class ViabFluxoCronograma extends LitElement {
               <urbi-botao variante="fantasma" pequeno ?desabilitado=${this.salvandoCronograma}
                 @click=${() => this._descartarRascunhoFase(f.id)}>Descartar</urbi-botao>
             ` : nothing}
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover fase"
+              .ariaLabel=${'Remover fase'}
               ?desabilitado=${this.salvandoCronograma}
               @click=${() => this._removerFase(f)}></urbi-botao>
           </td>` : nothing}
