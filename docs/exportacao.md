@@ -74,7 +74,9 @@ Um PDF para apresentar o projeto a um investidor, montado do que o estudo já te
 botão **Dossiê do projeto** fica ao lado de **Exportar PDF** na sub-aba **Proforma** de
 **Resultado** (Preliminar) e ao lado de **CSV** e **PDF** nas sub-abas **Fluxo de Caixa** e
 **Análise Financeira** de **Resultados** (Avançado). Como nos outros PDFs, a janela de impressão
-abre ao clicar e o navegador oferece "Salvar como PDF"; permita pop-ups.
+abre ao clicar e o navegador oferece "Salvar como PDF"; permita pop-ups. Enquanto o dossiê
+está sendo montado, um novo clique no botão não abre outra janela: traz para a frente a que já
+está montando.
 
 Cada nível leva as seções que tem, e **seção sem dado não aparece** — nem o título:
 

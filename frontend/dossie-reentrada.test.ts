@@ -82,3 +82,24 @@ test('reentrada: janela em montagem fechada pelo usuário não bloqueia nova abe
     await a;
   });
 });
+
+test('reentrada: o fim da montagem antiga não solta a trava da janela nova', async () => {
+  const j1 = janelaMock();
+  const j2 = janelaMock();
+  await comMocks([j1, j2], async (aberturas) => {
+    const g1 = portao();
+    const g2 = portao();
+    const a = exportarDossiePDF(async () => { await g1.p; return DADOS; });
+    j1.closed = true;
+    const b = exportarDossiePDF(async () => { await g2.p; return DADOS; });
+    assert.equal(aberturas(), 2);
+    g1.libera();
+    await a;
+    // j2 segue montando: a chamada seguinte foca j2 em vez de abrir uma terceira janela.
+    assert.equal(await exportarDossiePDF(async () => DADOS), true);
+    assert.equal(aberturas(), 2);
+    assert.equal(j2.focos, 1);
+    g2.libera();
+    await b;
+  });
+});
