@@ -22,8 +22,9 @@ export function fmtR$(v: number, comSimbolo = true): string {
   return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
 }
 /**
- * #581 — a PRIMEIRA exceção declarada ao contrato C7 (hoje são três: esta,
- * `fmtR$Milhoes` e `celulaInteira` — ver `CLAUDE.md` § Contratos inegociáveis).
+ * #581 — a PRIMEIRA exceção declarada ao contrato C7 (hoje são quatro: esta,
+ * `fmtR$Milhoes`, `celulaInteira` e `fmtR$Mi` — ver `CLAUDE.md` § Contratos
+ * inegociáveis).
  *
  * Decisão do autor em 2026-08-26 (leva Avançado, item 4): "ajustar valores em
  * R$ nos urbi-kpis para não terem casas decimais". Ela vale **só para o valor
@@ -102,6 +103,39 @@ export function fmtR$Milhoes(v: number): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(Math.abs(milhoes) < 0.05 ? 0 : milhoes);
+}
+
+/**
+ * Valor em **R$ milhões, com uma casa e o sufixo "mi"**: `20_100_000` sai
+ * `R$ 20,1 mi`; `1_234_500_000` sai `R$ 1.234,5 mi`.
+ *
+ * ⚠️ É a QUARTA exceção declarada ao contrato C7 ("todo valor monetário
+ * resultado de fórmula tem 2 casas"). Decisão do dono para o Funding: os
+ * cartões de operação e a aba Estrutura de capital mostram valores sempre em
+ * milhões, com uma casa. Vale **só** ali: a página da operação, as tabelas, o
+ * Fluxo de Caixa e a exportação seguem em reais cheios, com 2 casas. É
+ * arredondamento de EXIBIÇÃO; persistência, entrada e motor não mudam.
+ *
+ * Símbolo próprio pelo mesmo motivo das outras três exceções: a exceção precisa
+ * ser **greppável**. O inventário de call sites é travado por contagem exata em
+ * `frontend/funding-milhoes.test.ts`.
+ *
+ * Diferente do formatador da cascata, valor NÃO finito sai `—`: num KPI sem
+ * base, publicar zero seria dado falso. O sinal é normalizado APÓS o
+ * arredondamento, pelo critério do próprio Intl (half away from zero) na escala
+ * de milhões: |v| < 50.000 sai `R$ 0,0 mi`, nunca `-R$ 0,0 mi`. O espaço antes
+ * de "mi" é não separável, como o que o Intl põe depois de "R$".
+ */
+export function fmtR$Mi(v: number): string {
+  if (!Number.isFinite(v)) return '—';
+  const milhoes = v / 1e6;
+  const texto = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Math.abs(milhoes) < 0.05 ? 0 : milhoes);
+  return `${texto} mi`;
 }
 
 /**

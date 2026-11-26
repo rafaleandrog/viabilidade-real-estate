@@ -1200,10 +1200,10 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-fluxo-receitas.ts:452-453`) trocaram `fmtNum` sem 2º argumento por
   > `fmtR$(v, false)`. A #281 está fechada — a tabela de conformidade completa é
   > `docs/formulas.md` §"Estado de conformidade".
-  > ⚠️ **TRÊS exceções de EXIBIÇÃO, e só três.** As três seguem o mesmo desenho, de propósito:
+  > ⚠️ **QUATRO exceções de EXIBIÇÃO, e só quatro.** As quatro seguem o mesmo desenho, de propósito:
   > símbolo próprio (não um parâmetro de `fmtR$`) para a exceção ser **greppável**, e inventário de
   > call sites travado por **contagem exata** — chamada a menos e chamada a mais reprovam igual.
-  > **`fmtR$` e `celula` não mudaram em nenhuma das três**, e em nenhuma delas persistência, entrada,
+  > **`fmtR$` e `celula` não mudaram em nenhuma das quatro**, e em nenhuma delas persistência, entrada,
   > motor ou Fluxo de Caixa saem das 2 casas. A terceira é a única que alcança uma TABELA e a sua
   > exportação — a Proforma —, e está dito abaixo por quê.
   >
@@ -1249,6 +1249,21 @@ Git Bash — ver PROGRESSO).
   > como nas outras duas. A trava é `frontend/proforma-inteiros.test.ts`: contagem exata nos três
   > consumidores (`exportar.ts`, `tela-fluxo-ver.ts`, a declaração), zero no resto do frontend
   > versionado, e a rede de que `celulaProforma` e a Proforma do Avançado não voltaram a `celula`.
+  >
+  > **4ª — valores em R$ milhões no Funding, declarada pelo dono em 2026-11-26 (Rodada 16, issue
+  > #1005, decisão D12)**: **os cartões de operação e a aba Estrutura de capital do Funding mostram
+  > valores em R$ MILHÕES, com uma casa e o sufixo "mi"** — `R$ 20.100.000` aparece como
+  > `R$ 20,1 mi`. (a) É decisão de desenho do dono, não bug, e vale **só** nessas duas superfícies.
+  > (b) **Não vale** na página da operação (que mostra reais cheios), nas tabelas, no Fluxo de Caixa
+  > nem na exportação, que seguem em 2 casas; é arredondamento de EXIBIÇÃO, e persistência, entrada e
+  > motor não mudam. Diferente da 2ª, valor não finito sai `—`, nunca zero: num KPI sem base, zero
+  > seria dado falso. O sinal é normalizado depois de arredondar, como nas outras três. (c) Quem a
+  > implementa é `fmtR$Mi` (`frontend/viab-format.ts`) — símbolo próprio, prefixo do formatador da
+  > cascata, por isso a contagem procura a chamada com o parêntese. A trava é
+  > `frontend/funding-milhoes.test.ts`: contagem exata por consumidor (que começa vazia: o formatador
+  > nasce antes da tela, e os cartões e a aba entram no inventário quando passarem a chamá-lo), uma
+  > única ocorrência em `viab-format.ts` (a declaração) e zero no resto do frontend versionado,
+  > enumerado por `git ls-files`.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Sem exceção, inclusive nos documentos de impressão.** O CSS e os SVG dos PDFs de

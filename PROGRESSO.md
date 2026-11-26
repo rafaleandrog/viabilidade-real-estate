@@ -4,6 +4,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-26 — Funding R16, fase 1: núcleo de cálculo da Estrutura de capital (issue 1006)
+
+Primeira fase do arco da Rodada 16 (guarda-chuva: issue 1005). Nenhuma tela muda; o módulo novo não
+tem consumidor ainda — as fases dos cartões, da janela e da aba Estrutura de capital o ligam.
+
+- **Módulo puro `frontend/funding-estrutura.ts`** (sem lit, sem DOM, sem simular o motor): ordem de
+  senioridade (Financiamento à produção → dívida → antecipação → equity; tipo desconhecido depois do
+  equity; desempate por `ordem` e `id`; rascunho sem `id` por último no tipo), a sequência "antes →
+  depois" com `simular` injetado, os KPIs do cartão por tipo (em pontos percentuais; `null` sem base,
+  nunca zero), o maior saldo devedor, as camadas do stack (a do Financiamento à produção vem da
+  estrutura completa, não do passo dele sozinho), os totais, o rótulo de preferência do equity e a
+  "Leitura da operação" por regras, com os limiares em constantes testadas na fronteira.
+- **`indicadoresEstrutura` mudou de casa**: está no módulo novo, e `funding-alternativas.ts` o
+  reexporta até a tela deixar de importá-lo de lá. Os testes antigos continuam passando pela
+  reexportação; o módulo novo tem a cópia deles.
+- **Conferido no motor real**: reaproveitar o fluxo da estrutura completa e recalcular o fluxo para
+  cada prefixo dão os mesmos indicadores (fixture com os quatro tipos).
+- **`fmtR$Mi`** em `viab-format.ts` (`R$ 20,1 mi`; não finito sai `—`), quarta exceção de exibição
+  ao C7, descrita no `CLAUDE.md` e travada por `frontend/funding-milhoes.test.ts` com zero
+  consumidores. O guia `docs/formulas.md` só muda quando uma tela passar a usá-lo.
+- **`scripts/conferir-estudo.ts`** imprime, depois do bloco FUNDING, a sequência, as camadas, os
+  totais e os KPIs por operação; o diff do arquivo só acrescenta linhas.
+
 ## 2026-11-26 — Receitas do Avançado: janela Pós-chaves volta a ser fixa em 12 meses (issue 998)
 
 Pedido direto do autor: retirar o campo "Janela Pós-chaves" do modal de Absorção e de qualquer
