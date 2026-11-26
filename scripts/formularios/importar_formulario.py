@@ -354,9 +354,6 @@ def _validar_avancado(m, erros, avisos):
         soma = sum(float(g.get(c) or 0) for c in ('pre_lancamento_pct', 'lancamento_pct', 'obra_pct'))
         if soma > 100.01:
             E(f'Grupo "{g["nome"]}": absorção pré+lançamento+obra = {soma:.2f}% (> 100)')
-        janela = g.get('pos_chaves_meses')
-        if not (isinstance(janela, (int, float)) and float(janela).is_integer() and 1 <= janela <= 12):
-            E(f'Grupo "{g["nome"]}": janela pós-chaves deve ser um inteiro de 1 a 12 (veio {janela!r})')
         if tem_pre and g.get('pre_lancamento_pct') is None:
             A(f'Grupo "{g["nome"]}": há pré-lançamento e a absorção de pré está em branco (vale 0%)')
         if not tem_pre and g.get('pre_lancamento_pct'):
@@ -660,7 +657,7 @@ def escrever_avancado(api, m, eid):
             {'evento': 'lancamento', 'pct': lanc}, {'evento': 'obra', 'pct': obra},
             {'evento': 'pos_obra', 'pct': round(100 - pre - lanc - obra, 6)}]      # pós-chaves já DERIVADO
         absorcao = {'modo': 'distribuido', 'correcao_estoque': bool(g.get('correcao_estoque', False)),
-                    'pos_chaves_meses': int(g.get('pos_chaves_meses') or 12), 'blocos': blocos}
+                    'blocos': blocos}
         entradas, parcelas = [], []
         for _, q in ordenados(m['pagamento']):
             if q.get('grupo') != g['nome']:
@@ -945,8 +942,6 @@ def reler(api, m, eid):
             if b is None or not igual(g.get(campo) or 0, b.get('pct'), tol=0.01):
                 div.append(f'grupo "{nome}": absorção {evento} pedida {g.get(campo)!r}, gravada {None if b is None else b.get("pct")!r}')
         ab = r.get('absorcao') or {}
-        if not igual(g.get('pos_chaves_meses', 12), ab.get('pos_chaves_meses', 12)):
-            div.append(f'grupo "{nome}": janela pós-chaves pedida {g.get("pos_chaves_meses")!r}, gravada {ab.get("pos_chaves_meses")!r}')
         if bool(g.get('correcao_estoque', False)) != bool(ab.get('correcao_estoque', False)):
             div.append(f'grupo "{nome}": correção de estoque pedida {g.get("correcao_estoque")!r}, gravada {ab.get("correcao_estoque")!r}')
         if not igual(g.get('residuo_sem_prazo', 'imediato'), fp.get('residuoAteMarco', 'imediato')):

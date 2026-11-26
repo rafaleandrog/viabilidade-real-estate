@@ -122,9 +122,9 @@ export const EVENTO_LABEL: Record<string, string> = {
   obra: 'Obra',
   // BUG7-20: rótulo do evento do Cronograma (fase de custos) — id interno
   // pos_obra intacto. Não confundir com "Pós-chaves"/APOS_CHAVES_MESES logo
-  // abaixo, a janela comercial da Absorção, de 1 a 12 meses por Grupo (#348) — nomes
+  // abaixo, a janela comercial da Absorção, de 12 meses fixos (#348) — nomes
   // parecidos, conceitos diferentes (fase de custo livre × janela de vendas
-  // do Grupo, de 1 a 12 meses).
+  // fixa de 12 meses).
   pos_obra: 'Pós-obras',
 };
 

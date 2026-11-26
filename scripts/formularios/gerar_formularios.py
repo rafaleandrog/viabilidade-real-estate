@@ -887,8 +887,6 @@ def avancado(tipo, ex):
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_lanc'))
         f.campo(f'{k}_obra', f'Grupo {g} — Absorção Durante a obra', '% das unidades', f'grupos[{g}].obra_pct',
                 F_PCT, minimo=0, maximo=1, ex=ex.get(f'{k}_obra'))
-        f.campo(f'{k}_janela', f'Grupo {g} — Janela pós-chaves', 'meses (1 a 12)', f'grupos[{g}].pos_chaves_meses', F_INT,
-                minimo=1, maximo=12, inteiro=True, ex=ex.get(f'{k}_janela'))
         f.campo(f'{k}_corr', f'Grupo {g} — Correção de estoque', 'Sim/Não', f'grupos[{g}].correcao_estoque', F_TXT, lista=SN,
                 ex=ex.get(f'{k}_corr'))
         f.campo(f'{k}_resid', f'Grupo {g} — Resíduo sem prazo', 'lista: imediato | concentrado',
