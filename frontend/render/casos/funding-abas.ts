@@ -1,25 +1,28 @@
-// Caso de render: o CHASSI de abas da tela de Funding (#586).
+// Caso de render: a aba Operações do Funding em CARTÕES.
 //
 // ⚠️ O que este caso existe para pegar, e nenhuma outra camada pega. Os testes
-// de `frontend/funding-abas.test.ts` provam a REORDENAÇÃO (função pura) e o
-// PARTICIONAMENTO (lógica de conjunto lida da fonte). Nenhum dos dois enxerga
-// se a tela **monta** as abas: apagar o `<urbi-abas>` inteiro do `render()`,
-// ou trocá-lo por um `<div>`, deixa aquele arquivo VERDE — é a classe de
-// defeito nº 1 do `CLAUDE.md`, "o defeito mora na FIAÇÃO, não no cálculo".
+// de `frontend/funding-abas.test.ts` e `funding-cartao-dados.test.ts` provam a
+// PARTIÇÃO dos tipos e o CONTEÚDO de cada cartão (funções puras). Nenhum dos
+// dois enxerga se a tela MONTA os cartões, se a sequência "antes → depois"
+// chega a eles, nem se a leitura aparece — é a classe de defeito nº 1 do
+// `CLAUDE.md`, "o defeito mora na FIAÇÃO, não no cálculo".
 //
-// O `exigir` abaixo é a prova de montagem: quatro `urbi-hospedeiro` (um por
-// aba, todos montados — `urbi-abas` exibe a ativa e mantém os demais no DOM,
-// como em `tela-avancado.ts`) e a `urbi-tabela` compilada da aba Operações,
-// que é a aba ativa por padrão.
+// O `exigir` abaixo é a prova de montagem:
+//   · um `viab-funding-cartao` por operação listável (dívida e equity; o
+//     Financiamento à produção NÃO vira cartão). Apagar a montagem dos
+//     cartões em `render()` deixa este caso vermelho;
+//   · `div.leitura` em cada cartão — apagar a chamada de `leituraDaOperacao`
+//     (ou a da sequência, que alimenta a frase da exposição) a esvazia;
+//   · `s.antes`, o "antes" riscado da exposição máxima — só existe com o passo
+//     da sequência; apagar `sequenciaDeEstrutura` em `_recalcular` o tira.
 //
-// A fixture tem UMA operação de cada tipo, de propósito: é o menor conjunto que
-// prova que a tabela compila os TRÊS tipos numa lista só (critério 2) e que
-// nenhum tipo ficou sem aba.
+// `medir()` acrescenta o que o `exigir` não diz: zero `urbi-tabela` (a tabela
+// compilada saiu) e a GEOMETRIA de cada cartão nos dois temas — nada transborda
+// do cartão nem da grade, e cada valor cabe na moldura.
 
 import '../../tela-funding.js';
-import { fundingDoEstudo, type OperacaoFunding } from '../../funding-motor.js';
-import { mesRepasse } from '../../fluxo-shared.js';
-import { CRONO, DATA_INICIO, CUSTOS, fluxo, forcarEstado } from './dados.js';
+import type { OperacaoFunding } from '../../funding-motor.js';
+import { estadoFundingCarregado, forcarEstado } from './dados.js';
 
 const OPERACOES: (OperacaoFunding & { id: number; ordem: number })[] = [
   {
@@ -30,72 +33,84 @@ const OPERACOES: (OperacaoFunding & { id: number; ordem: number })[] = [
   {
     id: 2, ordem: 1, tipo: 'financiamento_producao', nome: 'Financiamento à produção',
     taxa_anual: 12.5, exposicao_minima: 20, percentual_financiavel: 80,
-    amortizar_com_caixa_disponivel: true,
+    // Desligado: o gráfico da aba dele (montada junto, porque o stub de
+    // urbi-abas não esconde a aba inativa) não é o que este caso mede.
+    amortizar_com_caixa_disponivel: true, ativo: false,
   } as any,
   {
-    id: 3, ordem: 2, tipo: 'equity', nome: 'Investidor',
+    id: 3, ordem: 2, tipo: 'equity', nome: 'Investidor com um nome bem comprido para testar a quebra',
     valor: 3_000_000, inicio_mes: 0, modo_retorno: 'permuta_financeira', pct_retorno: 15,
   } as any,
 ];
 
 export const caso = {
   nome: 'funding-abas',
-  // `exigir` é OBRIGATÓRIO em todo caso, e o harness lança sem ele: um caso que
-  // não renderiza nada passaria por TODAS as lentes com "limpo".
   exigir: [
     { seletor: 'urbi-abas', minimo: 1 },
-    // As TRÊS abas de tipo — Financiamento à produção, Dívida e Equity.
-    // Apagar a montagem de uma delas deixa este caso vermelho (critério 5).
-    { seletor: 'urbi-hospedeiro', minimo: 3 },
+    { seletor: 'viab-funding-cartao', minimo: 2 },
+    { seletor: 'div.leitura', minimo: 2 },
+    { seletor: 's.antes', minimo: 2 },
   ],
-  // ⚠️ O QUE ESTE CASO NÃO MEDE, e por quê — o limite é do harness, não do
-  // código, e declará-lo é obrigatório: um caso que se cala sobre a própria
-  // cobertura é indistinguível de um que cobriu tudo.
-  //
-  // A aba **Operações** e a `urbi-tabela` dentro dela **não são aferíveis
-  // aqui**. O stub recebe `colunas` e `linhas` por PROPRIEDADE (o espelho as
-  // declara `so_propriedade: true`) e não sabe desenhar tabela nenhuma — a
-  // caixa sai com altura ZERO, e caixa de área zero conta como invisível, que
-  // é o que o `exigir` mede. Medido: pedir `urbi-tabela` visível reprova
-  // sempre, inclusive com a tabela montada e correta.
-  //
-  // Consequência honesta: **apagar a aba Operações NÃO fica vermelho aqui.**
-  // Quem cobre esse flanco é `frontend/funding-abas.test.ts`, lendo a fonte —
-  // o teste dos rótulos literais das quatro abas e o do particionamento
-  // (`TIPOS` × `ABAS`). É cobertura mais fraca que render, e está dito assim
-  // em vez de anunciada como equivalente.
   aceitaNaoReproduzido: [
-    // Banner regulatório (§17/#277) — fica FORA das abas, no topo, e é parte
-    // da tela sob medição.
+    // Banner regulatório (§17/#277) — fica FORA das abas, no topo.
     'urbi-banner.variante',
-    // Campos dos formulários das abas de tipo (todas montadas).
-    'urbi-select.desabilitado',
-    'urbi-select.opcoes',
-    'urbi-input.desabilitado',
     // O primitivo de abas: `abas` é só-propriedade, `ativa` não dimensiona.
     'urbi-abas.abas',
     'urbi-abas.ativa',
+    // O badge do tipo em cada cartão: a cor não dimensiona.
+    'urbi-badge.cor',
+    // Formulário da aba Financiamento à produção, montada junto. (Os
+    // checkboxes dele saem com caixa de área zero no stub e não entram na conta.)
+    'urbi-input.desabilitado',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
-    const calc = fluxo();
-    const funding = fundingDoEstudo(
-      OPERACOES, calc.fluxoMensal, calc.receitaMensal,
-      calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1], mesRepasse(CRONO), 12,
-    );
-    const el = document.createElement('viab-funding');
+    const el = document.createElement('viab-funding') as any;
     forcarEstado(el, {
       estudo: { nivel_analise: 'avancado' }, // sem `id` — impede o fetch real em updated()
       carregando: false,
-      calc,
-      funding,
-      operacoes: OPERACOES,
-      custos: CUSTOS,
-      crono: CRONO,
-      dataInicio: DATA_INICIO,
-      taxaDescontoAa: 12,
+      ...estadoFundingCarregado(OPERACOES),
       editavel: false,
     });
     raiz.appendChild(el);
-    await (el as any).updateComplete;
+    await el.updateComplete;
+    el._recalcular();
+    await el.updateComplete;
+    for (const c of el.shadowRoot.querySelectorAll('viab-funding-cartao')) await (c as any).updateComplete;
+  },
+  async medir(raiz: HTMLElement) {
+    const tela = raiz.querySelector('viab-funding') as any;
+    const sr: ShadowRoot = tela.shadowRoot;
+    const cartoes = [...sr.querySelectorAll('viab-funding-cartao')] as any[];
+    const grade = sr.querySelector('div.cartoes') as HTMLElement | null;
+    const temas: Record<string, unknown> = {};
+    const variantes = ['0', '1'];
+    for (const v of variantes) {
+      document.documentElement.dataset.variante = v;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      temas[v] = {
+        grade: grade ? { scroll: grade.scrollWidth, client: grade.clientWidth } : null,
+        cartoes: cartoes.map((c) => {
+          const caixa = c.getBoundingClientRect();
+          const valores = [...c.shadowRoot.querySelectorAll('.val, .nome, .leitura p')] as HTMLElement[];
+          return {
+            scroll: c.scrollWidth,
+            client: c.clientWidth,
+            largura: caixa.width,
+            // Valor que sai da moldura: borda direita do texto além da do cartão.
+            fora: valores.filter((x) => x.getBoundingClientRect().right > caixa.right + 0.5
+              || x.scrollWidth > x.clientWidth + 1).length,
+          };
+        }),
+      };
+    }
+    document.documentElement.dataset.variante = '0';
+    return {
+      tabelas: sr.querySelectorAll('urbi-tabela').length,
+      ids: cartoes.map((c) => c.dataset.id),
+      kpisPorCartao: cartoes.map((c) => c.shadowRoot.querySelectorAll('.kpi').length),
+      termosPorCartao: cartoes.map((c) => c.shadowRoot.querySelectorAll('.termo').length),
+      tituloLeitura: cartoes.map((c) => c.shadowRoot.querySelector('.leitura h4')?.textContent?.trim() ?? null),
+      temas,
+    };
   },
 };

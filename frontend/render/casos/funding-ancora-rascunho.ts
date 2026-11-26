@@ -30,7 +30,7 @@ import '../../tela-funding.js';
 import { receitaLiquidaComCorretagemMensal, type OperacaoFunding } from '../../funding-motor.js';
 import { calcularFluxo, type FluxoConfig } from '../../fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from '../../fluxo-shared.js';
-import { CRONO, DATA_INICIO, CUSTOS, RECEITAS, forcarEstado } from './dados.js';
+import { CRONO, DATA_INICIO, CUSTOS, RECEITAS, abrirCartao, forcarEstado } from './dados.js';
 
 const MES_GRAVADO = 5;
 const EVENTO_NOVO = 'lancamento';
@@ -109,12 +109,13 @@ export const caso = {
       dataInicio: DATA_INICIO,
       taxaDescontoAa: 12,
       editavel: true,
-      abaAtiva: 'divida',
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
     (el as any)._recalcular();
     await (el as any).updateComplete;
+    // O formulário da dívida mora na página da operação, aberta pelo cartão.
+    await abrirCartao(el, DIVIDA.id);
   },
   async medir(raiz: HTMLElement) {
     const tela = raiz.querySelector('viab-funding')! as any;
@@ -140,12 +141,13 @@ export const caso = {
       ...estadoCalc(gravadaNova),
       operacoes: gravadaNova,
       custos: CUSTOS, crono: CRONO, dataInicio: DATA_INICIO, taxaDescontoAa: 12,
-      editavel: false, abaAtiva: 'divida',
+      editavel: false,
     });
     raiz.appendChild(ref);
     await ref.updateComplete;
     ref._recalcular();
     await ref.updateComplete;
+    await abrirCartao(ref, DIVIDA.id);
     const painelEsperado = painel(ref.shadowRoot!);
     ref.remove();
 

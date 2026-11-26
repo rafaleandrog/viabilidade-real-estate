@@ -22,7 +22,7 @@
 import '../../tela-funding.js';
 import { fundingDoEstudo, type OperacaoFunding } from '../../funding-motor.js';
 import { mesRepasse } from '../../fluxo-shared.js';
-import { CRONO, DATA_INICIO, CUSTOS, fluxo, forcarEstado } from './dados.js';
+import { CRONO, DATA_INICIO, CUSTOS, abrirCartao, fluxo, forcarEstado } from './dados.js';
 
 const OPERACAO: OperacaoFunding & { id: number } = {
   id: 1,
@@ -83,5 +83,8 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
+    // O painel "Visão do investidor" mora na página da operação, aberta pelo
+    // clique no cartão da aba Operações.
+    await abrirCartao(el, OPERACAO.id);
   },
 };

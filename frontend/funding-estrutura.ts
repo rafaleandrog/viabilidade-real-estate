@@ -457,21 +457,21 @@ function fraseExposicao(passo: PassoEstrutura | null, fmtValor: (v: number) => s
     : `Aumenta a exposição máxima do incorporador de ${fmtValor(antes)} para ${fmtValor(depois)}.`;
 }
 
-/** Meses exibidos começam em 1 (o índice 0 do motor é o mês 1). */
-function fraseQuando(serie: SerieOperacao): string | null {
+/** O mês sai pelo formatador da tela (`fmtMes` recebe o índice 0-based do motor), para a leitura dizer o mesmo mês que o resto da tela. */
+function fraseQuando(serie: SerieOperacao, fmtMes: (mes: number) => string): string | null {
   const entra = primeiroMes(serie.entradas);
   const sai = ultimoMes(serie.saidas);
   const tipo = serie.operacao.tipo;
   const [recebe, paga] = tipo === 'equity'
-    ? ['O investidor aporta a partir do mês', 'recebe o retorno até o mês']
+    ? ['O investidor aporta a partir de', 'recebe o retorno até']
     : tipo === 'antecipacao_recebiveis'
-      ? ['O projeto recebe o valor antecipado a partir do mês', 'repassa as parcelas cedidas até o mês']
-      : ['O projeto recebe a partir do mês', 'paga até o mês'];
-  if (entra !== null && sai !== null) return `${recebe} ${entra + 1} e ${paga} ${sai + 1}.`;
-  if (entra !== null) return `${recebe} ${entra + 1}.`;
+      ? ['O projeto recebe o valor antecipado a partir de', 'repassa as parcelas cedidas até']
+      : ['O projeto recebe a partir de', 'paga até'];
+  if (entra !== null && sai !== null) return `${recebe} ${fmtMes(entra)} e ${paga} ${fmtMes(sai)}.`;
+  if (entra !== null) return `${recebe} ${fmtMes(entra)}.`;
   if (sai !== null) {
     const sujeito = tipo === 'equity' ? 'O investidor' : 'O projeto';
-    return `${sujeito} ${paga} ${sai + 1}.`;
+    return `${sujeito} ${paga} ${fmtMes(sai)}.`;
   }
   return null;
 }
@@ -504,11 +504,18 @@ function fraseCusto(k: KpisOperacao): string | null {
  * número que a sustente não sai; sem nenhum número, `[]`.
  *
  * `fmtValor` formata os valores em R$ — a tela passa o formatador do cartão.
+ * `fmtMes` formata o mês (índice 0-based do motor) — a tela passa o rótulo de
+ * mês que usa em todo o resto (`rotuloMesRelativo`). Os dois são obrigatórios:
+ * esquecer um vira erro de compilação, não um mês contado de outro jeito.
  */
-export function leituraDaOperacao(entrada: EntradaLeitura, fmtValor: (v: number) => string): string[] {
+export function leituraDaOperacao(
+  entrada: EntradaLeitura,
+  fmtValor: (v: number) => string,
+  fmtMes: (mes: number) => string,
+): string[] {
   const frases = [
     fraseExposicao(entrada.passo, fmtValor),
-    fraseQuando(entrada.serie),
+    fraseQuando(entrada.serie, fmtMes),
     fraseCusto(entrada.kpis),
   ].filter((f): f is string => f !== null);
   return frases.slice(0, MAX_FRASES_LEITURA);

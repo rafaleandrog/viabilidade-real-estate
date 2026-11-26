@@ -147,9 +147,10 @@ const PCT_ENTRADA: { arquivo: string; chamadas: number; motivo: string }[] = [
     motivo: 'as três derivadas de % DIGITADA: pós-obra numa <td>, o saldo de chaves e a carteira própria (#850) dentro de div.repasse-box — uma caixa com forma de card exibindo derivada de valor digitado. Se ela conta como card de KPI é decisão do autor (registrada no PR da #581); enquanto não decidida, mantém as 2 casas do valor digitado',
   },
   {
-    // #586: entrou com a tabela compilada da aba Operações do Funding.
-    arquivo: 'tela-funding.ts', chamadas: 3,
-    motivo: 'duas CÉLULAS DE TABELA da aba Operações, não card. Na coluna "Taxa / retorno", os dois ramos da mesma célula: `taxa_anual` (Dívida, Financiamento à produção e Antecipação) e `pct_retorno` (Equity); na coluna "Valor", o `pct_carteira_cedida` da Antecipação (#851). Os três são % DIGITADA pelo usuário e por isso em 2 casas. O contrato do CLAUDE.md manda o oposto do card justamente aqui: tabela mantém a precisão de entrada',
+    // A tabela de Operações do Funding (#586) saiu; os mesmos percentuais
+    // digitados passaram para os TERMOS do cartão de operação.
+    arquivo: 'funding-cartao-dados.ts', chamadas: 4,
+    motivo: 'os TERMOS do cartão de operação do Funding, não os KPIs dele: a taxa da Dívida, o % de retorno do Equity, e a carteira cedida e a taxa de desconto da Antecipação. Os quatro são % DIGITADA pelo usuário, que o cartão repete como termo do contrato, e por isso em 2 casas. Os quatro KPIs do cartão (LTV, custo efetivo, ROI, TIR, deságio, TIR alavancada) usam fmtPct, 1 casa, pela regra de card',
   },
 ];
 

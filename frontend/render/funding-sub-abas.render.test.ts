@@ -1,7 +1,5 @@
-// Render das sub-abas por OPERAÇÃO dentro de um tipo de Funding (Dívida com
-// duas operações). Ver o topo de `casos/funding-sub-abas.ts` para o porquê de
-// medir aqui — a troca de sub-aba é fiação (evento → estado → re-render) que
-// nenhum teste de função pura alcança.
+// Render: duas operações do mesmo tipo viram dois cartões, na ordem de `ordem`.
+// Ver o topo de `casos/funding-sub-abas.ts`.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +8,7 @@ import { contar, naoDeclaradas, motivoParaPular, relato } from './apoio.js';
 
 const pular = await motivoParaPular();
 
-test('Funding: duas operações do mesmo tipo montam em sub-abas próprias', { skip: pular ?? false }, async () => {
+test('Funding: duas operações do mesmo tipo viram dois cartões, na ordem de `ordem`', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'funding-sub-abas', larguras: [900] });
 
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
@@ -19,16 +17,11 @@ test('Funding: duas operações do mesmo tipo montam em sub-abas próprias', { s
   assert.equal(contar(a, 'sobreposicao'), 0, 'caixas pintadas se sobrepuseram' + relato(a));
   assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
 
-  const extra = a.extra?.['900'] as { ativaAntes: string | null; ativaDepois: string | null } | undefined;
+  const extra = a.extra?.['900'] as { ids: string[]; nomes: string[] } | undefined;
   assert.ok(extra, 'o caso não devolveu a medida extra — `medir()` não rodou' + relato(a));
-
-  assert.equal(
-    extra!.ativaAntes, '10',
-    'a primeira operação de Dívida (id 10) tinha que ser a sub-aba ativa por padrão' + relato(a),
+  assert.deepEqual(
+    extra!.ids, ['11', '10'],
+    'dentro do mesmo tipo os cartões seguem `ordem` (a de id 11 tem ordem 0), não o id nem a chegada' + relato(a),
   );
-  assert.equal(
-    extra!.ativaDepois, '11',
-    'disparar `urbi:aba-selecionar` com a segunda operação (id 11) tinha que mudar a sub-aba ativa — '
-      + 'apagar o handler do template deixaria este caso vermelho e todo teste de função pura verde' + relato(a),
-  );
+  assert.deepEqual(extra!.nomes, ['Abrir operação 2º Dívida', 'Abrir operação 1º Dívida'], 'nome acessível do cartão');
 });

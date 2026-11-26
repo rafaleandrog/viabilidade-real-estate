@@ -53,7 +53,9 @@ export const caso = {
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
-    'urbi-select.opcoes',
+    // O cartão da dívida na aba Operações, montada junto (o stub de urbi-abas
+    // não esconde a aba inativa): a cor do badge não dimensiona.
+    'urbi-badge.cor',
     'urbi-abas.abas',
     'urbi-abas.ativa',
   ],
