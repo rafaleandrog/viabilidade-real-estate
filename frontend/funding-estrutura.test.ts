@@ -12,7 +12,7 @@ import {
 import { mesRepasse } from './fluxo-shared.js';
 import { visaoInvestidor } from './visao-investidor.js';
 import {
-  LIMIAR_CUSTO_EMPATE_PP, LIMIAR_EXPOSICAO_INALTERADA, MAX_FRASES_LEITURA, ORDEM_SENIORIDADE,
+  LIMIAR_CUSTO_EMPATE_PP, LIMIAR_EXPOSICAO_INALTERADA, LIMIAR_MES_COM_VALOR, MAX_FRASES_LEITURA, ORDEM_SENIORIDADE,
   camadasDoStack, indicadoresEstrutura, kpisDaOperacao, leituraDaOperacao, ltvDaSerie, maiorSaldoDevedor,
   nivelSenioridade, ordenarPorSenioridade, rotuloPreferenciaEquity, sequenciaDeEstrutura, totaisDaEstrutura,
   type IndicadoresEstrutura, type KpisOperacao, type PassoEstrutura,
@@ -402,6 +402,10 @@ test('rótulo de preferência do equity, com o padrão do motor', () => {
   assert.equal(rotuloPreferenciaEquity('resultado_final'), 'participa do resultado');
   assert.equal(rotuloPreferenciaEquity(undefined), 'recebe sobre a receita');
   assert.equal(rotuloPreferenciaEquity(null), 'recebe sobre a receita');
+  // Modo desconhecido: o motor só é progressivo com `permuta_financeira` exato,
+  // e o rótulo segue o motor.
+  assert.equal(rotuloPreferenciaEquity('outro_modo'), 'participa do resultado');
+  assert.equal(rotuloPreferenciaEquity(''), 'participa do resultado');
 });
 
 const est = (exposicaoMaxima: number, tirAlavancada: number | null = null): IndicadoresEstrutura =>
@@ -437,6 +441,18 @@ test('leitura (2): quando recebe e paga, em meses que começam em 1', () => {
   );
   const so = serie('divida', { saidas: [0, 0, 0, 5] });
   assert.deepEqual(leituraDaOperacao({ serie: so, kpis: kpiDivida(null, null), passo: null }, fmt), ['O projeto paga até o mês 4.']);
+});
+
+test('leitura (2): fronteira de LIMIAR_MES_COM_VALOR — abaixo não conta como mês, no limiar conta', () => {
+  const abaixo = LIMIAR_MES_COM_VALOR - 0.001;
+  const ler = (s: SerieOperacao) => leituraDaOperacao({ serie: s, kpis: kpiDivida(null, null), passo: null }, fmt);
+  // Valores abaixo do limiar, nos dois sinais, não fazem frase.
+  assert.deepEqual(ler(serie('divida', { entradas: [abaixo, 0, 0, 0], saidas: [0, 0, 0, -abaixo] })), []);
+  // No limiar exato, o mês conta — na entrada (primeiro mês) e na saída (último mês).
+  assert.deepEqual(
+    ler(serie('divida', { entradas: [abaixo, LIMIAR_MES_COM_VALOR, 0, 0], saidas: [0, 0, LIMIAR_MES_COM_VALOR, abaixo] })),
+    ['O projeto recebe a partir do mês 2 e paga até o mês 3.'],
+  );
 });
 
 test('leitura (3): custo contra a TIR alavancada antes, com veredito negativo e a fronteira do empate', () => {

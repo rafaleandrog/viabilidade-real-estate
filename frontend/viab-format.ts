@@ -22,8 +22,9 @@ export function fmtR$(v: number, comSimbolo = true): string {
   return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
 }
 /**
- * #581 — a PRIMEIRA exceção declarada ao contrato C7 (hoje são três: esta,
- * `fmtR$Milhoes` e `celulaInteira` — ver `CLAUDE.md` § Contratos inegociáveis).
+ * #581 — a PRIMEIRA exceção declarada ao contrato C7 (hoje são quatro: esta,
+ * `fmtR$Milhoes`, `celulaInteira` e `fmtR$Mi` — ver `CLAUDE.md` § Contratos
+ * inegociáveis).
  *
  * Decisão do autor em 2026-08-26 (leva Avançado, item 4): "ajustar valores em
  * R$ nos urbi-kpis para não terem casas decimais". Ela vale **só para o valor

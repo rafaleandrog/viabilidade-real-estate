@@ -25,9 +25,15 @@
 // Financiamento à produção (base) → dívidas → antecipações → equity → o
 // incorporador, que não é operação: é o que sobra. É RÓTULO e ordem de
 // leitura; o motor não muda (todo terceiro recebe o contrato inteiro e o
-// incorporador cobre a falta de caixa). A ordem não muda o resultado do
-// estudo: a antecipação é simulada em ordem cronológica, e o Financiamento à
-// produção lê o caixa depois das operações cegas, em qualquer ordem recebida.
+// incorporador cobre a falta de caixa). A ordem quase nunca muda o resultado
+// do estudo: a antecipação é simulada em ordem cronológica de `inicio_mes`, e
+// o Financiamento à produção lê o caixa depois das operações cegas, em
+// qualquer ordem recebida. A exceção é o EMPATE de `inicio_mes` entre duas
+// antecipações: o motor as simula na ordem do array recebido, e a segunda
+// cede sobre o lastro que a primeira deixou. Entre antecipações, a ordem de
+// senioridade é `ordem` e depois `id` — a mesma ordem em que a tela recebe as
+// operações (por `ordem`) —, então as duas só divergem se duas antecipações
+// do mesmo mês tiverem a mesma `ordem`.
 //
 // ── Camada ≠ passo ──────────────────────────────────────────────────────
 //
@@ -399,9 +405,14 @@ export function totaisDaEstrutura(
 // Rótulo de preferência do equity
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Modo ausente cai em `permuta_financeira`, o padrão do motor. */
+/**
+ * Modo ausente cai em `permuta_financeira`, o padrão do motor. Qualquer outro
+ * valor segue o motor, que só trata como progressivo o `permuta_financeira`
+ * exato e simula o resto como `resultado_final`: o rótulo nunca diz uma coisa
+ * enquanto o motor calcula outra.
+ */
 export function rotuloPreferenciaEquity(modo: ModoRetorno | string | null | undefined): string {
-  return modo === 'resultado_final' ? 'participa do resultado' : 'recebe sobre a receita';
+  return (modo ?? 'permuta_financeira') === 'permuta_financeira' ? 'recebe sobre a receita' : 'participa do resultado';
 }
 
 // ─────────────────────────────────────────────────────────────────────────
