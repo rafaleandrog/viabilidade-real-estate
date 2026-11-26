@@ -39,6 +39,8 @@ export class ViabDataRoom extends LitElement {
     .check { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--cor-borda); }
     .check li { color: var(--cor-texto-sec); font-size: var(--texto-rotulo, 0.75rem); }
     .check li.ok { color: var(--cor-texto); }
+    /* Marca do item (presente/pendente): urbi-icone, no lugar de glifo de texto. */
+    .check .marca { margin-right: 6px; }
     .acoes { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   `];
 
@@ -135,7 +137,9 @@ export class ViabDataRoom extends LitElement {
             ${lista[id].length ? html`
               <ul class="check">
                 ${lista[id].map((c) => html`
-                  <li class=${c.estado === 'presente' ? 'ok' : c.estado}>${c.estado === 'presente' ? '✓ ' : c.estado === 'pendente' ? '○ ' : ''}${c.rotulo}${c.estado === 'pendente' ? ' — pendente' : c.estado === 'indisponivel' ? ' — não verificado' : ''}</li>`)}
+                  <li class=${c.estado === 'presente' ? 'ok' : c.estado}>${c.estado === 'presente'
+                    ? html`<urbi-icone class="marca" classe="fa-solid fa-check"></urbi-icone>`
+                    : c.estado === 'pendente' ? html`<urbi-icone class="marca" classe="fa-regular fa-circle"></urbi-icone>` : nothing}${c.rotulo}${c.estado === 'pendente' ? ' — pendente' : c.estado === 'indisponivel' ? ' — não verificado' : ''}</li>`)}
               </ul>` : nothing}
             ${this._renderOndeAnexar(id)}
           </urbi-card>`)}
