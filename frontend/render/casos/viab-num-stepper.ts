@@ -13,7 +13,8 @@ export interface MedidaStepperNum {
 export const caso = {
   nome: 'viab-num-stepper',
   exigir: [{ seletor: 'viab-num', minimo: 2 }],
-  aceitaNaoReproduzido: [],
+  // O ▲/▼ é desenhado por `urbi-icone`, cujo `classe` o harness não reproduz.
+  aceitaNaoReproduzido: ['urbi-icone.classe'],
   async montar(raiz: HTMLElement): Promise<void> {
     const criar = (attrs: Record<string, string>) => {
       const el = document.createElement('viab-num');
