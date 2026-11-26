@@ -177,6 +177,10 @@ export class ViabFunding extends LitElement {
       grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
     }
     .pagina-operacao .voltar { margin-bottom: 10px; }
+    /* A página recebe o foco ao abrir (o cartão que o tinha saiu da tela); o
+       Tab seguinte vai ao botão de voltar. Foco programático em contêiner não
+       pede anel. */
+    .pagina-operacao:focus { outline: none; }
     .escolha-tipo { display: flex; flex-direction: column; gap: 8px; }
     .op-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .op-cab .espaco { flex: 1; }
@@ -510,6 +514,10 @@ export class ViabFunding extends LitElement {
       const mudaram = camadasComOrdemAlterada(this.operacoes, nova);
       if (mudaram.length === 0) return;
       this.operacoes = nova;
+      // A ordem dentro do tipo muda a sequência "antes → depois" dos cartões (e,
+      // entre antecipações do mesmo mês, o lastro que sobra): recalcula já, com
+      // a ordem nova, em vez de deixar os cartões com os números da antiga.
+      this._recalcular();
       for (const o of mudaram) {
         const r = await atualizarFundingOperacao(this.estudo.id, o.id, { ordem: o.ordem });
         if (r?.erro) { urbiVerso.notificar('Não foi possível reordenar.', 'erro'); await this._carregar(); return; }
@@ -977,12 +985,17 @@ export class ViabFunding extends LitElement {
     this.opAbertaId = null;
   }
 
-  /** Ao voltar para a lista, o foco volta ao cartão de origem. */
+  /** Ao abrir a página, o foco vai para ela (o cartão focado saiu da tela, e
+   * sem isto o foco cairia no corpo do documento); ao voltar para a lista, o
+   * foco volta ao cartão de origem. */
   protected updated(mudou: Map<string, unknown>) {
     super.updated?.(mudou);
     if (mudou.has('estudo') && this.estudo?.id && !this.carregado) {
       this.carregado = true;
       this._carregar();
+    }
+    if (mudou.has('opAbertaId') && mudou.get('opAbertaId') == null && this.opAbertaId !== null) {
+      (this.shadowRoot?.querySelector('div.pagina-operacao') as HTMLElement | null)?.focus();
     }
     if (this.focarCartaoId !== null && this.opAbertaId === null) {
       const alvo = [...(this.shadowRoot?.querySelectorAll('viab-funding-cartao') ?? [])]
@@ -1053,7 +1066,7 @@ export class ViabFunding extends LitElement {
     const irmaos = this._operacoesDoTipo(o.tipo);
     const i = irmaos.findIndex((x) => String(x.id) === String(o.id));
     return html`
-      <div class="pagina-operacao">
+      <div class="pagina-operacao" tabindex="-1">
         <div class="voltar">
           <urbi-botao-voltar texto="Operações" @urbi:voltar=${(e: Event) => {
             e.preventDefault();

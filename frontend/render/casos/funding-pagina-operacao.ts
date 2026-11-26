@@ -103,7 +103,10 @@ export const caso = {
     const montagem = document.createElement('div');
     raiz.appendChild(montagem);
     const nav = await tela(montagem, [DIVIDA, fap(false), EQUITY], true);
+    cartao(nav, DIVIDA.id).focus();
     await abrirCartao(nav, DIVIDA.id);
+    // ── Ao abrir, o foco vai para a página (o cartão focado saiu da tela) ──
+    const focoAoAbrir = (sr(nav).activeElement as HTMLElement | null)?.className ?? null;
 
     // ── Voltar pelo urbi:voltar: a lista volta, e o foco volta ao cartão ──
     (sr(nav).querySelector('urbi-botao-voltar') as HTMLElement).dispatchEvent(new CustomEvent('urbi:voltar', { bubbles: true, composed: true, cancelable: true }));
@@ -215,9 +218,27 @@ export const caso = {
     ed.opAbertaId = 12345;
     await esperar(ed);
     const fantasma = { paginaAberta: paginaAberta(ed), cartoes: cartoes(ed).length };
+    ed.remove();
+
+    // ── Mover pelas setas recalcula a sequência "antes → depois" na ordem nova ──
+    const OUTRA = { ...DIVIDA, id: 5, ordem: 3, nome: 'Segunda dívida', valor: 2_000_000 };
+    lista = [{ ...DIVIDA }, { ...OUTRA }, fap(false)];
+    const mv = await tela(montagem, lista, true);
+    const ordemPassos = () => (mv.sequencia?.passos ?? []).map((p: any) => String(p.operacao.id));
+    const antesDeMover = ordemPassos();
+    await mv._mover(OUTRA.id, 'cima');
+    await esperar(mv);
+    const mover = {
+      antes: antesDeMover,
+      depois: ordemPassos(),
+      // O cartão que passou a ser o primeiro mostra, como "antes", o projeto sem funding.
+      primeiroCartao: cartoes(mv)[0]?.dataset.id ?? null,
+      antesDoPrimeiro: mv.sequencia?.passos?.[0]?.antes === mv.sequencia?.base,
+    };
     montagem.remove();
 
     return {
+      focoAoAbrir, mover,
       botaoVoltar, editor, aposVoltar, acessivel, outraTecla, enter, espaco,
       leitorLista, leitorPagina, msgLigado, msgDesligado, janela, aposCriar, aposRemover, fantasma,
     };

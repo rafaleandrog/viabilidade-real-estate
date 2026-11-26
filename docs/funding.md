@@ -85,7 +85,7 @@ operação além dele, que tem aba própria.
 ### A página da operação
 
 Clicar num cartão — ou focá-lo pelo teclado e apertar Enter ou Espaço — abre a página da operação,
-no lugar da lista. O botão **Operações**, no topo, volta para a lista, com o foco de volta no
+no lugar da lista, com o foco nela (o próximo Tab vai ao botão de voltar). O botão **Operações**, no topo, volta para a lista, com o foco de volta no
 cartão de onde se saiu. A página tem o formulário da operação: o nome, os campos do tipo (abaixo),
 o painel de indicadores — **Visão do investidor** na dívida e no equity, **Resultado da
 antecipação** na antecipação —, as setas que mudam a posição da operação entre as do mesmo tipo,

@@ -27,6 +27,10 @@ test('Funding: o cartão abre a página da operação, e a página volta para Op
   // Quem edita: as duas setas, o Remover e o Salvar de hoje, dentro da página.
   assert.deepEqual(x.editor, { setas: 2, remover: 1, salvar: 1 });
 
+  assert.equal(x.focoAoAbrir, 'pagina-operacao', 'ao abrir a página, o foco não foi para ela');
+  assert.deepEqual(x.mover, { antes: ['1', '5'], depois: ['5', '1'], primeiroCartao: '5', antesDoPrimeiro: true },
+    'mover pelas setas não recalculou a sequência "antes → depois" na ordem nova');
+
   assert.equal(x.aposVoltar.pagina, false, 'urbi:voltar não fechou a página');
   assert.equal(x.aposVoltar.cartoes, 2, 'a lista de cartões não voltou');
   assert.equal(x.aposVoltar.foco, '1', 'o foco não voltou ao cartão de origem');

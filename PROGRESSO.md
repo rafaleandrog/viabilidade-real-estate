@@ -43,6 +43,12 @@ no motor, no `schema.json` nem na `versao`.
   `tela-resumo.ts`, `tela-fluxo-ver.ts`, `tela-cenarios.ts`, `scripts/conferir-estudo.ts`,
   `casos/ind-funding.ts` e `CLAUDE.md` (o aviso regulatório). Várias já não apontavam para o símbolo
   antes deste PR.
+- **Revisão, rodada 1.** O App do Codex achou que mover uma operação pelas setas (`_mover`) gravava
+  a ordem nova sem recalcular: os cartões trocavam de lugar com o "antes → depois" da ordem antiga.
+  `_mover` passou a chamar `_recalcular` logo depois de aplicar a ordem. De passagem, abrir a página
+  da operação passou a pôr o foco nela (o cartão focado sai da tela, e o foco caía no corpo do
+  documento). O caso `funding-pagina-operacao` cobre os dois, e cada um fica vermelho se a linha
+  sair.
 
 ---
 
