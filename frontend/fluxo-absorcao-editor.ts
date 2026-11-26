@@ -32,7 +32,7 @@
 // O que este módulo NÃO faz: dar superfície para editar a curva ponto a ponto.
 // Isso é feature; esta issue só impede a destruição.
 
-import { APOS_CHAVES_MESES, mesesPosChaves, pctPosChavesDerivado } from './fluxo-shared.js';
+import { pctPosChavesDerivado } from './fluxo-shared.js';
 
 /** A projeção que o formulário sabe carregar — e só ela. */
 export interface FormularioAbsorcao {
@@ -40,8 +40,6 @@ export interface FormularioAbsorcao {
   pre_lancamento_pct: number;
   lancamento_pct: number;
   obra_pct: number;
-  /** Duração da janela Pós-chaves do Grupo, de 1 a 12 meses (padrão 12). */
-  pos_chaves_meses: number;
   /**
    * #431 — MEMÓRIA do que foi LIDO do persistido, antes de qualquer ajuste de
    * apresentação. Não é campo editável e não tem controle na tela: é a
@@ -57,13 +55,12 @@ export interface FormularioAbsorcao {
   lido: ProjecaoAbsorcao;
 }
 
-/** As cinco grandezas que o formulário lê e escreve. */
+/** As quatro grandezas que o formulário lê e escreve. */
 export interface ProjecaoAbsorcao {
   correcao_estoque: boolean;
   pre_lancamento_pct: number;
   lancamento_pct: number;
   obra_pct: number;
-  pos_chaves_meses: number;
 }
 
 const n = (v: any): number => Number(v) || 0;
@@ -95,8 +92,6 @@ export function formularioAbsorcao(absorcao: any, temPreLancamento: boolean): Fo
     pre_lancamento_pct: pctBloco(absorcao, 'pre_lancamento'),
     lancamento_pct: pctBloco(absorcao, 'lancamento'),
     obra_pct: pctBloco(absorcao, 'obra'),
-    // Ausente (todo estudo anterior ao campo) ou fora da faixa → 12.
-    pos_chaves_meses: mesesPosChaves(absorcao),
   };
   return {
     ...lido,
@@ -105,51 +100,11 @@ export function formularioAbsorcao(absorcao: any, temPreLancamento: boolean): Fo
   };
 }
 
-/**
- * A curva mudou em relação ao que foi lido — algum dos três percentuais de
- * bloco OU a duração da janela Pós-chaves? As duas coisas desenham a curva:
- * encurtar a janela concentra o mesmo % em menos meses.
- */
+/** A curva mudou em relação ao que foi lido — algum dos três percentuais de bloco? */
 function editouACurva(form: FormularioAbsorcao): boolean {
   return n(form.pre_lancamento_pct) !== n(form.lido.pre_lancamento_pct)
     || n(form.lancamento_pct) !== n(form.lido.lancamento_pct)
-    || n(form.obra_pct) !== n(form.lido.obra_pct)
-    || n(form.pos_chaves_meses) !== n(form.lido.pos_chaves_meses);
-}
-
-/**
- * "À vista, mês único": o Grupo inteiro vendido no PRIMEIRO mês das chaves.
- * Não é um modo novo nem um campo novo — é exatamente 0% nos três períodos
- * informados (o Pós-chaves derivado fica com 100%) e janela Pós-chaves de 1
- * mês. Como toda venda contratada depois da entrega, ela é recebida à vista
- * (`componentesEfetivosSafra`, `fluxo-caixa-motor.ts`). Ler do formulário, e
- * não de uma flag gravada, impede que as duas representações divirjam.
- */
-export function ehMesUnico(form: ProjecaoAbsorcao): boolean {
-  return n(form.pre_lancamento_pct) === 0 && n(form.lancamento_pct) === 0
-    && n(form.obra_pct) === 0 && n(form.pos_chaves_meses) === 1;
-}
-
-/**
- * Liga ou desliga o atalho "mês único" no formulário. Ligar zera os três
- * percentuais e põe a janela em 1 mês. Desligar devolve o que foi LIDO do
- * persistido quando aquilo não era mês único; se era, volta para a janela
- * padrão de 12 meses com os percentuais zerados, para o usuário redistribuir.
- */
-export function alternarMesUnico(form: FormularioAbsorcao, ligar: boolean): FormularioAbsorcao {
-  if (ligar) {
-    return { ...form, pre_lancamento_pct: 0, lancamento_pct: 0, obra_pct: 0, pos_chaves_meses: 1 };
-  }
-  if (!ehMesUnico(form.lido)) {
-    return {
-      ...form,
-      pre_lancamento_pct: form.lido.pre_lancamento_pct,
-      lancamento_pct: form.lido.lancamento_pct,
-      obra_pct: form.lido.obra_pct,
-      pos_chaves_meses: form.lido.pos_chaves_meses,
-    };
-  }
-  return { ...form, pos_chaves_meses: APOS_CHAVES_MESES };
+    || n(form.obra_pct) !== n(form.lido.obra_pct);
 }
 
 /** O registro tem alguma coisa que valha a pena preservar? */
@@ -196,7 +151,7 @@ export function absorcaoSubstituiCurva(
  *
  *  1. não há registro persistido com nada a preservar → monta o `distribuido`
  *     do formulário, que é o comportamento de sempre;
- *  2. a curva NÃO foi editada (nem os três blocos, nem a janela) → devolve o persistido verbatim, só
+ *  2. a curva NÃO foi editada (nenhum dos três blocos) → devolve o persistido verbatim, só
  *     carimbando o que o formulário legitimamente possui: `correcao_estoque` e
  *     `aplicado`. É o no-op — `modo` e `meses` chegam do jeito que estavam;
  *  3. a curva foi editada → monta o `distribuido` novo. É a conversão
@@ -226,17 +181,14 @@ export function absorcaoParaSalvar(form: FormularioAbsorcao, persistido: any): a
       // real. Precisão plena: é derivado não monetário (C7), não arredonda.
       { evento: 'pos_obra', pct: pctPosChavesDerivado(blocosBase) },
     ],
-    // Janela Pós-chaves: só é gravada quando difere do padrão de 12 meses —
-    // ausente já significa 12 (`mesesPosChaves`), e assim o JSON de quem
-    // nunca mexeu na janela continua com o mesmo formato de antes.
-    ...(n(form.pos_chaves_meses) !== APOS_CHAVES_MESES
-      ? { pos_chaves_meses: n(form.pos_chaves_meses) }
-      : {}),
     aplicado: true as const,
   };
   if (!temDadoPreservavel(persistido)) return novo;                       // caso 1
   if (!editouACurva(form)) {                                              // caso 2
-    return { ...persistido, correcao_estoque: Boolean(form.correcao_estoque), aplicado: true };
+    // `pos_chaves_meses` (campo removido, #998) é descartado: era a janela
+    // por Grupo e hoje o motor a ignora — não faz sentido seguir gravado.
+    const { pos_chaves_meses: _removido, ...resto } = persistido;
+    return { ...resto, correcao_estoque: Boolean(form.correcao_estoque), aplicado: true };
   }
   return novo;                                                            // caso 3
 }
