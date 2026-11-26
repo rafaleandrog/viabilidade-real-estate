@@ -19,6 +19,12 @@ que o seu usuário enxerga; se a app não aparecer, ou a API não deixar confirm
 com `incompleto: versão instalada não confirmada, esperada <versão>`. Se for outra que `<versão>`,
 feche com `incompleto: versão instalada <x>, esperada <versão>`.
 
+**ADAPTADO — a `versao` não prova a build neste repo.** Aqui ela só sobe com migração nova, então uma
+release de código sai com a MESMA `versao` e muda só o sha da tag (`viabilidade-a<x.y.z>_<sha8>`).
+Igual não prova que a build do PR está instalada. Compare também o sha de build da app com o
+`<sha8>` da tag `<tag>` — se a lista de apps não expõe o sha, ou ele diverge, ou não conseguir
+confirmar, feche com `incompleto: build instalada não confirmada, esperada <sha8>`.
+
 <- módulo de canal: a versão é a do módulo, lida na lista de
   módulos (`GET /api/shell/modulos`, campo `versao` do slug, alçada Apps) em vez da de apps; a tela
   e o mount direto `/api/modulos/<slug>/…` pedem a alçada `nucleo` no QA Principal, e sem ela são

@@ -181,7 +181,7 @@ escolheu revisar ele mesmo: a revisão roda sem autorização, a coordenadora n�
 pronto vai a ele.
 
 **Essa resposta é a ordem expressa.** A regra do repositório que exige ordem expressa na conversa
-para merge e release — num repositório de app, a do `KIT.md` — fica cumprida por ela: foi dada na
+para merge e release — num repositório de app, a do `KIT.md` (aqui, o § Merge do `CLAUDE.md`) — fica cumprida por ela: foi dada na
 conversa, pelo dono, e o escopo do arco nomeia os PRs e as apps. Não recuse o merge nem a release
 que ela autorizou "porque não pode", nem peça de novo PR a PR: mandar o dono clicar no GitHub o
 que ele já mandou fazer é fricção, não segurança.
@@ -365,7 +365,7 @@ contrato da lente é o bundle do SDK instalado (`node_modules/@urbiverso/sdk/doc
 Em PR que toca módulo (repositório de módulo ou misto), os gatilhos continuam os da § 2.1 de
 `revisar-pr-apps` e o bundle mora no `backend/` do módulo
 (`modulos/<slug>/backend/node_modules/@urbiverso/sdk/docs/`) — o mesmo bundle, a mesma regra; o
-caminho de `apps/<appId>/` vale só para a parte do PR que toca app.
+caminho de app vale só para a parte do PR que toca app (aqui, a raiz).
 
 **A medição decide, e a trilha só sobe.** A previsão do outline (§ 2.3) é para o dono ver o
 custo; previsão expressa que mediu normal é normal, e normal nunca desce. Anuncie no checklist,
@@ -444,8 +444,8 @@ rodada sem ela (ou com "Não mergeie.") a coordenadora nunca mergeia: dispara re
 autorização no prompt. A revisão fechou em Sucesso e reportou o head final com **todos os itens do portão conferidos** e
 sem "barrado por", mas não mergeou (ociosa, travada pelo classificador, ou recusando porque a
 autorização veio em "notificação automática"). A coordenadora mergeia pela API
-(`merge_pull_request`, **squash**, `sha` esperado = head revisado reportado:
-(aqui a revisão não commita) **só se** o head atual do PR for esse head, o CI
+(`merge_pull_request`, **squash**, `sha` esperado = head revisado reportado)
+**só se** o head atual do PR for esse head, o CI
 estiver verde nele, o PR for mergeable e o corpo tiver `Closes` em inglês por issue (na forma
 completa para issue de outro repositório). Qualquer divergência: não mergeia. O dono escolheu
 revisar ele mesmo: não há fallback — diga a ele que o PR está pronto, com o head final e o portão

@@ -28,7 +28,8 @@ QA só se dispara contra a **versão da release instalada** na instância de tes
 ligado para a app, ela chega sozinha; desligado, instalar é do dono, e a coordenadora pede e
 espera — ela não instala. O prompt de QA leva a versão esperada (`<versão>` do
 `prompt-qa.md`, a do manifesto da app; a tag da release é dado à parte, só do relatório): a filha
-compara com o campo `versao` da lista de apps da instância e, se for outra ou se não conseguir
+compara com o campo `versao` da lista de apps da instância **e com o sha de build da tag** (aqui a
+`versao` só sobe com migração: a mesma `versao` não prova a build) e, se for outra ou se não conseguir
 confirmar, reporta "incompleto" em vez de validar o que não foi pedido.
 
 ## 4. QA e aviso
