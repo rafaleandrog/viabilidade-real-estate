@@ -144,7 +144,7 @@ test('#850 critério 4: carteira consolidada zera na última parcela, nunca nega
 test('#850: o horizonte do fluxo cobre a última parcela da carteira, inclusive da última venda', () => {
   const linha = {
     id: 1, nome: 'Lotes', tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 300, preco_m2: 1_000 }],
-    absorcao: { modo: 'linear', pos_chaves_meses: 6 },
+    absorcao: { modo: 'linear' },
     fluxo_pagamento: fluxoPagamentoParaSalvar(
       formularioPagamento(plano({ pct_banco: 0, carteira_parcelas: 120, carteira_carencia_meses: 0 })), CRONO, 12),
   };

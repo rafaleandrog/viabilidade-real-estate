@@ -15,7 +15,7 @@
 //   informativo do #188 (`vgvTotal`/`vgvPermutaFisica`/`receitaBrutaVgv`).
 
 import {
-  absorcaoMensal, periodoAbsorcao, mesesPosChaves, vgvLinha, receitaLiquidaLinha,
+  absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha,
   vgvTipologia, vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, totalConstrucaoCustos, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, eMarketing, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
@@ -2116,8 +2116,8 @@ export function ultimoMesRecebivelLinha(
   // aba Viabilidade → Financeiro). Omitir vira TS2554, não silêncio.
   jurosTabelaAaEstudo: number,
 ): number {
-  // A última safra é o fim da janela Pós-chaves DESTE Grupo (1 a 12 meses) — ou a última venda da curva de cenário (#971).
-  const periodo = periodoAbsorcao(cronograma, mesesPosChaves(linha?.absorcao));
+  // A última safra é o fim da janela Pós-chaves (12 meses) — ou a última venda da curva de cenário (#971).
+  const periodo = periodoAbsorcao(cronograma);
   if (!periodo) return 0;
   const ultimoMesVenda = janelaVendasDaCurva(linha?.absorcao, periodo)!.fim;
   const fp = linha?.fluxo_pagamento ?? null;

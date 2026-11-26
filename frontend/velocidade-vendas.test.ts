@@ -19,7 +19,7 @@ const quase = (a: number, b: number, tol = 1e-9) => Math.abs(a - b) <= tol;
 const DEZ_MESES = { modo: 'personalizado', meses: Array.from({ length: 10 }, (_, i) => ({ mes: 12 + i, pct: 10 })) };
 
 const DISTRIBUIDA = {
-  modo: 'distribuido', pos_chaves_meses: 6,
+  modo: 'distribuido',
   blocos: [{ evento: 'pre_lancamento', pct: 0 }, { evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 50 }],
 };
 
