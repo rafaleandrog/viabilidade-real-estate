@@ -54,7 +54,7 @@ preenche antes de disparar:
 
 | Arquivo | Filha |
 |---|---|
-| `prompt-implementacao.md` | roda `/implementar` numa fase (ou num lote de issues que colidem) e abre o PR |
+| `prompt-implementacao.md` | implementa uma fase, ou um lote de issues que colidem, e abre o PR (pelo `/implementar` quando existe; neste repo, pelo processo do `CLAUDE.md`) |
 | `prompt-revisao.md` | roda `/revisar-pr-apps` em ciclo; o merge vai autorizado no prompt inicial quando o dono autorizou (§ 2.4) |
 | `prompt-qa.md` | roda a skill `qa` contra a instância de teste e publica o relatório no PR |
 | `prompt-lente-expressa.md` | lente única da trilha expressa — subagente seu, não sessão (§ 6.0) |
