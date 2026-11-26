@@ -33,24 +33,77 @@ varredura do caixa disponível.
 
 ## Para usuários
 
-Na página **Funding**, a aba **Operações** lista as operações do estudo. Cada linha traz **Tipo**,
-**Nome**, **Valor** (no financiamento à produção, o percentual do custo financiável, e na
-antecipação de recebíveis, o percentual da carteira cedida — nos dois o valor não é digitado),
-**Início** e **Taxa / retorno** (na antecipação, a taxa de desconto). Para dívida e equity, o **Mês do aporte** é
-uma **âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras, com o mês
+A página **Funding** tem três abas: **Operações**, **Financiamento à produção** e **Comparar
+estruturas**. Acima delas há um aviso permanente: o app simula contratos privados e não valida a
+legalidade da captação — uma oferta ao público pode ter obrigações regulatórias próprias.
+
+### A aba Operações
+
+Cada dívida, equity e antecipação de recebíveis do estudo é um **cartão**. Os cartões seguem a
+ordem de senioridade — primeiro as dívidas, depois as antecipações, por fim o equity; dentro do
+mesmo tipo, a posição que a operação tem (as setas da página da operação a mudam). O
+financiamento à produção não tem cartão: ele tem aba própria.
+
+Cada cartão mostra:
+
+- **o tipo**, numa etiqueta com a cor do tipo, e **o nome** da operação;
+- **quatro termos** do contrato. Dívida: aporte (à vista ou em quantos meses), taxa ao ano, prazo
+  com a carência e a amortização (Price). Equity: aporte, retorno (o percentual e sobre o que
+  incide), quando o investidor recebe e o retorno total. Antecipação: carteira cedida, taxa de
+  desconto, mês da cessão e valor antecipado;
+- **Leitura da operação**: até três frases montadas dos números — o que a operação faz com a
+  exposição máxima do incorporador, quando o projeto recebe e paga (ou o investidor aporta e
+  recebe) e o custo dela contra a TIR alavancada de antes dela. O veredito pode ser negativo. Sem
+  número que sustente frase, a leitura não aparece;
+- **quatro indicadores**. Dívida: LTV (principal liberado ÷ VGV potencial), custo efetivo (a taxa
+  anual do fluxo do credor, com as tarifas), TIR alavancada e exposição máxima. Equity: ROI do
+  investidor (lucro ÷ aporte; −100% quando nada volta), TIR do investidor, TIR alavancada e
+  exposição máxima. Antecipação: deságio (em percentual da face), custo efetivo, TIR alavancada e
+  exposição máxima.
+
+**TIR alavancada** e **exposição máxima** aparecem como "antes → depois", com o "antes" riscado.
+As operações entram numa sequência, na ordem de senioridade, a partir do financiamento à produção
+(quando ligado): o "antes" de uma operação é o projeto com as operações anteriores na sequência, e
+o "depois" é com ela também; o "depois" de uma é o "antes" da seguinte. A ordem só muda a leitura —
+o resultado do estudo é o mesmo em qualquer ordem. Indicador sem base de cálculo mostra "—", nunca
+zero. Uma antecipação sem parcela a ceder mostra deságio e custo efetivo em "—" e, abaixo dos
+indicadores, o aviso de por que não há lastro.
+
+Valores em reais nos cartões aparecem em milhões, com uma casa ("R$ 20,1 mi"); passar o ponteiro
+sobre o valor mostra o número exato. Os percentuais digitados (taxa, retorno, carteira cedida) saem
+com duas casas; os indicadores em percentual, com uma.
+
+Enquanto uma operação está em edição, o cartão dela já mostra os números do que está sendo
+digitado, como a página da operação.
+
+Com permissão de edição, **Nova operação** pergunta o tipo — Dívida / Capital de giro, Equity ou
+Antecipação de recebíveis — e cria a operação com os valores padrão, abrindo em seguida a página
+dela. Sem nenhuma dívida, equity ou antecipação, a aba diz que não há operação de funding e que o
+Fluxo de Caixa é igual ao Livre; se o financiamento à produção estiver ligado, diz que não há
+operação além dele, que tem aba própria.
+
+### A página da operação
+
+Clicar num cartão — ou focá-lo pelo teclado e apertar Enter ou Espaço — abre a página da operação,
+no lugar da lista. O botão **Operações**, no topo, volta para a lista, com o foco de volta no
+cartão de onde se saiu. A página tem o formulário da operação: o nome, os campos do tipo (abaixo),
+o painel de indicadores — **Visão do investidor** na dívida e no equity, **Resultado da
+antecipação** na antecipação —, as setas que mudam a posição da operação entre as do mesmo tipo,
+**Remover** e **Salvar**. Quem só lê vê a página sem as setas, sem Remover e sem Salvar. Remover a
+operação aberta volta para a lista. Na página, os valores aparecem em reais cheios.
+
+Uma edição ainda não salva continua guardada ao voltar para a lista; o Salvar é o da página.
+
+Para dívida, equity e antecipação, o **Mês do aporte** (na antecipação, o **Mês da cessão**) é uma
+**âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras, com o mês
 derivado mostrado ao lado, só para leitura — ou um **Mês específico** digitado; assim a operação
 acompanha o cronograma quando ele muda. Enquanto uma operação ancorada está em edição — a âncora
 trocada ou qualquer outro campo alterado —, o mês derivado e os indicadores dela já usam o mês que o
 Salvar vai gravar, antes de salvar; um evento que o estudo não tem (Pré-lançamento num estudo sem
 pré-lançamento) mantém o mês que a operação já tinha. Operação sem edição em andamento usa o mês
 gravado — o mesmo que Fluxo de Caixa, Cenários e Resumo usam —, ainda que o Cronograma tenha mudado
-depois: o mês só é rederivado quando a operação é salva de novo. A janela do financiamento à produção vem sempre do Cronograma (a obra). Acima da lista há um
-aviso permanente: o app simula contratos privados e não valida a legalidade da captação — uma
-oferta ao público pode ter obrigações regulatórias próprias.
-
-As abas **Dívida**, **Equity** e **Antecipação** editam as operações daquele tipo. Havendo mais de uma, cada uma
-ganha sua própria sub-aba, identificada pelo nome — criar uma nova operação já abre nela; com uma
-só, o formulário aparece direto, sem sub-navegação.
+depois: o mês só é rederivado quando a operação é salva de novo. A janela do financiamento à
+produção vem sempre do Cronograma (a obra).
 
 ### Dívida / Capital de giro
 
@@ -121,7 +174,7 @@ O valor não é digitado: ele sai do lastro e da taxa.
 - **Tarifa contada duas vezes.** Como na Dívida, se uma tarifa da antecipação for informada e
   também houver uma linha de custo financeiro do mesmo tipo no Orçamento, a página avisa.
 
-A aba mostra, em **Resultado da antecipação**:
+A página da operação mostra, em **Resultado da antecipação**:
 - as parcelas cedidas (face);
 - o valor presente;
 - o recebido líquido;

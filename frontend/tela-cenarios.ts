@@ -293,7 +293,7 @@ export class ViabTelaCenarios extends LitElement {
   // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
   // foi CONSIDERADA E RECUSADA pelo autor; ver
   // `referencia/fluxo-investidor-formulas.md` §9. Os outros quatro
-  // consumidores: frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:239
+  // consumidores: frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:317
   // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
   // fundingDoEstudo) · scripts/conferir-estudo.ts:153. (Este arquivo remonta
   // resultadoFinal DE NOVO em `:263`, como `resultadoDesalavancado`.)

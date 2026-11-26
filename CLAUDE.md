@@ -222,7 +222,7 @@ esse produto de propósito — ele é o único que **não** segue a planilha nov
 > (PR #417, 2026-08-17).** Evidência hoje: `referencia/fluxo-investidor-formulas.md` existe;
 > D14 está em `frontend/fluxo-invariantes.ts:633-642`
 > (`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING`, severidade `alerta`); o aviso regulatório, em
-> `frontend/tela-funding.ts:822-828`.
+> `frontend/tela-funding.ts:1154-1160`.
 >
 > A lição é a de sempre, com uma volta a mais: **"a issue fechou" não é evidência de entrega, e o
 > plano publicado na issue também não** — só o diff é. Quando um plano tem passo de documentação ou
@@ -1260,8 +1260,8 @@ Git Bash — ver PROGRESSO).
   > seria dado falso. O sinal é normalizado depois de arredondar, como nas outras três. (c) Quem a
   > implementa é `fmtR$Mi` (`frontend/viab-format.ts`) — símbolo próprio, prefixo do formatador da
   > cascata, por isso a contagem procura a chamada com o parêntese. A trava é
-  > `frontend/funding-milhoes.test.ts`: contagem exata por consumidor (que começa vazia: o formatador
-  > nasce antes da tela, e os cartões e a aba entram no inventário quando passarem a chamá-lo), uma
+  > `frontend/funding-milhoes.test.ts`: contagem exata por consumidor (hoje os cartões de operação,
+  > em `frontend/funding-cartao-dados.ts`; a aba Estrutura de capital entra quando passar a chamá-lo), uma
   > única ocorrência em `viab-format.ts` (a declaração) e zero no resto do frontend versionado,
   > enumerado por `git ls-files`.
 - Rotas relativas; shell prefixa `/api/viabilidade/`

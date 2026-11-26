@@ -336,13 +336,14 @@ publicados.
 
 ### Estado de conformidade
 
-Três exceções de **exibição**, e só três — nenhuma muda o que é persistido, o motor ou a entrada:
+Quatro exceções de **exibição**, e só quatro — nenhuma muda o que é persistido, o motor ou a entrada:
 
 | Onde | Casas | Regra |
 |---|---|---|
 | Card de KPI (Resumo, Gráficos, Premissas) | 0 em R$, 1 em % | a figura grande do card; o detalhe e as tabelas seguem em 2 casas |
 | Rótulo das colunas da cascata do resultado (aba Gráficos) | R$ milhões, 1 casa | o valor exato fica no detalhe de cada coluna |
 | Coluna R$ da Proforma (Preliminar e Avançado, tabela de sensibilidade, CSV e PDF) | 0 (inteiros) | tela e arquivo compartilham a mesma célula; `% VGV` e `R$/m²` não mudam de precisão, mas herdam o sinal do R$ publicado |
+| Cartões de operação do Funding (aba Operações) | R$ milhões, 1 casa, com "mi" (`R$ 20,1 mi`) | o valor exato, em 2 casas, fica no detalhe de cada valor; valor sem base sai "—", nunca zero; a página da operação segue em reais cheios |
 
 Tudo o mais — Fluxo de Caixa (tela, CSV e PDF), orçamento de custos, tipologias, parâmetros
 financeiros, preço unitário e total das alocações, as demais tabelas de Resultados — sai em duas
