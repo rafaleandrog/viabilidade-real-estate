@@ -62,6 +62,7 @@ export const caso = {
     'urbi-botao.variante',
     'urbi-estado-vazio.icone',
     'urbi-estado-vazio.mensagem',
+    'urbi-icone.classe',
     'urbi-modal.title',
   ],
   async montar(raiz: HTMLElement): Promise<void> {

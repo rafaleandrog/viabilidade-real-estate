@@ -139,7 +139,7 @@ export class ViabDataRoom extends LitElement {
                 ${lista[id].map((c) => html`
                   <li class=${c.estado === 'presente' ? 'ok' : c.estado}>${c.estado === 'presente'
                     ? html`<urbi-icone class="marca" classe="fa-solid fa-check"></urbi-icone>`
-                    : c.estado === 'pendente' ? html`<urbi-icone class="marca" classe="fa-regular fa-circle"></urbi-icone>` : nothing}${c.rotulo}${c.estado === 'pendente' ? ' — pendente' : c.estado === 'indisponivel' ? ' — não verificado' : ''}</li>`)}
+                    : c.estado === 'pendente' ? html`<urbi-icone class="marca" classe="fa-regular fa-circle"></urbi-icone>` : nothing} ${c.rotulo}${c.estado === 'pendente' ? ' — pendente' : c.estado === 'indisponivel' ? ' — não verificado' : ''}</li>`)}
               </ul>` : nothing}
             ${this._renderOndeAnexar(id)}
           </urbi-card>`)}

@@ -34,7 +34,10 @@ const EMOJI = /[\p{Extended_Pictographic}\u25A0-\u25FF\u2605\u2606\u2713-\u2718\
 function fontesVersionados(): string[] {
   return execFileSync('git', ['ls-files', 'frontend', 'backend'], { cwd: RAIZ, encoding: 'utf8' })
     .split('\n')
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.includes('/fixtures/'));
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.includes('/fixtures/')
+      // `frontend/render/` é o harness de teste em Chromium (casos e sondas):
+      // não chega à tela, e a sonda do Data Room traduz o ícone em "✓ "/"○ ".
+      && !f.startsWith('frontend/render/'));
 }
 
 export function emojisNoTexto(arquivo: string, fonte: string): string[] {
