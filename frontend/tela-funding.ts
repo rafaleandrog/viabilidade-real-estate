@@ -308,13 +308,22 @@ export class ViabFunding extends LitElement {
   private _recalcular() {
     if (!this.calc) { this.funding = null; return; }
     const efetivas = this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)) as OperacaoFunding[];
-    const resultadoFinal = this.calc.fluxoAcumulado[this.calc.fluxoAcumulado.length - 1] ?? 0;
+    // O horizonte de `this.calc` vem das operações GRAVADAS (`_carregar`). Com
+    // rascunho, o fluxo-base é refeito com as efetivas — a montagem de
+    // `_simularEstrutura` —, senão uma operação movida para mais tarde é
+    // truncada pelo horizonte antigo e o Salvar muda o número.
+    const comRascunho = !!this.config && Object.keys(this.draft).length > 0;
+    const calc = comRascunho ? calcularFluxo({ ...this.config!, operacoesFunding: efetivas }) : this.calc;
+    const receitaLiquida = comRascunho
+      ? receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.custos)
+      : this.receitaLiquida;
+    const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
     this.funding = fundingDoEstudo(
-      efetivas, this.calc.fluxoMensal, this.receitaLiquida,
+      efetivas, calc.fluxoMensal, receitaLiquida,
       resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
       {
-        custosRaw: this.custos, linhasCusto: this.calc.linhasCusto, cronograma: this.crono,
-        recebimentoPorSafraMensal: this.calc.recebimentoPorSafraMensal,
+        custosRaw: this.custos, linhasCusto: calc.linhasCusto, cronograma: this.crono,
+        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
       },
     );
   }

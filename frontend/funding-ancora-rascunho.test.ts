@@ -56,7 +56,12 @@ test('rascunho que só muda o valor de operação ancorada já usa o mês que o 
   assert.equal(operacaoComRascunho(custom, { valor: 1_000 }, CRONO).inicio_mes, 5);
 });
 
-test('campo nulo no rascunho cai no gravado, como os `??` do servidor', () => {
+// Os `??` repetem os de `resolverInicio`: campo nulo no rascunho cai no gravado.
+// A tela não produz nenhum dos dois rascunhos abaixo (o seletor nunca manda
+// evento nulo, e a fase-âncora não é editável); o teste trava só a precedência.
+// Com fase gravada, o navegador não deriva: mantém o mês gravado, que o
+// servidor tirou da fase.
+test('campo nulo no rascunho cai no valor gravado (precedência dos `??`)', () => {
   assert.equal(operacaoComRascunho(GRAVADA, { cronograma_evento: null }, CRONO).inicio_mes, 13);
   const comFase = { ...GRAVADA, fase_ancora_id: 9, inicio_mes: 30 };
   assert.equal(operacaoComRascunho(comFase, { fase_ancora_id: null, valor: 1 }, CRONO).inicio_mes, 30);

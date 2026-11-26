@@ -216,7 +216,8 @@ export function mesDaAncora(evento: string, crono: EventoCrono[]): number | null
  * telas simulam com ele, e derivar aqui faria esta aba contar outra história
  * quando o Cronograma mudou depois de a operação ser salva. Fase-âncora
  * (`fase_ancora_id`) não é recalculada: o servidor a resolve, e a tela não a
- * oferece. Os `??` repetem os do servidor: campo nulo no rascunho cai no gravado.
+ * oferece. Os `??` repetem a precedência do servidor: campo nulo no rascunho
+ * cai no gravado.
  */
 export function operacaoComRascunho<T extends Record<string, any>>(
   gravada: T, rascunho: Record<string, any> | undefined, crono: EventoCrono[],

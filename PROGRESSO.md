@@ -19,13 +19,19 @@ no `schema.json` nem na `versao`.
   na revisão).
 - **`tela-funding.ts`**: `_recalcular` usa `operacaoComRascunho`; o "Início derivado" de
   `_renderAncora` mostra o mês que a simulação usa (`_mesSimulado`). O PATCH não mudou.
+  Com rascunho, `_recalcular` também refaz o fluxo-base com as operações efetivas (a montagem de
+  `_simularEstrutura`): o horizonte de `this.calc` vem das operações gravadas, e uma dívida movida
+  para mais tarde tinha as parcelas truncadas na prévia e mudava de número ao salvar (achado do App
+  do Codex na rodada 2 da revisão; o defeito já existia na `main` para o mês digitado e o prazo).
 - **Paridade com o servidor** em `backend/rotas/funding-ancora-paridade.test.ts` (cinco eventos,
   `customizado` e um desconhecido, com e sem pré-lançamento e num cronograma deslocado); a função
   sozinha em `frontend/funding-ancora-rascunho.test.ts`.
 - **Ligação** no caso de render `funding-ancora-rascunho`: operação gravada em `obra` com mês
   defasado, rascunho troca para `lancamento`; exige o mês novo e o painel do investidor igual ao de
-  uma tela com a operação já gravada no mês novo; depois do Salvar, o mês exibido é o gravado.
-  Medido: trocar a chamada em `_recalcular` pela mescla antiga deixa o caso vermelho no painel;
+  uma tela com a operação já gravada no mês novo, com o fluxo-base que `_carregar` montaria; depois
+  do Salvar, o mês exibido é o gravado. A dívida amortiza em 64 meses para o aporte no mês novo
+  esticar o horizonte (73 → 77), e o caso exige esse estiramento. Medido: trocar a chamada em
+  `_recalcular` pela mescla antiga deixa o caso vermelho no painel; não refazer o fluxo-base também;
   trocar a de `_mesSimulado` deixa vermelho no texto do mês.
 - **Observação fora do escopo** (já no painel): o servidor não reancora operações de funding quando
   o Cronograma muda; por isso a operação sem rascunho segue com o mês gravado.
