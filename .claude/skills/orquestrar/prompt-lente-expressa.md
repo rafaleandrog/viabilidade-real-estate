@@ -77,7 +77,8 @@ Procure, nesta ordem:
 3. **Contrato** — o diff contradiz a referência acima; o comportamento mudou e a documentação do
    repositório não acompanhou no mesmo PR; falta a keyword `Closes`, em inglês, para alguma issue
    (uma keyword por issue, forma completa para issue de outro repositório); numa app, a `versao` do
-   `manifesto.json` não avançou quando o PR mexe em `schema.json`, migração ou piso.
+   `manifesto.json` avançou sem migração nova, ou não avançou havendo migração nova (subir piso não
+   bumpa a `versao`).
 4. **Trilha** — o PR toca algo de contrato que a medição por arquivo não viu (permissão, conta,
    auditoria, migração, schema, identidade, autenticação, rota de API nova ou removida). Isso é
    BLOQUEANTE por si só: não é defeito do PR, é o PR estar na trilha errada.

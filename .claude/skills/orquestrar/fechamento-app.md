@@ -11,7 +11,7 @@ A regra é a do núcleo, sem nada próprio daqui: a resposta do dono na prepara�
 ## 2. Release
 
 Merge de PR de app **não gera release**. A release sai pelo workflow `release.yml` do repositório
-da app, disparado por `workflow_dispatch` com o appId, e segue a resposta do dono na preparação do
+da app, disparado por `workflow_dispatch` (sem entradas: app única na raiz), e segue a resposta do dono na preparação do
 arco (`SKILL.md` § 2.4): autorizou, a coordenadora dispara depois do merge; pediu para esperar,
 ela avisa que está pronto para release e espera. Quem dispara é a coordenadora: é ação de GitHub,
 não rota de instância nem homologação. Rota de instância com `homolog`, `upgrade`, `release` ou

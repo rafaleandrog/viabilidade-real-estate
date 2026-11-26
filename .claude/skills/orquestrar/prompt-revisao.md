@@ -8,7 +8,7 @@ troque-a por "Não mergeie." O texto entre as duas réguas é o prompt.
 
 ---
 
-/revisar-pr-apps <n> — máximo 3 rodadas
+/revisar-pr-apps <n>
 
 Branch liberada — <sha do head conferido pela coordenadora>
 
@@ -20,15 +20,15 @@ de skill não a lista —, **PARE e reporte** à coordenadora no formato do fim 
 desfecho `bloqueado: skill de revisão não carregou`. Não revise de memória: revisão sem a skill
 perde o portão, os motores e o critério de parada, e o laudo dela não vale como revisão.
 
-**Merge autorizado se, e somente se,** o ciclo fechar no desfecho **Sucesso** e o CI do head final
-estiver **verde**: squash, prendendo o head final (o do passe de fechamento, se ele commitou).
-Qualquer outro desfecho — não converge, rodadas esgotadas, decisão de desenho, regressão — não
-mergeia: reporte e pare.
+**Merge autorizado se, e somente se,** o ciclo fechar com **zero bloqueantes pendentes** e o CI do
+head final estiver **verde**: squash, prendendo o head revisado. Qualquer outro desfecho — não
+converge, decisão de desenho, regressão — não mergeia: reporte e pare. (Esta revisão não commita
+nem conserta: bloqueante volta à coordenadora, que dispara a implementação do conserto.)
 
 **Foco adicional desta revisão:**
 - confira o corpo do PR contra as issues que ele fecha — item pedido e não feito é bloqueante;
 - ao fim, confira o portão de merge da sua skill (§ 9, "Merge") item por item e reporte cada um,
-  mais o head final (depois do passe de fechamento, se ele commitou) — a coordenadora só confia
+  mais o head revisado — a coordenadora só confia
   em head cujo portão você reportou inteiro e sem item barrado, mesmo em Sucesso;
 <- o PR muda o modo de um primitivo de UI: varra cada `@urbi:` escutado contra os eventos do modo
   usado;>
@@ -50,7 +50,7 @@ Merge: <feito, sha <sha> | não feito: sem autorização neste prompt | não fei
 Head final: <sha — o que o portão abaixo conferiu>
 Portão (skill revisar-pr-apps): <item: conferido | falhou — detalhe, um por item da sua § 9, inclusive Closes na forma completa e versão do manifesto, quando app>
 CI do head: <verde | vermelho | pendente>
-Sobras do passe de fechamento: <achado — rodada r … ou "nenhuma">
+Observações não bloqueantes: <achado — rodada r … ou "nenhuma">
 Lacunas da plataforma confirmadas: <… ou "nenhuma">
 Ponto reincidente / decisão pedida: <… ou "nenhum">
 Início <hh:mm> · Fim <hh:mm> · Duração <min>
