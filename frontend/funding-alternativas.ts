@@ -8,8 +8,6 @@
 // As alternativas vivem só no navegador (localStorage por estudo). Nada vai
 // para a API até o usuário escolher "Usar esta", que aplica o plano abaixo
 // pelas rotas existentes de operação de funding.
-import type { FluxoCalc } from './fluxo-caixa-motor.js';
-import { tirFluxo } from './fluxo-caixa-motor.js';
 import type { FundingCalc, OperacaoFunding } from './funding-motor.js';
 
 /** Máximo de alternativas guardadas por estudo. */
@@ -21,51 +19,11 @@ export interface AlternativaFunding {
   operacoes: OperacaoFunding[];
 }
 
-export interface IndicadoresEstrutura {
-  /** Pior ponto do acumulado do fluxo alavancado, com piso em zero (nunca positivo, nunca -0). */
-  exposicaoMaxima: number;
-  /** TIR anual em % a.a. (mesma unidade e mesma função da TIR do projeto); null sem mudança de sinal. */
-  tirAlavancada: number | null;
-  /** Σ saídas − Σ entradas do funding no fluxo; 0 sem funding. */
-  custoFinanceiro: number;
-  /** Σ do fluxo alavancado; sem funding, Σ do fluxo livre. */
-  resultadoAposFunding: number;
-}
-
-const round2 = (v: number): number => Math.round(v * 100) / 100;
-/** round2 sem produzir -0. */
-const r2 = (v: number): number => round2(v) || 0;
-const soma = (xs: number[]): number => xs.reduce((s, v) => s + v, 0);
-
-/**
- * Os quatro indicadores de uma estrutura. Sem funding (`null`), a estrutura é
- * o próprio projeto: TIR = TIR do projeto, custo financeiro 0 e resultado = Σ
- * do fluxo livre.
- *
- * O acumulado segue a convenção do motor de fluxo: `round2` a cada passo.
- * `custoFinanceiro` é a soma das saídas menos a das entradas arredondada só no
- * fim; por isso, contra "resultado sem funding − resultado após funding" (cada
- * mês do alavancado é arredondado em separado) pode haver diferença de centavos.
- */
-export function indicadoresEstrutura(
-  calc: Pick<FluxoCalc, 'fluxoMensal'>,
-  funding: FundingCalc | null,
-): IndicadoresEstrutura {
-  const nf = funding?.noFluxo;
-  const fluxo = nf ? nf.fluxoMensal : calc.fluxoMensal;
-  let acc = 0;
-  let menor = 0;
-  for (const v of fluxo) {
-    acc = round2(acc + v);
-    if (acc < menor) menor = acc;
-  }
-  return {
-    exposicaoMaxima: menor < 0 ? menor : 0,
-    tirAlavancada: tirFluxo(fluxo),
-    custoFinanceiro: nf ? r2(soma(nf.saidas) - soma(nf.entradas)) : 0,
-    resultadoAposFunding: r2(soma(fluxo)),
-  };
-}
+// Os indicadores de uma estrutura moraram aqui e se mudaram para
+// `funding-estrutura.ts`, o núcleo de cálculo da Estrutura de capital. A
+// reexportação mantém os importadores de hoje (a tela de Funding, o teste deste
+// módulo e o caso de render da comparação) compilando sem mudança.
+export { indicadoresEstrutura, type IndicadoresEstrutura } from './funding-estrutura.js';
 
 const clonar = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 

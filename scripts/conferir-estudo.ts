@@ -55,6 +55,10 @@ import {
   contarConfiguracoesAvancadas,
   type LinhaReceitaAuditavel, type ContagemConfiguracoesAvancadas,
 } from '../frontend/auditoria-configuracoes.js';
+import {
+  camadasDoStack, indicadoresEstrutura, kpisDaOperacao, sequenciaDeEstrutura, totaisDaEstrutura,
+  type CamadaStack, type KpisOperacao, type SequenciaEstrutura, type TotaisEstrutura,
+} from '../frontend/funding-estrutura.js';
 
 const BASE = process.env.URBI_BASE || 'https://homolog.urbiverso.com.br';
 const TOKEN = process.env.URBI_TOKEN || '';
@@ -92,6 +96,8 @@ export interface Conferencia {
   /** Checagens aritméticas próprias deste script (não são invariantes do app). */
   contas: { rotulo: string; esperado: number; obtido: number; delta: number; ok: boolean }[];
   brutos: Record<string, any>;
+  /** Estrutura de capital: sequência por senioridade, camadas do stack e KPIs por operação. */
+  estrutura?: EstruturaConferida | null;
 }
 
 export async function conferir(id: number): Promise<Conferencia> {
@@ -171,6 +177,10 @@ export async function conferir(id: number): Promise<Conferencia> {
       },
     );
   }
+
+  // Estrutura de capital: cada passo da sequência refaz o fluxo e o funding
+  // para o subconjunto de operações (só leitura, como o resto do script).
+  if (out.funding) out.estrutura = estruturaDoEstudo(config, d, ops, calc, out.funding);
 
   out.divergencias = [
     ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, calc.prazo),
@@ -316,6 +326,8 @@ function imprimir(c: Conferencia) {
     console.log(`  mín. do alavancado ... ${R$(Math.min(...f.fluxoAcumulado))}`);
   }
 
+  if (c.estrutura) imprimirEstrutura(c.estrutura);
+
   console.log('CONTAS');
   for (const t of c.contas) {
     console.log(`  ${t.ok ? 'ok  ' : 'FALHA'} ${t.rotulo}: esperado ${t.esperado.toFixed(2)} · obtido ${t.obtido.toFixed(2)} · Δ ${t.delta.toFixed(2)}`);
@@ -326,6 +338,69 @@ function imprimir(c: Conferencia) {
     const num = Number.isFinite(d.esperado) && Number.isFinite(d.encontrado)
       ? `  [esperado ${d.esperado} · encontrado ${d.encontrado} · Δ ${d.diferenca}]` : '';
     console.log(`  [${d.severidade}] ${d.codigo}${d.linha ? ' · ' + d.linha : ''}${d.mes !== undefined ? ' · mês ' + (d.mes + 1) : ''}: ${d.mensagem}${num}`);
+  }
+}
+
+// ── Estrutura de capital: sequência, camadas e KPIs por operação ─────────
+
+interface EstruturaConferida {
+  sequencia: SequenciaEstrutura;
+  camadas: CamadaStack[];
+  totais: TotaisEstrutura;
+  kpis: { nome: string; kpis: KpisOperacao }[];
+}
+
+function estruturaDoEstudo(
+  config: FluxoConfig,
+  d: { custos: any[]; crono: EventoCrono[]; taxa: number },
+  ops: OperacaoFunding[],
+  calc: FluxoCalc,
+  funding: FundingCalc,
+): EstruturaConferida | null {
+  const simular = (sub: OperacaoFunding[]) => {
+    const c = calcularFluxo({ ...config, operacoesFunding: sub });
+    const rl = receitaLiquidaComCorretagemMensal(c.receitaMensal, c.linhasCusto, d.custos);
+    const rf = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0;
+    const f = fundingDoEstudo(sub, c.fluxoMensal, rl, rf, mesRepasse(d.crono), d.taxa, {
+      custosRaw: d.custos, linhasCusto: c.linhasCusto, cronograma: d.crono,
+      recebimentoPorSafraMensal: c.recebimentoPorSafraMensal,
+    });
+    return indicadoresEstrutura(c, f);
+  };
+  const sequencia = sequenciaDeEstrutura(ops, simular);
+  if (!sequencia) return null;
+  const completa = indicadoresEstrutura(calc, funding);
+  const camadas = camadasDoStack(funding, completa);
+  const kpis = funding.operacoes.map((s) => {
+    const passo = sequencia.passos.find((p) => p.operacao === s.operacao
+      || (p.operacao.id != null && p.operacao.id === s.operacao.id)) ?? null;
+    return { nome: s.operacao.nome, kpis: kpisDaOperacao(s, calc.vgvTotal, passo) };
+  });
+  return { sequencia, camadas, totais: totaisDaEstrutura(calc, camadas, completa), kpis };
+}
+
+function imprimirEstrutura(e: EstruturaConferida) {
+  const tir = (v: number | null | undefined) => (v === null || v === undefined ? 'n/d' : `${v.toFixed(2)}% a.a.`);
+  const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toFixed(2)}%`);
+  const exp = (v: number | null) => (v === null ? '—' : R$(v));
+  console.log('ESTRUTURA DE CAPITAL (senioridade)');
+  console.log(`  sem funding .......... TIR ${tir(e.sequencia.base.tirAlavancada)} · exposição ${R$(Math.abs(e.sequencia.base.exposicaoMaxima))}`);
+  for (const p of e.sequencia.passos) {
+    console.log(`  + ${p.operacao.tipo} "${p.operacao.nome}": TIR ${tir(p.antes.tirAlavancada)} → ${tir(p.depois.tirAlavancada)}`
+      + ` · exposição ${R$(Math.abs(p.antes.exposicaoMaxima))} → ${R$(Math.abs(p.depois.exposicaoMaxima))}`);
+  }
+  console.log('  camadas do stack (da base ao topo):');
+  for (const c of e.camadas) console.log(`    ${c.tipo} "${c.nome}": ${R$(c.valor)} · ${pct(c.pct)}`);
+  const t = e.totais;
+  console.log(`  usos ${R$(t.usosTotais)} · dívida ${R$(t.divida)} · equity de terceiros ${R$(t.equityTerceiros)} · incorporador no pico ${R$(t.incorporadorNoPico)}`);
+  console.log('  KPIs por operação:');
+  for (const { nome, kpis: k } of e.kpis) {
+    const especificos = k.tipo === 'divida' ? `LTV ${pct(k.ltvPct)} · custo efetivo ${tir(k.custoEfetivoPct)}`
+      : k.tipo === 'equity' ? `ROI do investidor ${pct(k.roiInvestidorPct)} · TIR do investidor ${tir(k.tirInvestidorPct)}`
+        : k.tipo === 'antecipacao_recebiveis' ? `deságio ${pct(k.desagioPct)} · custo efetivo ${tir(k.custoEfetivoPct)}`
+          : '';
+    console.log(`    ${k.tipo} "${nome}": ${especificos}${especificos ? ' · ' : ''}`
+      + `TIR alav. ${tir(k.tirAlavancadaAntes)} → ${tir(k.tirAlavancadaDepois)} · exposição ${exp(k.exposicaoAntes)} → ${exp(k.exposicaoDepois)}`);
   }
 }
 
