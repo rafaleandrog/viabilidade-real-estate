@@ -9,7 +9,7 @@ import {
   listarFundingOperacoes, criarFundingOperacao, atualizarFundingOperacao, removerFundingOperacao,
 } from './viabilidade-api.js';
 import { calcularFluxo, taxaDescontoOuPadrao, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { dinheiroParaRotulo, impostoDoEstudoAvancado, mesRepasse, rotuloMesRelativo, type ContextoCusto, type EventoCrono } from './fluxo-shared.js';
+import { dinheiroParaRotulo, impostoDoEstudoAvancado, mesRepasse, operacaoComRascunho, rotuloMesRelativo, type ContextoCusto, type EventoCrono } from './fluxo-shared.js';
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao, indicadoresAntecipacao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
@@ -301,17 +301,29 @@ export class ViabFunding extends LitElement {
   // consumidores: frontend/tela-fluxo-ver.ts:179 · frontend/tela-cenarios.ts:240
   // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
   // fundingDoEstudo) · scripts/conferir-estudo.ts:153.
-  /** Prévia sobre o DRAFT: o que está sendo digitado já aparece nos indicadores. */
+  /** Prévia sobre o DRAFT: o que está sendo digitado já aparece nos indicadores.
+   * Operação ancorada com rascunho entra com o mês derivado do Cronograma, o
+   * mesmo que o servidor vai gravar no PATCH (`operacaoComRascunho`); operação
+   * sem rascunho simula com o `inicio_mes` gravado, como as outras telas. */
   private _recalcular() {
     if (!this.calc) { this.funding = null; return; }
-    const efetivas = this.operacoes.map((o) => ({ ...o, ...(this.draft[o.id] ?? {}) })) as OperacaoFunding[];
-    const resultadoFinal = this.calc.fluxoAcumulado[this.calc.fluxoAcumulado.length - 1] ?? 0;
+    const efetivas = this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)) as OperacaoFunding[];
+    // O horizonte de `this.calc` vem das operações GRAVADAS (`_carregar`). Com
+    // rascunho, o fluxo-base é refeito com as efetivas — a montagem de
+    // `_simularEstrutura` —, senão uma operação movida para mais tarde é
+    // truncada pelo horizonte antigo e o Salvar muda o número.
+    const comRascunho = !!this.config && Object.keys(this.draft).length > 0;
+    const calc = comRascunho ? calcularFluxo({ ...this.config!, operacoesFunding: efetivas }) : this.calc;
+    const receitaLiquida = comRascunho
+      ? receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.custos)
+      : this.receitaLiquida;
+    const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
     this.funding = fundingDoEstudo(
-      efetivas, this.calc.fluxoMensal, this.receitaLiquida,
+      efetivas, calc.fluxoMensal, receitaLiquida,
       resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
       {
-        custosRaw: this.custos, linhasCusto: this.calc.linhasCusto, cronograma: this.crono,
-        recebimentoPorSafraMensal: this.calc.recebimentoPorSafraMensal,
+        custosRaw: this.custos, linhasCusto: calc.linhasCusto, cronograma: this.crono,
+        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
       },
     );
   }
@@ -505,6 +517,12 @@ export class ViabFunding extends LitElement {
     ></viab-num>`;
   }
 
+  /** O mês que a simulação usa para a operação: o derivado da âncora quando há
+   * rascunho, o gravado caso contrário — a mesma regra de `_recalcular`. */
+  private _mesSimulado(o: any): number {
+    return Number(operacaoComRascunho(o, this.draft[o.id], this.crono).inicio_mes) || 0;
+  }
+
   private _renderAncora(o: any, rotulo = 'Mês do aporte'): TemplateResult {
     const evento = String(this._valor(o, 'cronograma_evento') ?? 'customizado');
     return html`
@@ -519,7 +537,7 @@ export class ViabFunding extends LitElement {
         ? this._num(o, 'inicio_mes', 'Mês', 'º mês', 0)
         : html`<div class="sel-campo">
             <span class="sel-rotulo">Início derivado</span>
-            <span>${rotuloMesRelativo(this.dataInicio, Number(this._valor(o, 'inicio_mes')) || 0)}
+            <span class="mes-derivado">${rotuloMesRelativo(this.dataInicio, this._mesSimulado(o))}
               <urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Derivado do Cronograma"></urbi-icone></span>
           </div>`}
     `;
