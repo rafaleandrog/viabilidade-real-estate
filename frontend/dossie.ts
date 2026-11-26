@@ -123,6 +123,9 @@ export function htmlDossie(dados: DadosDossie, temaCss = ''): string {
   </body></html>`;
 }
 
+// Janela do dossiê ainda em montagem: a trava de reentrada de `exportarDossiePDF`.
+let janelaEmMontagem: Window | null = null;
+
 /**
  * Abre a janela de impressão do dossiê. A janela é aberta ANTES de os dados chegarem: os
  * complementos (mercado, Apelo) vêm de rotas assíncronas, e abrir depois do `await` perderia o
@@ -132,8 +135,6 @@ export function htmlDossie(dados: DadosDossie, temaCss = ''): string {
  * janela: foca a que está montando e devolve `true` (a trava cai ao fim da montagem, com sucesso ou
  * erro, e também quando o usuário fecha a janela em montagem).
  */
-let janelaEmMontagem: Window | null = null;
-
 export async function exportarDossiePDF(montar: () => Promise<DadosDossie> | DadosDossie): Promise<boolean> {
   if (janelaEmMontagem && !janelaEmMontagem.closed) {
     janelaEmMontagem.focus?.();
