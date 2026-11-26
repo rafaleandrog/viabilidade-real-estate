@@ -123,16 +123,32 @@ export function htmlDossie(dados: DadosDossie, temaCss = ''): string {
   </body></html>`;
 }
 
+// Janelas do dossiê ainda em montagem, por chave (estudo e nível): a trava de reentrada de
+// `exportarDossiePDF`. Por chave, e não global, para um clique noutro estudo abrir o dossiê dele.
+const janelasEmMontagem = new Map<string, Window>();
+
 /**
  * Abre a janela de impressão do dossiê. A janela é aberta ANTES de os dados chegarem: os
  * complementos (mercado, Apelo) vêm de rotas assíncronas, e abrir depois do `await` perderia o
  * gesto do clique — o navegador trataria como pop-up e bloquearia. Devolve `false` quando o
  * pop-up foi bloqueado (a tela avisa, como nas outras exportações); se a montagem falhar, a
- * janela é fechada e o erro sobe para a tela.
+ * janela é fechada e o erro sobe para a tela. Com uma montagem em curso para a MESMA `chave`
+ * (estudo e nível, que a tela passa), chamada nova NÃO abre outra janela: foca a que está montando
+ * e devolve `true`. Chave diferente abre normalmente. A trava cai ao fim da montagem, com sucesso ou
+ * erro, e também quando o usuário fecha a janela em montagem.
  */
-export async function exportarDossiePDF(montar: () => Promise<DadosDossie> | DadosDossie): Promise<boolean> {
+export async function exportarDossiePDF(
+  montar: () => Promise<DadosDossie> | DadosDossie,
+  chave = '',
+): Promise<boolean> {
+  const emMontagem = janelasEmMontagem.get(chave);
+  if (emMontagem && !emMontagem.closed) {
+    emMontagem.focus?.();
+    return true;
+  }
   const w = window.open('', '_blank');
   if (!w) return false;
+  janelasEmMontagem.set(chave, w);
   try {
     w.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Dossiê do projeto</title></head><body><p>Montando o dossiê…</p></body></html>');
     w.document.close();
@@ -146,5 +162,7 @@ export async function exportarDossiePDF(montar: () => Promise<DadosDossie> | Dad
   } catch (e) {
     w.close();
     throw e;
+  } finally {
+    if (janelasEmMontagem.get(chave) === w) janelasEmMontagem.delete(chave);
   }
 }
