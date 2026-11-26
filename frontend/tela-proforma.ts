@@ -676,7 +676,9 @@ export class ViabTelaProforma extends LitElement {
                 <td>
                   ${r.toggle
                     ? html`<button class="toggle" title="Expandir/recolher"
-                        @click=${() => this._toggle(r.toggle!)}>${this.colapso[r.toggle!] ? '▸' : '▾'}</button>`
+                        aria-expanded=${!this.colapso[r.toggle!]}
+                        aria-label=${`${this.colapso[r.toggle!] ? 'Expandir' : 'Recolher'} ${r.l}`}
+                        @click=${() => this._toggle(r.toggle!)}><urbi-icone classe=${this.colapso[r.toggle!] ? 'fa-solid fa-caret-right' : 'fa-solid fa-caret-down'}></urbi-icone></button>`
                     : nothing}
                   ${r.l}
                 </td>
@@ -882,7 +884,7 @@ export class ViabTelaProforma extends LitElement {
             ${ordenavel
               ? html`<button type="button" class="ordenar" title="Ordenar pela amplitude"
                   @click=${() => { this._sensPorAmplitude = !this._sensPorAmplitude; }}
-                >Amplitude ${this._sensPorAmplitude ? '↓' : ''}</button>`
+                >Amplitude ${this._sensPorAmplitude ? html`<urbi-icone classe="fa-solid fa-arrow-down"></urbi-icone>` : nothing}</button>`
               : html`Amplitude`}
           </th>
         </tr>

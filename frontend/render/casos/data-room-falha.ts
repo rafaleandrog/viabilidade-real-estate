@@ -58,7 +58,14 @@ export const caso = {
       arquivoApelo: Array.from(painel?.shadowRoot?.querySelectorAll('.arquivo-apelo') ?? []).map((n: any) => n.textContent.trim()),
       secoes: cards.map((c) => c.getAttribute('data-categoria') || ''),
       nomes: Array.from(painel?.shadowRoot?.querySelectorAll('li.doc .nome') ?? []).map((n: any) => n.textContent.trim()),
-      checklist: Array.from(painel?.shadowRoot?.querySelectorAll('.check li') ?? []).map((n: any) => n.textContent.trim().replace(/\s+/g, ' ')),
+      // A marca do item é um `urbi-icone`, não texto: a sonda a traduz pelo
+      // ícone de fato desenhado (`fa-check` → "✓ ", `fa-circle` → "○ "), para
+      // a asserção continuar provando que o item presente leva a marca certa.
+      checklist: Array.from(painel?.shadowRoot?.querySelectorAll('.check li') ?? []).map((n: any) => {
+        const classe = n.querySelector('urbi-icone.marca')?.getAttribute('classe') ?? '';
+        const marca = classe.includes('fa-check') ? '✓ ' : classe.includes('fa-circle') ? '○ ' : '';
+        return marca + n.textContent.trim().replace(/\s+/g, ' ');
+      }),
       semTipo: Array.from(painel?.shadowRoot?.querySelectorAll('p.vazio') ?? []).map((n: any) => n.textContent.trim()),
     };
   },

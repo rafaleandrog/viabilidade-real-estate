@@ -24,6 +24,7 @@ export const caso = {
     'urbi-botao.pequeno',
     'urbi-botao.variante',
     'urbi-card.titulo',
+    'urbi-icone.classe',
     'urbi-kpi.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {

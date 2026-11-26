@@ -16,6 +16,11 @@ import ts from 'typescript';
 // pintado por token de cor — o emoji não respeita tema nem token, e cada
 // sistema operacional o desenha de um jeito.
 //
+// O mesmo vale para os glifos de texto usados COMO ÍCONE: triângulos e
+// círculos (▲ ▼ ▸ ▾ ● ○), estrelas (★ ☆), marcas de conferência (✓ ✔ ✗) e as
+// setas verticais (↑ ↓ ⇅). Ficam permitidos os sinais que são PONTUAÇÃO de
+// frase — `→` em "Admin → Apps", `×` em "Projeto × mercado", `−`, `÷`, `Δ`.
+//
 // O teste lê o FONTE versionado (`git ls-files`, nunca o disco: armadilha 1
 // da Rodada 10) com o parser do TypeScript e olha só o que pode chegar à
 // tela: literais de string e de template. Comentário de código não conta —
@@ -24,12 +29,15 @@ import ts from 'typescript';
 // citar emoji para provar que ele sumiu.
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const EMOJI = /\p{Extended_Pictographic}/u;
+const EMOJI = /[\p{Extended_Pictographic}\u25A0-\u25FF\u2605\u2606\u2713-\u2718\u2191\u2193\u21C5]/u;
 
 function fontesVersionados(): string[] {
   return execFileSync('git', ['ls-files', 'frontend', 'backend'], { cwd: RAIZ, encoding: 'utf8' })
     .split('\n')
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.includes('/fixtures/'));
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.includes('/fixtures/')
+      // `frontend/render/` é o harness de teste em Chromium (casos e sondas):
+      // não chega à tela, e a sonda do Data Room traduz o ícone em "✓ "/"○ ".
+      && !f.startsWith('frontend/render/'));
 }
 
 export function emojisNoTexto(arquivo: string, fonte: string): string[] {
@@ -70,6 +78,12 @@ test('controle: a varredura acha emoji em literal e ignora comentário', () => {
   assert.equal(emojisNoTexto('a.ts', 'const a = html`<span>📅 ${x}</span>`;').length, 1);
   assert.equal(emojisNoTexto('a.ts', "const a = `<p>⚠️ aviso</p>`;").length, 1);
   assert.equal(emojisNoTexto('a.ts', "const a = '\\u{1F512}';").length, 1);
+  // Glifo de texto usado como ícone também reprova; pontuação de frase, não.
+  assert.equal(emojisNoTexto('a.ts', "const a = html`<button>▲</button>`;").length, 1);
+  assert.equal(emojisNoTexto('a.ts', "const a = recolhido ? '▸' : '▾';").length, 2);
+  assert.equal(emojisNoTexto('a.ts', "const a = '✓ ok';").length, 1);
+  assert.equal(emojisNoTexto('a.ts', "const a = 'Amplitude ↓';").length, 1);
+  assert.equal(emojisNoTexto('a.ts', "const a = 'Admin → Apps · Projeto × mercado · Bull − Bear ÷ Base · Δ%';").length, 0);
   assert.equal(emojisNoTexto('a.ts', "const a = '\\uD83D\\uDD12';").length, 1);
   assert.equal(emojisNoTexto('a.ts', '// 🔒 comentário\nconst a = 1;').length, 0);
   assert.equal(emojisNoTexto('a.ts', 'const c = css`/* ⚠️ nota */ .a { color: red; }`;').length, 0);
@@ -90,4 +104,13 @@ test('fiação: os ícones que substituíram emoji estão nas telas', () => {
   assert.match(le('frontend/faixa-cenarios.ts'), /classe=\$\{ICONE_CENARIO\.bull\}/);
   assert.match(le('frontend/tela-fluxo-receitas.ts'), /fa-triangle-exclamation/);
   assert.match(le('frontend/tela-funding.ts'), /fa-triangle-exclamation/);
+  assert.match(le('frontend/viab-num.ts'), /classe="fa-solid fa-caret-up"/);
+  assert.match(le('frontend/viab-num.ts'), /classe="fa-solid fa-caret-down"/);
+  assert.match(le('frontend/fluxo-tabela.ts'), /'fa-solid fa-caret-right'/);
+  assert.match(le('frontend/tela-proforma.ts'), /'fa-solid fa-caret-right'/);
+  assert.match(le('frontend/tela-proforma.ts'), /classe="fa-solid fa-arrow-down"/);
+  assert.match(le('frontend/data-room-painel.ts'), /classe="fa-solid fa-check"/);
+  // O ícone de presente é a única marca textual desse estado: sem rótulo, o
+  // leitor de tela não distingue "presente" de um item sem marca.
+  assert.match(le('frontend/data-room-painel.ts'), /fa-check" role="img" aria-label="Presente:"/);
 });

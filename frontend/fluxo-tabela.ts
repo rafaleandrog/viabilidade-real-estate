@@ -469,7 +469,7 @@ function linhaTabela(
       <td class="c1">
         ${podeToggle ? html`
           <button class="toggle" @click=${() => toggle(chaveToggle)} aria-expanded=${!recolhido}>
-            <span class="seta">${recolhido ? '▸' : '▾'}</span>${nome}
+            <urbi-icone class="seta" classe=${recolhido ? 'fa-solid fa-caret-right' : 'fa-solid fa-caret-down'}></urbi-icone>${nome}
           </button>` : nome}
       </td>
       <td class="c2">${linha.duracao ? rotuloMesRelativo(dataInicio, linha.inicio!) : ''}</td>
