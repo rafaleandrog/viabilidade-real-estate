@@ -310,6 +310,7 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="º mês" passo="1"
+              rotulo-acessivel="Início de ${EVENTO_LABEL[ev.evento] || ev.evento}"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido) : ''}
               ?desabilitado=${bloqueado || travadoIni}
               .valor=${inicioExibido}
@@ -321,6 +322,7 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="meses" passo="1"
+              rotulo-acessivel="Duração de ${EVENTO_LABEL[ev.evento] || ev.evento}"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido + duracaoExibida - 1) : ''}
               ?desabilitado=${bloqueado || travadoDur}
               .valor=${duracaoExibida}
@@ -441,6 +443,7 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="º mês" passo="1"
+              rotulo-acessivel="Início de ${nomeExibido || 'Fase'}"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido) : ''}
               ?desabilitado=${bloqueado}
               .valor=${inicioExibido}
@@ -451,6 +454,7 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="meses" passo="1"
+              rotulo-acessivel="Duração de ${nomeExibido || 'Fase'}"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido + duracaoExibida - 1) : ''}
               ?desabilitado=${bloqueado}
               .valor=${duracaoExibida}
