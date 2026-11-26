@@ -127,6 +127,12 @@ export class ViabNum extends LitElement {
     return this._foco ? this._rascunho : this._fmtAgrupado(this.valor);
   }
 
+  // Nome acessível dos botões do stepper: com rótulo, "Aumentar <rótulo>".
+  private _rotuloPasso(verbo: 'Aumentar' | 'Diminuir'): string {
+    const rotulo = this.label.trim();
+    return rotulo ? `${verbo} ${rotulo}` : verbo;
+  }
+
   render() {
     return html`
       <div class="campo">
@@ -147,8 +153,8 @@ export class ViabNum extends LitElement {
           />
           ${this.passo > 0 && !this.desabilitado ? html`
             <span class="stepper">
-              <button type="button" aria-label="Aumentar" @click=${() => this._incrementar(this.passo)}><urbi-icone classe="fa-solid fa-caret-up"></urbi-icone></button>
-              <button type="button" aria-label="Diminuir" @click=${() => this._incrementar(-this.passo)}><urbi-icone classe="fa-solid fa-caret-down"></urbi-icone></button>
+              <button type="button" aria-label=${this._rotuloPasso('Aumentar')} @click=${() => this._incrementar(this.passo)}><urbi-icone classe="fa-solid fa-caret-up"></urbi-icone></button>
+              <button type="button" aria-label=${this._rotuloPasso('Diminuir')} @click=${() => this._incrementar(-this.passo)}><urbi-icone classe="fa-solid fa-caret-down"></urbi-icone></button>
             </span>` : nothing}
           ${this.sufixo ? html`<span class="afixo">${this.sufixo}</span>` : nothing}
           ${this.sufixoMes ? html`<span class="afixo afixo-mes">${this.sufixoMes}</span>` : nothing}
