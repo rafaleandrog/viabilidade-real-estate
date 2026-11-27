@@ -125,7 +125,7 @@ descartar. Clicar fora da janela não a fecha. Ao fechar, o foco volta ao botão
 criação, a operação criada abre em seguida na página dela.
 
 Antes de gravar, a janela aplica as mesmas regras do servidor e mostra a recusa na etapa do campo:
-valor, taxa ou prazo negativo, percentual acima de 100, carência igual ou maior que a amortização,
+valor, taxa ou prazo negativo, percentual acima de 100, carência igual ou maior que a amortização (quando a amortização é maior que zero),
 "Aporte em" menor que 1, número inválido, nome vazio ou com mais de 100 caracteres (também na
 edição) e, no equity, retorno somado acima de 100% entre as operações do mesmo modo. Criar operação
 com uma regra violada leva à etapa do erro e não grava. Se o servidor ainda assim recusar, a
@@ -313,8 +313,9 @@ Só pode haver uma operação de `financiamento_producao` por estudo. Valores mo
 casas; percentuais são guardados como percentual.
 
 O `tipo` de uma operação é fixado na criação. Um `PATCH` com `tipo` diferente do gravado é recusado
-com **422** e código `TIPO_IMUTAVEL`, sem gravar nada — antes de qualquer outra validação de campo,
-então a resposta não vira um 400 de outro campo. Mandar o **mesmo** `tipo` já gravado é aceito, e o
+com **422** e código `TIPO_IMUTAVEL`, sem gravar nada. A recusa vem antes das regras de campo
+(carência, percentuais, prazos), então uma regra violada no mesmo pedido não a esconde; só um número
+malformado no mesmo pedido volta antes, como 400 `CAMPO_INVALIDO`. Mandar o **mesmo** `tipo` já gravado é aceito, e o
 `PATCH` sem `tipo` continua como sempre. Para trocar de tipo, remova a operação e crie outra. Na
 antecipação de recebíveis o `valor` não é lido pelo cálculo; a tela não o manda.
 

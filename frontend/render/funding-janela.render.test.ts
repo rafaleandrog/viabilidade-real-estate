@@ -115,7 +115,7 @@ test('Funding: a janela de operação cria e edita só ao confirmar, com resumo 
   assert.deepEqual(x.salvar, { chamadas: ['PATCH /funding/1'], corpo: { taxa_anual: 22 }, fechada: true, foco: 'editar' });
 
   // ── Remover: o foco vai a um alvo estável da lista ──
-  assert.deepEqual(x.remover, { pagina: false, foco: 'cartao:3' }, 'depois de remover, o foco não foi ao primeiro cartão');
+  assert.deepEqual(x.remover, { pagina: false, foco: 'cartao:3', documento: true, ativo: 'cartao:3' }, 'depois de remover, o foco não pousou no primeiro cartão');
 
   // ── Leitor ──
   assert.deepEqual(x.leitor, { nova: false, janela: false, botoesNaPagina: 0 });

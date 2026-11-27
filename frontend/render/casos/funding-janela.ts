@@ -398,7 +398,16 @@ export const caso = {
     await esperar(ed);
     clicar(porTexto(sr(ed).querySelector('urbi-modal')!, 'Remover'));
     await esperar(ed, 5);
-    const remover = { pagina: !!sr(ed).querySelector('div.pagina-operacao'), foco: ultimoFoco() };
+    // O cartão é elemento da app, focável (`tabindex="0"`), então aqui o foco
+    // pousado é mensurável, além da chamada: `document.activeElement` é a tela
+    // (o foco está dentro do shadow root dela) e o `activeElement` desse shadow
+    // root é o cartão. A espia sozinha não distinguiria um `focus()` sem efeito.
+    const remover = {
+      pagina: !!sr(ed).querySelector('div.pagina-operacao'),
+      foco: ultimoFoco(),
+      documento: document.activeElement === ed,
+      ativo: descreverFoco(sr(ed).activeElement ?? undefined),
+    };
     ed.remove();
 
     // ── Leitor: sem Editar, Remover, setas nem Nova operação; a janela não abre ──

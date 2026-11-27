@@ -203,8 +203,9 @@ export function remocaoFinanciamentoBloqueada(operacao: { tipo?: unknown }): boo
  * linha gravada a deixaria com campos do tipo antigo que o novo não lê. Mandar
  * o MESMO tipo já gravado é aceito, para cliente que reenvia o objeto inteiro.
  * Pura e testável, no molde de `remocaoFinanciamentoBloqueada`; o PATCH chama
- * logo depois da coerção e antes de `validarCamposOperacao`, para a troca nunca
- * ser mascarada por 400 de outro campo.
+ * logo depois da coerção e antes de `validarCamposOperacao`, para a troca não
+ * ser mascarada por 400 de regra de campo. A coerção numérica vem antes: um
+ * número malformado no mesmo PATCH ainda volta 400 `CAMPO_INVALIDO`.
  */
 export function trocaDeTipoBloqueada(operacao: { tipo?: unknown }, dados: Record<string, any>): boolean {
   return dados.tipo !== undefined && dados.tipo !== operacao.tipo;
