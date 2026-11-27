@@ -1078,7 +1078,7 @@ export class ViabFluxoCustos extends LitElement {
       colunas.push({
         id: 'acoes', label: '',
         render: (c: any) => html`
-          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover custo'} title="Remover custo"
             @click=${() => { this.removerAlvo = c; }}></urbi-botao>`,
       });
     }
