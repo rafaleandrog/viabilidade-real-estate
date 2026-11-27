@@ -141,15 +141,19 @@ export function recusaDoPostComoServidor(op: Record<string, any>): string | null
   return validarOperacaoComoServidor(op);
 }
 
-/** Espelha `trocaDeTipoBloqueada` (backend/rotas/funding.ts): o PATCH recusa troca de `tipo`. */
+/**
+ * Espelha `trocaDeTipoBloqueada` (backend/rotas/funding.ts): o PATCH recusa troca
+ * de `tipo` para outro tipo VÁLIDO. `tipo` malformado não é troca: cai em
+ * `validarOperacaoComoServidor`, cuja primeira regra é o `tipo`.
+ */
 export function trocaDeTipoComoServidor(gravada: { tipo?: unknown }, patch: Record<string, any>): boolean {
-  return patch.tipo !== undefined && patch.tipo !== gravada.tipo;
+  return patch.tipo !== undefined && TIPOS_OPERACAO.includes(patch.tipo) && patch.tipo !== gravada.tipo;
 }
 
 /**
  * O que o PATCH de uma operação recusa, na ordem do servidor: coerção numérica do
- * patch, troca de `tipo` (422 `TIPO_IMUTAVEL`) e `validarCamposOperacao` sobre o
- * estado FINAL (gravada + patch). A soma de retorno do equity não é regra de
+ * patch, troca de `tipo` válido (422 `TIPO_IMUTAVEL`) e `validarCamposOperacao` sobre o
+ * estado FINAL (gravada + patch), que recusa o `tipo` malformado antes de tudo. A soma de retorno do equity não é regra de
  * campo: é `errosRetornoPorModo`.
  */
 export function recusaDoPatchComoServidor(gravada: Record<string, any>, patch: Record<string, any>): string | null {

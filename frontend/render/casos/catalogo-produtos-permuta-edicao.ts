@@ -25,6 +25,7 @@ export const caso = {
     { seletor: 'table.prod tbody td.num viab-num.u-permutadas', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-card.titulo',
     'urbi-select.opcoes',
     'urbi-input.placeholder',

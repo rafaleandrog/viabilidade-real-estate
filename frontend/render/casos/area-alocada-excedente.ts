@@ -36,6 +36,7 @@ export const caso = {
   // harness confronta nos dois sentidos (usada e não declarada → falha; declarada
   // e sem uso → falha), então a lista não envelhece em silêncio.
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     // O `urbi-card` da aba (não tem título desenhado pelo stub) — mesma
     // natureza de `catalogo-produtos-tipo.ts`.
     'urbi-card.titulo',

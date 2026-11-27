@@ -13,7 +13,7 @@
 // que o componente errado não monta primeiro; só montar de verdade e
 // verificar o que a API stub recebeu prova isso. Mesma classe de defeito nº 1
 // do CLAUDE.md (a fiação, não o cálculo) do caso irmão
-// `funding-fap-checkbox.ts`, de onde este caso copia a técnica de espionar
+// `funding-fap-toggle.ts`, de onde este caso copia a técnica de espionar
 // `urbiVerso.api`/`urbiVerso.modulo` e devolver o resultado por `medir()`.
 
 import '../../tela-dashboard.js';
@@ -46,6 +46,7 @@ export const caso = {
   // `urbi-shell-page.dashboard` não chegam a "participar da medição" e não
   // entram nem como reproduzidas nem como não-reproduzidas.
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-abas.abas',
     'urbi-abas.ativa',
     'urbi-abas.expandir',

@@ -43,6 +43,7 @@ export const caso = {
     { seletor: 'urbi-banner.aviso-area-alocada', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-card.titulo',
     'urbi-select.opcoes',
     'urbi-input.placeholder',

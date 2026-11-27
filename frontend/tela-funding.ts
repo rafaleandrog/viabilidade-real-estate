@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { live } from 'lit/directives/live.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtR$Kpi, fmtPct } from './viab-format.js';
 import {
@@ -29,6 +30,10 @@ import {
 import { AVISO_SEM_LASTRO, TIPOS_DE_CARTAO, dadosDoCartao, operacoesDeCartao, type ValorCartao } from './funding-cartao-dados.js';
 import { dadosDaEstrutura, type LinhaSequencia } from './funding-estrutura-dados.js';
 import './grafico-stack-capital.js';
+import {
+  NOME_ACESSIVEL_LIGA_DESLIGA, controleLigaDesliga, rotuloDoEstado,
+  type ControleLigaDesliga, type RegistroDeElementos,
+} from './funding-liga-desliga.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Sub-aba "Viabilidade → Funding" (#355, item 48 da Rodada 7).
@@ -147,6 +152,17 @@ export class ViabFunding extends LitElement {
   // criação é assíncrona, e `_carregar` pode ser chamado de novo (troca de
   // estudo) antes da primeira resposta voltar.
   @state() private criandoFinanciamento = false;
+  // O PATCH do liga/desliga em curso: o controle fica desabilitado e um
+  // segundo evento não dispara outro PATCH.
+  @state() private ligandoFinanciamento = false;
+  // Interruptor (`urbi-toggle`) ou caixa de seleção (`urbi-checkbox`): decidido
+  // UMA vez, no primeiro desenho do controle, e mantido enquanto a tela viver
+  // — o controle não troca de forma depois de desenhado, nem que a tag seja
+  // registrada mais tarde. `registroDeElementos` é parâmetro só para o caso de
+  // render exercer a queda (ver `frontend/funding-liga-desliga.ts`).
+  private controleFinanciamento: ControleLigaDesliga | null = null;
+  private registroDeElementos: RegistroDeElementos | null =
+    typeof customElements === 'undefined' ? null : customElements;
   @state() private calc: FluxoCalc | null = null;
   @state() private funding: FundingCalc | null = null;
   // #586: aba ativa — estado INTERNO, não vai para a URL. É a convenção do
@@ -211,6 +227,8 @@ export class ViabFunding extends LitElement {
     .termos dd { margin: 0; color: var(--cor-texto); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
     .op-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .op-cab .espaco { flex: 1; }
+    .liga-desliga { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .estado-liga { min-width: 6.5em; color: var(--cor-texto-sec); white-space: nowrap; }
     .op-cab urbi-input { min-width: 220px; }
     .secao { margin-top: 12px; }
     .secao h4 {
@@ -428,7 +446,7 @@ export class ViabFunding extends LitElement {
    * #587 — o Financiamento à produção é ÚNICO E FIXO: a tela cria a operação
    * sozinha, DESLIGADA, na primeira vez que um estudo sem ela é aberto em
    * modo edição, para a aba dedicada ter sempre um formulário sobre o qual
-   * desenhar o checkbox. Nasce `ativo: false` — é o estado "estudo sem FàP
+   * desenhar o liga/desliga. Nasce `ativo: false` — é o estado "estudo sem FàP
    * hoje" da regra de transição da #587: nenhum número entra no motor até o
    * usuário ligar. Estudo que JÁ tinha a operação nunca passa por aqui
    * (`_temFinanciamento()` corta antes) — o `ativo: true` default do
@@ -459,10 +477,23 @@ export class ViabFunding extends LitElement {
     }
   }
 
+  /**
+   * Grava `ativo` na hora e recarrega. O controle muda de posição sozinho ao
+   * clicar; se o servidor recusar, o `ativo` do modelo não mudou e o controle
+   * precisa voltar ao gravado: o template liga `checked`/`marcado` com `live()`,
+   * que compara com o valor VIVO do elemento, e o redesenho do fim (a troca de
+   * `ligandoFinanciamento`) o reescreve.
+   */
   private async _ligarDesligarFinanciamento(o: any, ativo: boolean): Promise<void> {
-    const r = await atualizarFundingOperacao(this.estudo.id, o.id, { ativo });
-    if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível salvar.', 'erro'); return; }
-    await this._carregar();
+    if (!this.editavel || this.ligandoFinanciamento || this.criandoFinanciamento) { this.requestUpdate(); return; }
+    this.ligandoFinanciamento = true;
+    try {
+      const r = await atualizarFundingOperacao(this.estudo.id, o.id, { ativo });
+      if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível salvar.', 'erro'); return; }
+      await this._carregar();
+    } finally {
+      this.ligandoFinanciamento = false;
+    }
   }
 
   /**
@@ -886,7 +917,11 @@ export class ViabFunding extends LitElement {
         : alvo === 'nova'
           ? r?.querySelector('urbi-botao.nova-operacao')
           : (r?.querySelector('viab-funding-cartao') ?? r?.querySelector('urbi-botao.nova-operacao'));
-      if (el) { this.focarAlvo = null; (el as HTMLElement).focus(); }
+      // Limpa mesmo sem achar: este é o desenho em que o alvo deveria estar
+      // (a lista já carregou e a janela fechou). Guardado, ele roubaria o foco
+      // num desenho posterior qualquer em que o elemento voltasse a existir.
+      this.focarAlvo = null;
+      (el as HTMLElement | null | undefined)?.focus();
     }
     if (this.focarCartaoId !== null && this.opAbertaId === null) {
       const alvo = [...(this.shadowRoot?.querySelectorAll('viab-funding-cartao') ?? [])]
@@ -970,12 +1005,41 @@ export class ViabFunding extends LitElement {
   }
 
   /**
+   * O liga/desliga do Financiamento à produção — o único com esse controle.
+   * Interruptor com o estado em texto ao lado; sem a tag `urbi-toggle`
+   * registrada, a caixa de seleção "Ativo" de antes, com o mesmo
+   * comportamento. Nos dois, `checked`/`marcado` vêm por `live()` para a recusa
+   * do servidor devolver o controle ao estado gravado.
+   */
+  private _renderLigaDesliga(o: any, ativo: boolean): TemplateResult {
+    this.controleFinanciamento ??= controleLigaDesliga(this.registroDeElementos);
+    const desabilitado = !this.editavel || this.criandoFinanciamento || this.ligandoFinanciamento;
+    if (this.controleFinanciamento === 'checkbox') {
+      return html`<urbi-checkbox class="liga-desliga"
+        label="Ativo"
+        ?desabilitado=${desabilitado}
+        .marcado=${live(ativo)}
+        @urbi:checkbox-change=${(e: CustomEvent) => this._ligarDesligarFinanciamento(o, e.detail.marcado)}
+      ></urbi-checkbox>`;
+    }
+    return html`<span class="liga-desliga">
+      <urbi-toggle
+        .checked=${live(ativo)}
+        .disabled=${desabilitado}
+        .ariaLabel=${NOME_ACESSIVEL_LIGA_DESLIGA}
+        @urbi-toggle:change=${(e: CustomEvent<boolean>) => this._ligarDesligarFinanciamento(o, e.detail === true)}
+      ></urbi-toggle>
+      <span class="estado-liga" aria-hidden="true">${rotuloDoEstado(ativo)}</span>
+    </span>`;
+  }
+
+  /**
    * #587 — a aba `Financiamento à produção`: SEMPRE um formulário único,
-   * nunca lista, nunca botão "adicionar". O checkbox liga/desliga sem apagar
-   * a operação — é o que preserva os parâmetros que o `_remover` genérico
-   * jogaria fora — por isso este card não tem o botão de lixeira nem as
-   * setas ↑↓ de `_renderOperacao` (não há irmão do mesmo tipo para reordenar
-   * contra, e não há como remover: a operação é fixa).
+   * nunca lista, nunca botão "adicionar". O liga/desliga (`_renderLigaDesliga`)
+   * desliga sem apagar a operação — é o que preserva os parâmetros que o
+   * `_remover` genérico jogaria fora — por isso este card não tem o botão de
+   * lixeira nem as setas ↑↓ de `_renderOperacao` (não há irmão do mesmo tipo
+   * para reordenar contra, e não há como remover: a operação é fixa).
    */
   private _renderAbaFinanciamentoProducao(): TemplateResult {
     const o = this._operacaoFinanciamento();
@@ -998,12 +1062,7 @@ export class ViabFunding extends LitElement {
             @urbi:input-change=${(e: CustomEvent) => this._set(o, 'nome', e.detail.valor)}
           ></urbi-input>
           <span class="espaco"></span>
-          <urbi-checkbox
-            label="Ativo"
-            ?desabilitado=${!this.editavel || this.criandoFinanciamento}
-            ?marcado=${ativo}
-            @urbi:checkbox-change=${(e: CustomEvent) => this._ligarDesligarFinanciamento(o, e.detail.marcado)}
-          ></urbi-checkbox>
+          ${this._renderLigaDesliga(o, ativo)}
         </div>
         ${ativo ? nothing : html`
           <urbi-banner variante="info">

@@ -216,6 +216,9 @@ export const caso = {
     'urbi-nav.secoes',
     'urbi-select.label',
     'urbi-select.opcoes',
+    // O interruptor da aba Financiamento à produção, montada junto (ver
+    // COMPORTAMENTOS em scripts/render-check.mjs).
+    'urbi-toggle.ariaLabel',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     espiarFoco();
@@ -301,6 +304,7 @@ export const caso = {
 
     // ── Recusa do servidor: aparece na janela, que continua aberta ──
     recusarProxima = 'Recusado pelo servidor de teste.';
+    focados = [];
     clicar(jr(cr).querySelector('urbi-botao.confirmar'));
     await esperar(cr, 3);
     const recusa = {
@@ -309,6 +313,32 @@ export const caso = {
       valorIntacto: janelaDe(cr)?.valores?.valor ?? null,
       escritas: escritas.length,
     };
+    // O foco volta para DENTRO da janela, no aviso do servidor. Medido onde ele
+    // de fato pousa, e não só pela espia de `focus()`: o documento aponta para a
+    // tela, o shadow root da tela aponta para a janela, e o da janela aponta
+    // para o aviso (um `div` da app, focável por `tabindex="-1"`).
+    const avisoFoco = jr(cr).querySelector('div.erro-servidor-foco');
+    const focoRecusa = {
+      chamada: focados.length > 0 && focados[focados.length - 1] === avisoFoco,
+      documento: document.activeElement === cr,
+      tela: sr(cr).activeElement === janelaDe(cr),
+      janela: !!avisoFoco && jr(cr).activeElement === avisoFoco,
+      papel: avisoFoco?.getAttribute('role') ?? null,
+      tabindex: avisoFoco?.getAttribute('tabindex') ?? null,
+    };
+    // Sem aviso do servidor (o fim da gravação sem mensagem), o foco vai ao
+    // primeiro campo da etapa aberta. O campo é primitivo: o stub não é
+    // focável, então aqui só a chamada é mensurável (a delegação de foco dos
+    // primitivos não é declarada pelo SDK).
+    const jan = janelaDe(cr);
+    jan.erroServidor = '';
+    jan.gravando = true;
+    await esperar(cr);
+    focados = [];
+    jan.gravando = false;
+    await esperar(cr);
+    const primeiro = jr(cr).querySelector('section.campos [data-campo]');
+    const focoSemAviso = { alvo: ultimoFoco(), primeiroDaEtapa: !!primeiro && focados[focados.length - 1] === primeiro };
 
     // ── Criar: um POST só, mesmo com dois cliques; abre a página da criada ──
     const antesDeCriar = escritas.length;
@@ -451,6 +481,28 @@ export const caso = {
     };
     ed.remove();
 
+    // ── O alvo do foco que não existe no desenho é descartado, e não guardado ──
+    // "Editar" só existe com a página de uma operação aberta. Pedir o foco nele
+    // com a lista na tela não acha o botão; o alvo tem de ser limpo ali, senão
+    // ele rouba o foco quando a página abrir depois (o foco certo é a página).
+    instalarApi();
+    focados = [];
+    const fa = await tela(montagem, [DIVIDA, FAP, EQUITY], true);
+    fa.focarAlvo = 'editar';
+    fa.requestUpdate();
+    await esperar(fa);
+    const alvoGuardado = fa.focarAlvo;
+    focados = [];
+    await abrirCartao(fa, DIVIDA.id);
+    await esperar(fa, 2);
+    const alvoFantasma = {
+      guardado: alvoGuardado,
+      foco: ultimoFoco(),
+      documento: document.activeElement === fa,
+      ativo: descreverFoco(sr(fa).activeElement ?? undefined),
+    };
+    fa.remove();
+
     // ── Leitor: sem Editar, Remover, setas nem Nova operação; a janela não abre ──
     instalarApi();
     const le = await tela(montagem, [DIVIDA, FAP, EQUITY], false);
@@ -469,7 +521,8 @@ export const caso = {
     return {
       geoCriar, geoEditar,
       abrir, etapaAporte, resumoInicial, resumoComValor, graficoComValor, ancora, escritasAoDigitar,
-      regra, recusa, criar, emCurso, emCursoDepois, cancelar, escNao, escSim, paginaLeitura, editar, nomeVazio, salvar, remover, leitor,
+      regra, recusa, focoRecusa, focoSemAviso, criar, emCurso, emCursoDepois, cancelar, escNao, escSim, paginaLeitura, editar,
+      nomeVazio, salvar, remover, alvoFantasma, leitor,
     };
   },
 };

@@ -83,6 +83,7 @@ export const caso = {
   ],
   // Lista MEDIDA (o harness reprova a que falta e a declarada à toa).
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-abas.abas',
     'urbi-abas.ativa',
     'urbi-badge.cor',

@@ -82,6 +82,12 @@ test('Funding: a janela de operação cria e edita só ao confirmar, com resumo 
 
   // ── Recusa do servidor: dentro da janela, que fica aberta com o rascunho ──
   assert.deepEqual(x.recusa, { aberta: true, mensagem: 'Recusado pelo servidor de teste.', valorIntacto: 8_000_000, escritas: 1 });
+  // O foco volta para dentro da janela, no aviso do servidor — medido no
+  // `document.activeElement` e no `activeElement` de cada shadow root, não só na espia.
+  assert.deepEqual(x.focoRecusa, { chamada: true, documento: true, tela: true, janela: true, papel: 'alert', tabindex: '-1' },
+    'depois da recusa do servidor, o foco não voltou para o aviso dentro da janela');
+  // Sem aviso, o primeiro campo da etapa aberta.
+  assert.equal(x.focoSemAviso.primeiroDaEtapa, true, `sem aviso do servidor, o foco foi para ${x.focoSemAviso.alvo}`);
 
   // ── Criar: um POST só, mesmo com dois cliques; a página da criada abre ──
   assert.deepEqual(x.criar.chamadas, ['POST'], 'dois cliques em Criar operação gravaram duas vezes');
@@ -121,6 +127,10 @@ test('Funding: a janela de operação cria e edita só ao confirmar, com resumo 
 
   // ── Remover: o foco vai a um alvo estável da lista ──
   assert.deepEqual(x.remover, { pagina: false, foco: 'cartao:3', documento: true, ativo: 'cartao:3' }, 'depois de remover, o foco não pousou no primeiro cartão');
+
+  // ── Alvo de foco que não existe no desenho: descartado, não rouba o foco depois ──
+  assert.deepEqual(x.alvoFantasma, { guardado: null, foco: 'pagina-operacao', documento: true, ativo: 'pagina-operacao' },
+    'o alvo "editar" pedido sem a página aberta ficou guardado e roubou o foco quando a página abriu');
 
   // ── Leitor ──
   assert.deepEqual(x.leitor, { nova: false, janela: false, botoesNaPagina: 0 });

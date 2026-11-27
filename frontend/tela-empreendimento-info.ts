@@ -160,7 +160,7 @@ export class ViabEmpreendimentoInfo extends LitElement {
               <div class="doc">
                 <span><strong>${d.nome_arquivo || 'arquivo'}</strong></span>
                 ${!dis ? html`
-                  <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+                  <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover arquivo'} title="Remover arquivo"
                     @click=${() => this._remover(d.id)}></urbi-botao>` : nothing}
               </div>`)}
           </div>`}

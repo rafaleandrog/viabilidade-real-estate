@@ -28,6 +28,7 @@ export const SELETOR_BOTAO = 'urbi-botao[icone="fa-solid fa-diagram-project"]';
  * vazio) usa. Lista medida: o harness reprova tanto a que falta quanto a declarada à toa.
  */
 export const ACEITA_NAO_REPRODUZIDO = [
+  'urbi-botao.ariaLabel',
   'urbi-abas.abas',
   'urbi-abas.ativa',
   'urbi-badge.cor',
