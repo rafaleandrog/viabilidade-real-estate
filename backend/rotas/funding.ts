@@ -206,22 +206,15 @@ export function remocaoFinanciamentoBloqueada(operacao: { tipo?: unknown }): boo
  * logo depois da coerção e antes de `validarCamposOperacao`, para a troca não
  * ser mascarada por 400 de regra de campo. A coerção numérica vem antes: um
  * número malformado no mesmo PATCH ainda volta 400 `CAMPO_INVALIDO`. Só valor
- * VÁLIDO e diferente do gravado é troca: `tipo` malformado é recusado antes, como
- * valor inválido (`tipoInvalidoNoPatch`), e aqui devolve `false`.
+ * VÁLIDO e diferente do gravado é troca: `tipo` malformado (`''`, `null`,
+ * `'DIVIDA'`…) devolve `false` aqui e é recusado logo depois por
+ * `validarCamposOperacao`, cuja PRIMEIRA regra é o `tipo`, com o mesmo
+ * `400 CAMPO_INVALIDO` e a mesma mensagem da criação. Uma checagem só: sem o
+ * `includes` acima, o malformado volta a sair como `TIPO_IMUTAVEL`, e o teste
+ * HTTP de tipo malformado fica vermelho.
  */
 export function trocaDeTipoBloqueada(operacao: { tipo?: unknown }, dados: Record<string, any>): boolean {
   return dados.tipo !== undefined && TIPOS_OPERACAO.includes(dados.tipo) && dados.tipo !== operacao.tipo;
-}
-
-/**
- * O PATCH trouxe um `tipo` que não é nenhum dos quatro (`''`, `null`,
- * `'DIVIDA'`…)? Isso é valor inválido, não troca de tipo: o PATCH o recusa com
- * o mesmo `400 CAMPO_INVALIDO` e a mesma mensagem que a validação de campo
- * (`validarCamposOperacao`) dá na criação, ANTES de `trocaDeTipoBloqueada`, que
- * por isso só vê valor válido. Nada é gravado.
- */
-export function tipoInvalidoNoPatch(dados: Record<string, any>): boolean {
-  return dados.tipo !== undefined && !TIPOS_OPERACAO.includes(dados.tipo);
 }
 
 /**
@@ -405,10 +398,6 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
     if (!coagidos) return;
     dados = coagidos;
 
-    if (tipoInvalidoNoPatch(dados)) {
-      erro(res, 400, 'CAMPO_INVALIDO', `tipo deve ser um de: ${TIPOS_OPERACAO.join(', ')}`);
-      return;
-    }
     if (trocaDeTipoBloqueada(operacao, dados)) {
       erro(res, 422, 'TIPO_IMUTAVEL',
         'O tipo de uma operação não muda depois de criada. Para outro tipo, crie uma operação nova.');

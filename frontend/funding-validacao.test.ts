@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
   errosRetornoPorModo, recusaDoNome, recusaDoPatchComoServidor,
-  recusaDoPostComoServidor, trocaDeTipoComoServidor, tipoInvalidoComoServidor, validarOperacaoComoServidor,
+  recusaDoPostComoServidor, trocaDeTipoComoServidor, validarOperacaoComoServidor,
 } from './funding-validacao.js';
 
 const eq = (pct: number, modo?: string, extra: Record<string, unknown> = {}) =>
@@ -140,7 +140,7 @@ test('recusaDoNome: vazio, só espaços e mais de 100 caracteres', () => {
 });
 
 
-test('paridade: trocaDeTipoComoServidor ⇔ trocaDeTipoBloqueada e tipoInvalidoComoServidor ⇔ tipoInvalidoNoPatch', async () => {
+test('paridade: trocaDeTipoComoServidor ⇔ trocaDeTipoBloqueada', async () => {
   const mod = await import(CAMINHO_BACKEND_FUNDING);
   const tipos = ['divida', 'equity', 'antecipacao_recebiveis', 'financiamento_producao'];
   for (const gravado of tipos) {
@@ -148,7 +148,6 @@ test('paridade: trocaDeTipoComoServidor ⇔ trocaDeTipoBloqueada e tipoInvalidoC
     for (const patch of [{}, { nome: 'x' }, ...tipos.map((tipo) => ({ tipo })), ...malformados]) {
       assert.equal(trocaDeTipoComoServidor({ tipo: gravado }, patch), mod.trocaDeTipoBloqueada({ tipo: gravado }, patch),
         `${gravado} ← ${JSON.stringify(patch)}`);
-      assert.equal(tipoInvalidoComoServidor(patch), mod.tipoInvalidoNoPatch(patch), JSON.stringify(patch));
     }
   }
 });

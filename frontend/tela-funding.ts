@@ -446,7 +446,7 @@ export class ViabFunding extends LitElement {
    * #587 — o Financiamento à produção é ÚNICO E FIXO: a tela cria a operação
    * sozinha, DESLIGADA, na primeira vez que um estudo sem ela é aberto em
    * modo edição, para a aba dedicada ter sempre um formulário sobre o qual
-   * desenhar o checkbox. Nasce `ativo: false` — é o estado "estudo sem FàP
+   * desenhar o liga/desliga. Nasce `ativo: false` — é o estado "estudo sem FàP
    * hoje" da regra de transição da #587: nenhum número entra no motor até o
    * usuário ligar. Estudo que JÁ tinha a operação nunca passa por aqui
    * (`_temFinanciamento()` corta antes) — o `ativo: true` default do
@@ -1005,14 +1005,6 @@ export class ViabFunding extends LitElement {
   }
 
   /**
-   * #587 — a aba `Financiamento à produção`: SEMPRE um formulário único,
-   * nunca lista, nunca botão "adicionar". O checkbox liga/desliga sem apagar
-   * a operação — é o que preserva os parâmetros que o `_remover` genérico
-   * jogaria fora — por isso este card não tem o botão de lixeira nem as
-   * setas ↑↓ de `_renderOperacao` (não há irmão do mesmo tipo para reordenar
-   * contra, e não há como remover: a operação é fixa).
-   */
-  /**
    * O liga/desliga do Financiamento à produção — o único com esse controle.
    * Interruptor com o estado em texto ao lado; sem a tag `urbi-toggle`
    * registrada, a caixa de seleção "Ativo" de antes, com o mesmo
@@ -1041,6 +1033,14 @@ export class ViabFunding extends LitElement {
     </span>`;
   }
 
+  /**
+   * #587 — a aba `Financiamento à produção`: SEMPRE um formulário único,
+   * nunca lista, nunca botão "adicionar". O liga/desliga (`_renderLigaDesliga`)
+   * desliga sem apagar a operação — é o que preserva os parâmetros que o
+   * `_remover` genérico jogaria fora — por isso este card não tem o botão de
+   * lixeira nem as setas ↑↓ de `_renderOperacao` (não há irmão do mesmo tipo
+   * para reordenar contra, e não há como remover: a operação é fixa).
+   */
   private _renderAbaFinanciamentoProducao(): TemplateResult {
     const o = this._operacaoFinanciamento();
     const t = TIPOS.find((x) => x.valor === 'financiamento_producao')!;

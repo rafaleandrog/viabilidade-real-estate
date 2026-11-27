@@ -26,14 +26,15 @@ test('rotuloDoEstado: Ligado e Desligado', () => {
 // `urbi-toggle` entra pela tag. Só `import type` passa. Enumera a fonte
 // versionada (`git ls-files`), nunca o disco.
 test('nenhum import de @urbiverso/ui além de import type no frontend', () => {
-  const arquivos = execFileSync('git', ['ls-files', 'frontend/*.ts', 'frontend/**/*.ts'], { encoding: 'utf8' })
+  const raiz = new URL('../', import.meta.url);
+  const arquivos = execFileSync('git', ['ls-files', 'frontend/*.ts', 'frontend/**/*.ts'], { cwd: raiz, encoding: 'utf8' })
     .split('\n').filter(Boolean);
   assert.ok(arquivos.length > 50, `a enumeração achou só ${arquivos.length} arquivos`);
   const proibidos: string[] = [];
   const padrao = /(?:^|\n)\s*(import|export)\s+(?!type\b)[^;]*?['"]@urbiverso\/ui(?:\/[^'"]*)?['"]|import\s*\(\s*['"]@urbiverso\/ui|(?:^|\n)\s*import\s+['"]@urbiverso\/ui/g;
   for (const a of arquivos) {
     if (a === 'frontend/funding-liga-desliga.test.ts') continue; // este arquivo cita o padrão
-    const fonte = readFileSync(a, 'utf8');
+    const fonte = readFileSync(new URL(a, raiz), 'utf8');
     for (const m of fonte.matchAll(padrao)) proibidos.push(`${a}: ${m[0].trim()}`);
   }
   assert.deepEqual(proibidos, []);

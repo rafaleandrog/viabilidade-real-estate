@@ -4,9 +4,9 @@
 //
 // Por que a queda existe: o SDK lista o `urbi-toggle` como primitivo de "uso
 // pontual", fora do registro global, e proíbe a app de importá-lo por subcaminho
-// (`docs/ui.md` § Registro dos primitivos). Ele só fica disponível porque o
-// shell o registra para os primitivos que o usam por dentro (o `urbi-tabela`).
-// Isso é fato da instância, não do SDK: num shell que não o registre, a tag
+// (`docs/ui.md` § Registro dos primitivos). O SDK diz que o `urbi-tabela` o usa
+// por dentro; que isso deixe a tag registrada na página é inferência, que só a
+// instância confirma. Num shell que não a registre, a tag
 // seria um elemento vazio, sem clique e sem evento. A tela então pergunta ao
 // registro na hora de desenhar e, sem a tag, desenha a caixa de seleção.
 //

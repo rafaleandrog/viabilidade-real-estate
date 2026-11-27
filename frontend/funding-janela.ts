@@ -99,7 +99,7 @@ export class ViabFundingJanela extends LitElement {
     .cadeado { font-size: 0.75em; margin-left: 4px; color: var(--cor-texto-sec); }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin-top: 8px; }
     .erro-etapa { margin-top: 10px; }
-    .erro-servidor-foco { outline-offset: 2px; }
+    .erro-servidor-foco:focus { outline: 2px solid var(--cor-foco); outline-offset: 2px; }
     .lado { display: flex; flex-direction: column; gap: 12px; }
     .lado h4 {
       margin: 0 0 6px; font-size: var(--texto-rotulo); text-transform: uppercase;
@@ -211,10 +211,11 @@ export class ViabFundingJanela extends LitElement {
   /**
    * Enquanto grava, a janela fica `inert` e o foco sai dela (o botão de
    * confirmar deixa de ser focável). Quando a gravação termina com a janela
-   * ainda aberta — o sucesso a fecha, então aqui só chega a recusa —, o foco
-   * volta para DENTRO: para o aviso do servidor (`role="alert"`,
-   * `tabindex="-1"`), que diz o que houve; na falta dele, para o primeiro campo
-   * da etapa aberta.
+   * ainda aberta — o sucesso a fecha antes de a gravação terminar, então aqui
+   * chega a recusa, com o aviso do servidor, e a exceção no envio, sem ele —,
+   * o foco volta para DENTRO: para o aviso (`role="alert"`, `tabindex="-1"`),
+   * que diz o que houve; na falta dele, para o primeiro campo da etapa aberta,
+   * em vez de ficar no corpo do documento.
    */
   protected updated(mudou: PropertyValues<this>) {
     super.updated?.(mudou);

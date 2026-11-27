@@ -33,7 +33,8 @@ Sétima fase do arco da Rodada 16 (guarda-chuva: issue 1005, decisão D6). Nada 
 - **Foco guardado (adendo 2).** `focarAlvo` é limpo no desenho em que o alvo deveria estar, ache ou
   não o elemento.
 - **Servidor (adendos 3 e 4).** No PATCH, `tipo` fora dos quatro volta `400 CAMPO_INVALIDO` com a
-  mensagem da criação (`tipoInvalidoNoPatch`), e `TIPO_IMUTAVEL` fica só para tipo válido e
+  mensagem da criação (a regra de `tipo` de `validarCamposOperacao`, que roda logo depois, numa
+  checagem só), e `TIPO_IMUTAVEL` fica só para tipo válido e
   diferente do gravado; espelho em `frontend/funding-validacao.ts` com paridade. Teste HTTP novo
   para "deixar de ser Financiamento à produção".
 - **Guia.** `docs/funding.md`: o interruptor, a queda, o foco na recusa e o 400 do tipo malformado.
