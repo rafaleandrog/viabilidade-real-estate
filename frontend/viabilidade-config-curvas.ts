@@ -100,7 +100,7 @@ export class ViabConfigCurvas extends LitElement {
         id: 'acoes', label: '',
         render: (c: any) => this.somenteLeitura ? html`` : html`
           <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen" @click=${() => this._abrirForm(c)}>Editar</urbi-botao>
-          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" ?desabilitado=${Boolean(c.is_padrao)}
+          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" ?desabilitado=${Boolean(c.is_padrao)} .ariaLabel=${'Excluir curva'}
             title=${c.is_padrao ? 'A Curva S padrão não pode ser excluída' : 'Excluir'}
             @click=${() => { if (!c.is_padrao) this.removerAlvo = c; }}></urbi-botao>`,
       },
