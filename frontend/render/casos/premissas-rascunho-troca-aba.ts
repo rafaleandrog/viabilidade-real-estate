@@ -74,10 +74,9 @@ export const caso = {
   aceitaNaoReproduzido: [
     'urbi-abas.abas',
     'urbi-abas.ativa',
-    'urbi-badge.ativo',
     'urbi-badge.cor',
-    'urbi-badge.interativo',
     'urbi-banner.variante',
+    'urbi-botao.ariaLabel',
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',

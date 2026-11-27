@@ -15,6 +15,8 @@ test('Premissas: rascunho sobrevive à troca de página com a faixa de não salv
 
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
 
   const m = a.extra?.['1280'] as Record<string, unknown> | undefined;
   assert.ok(m, 'o caso não devolveu a medida extra — medir() não rodou' + relato(a));
