@@ -71,7 +71,7 @@ test('torre: camada pequena no piso e numa linha, valor e % nunca cortados, sem 
     for (let i = 1; i < s!.camadas.length; i++) {
       assert.ok(s!.camadas[i].topo < s!.camadas[i - 1].topo, `a camada ${s!.camadas[i].id} não está acima da ${s!.camadas[i - 1].id}`);
     }
-    // A camada de 0,4% fica no piso, numa linha, com o % verdadeiro escrito.
+    // A camada de 0,3% fica no piso, numa linha, com o % verdadeiro escrito.
     const pequena = s!.camadas.find((c) => c.id === '3')!;
     const real = CAMADAS.find((c) => c.id === 3)!;
     assert.ok(real.pct! < 1, 'a fixture tem uma camada abaixo de 1%');
@@ -130,7 +130,30 @@ test('aba Estrutura de capital: torre na senioridade com o FàP na base, totais,
     }
     // A última linha é a estrutura completa: o "incorporador no pico".
     assert.equal(x.tabelaTexto[3].exposicao, x.totais[3].valor, 'a última linha não é a estrutura completa');
-    // O texto de apoio traz a D9 junto da frase do pagamento pelo contrato.
+    // O texto de apoio traz a D9 junto da frase do pagamento pelo contrato, e
+    // não afirma que não há cascata: o Financiamento à produção varre o caixa.
     assert.match(x.apoio, /ordem de pagamento e a ordem de entrada na comparação\. O app paga todo terceiro pelo contrato/);
+    assert.match(x.apoio, /nenhuma operação recebe menos do que o contrato dela prevê por estar abaixo de outra/);
+    assert.doesNotMatch(x.apoio, /cascata/i, 'o texto de apoio voltou a negar a cascata');
+    // Os totais amarrados às camadas da torre, pelo valor exato (título do total
+    // e nome acessível da camada): dívida = FàP + dívida, equity = o investidor,
+    // incorporador no pico = a camada do incorporador.
+    const exato = (t: string | null) => Number((t ?? '').replace(/[^\d,]/g, '').replace(',', '.'));
+    const daCamada = (id: string) => {
+      const c = s.camadas.find((k) => k.id === id);
+      assert.ok(c, `camada ${id} ausente`);
+      const m = c!.rotuloAcessivel.replace(/\u00a0/g, ' ').match(/R\$ [\d.]+,\d\d/);
+      assert.ok(m, `camada ${id} sem o valor exato no nome acessível`);
+      return exato(m![0]);
+    };
+    const perto = (a: number, b: number) => Math.abs(a - b) < 0.015;
+    assert.ok(perto(exato(x.totais[1].titulo), daCamada('2') + daCamada('1')), `total Dívida ≠ FàP + dívida: ${x.totais[1].titulo}`);
+    assert.ok(perto(exato(x.totais[2].titulo), daCamada('3')), `total Equity ≠ camada do investidor: ${x.totais[2].titulo}`);
+    assert.ok(perto(exato(x.totais[3].titulo), daCamada('incorporador')), `total Incorporador ≠ camada do incorporador: ${x.totais[3].titulo}`);
+    // O eixo lateral: "mais júnior" em cima, "mais sênior" embaixo, fora da árvore acessível.
+    assert.ok(s.eixo, 'o eixo lateral sumiu');
+    assert.deepEqual(s.eixo!.textos.map((t) => t.texto), ['mais júnior', 'mais sênior']);
+    assert.ok(s.eixo!.textos[0].topo < s.eixo!.textos[1].topo, '"mais júnior" não está acima de "mais sênior"');
+    assert.equal(s.eixo!.ocultoDoLeitor, true, 'o eixo lateral não está aria-hidden');
   }
 });

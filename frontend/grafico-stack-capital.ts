@@ -72,7 +72,7 @@ export class ViabGraficoStackCapital extends LitElement {
       overflow: hidden;
       padding: 0 10px;
       border-left: 4px solid;
-      border-radius: 3px;
+      border-radius: var(--raio-xs);
       color: var(--cor-texto);
       font-size: 12px;
       line-height: 16px;

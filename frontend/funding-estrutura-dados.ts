@@ -15,7 +15,7 @@
 import type { FluxoCalc } from './fluxo-caixa-motor.js';
 import type { FundingCalc, ModoRetorno } from './funding-motor.js';
 import {
-  camadasDoStack, rotuloNivelCamada, totaisDaEstrutura,
+  camadasDoStack, indicadoresEstrutura, rotuloNivelCamada, totaisDaEstrutura,
   type CamadaStack, type IndicadoresEstrutura, type SequenciaEstrutura,
 } from './funding-estrutura.js';
 import { corDoTipo } from './funding-cores.js';
@@ -44,14 +44,18 @@ export interface LinhaSequencia {
 
 export interface DadosEstrutura {
   totais: TotalEstrutura[];
-  /** Todas as camadas, inclusive as de valor zero (a torre as filtra; a lista em texto, não). */
+  /**
+   * Todas as camadas, inclusive as de valor zero. A torre não desenha a de
+   * valor zero; a alternativa em texto da aba é a tabela da sequência (onde a
+   * operação de valor zero continua sendo um passo) e os totais.
+   */
   camadas: CamadaDaTorre[];
   linhas: LinhaSequencia[];
 }
 
 export interface EntradaEstrutura {
   /** O fluxo do projeto usado na sequência (com o rascunho, quando houver). */
-  calc: Pick<FluxoCalc, 'custoMensal'>;
+  calc: Pick<FluxoCalc, 'custoMensal' | 'fluxoMensal'>;
   /** O funding da estrutura completa (null sem operação efetiva). */
   funding: FundingCalc | null;
   /** A sequência que a tela já calculou para os cartões. */
@@ -63,10 +67,11 @@ export interface EntradaEstrutura {
 }
 
 /**
- * A estrutura completa é o "depois" do último passo da sequência (ou o
- * projeto sem funding, sem passo nenhum). É dela que saem a camada do
- * incorporador e o total "incorporador no pico" — e é por isso que a última
- * linha da tabela e esses dois números nunca divergem.
+ * A estrutura completa vista pela sequência: o "depois" do último passo (ou o
+ * projeto sem funding, sem passo nenhum) — é a última linha da tabela. Fora do
+ * empate de antecipações descrito em `dadosDaEstrutura`, é igual à estrutura do
+ * funding completo, de onde saem a camada do incorporador e o total
+ * "incorporador no pico" (teste).
  */
 export function estruturaCompleta(sequencia: SequenciaEstrutura): IndicadoresEstrutura {
   const passos = sequencia.passos;
@@ -83,9 +88,19 @@ function linha(id: string, passo: string, ind: IndicadoresEstrutura): LinhaSeque
   };
 }
 
-/** Tudo o que a aba Estrutura de capital mostra. */
+/**
+ * Tudo o que a aba Estrutura de capital mostra.
+ *
+ * As camadas, a do incorporador e os totais saem da MESMA simulação: o funding
+ * da estrutura completa que a tela já tem (`e.funding`), lido por
+ * `indicadoresEstrutura`. Não do último passo da sequência: a sequência ordena
+ * por senioridade e desempata por `id`, e o funding recebe as operações na
+ * ordem da tela; quando duas antecipações empatam em `inicio_mes` e `ordem`, o
+ * motor as simula pela posição no array, e as duas simulações divergem. Fora
+ * desse empate, o último passo e esta estrutura são iguais (teste).
+ */
 export function dadosDaEstrutura(e: EntradaEstrutura): DadosEstrutura {
-  const completa = estruturaCompleta(e.sequencia);
+  const completa = indicadoresEstrutura(e.calc, e.funding);
   const brutas = camadasDoStack(e.funding, completa);
   const camadas: CamadaDaTorre[] = brutas.map((c) => ({
     ...c,

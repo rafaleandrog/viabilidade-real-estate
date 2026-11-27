@@ -252,7 +252,8 @@ incide sobre a receita líquida ou sobre o resultado final) e "recebe por últim
 Uma camada pequena tem uma altura mínima para o texto caber numa linha, e o percentual escrito
 continua sendo o verdadeiro; nome comprido é cortado com reticências, e o valor e o percentual
 ficam sempre visíveis. Camada de valor zero — uma antecipação sem parcela a ceder, por exemplo, ou
-o incorporador num projeto que nunca fica no vermelho — não é desenhada, mas aparece na tabela.
+o incorporador num projeto que nunca fica no vermelho — não é desenhada, mas aparece na tabela da
+sequência e nos totais.
 Sem nenhuma camada com valor, a torre dá lugar ao texto "Nenhuma camada com valor.". Para leitor
 de tela, cada camada é um item de lista com o nome, o nível, o valor exato e o percentual.
 
@@ -269,8 +270,8 @@ mesmos textos do "depois" de cada cartão. A última linha é a estrutura comple
 O texto de apoio, abaixo da tabela, lembra como ler a aba:
 
 - senioridade aqui é a ordem de pagamento e a ordem de entrada na comparação; o app paga todo
-  terceiro pelo contrato, e o incorporador cobre a falta de caixa — não há cascata de pagamento no
-  cálculo;
+  terceiro pelo contrato, e o incorporador cobre a falta de caixa — nenhuma operação recebe menos do
+  que o contrato dela prevê por estar abaixo de outra;
 - o restante dos usos é pago pelas vendas ao longo do projeto, que ficam fora da torre;
 - as camadas não acontecem no mesmo mês, então a soma delas não é um saldo numa data;
 - a camada do financiamento à produção é medida na estrutura completa, e o "depois" dele na tabela

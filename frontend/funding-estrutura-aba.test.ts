@@ -142,7 +142,7 @@ test('a estrutura completa é o "depois" do último passo — igual à simulaç�
 });
 
 test('totais: os quatro números de `totaisDaEstrutura`, no formatador do cartão', () => {
-  const completa = estruturaCompleta(M.sequencia);
+  const completa = indicadoresEstrutura(M.calc, M.funding);
   const t = totaisDaEstrutura(M.calc, camadasDoStack(M.funding, completa), completa);
   assert.deepEqual(D.totais, [
     { rotulo: 'Usos totais', valor: valorEmReais(t.usosTotais) },
@@ -195,6 +195,73 @@ test('Financiamento à produção desligado não vira camada nem passo', () => {
   const d = dadosDaEstrutura({ calc: s.calc, funding: s.funding, sequencia: s.sequencia, operacoes: ops, rotuloTipo });
   assert.deepEqual(d.camadas.map((c) => c.tipo), ['divida', 'incorporador']);
   assert.deepEqual(d.linhas.map((l) => l.id), ['base', '20']);
+});
+
+test('só o Financiamento à produção ligado: ele é a base e a única operação, abaixo do incorporador', () => {
+  const ops = [FAP];
+  const s = montar(ops);
+  const d = dadosDaEstrutura({ calc: s.calc, funding: s.funding, sequencia: s.sequencia, operacoes: ops, rotuloTipo });
+  assert.deepEqual(d.camadas.map((c) => c.tipo), ['financiamento_producao', 'incorporador']);
+  assert.equal(d.camadas[0].nivel, 'sênior · base');
+  assert.ok(d.camadas[0].valor > 0, 'o Financiamento à produção ligado não liberou nada na fixture');
+  assert.deepEqual(d.linhas.map((l) => l.id), ['base', '10']);
+  assert.ok(Math.abs(somaDe(d.camadas.map((c) => c.pct ?? 0)) - 100) < 1e-9);
+});
+
+test('antecipação sem lastro: camada de valor zero, que continua passo da tabela', () => {
+  // Venda 100% à vista: não há carteira para ceder.
+  const avista: FluxoConfig = {
+    ...CONFIG,
+    linhasReceita: [{
+      ...CONFIG.linhasReceita![0],
+      fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] },
+    }],
+  } as FluxoConfig;
+  const ops = [DIVIDA, ANTECIPACAO];
+  const calc = calcularFluxo({ ...avista, operacoesFunding: ops });
+  const rl = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, avista.linhasCusto);
+  const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
+  const sim = (sub: OperacaoFunding[]) => fundingDoEstudo(
+    sub, calc.fluxoMensal, rl, resultadoFinal, mesRepasse(CRONO), 12,
+    { custosRaw: avista.linhasCusto, linhasCusto: calc.linhasCusto, cronograma: CRONO, recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal },
+  );
+  const funding = sim(ops);
+  const sequencia = sequenciaDeEstrutura(ops, (sub) => indicadoresEstrutura(calc, sub.length ? sim(sub) : null))!;
+  const d = dadosDaEstrutura({ calc, funding, sequencia, operacoes: ops, rotuloTipo });
+  const camada = d.camadas.find((c) => c.tipo === 'antecipacao_recebiveis');
+  assert.ok(camada, 'a antecipação sem lastro sumiu das camadas');
+  assert.equal(camada!.valor, 0);
+  assert.equal(camada!.pct, 0);
+  assert.deepEqual(d.linhas.map((l) => l.id), ['base', '20', '30']);
+});
+
+test('TIR sem troca de sinal sai "—", nunca "0,0%"; sem exposição, nenhuma camada com valor', () => {
+  // Fluxo só positivo: a TIR não existe e o projeto nunca fica no vermelho.
+  const calc = { custoMensal: [0, 0, 0], fluxoMensal: [100, 200, 300] };
+  const base = indicadoresEstrutura(calc, null);
+  assert.equal(base.tirAlavancada, null);
+  const d = dadosDaEstrutura({ calc, funding: null, sequencia: { base, passos: [] }, operacoes: [], rotuloTipo });
+  assert.equal(d.linhas[0].tir.texto, '—');
+  assert.deepEqual(d.camadas.map((c) => [c.tipo, c.valor, c.pct]), [['incorporador', 0, null]]);
+  assert.equal(d.totais[3].valor.texto, valorEmReais(0).texto);
+});
+
+test('empate de antecipações: camadas, incorporador e totais saem da MESMA simulação, a do funding', () => {
+  // Duas antecipações no mesmo mês e com a mesma `ordem`, recebidas fora da
+  // ordem de `id`: a sequência desempata por `id`, o funding pela posição.
+  // Cessão no mês 6, antes do pico, com taxas diferentes: a ordem muda o pico.
+  const a1 = { ...ANTECIPACAO, id: 31, ordem: 1, inicio_mes: 6, pct_carteira_cedida: 60, taxa_anual: 10 } as OperacaoFunding;
+  const a2 = { ...ANTECIPACAO, id: 32, ordem: 1, inicio_mes: 6, pct_carteira_cedida: 30, taxa_anual: 40 } as OperacaoFunding;
+  const ops = [a2, a1];
+  const s = montar(ops);
+  const d = dadosDaEstrutura({ calc: s.calc, funding: s.funding, sequencia: s.sequencia, operacoes: ops, rotuloTipo });
+  const real = indicadoresEstrutura(s.calc, s.funding);
+  // A fixture exercita o empate de verdade: as duas simulações divergem.
+  assert.notEqual(estruturaCompleta(s.sequencia).exposicaoMaxima, real.exposicaoMaxima, 'a fixture não produz o empate');
+  const inc = d.camadas.find((c) => c.tipo === 'incorporador')!;
+  assert.equal(inc.valor, Math.abs(real.exposicaoMaxima));
+  assert.deepEqual(d.totais[3].valor, valorEmReais(Math.abs(real.exposicaoMaxima)));
+  assert.ok(Math.abs(somaDe(d.camadas.map((c) => c.pct ?? 0)) - 100) < 1e-9);
 });
 
 // ── Geometria da torre ──────────────────────────────────────────────────

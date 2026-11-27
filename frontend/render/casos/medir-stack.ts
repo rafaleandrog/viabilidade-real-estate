@@ -64,6 +64,8 @@ export interface MedidaStack {
   /** Menor contraste de texto por variante de tema. */
   contrastePorTema: Record<string, number>;
   vazio: string | null;
+  /** Rótulos do eixo lateral, de cima para baixo, e se o eixo está fora da árvore acessível. */
+  eixo: { textos: { texto: string; topo: number }[]; ocultoDoLeitor: boolean } | null;
 }
 
 export async function medirStack(grafico: HTMLElement & { shadowRoot: ShadowRoot }): Promise<MedidaStack> {
@@ -126,5 +128,13 @@ export async function medirStack(grafico: HTMLElement & { shadowRoot: ShadowRoot
     camadas: medirCamadas(),
     contrastePorTema,
     vazio: sr.querySelector('p.vazio')?.textContent?.trim() ?? null,
+    eixo: (() => {
+      const e = sr.querySelector('div.eixo') as HTMLElement | null;
+      if (!e) return null;
+      const textos = ([...e.children] as HTMLElement[])
+        .filter((x) => (x.textContent ?? '').trim() !== '')
+        .map((x) => ({ texto: (x.textContent ?? '').trim(), topo: x.getBoundingClientRect().top }));
+      return { textos, ocultoDoLeitor: e.getAttribute('aria-hidden') === 'true' };
+    })(),
   };
 }

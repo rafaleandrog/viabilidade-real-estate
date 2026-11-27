@@ -190,7 +190,7 @@ export class ViabFunding extends LitElement {
     }
     .total {
       padding: 10px 12px; min-width: 0;
-      border: 1px solid; border-color: var(--cor-borda); border-radius: 6px;
+      border: 1px solid; border-color: var(--cor-borda); border-radius: var(--raio-sm);
       background: var(--cor-superficie);
     }
     .total .rot { font-size: 12px; color: var(--cor-texto-sec); }
@@ -1122,8 +1122,8 @@ export class ViabFunding extends LitElement {
         </section>
         <ul class="apoio">
           <li>Senioridade aqui é a ordem de pagamento e a ordem de entrada na comparação. O app paga
-            todo terceiro pelo contrato, e o incorporador cobre a falta de caixa: não há cascata de
-            pagamento no cálculo.</li>
+            todo terceiro pelo contrato, e o incorporador cobre a falta de caixa: nenhuma operação
+            recebe menos do que o contrato dela prevê por estar abaixo de outra.</li>
           <li>O restante dos usos é pago pelas vendas ao longo do projeto.</li>
           <li>As camadas não acontecem no mesmo mês, então a soma delas não é um saldo numa data.</li>
           <li>O tamanho de cada camada é o maior valor que aquela parte teve dentro do projeto. O
