@@ -1,17 +1,15 @@
 // Espelho das regras do servidor no navegador (`funding-validacao.ts`): os
-// testes de paridade com o servidor e os de `errosDoEstadoFinal`, sobre
-// `OperacaoFunding[]`.
+// testes de paridade com o servidor e os da soma de retorno do equity por modo.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { OperacaoFunding } from './funding-motor.js';
 import {
-  CAMPOS_OPERACAO_ESPELHO, errosDoEstadoFinal, errosRetornoPorModo, recusaDoNome, recusaDoPatchComoServidor,
+  errosRetornoPorModo, recusaDoNome, recusaDoPatchComoServidor,
   recusaDoPostComoServidor, trocaDeTipoComoServidor, validarOperacaoComoServidor,
 } from './funding-validacao.js';
 
 const eq = (pct: number, modo?: string, extra: Record<string, unknown> = {}) =>
   ({ tipo: 'equity', nome: `E${pct}`, valor: 0, inicio_mes: 0, modo_retorno: 'permuta_financeira', pct_retorno: pct, ...(modo ? { modo_retorno: modo } : {}), ...extra }) as OperacaoFunding;
-const lista = (...ops: OperacaoFunding[]): OperacaoFunding[] => ops;
 
 // ── paridade com o servidor ─────────────────────────────────────────
 // O frontend não importa de `backend/`, mas este teste carrega o módulo do
@@ -49,6 +47,11 @@ function casosDeParidade(): Array<[string, Record<string, any>]> {
     casos.push([`${tipo} amort 0 carência 5`, { ...base, periodo_amortizacao_meses: 0, periodo_carencia_meses: 5 }]);
     casos.push([`${tipo} aporte_meses 0`, { ...base, aporte_meses: 0 }]);
     for (const a of ['sim', false, true, null, 1]) casos.push([`${tipo} ativo=${JSON.stringify(a)}`, { ...base, ativo: a }]);
+    // Desligado continua validado inteiro: `ativo: false` junto com um campo inválido. No
+    // Financiamento à produção o servidor recusa pelo campo, não pelo `ativo`.
+    for (const [campo, v] of [['valor', -5], ['taxa_anual', -1], ['percentual_financiavel', 101]] as const) {
+      casos.push([`${tipo} ativo=false ${campo}=${v}`, { ...base, ativo: false, [campo]: v }]);
+    }
     casos.push([`${tipo} tipo inválido`, { ...base, tipo: 'xx' }]);
     casos.push([`${tipo} modo inválido`, { ...base, modo_retorno: 'xx' }]);
     casos.push([`${tipo} evento inválido`, { ...base, cronograma_evento: 'xx' }]);
@@ -73,24 +76,6 @@ async function servidorRecusa(op: Record<string, any>): Promise<string | null> {
   return validarCamposOperacao(dados);
 }
 
-const CAMINHO_BACKEND_AVANCADO = '../backend/rotas/avancado.ts';
-
-test('errosDoEstadoFinal: soma 120% num modo → um erro; modo padrão é permuta_financeira', () => {
-  const erros = errosDoEstadoFinal(lista(eq(70), eq(50, 'permuta_financeira')));
-  assert.equal(erros.length, 1);
-  assert.match(erros[0], /Permuta financeira.*120\.00%/);
-});
-
-test('errosDoEstadoFinal: 100 em cada um de dois modos → sem erro', () => {
-  assert.deepEqual(errosDoEstadoFinal(lista(eq(100, 'permuta_financeira'), eq(100, 'resultado_final'))), []);
-});
-
-test('errosDoEstadoFinal: retorno ou valor negativo e retorno acima de 100 por operação', () => {
-  assert.equal(errosDoEstadoFinal(lista(eq(-5))).length, 1);
-  assert.equal(errosDoEstadoFinal(lista(eq(10, undefined, { valor: -1 }))).length, 1);
-  assert.ok(errosDoEstadoFinal(lista(eq(101))).length >= 1);
-});
-
 test('paridade: validarOperacaoComoServidor aceita ⇔ validarCamposOperacao aceita', async () => {
   const casos = casosDeParidade();
   assert.ok(casos.length > 300);
@@ -99,6 +84,15 @@ test('paridade: validarOperacaoComoServidor aceita ⇔ validarCamposOperacao ace
     assert.equal(validarOperacaoComoServidor(op) === null, servidor === null, nome);
     assert.equal(validarOperacaoComoServidor(op), servidor, `${nome} (mensagem)`);
   }
+});
+
+test('Financiamento à produção desligado continua validado: valor negativo é recusado no POST e no PATCH', () => {
+  const fin = { ...BASE_POR_TIPO.financiamento_producao, ativo: false, valor: -5 };
+  assert.equal(validarOperacaoComoServidor(fin), 'valor não pode ser negativo');
+  assert.equal(recusaDoPostComoServidor(fin), 'valor não pode ser negativo');
+  assert.equal(recusaDoPatchComoServidor(BASE_POR_TIPO.financiamento_producao, { ativo: false, valor: -5 }), 'valor não pode ser negativo');
+  // Desligado e válido passa: o `ativo: false` sozinho não é recusa no Financiamento.
+  assert.equal(validarOperacaoComoServidor({ ...BASE_POR_TIPO.financiamento_producao, ativo: false }), null);
 });
 
 test('paridade do POST: recusaDoPostComoServidor ⇔ coerção + tipo/nome + validarCamposOperacao', async () => {
@@ -125,35 +119,16 @@ test('paridade do POST: recusaDoPostComoServidor ⇔ coerção + tipo/nome + val
   assert.equal(recusaDoPostComoServidor({ ...BASE_POR_TIPO.divida, nome: '' }), 'nome é obrigatório');
 });
 
-test('errosDoEstadoFinal: nome apagado, tipo ausente e número inválido são recusados antes de gravar', () => {
-  const div = BASE_POR_TIPO.divida as any;
-  assert.equal(errosDoEstadoFinal(lista({ ...div, nome: '' })).length, 1);
-  assert.equal(errosDoEstadoFinal(lista({ ...div, nome: 'x'.repeat(101) })).length, 1);
-  assert.equal(errosDoEstadoFinal(lista({ ...div, tipo: '' })).length, 1);
-  assert.equal(errosDoEstadoFinal(lista({ ...div, valor: 'abc' })).length, 1);
-  assert.equal(errosDoEstadoFinal(lista({ ...div, inicio_mes: 1.5 })).length, 1);
-});
-
-test('errosDoEstadoFinal: recusa o que o servidor recusa (taxa negativa, carência >= amortização, ativo inválido)', () => {
-  const div = { ...BASE_POR_TIPO.divida, taxa_anual: -3 } as unknown as OperacaoFunding;
-  const erros = errosDoEstadoFinal(lista(div));
-  assert.equal(erros.length, 1);
-  assert.match(erros[0], /taxa_anual não pode ser negativo/);
-  assert.equal(errosDoEstadoFinal(lista({ ...BASE_POR_TIPO.divida, periodo_carencia_meses: 30 } as unknown as OperacaoFunding)).length, 1);
-  assert.equal(errosDoEstadoFinal(lista({ ...BASE_POR_TIPO.divida, ativo: false } as unknown as OperacaoFunding)).length, 1);
-  assert.deepEqual(errosDoEstadoFinal(lista(BASE_POR_TIPO.divida as unknown as OperacaoFunding)), []);
-});
-
-test('paridade: CAMPOS_OPERACAO_ESPELHO é exatamente o CAMPOS_OPERACAO do backend', async () => {
-  const mod = await import(CAMINHO_BACKEND_AVANCADO);
-  assert.deepEqual([...CAMPOS_OPERACAO_ESPELHO].sort(), [...mod.CAMPOS_OPERACAO].sort());
-});
-
 test('errosRetornoPorModo: soma por modo, tolerância de 100,01', () => {
   assert.deepEqual(errosRetornoPorModo([eq(60), eq(40)]), []);
   assert.deepEqual(errosRetornoPorModo([eq(60), eq(40.01)]), []);
   assert.equal(errosRetornoPorModo([eq(60), eq(40.02)]).length, 1);
   assert.deepEqual(errosRetornoPorModo([eq(90, 'resultado_final'), eq(90)]), []);
+  // Uma mensagem por modo que passa, com o rótulo do modo e a soma; sem `modo_retorno`, conta como permuta.
+  const semModo = { ...eq(50), modo_retorno: undefined } as unknown as OperacaoFunding;
+  const erros = errosRetornoPorModo([eq(70), semModo]);
+  assert.equal(erros.length, 1);
+  assert.match(erros[0], /Permuta financeira.*120\.00%/);
 });
 
 test('recusaDoNome: vazio, só espaços e mais de 100 caracteres', () => {

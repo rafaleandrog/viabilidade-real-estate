@@ -21,6 +21,13 @@ motor, no `schema.json`, nas migrações, no backend nem na `versao`.
   `frontend/funding-estrutura.test.ts` (sai só o teste da reexportação); a validação espelhada do
   servidor em `frontend/funding-validacao.test.ts`, que deixa de importar a fábrica de operação da
   comparação e escreve a operação de equity literal.
+- **Sem consumidor, saíram também** de `frontend/funding-validacao.ts`: `errosDoEstadoFinal` (a
+  validação de um estado final inteiro, que só a gravação em lote da comparação chamava),
+  `ROTULO_TIPO_ERRO` (só ela o lia) e `CAMPOS_OPERACAO_ESPELHO` (só o plano de "Usar esta" o lia),
+  com os testes deles. A janela valida com `recusaDoPostComoServidor`, `recusaDoPatchComoServidor` e
+  `errosRetornoPorModo`, que seguem com teste. A regra de que o Financiamento à produção desligado
+  continua validado inteiro, antes provada só pela função apagada, ganhou teste próprio e casos de
+  paridade com o servidor (`ativo: false` junto com campo inválido).
 - **Travas:** `frontend/funding-abas.test.ts` exige exatamente as três abas e recusa `id: 'comparar'`
   e o painel na fonte; o caso de render `funding-abas` passa a medir a lista entregue ao `urbi-abas`,
   um `urbi-hospedeiro` por aba e a aba que abre na montagem (`operacoes`), em 1280, 900 e 600 px.

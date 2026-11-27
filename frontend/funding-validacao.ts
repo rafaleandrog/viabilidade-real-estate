@@ -13,29 +13,9 @@
 // mandar.
 import type { OperacaoFunding } from './funding-motor.js';
 
-/**
- * Os campos que as rotas de operação gravam — espelho exato de
- * `CAMPOS_OPERACAO` (backend/rotas/avancado.ts), travado pelo teste de
- * paridade.
- */
-export const CAMPOS_OPERACAO_ESPELHO = [
-  'tipo', 'nome', 'ordem', 'valor',
-  'cronograma_evento', 'fase_ancora_id', 'inicio_mes',
-  'distribuir_aporte', 'aporte_meses', 'taxa_anual',
-  'periodo_amortizacao_meses', 'periodo_carencia_meses',
-  'modo_retorno', 'pct_retorno',
-  'exposicao_minima', 'percentual_financiavel', 'amortizar_com_caixa_disponivel', 'custo_linha_ids',
-  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
-  'pct_carteira_cedida', 'ativo',
-];
-
 export const ROTULO_MODO: Record<string, string> = {
   permuta_financeira: 'Permuta financeira',
   resultado_final: 'Resultado final',
-};
-
-export const ROTULO_TIPO_ERRO: Record<string, string> = {
-  financiamento_producao: 'Financiamento à produção', divida: 'Dívida', equity: 'Equity', antecipacao_recebiveis: 'Antecipação',
 };
 
 // Espelham as listas de `backend/rotas/funding.ts`.
@@ -203,20 +183,4 @@ export function errosRetornoPorModo(operacoes: readonly OperacaoFunding[]): stri
     }
   }
   return erros;
-}
-
-/**
- * As regras do servidor sobre um ESTADO FINAL de operações gravadas, antes de
- * gravar qualquer passo: `recusaDoPostComoServidor` em cada uma (coerção
- * numérica estrita, `tipo` e `nome` obrigatórios, `validarCamposOperacao`) e a
- * soma de retorno do equity por modo. Devolve uma mensagem por problema.
- */
-export function errosDoEstadoFinal(operacoes: readonly OperacaoFunding[]): string[] {
-  const erros: string[] = [];
-  for (const o of operacoes) {
-    const nome = o.nome || ROTULO_TIPO_ERRO[o.tipo] || o.tipo;
-    const msg = recusaDoPostComoServidor(o as any);
-    if (msg) erros.push(`"${nome}": ${msg}.`);
-  }
-  return [...erros, ...errosRetornoPorModo(operacoes)];
 }
