@@ -520,3 +520,36 @@ export function leituraDaOperacao(
   ].filter((f): f is string => f !== null);
   return frases.slice(0, MAX_FRASES_LEITURA);
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Rótulo de nível de cada camada do stack
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * O rótulo de nível da camada, para a torre da aba Estrutura de capital:
+ * Financiamento à produção "sênior · base", dívida "dívida", antecipação
+ * "cessão de recebíveis", equity a preferência dele (`rotuloPreferenciaEquity`,
+ * pelo `modo_retorno` da operação achada pelo `id` da camada) e o incorporador
+ * "recebe por último". É RÓTULO: não muda a ordem nem o valor da camada.
+ *
+ * Tipo desconhecido segue o motor, que o simula como equity. Equity cuja
+ * operação não está na lista (ou camada sem `id`) cai no modo padrão do motor,
+ * o mesmo que `rotuloPreferenciaEquity` adota para modo ausente.
+ */
+export function rotuloNivelCamada(
+  camada: Pick<CamadaStack, 'id' | 'tipo'>,
+  operacoes: readonly { id?: number | string | null; modo_retorno?: ModoRetorno | string | null }[],
+): string {
+  switch (camada.tipo) {
+    case 'financiamento_producao': return 'sênior · base';
+    case 'divida': return 'dívida';
+    case 'antecipacao_recebiveis': return 'cessão de recebíveis';
+    case 'incorporador': return 'recebe por último';
+    default: {
+      const op = camada.id === null || camada.id === undefined
+        ? undefined
+        : operacoes.find((o) => o.id !== null && o.id !== undefined && String(o.id) === String(camada.id));
+      return rotuloPreferenciaEquity(op?.modo_retorno);
+    }
+  }
+}

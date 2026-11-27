@@ -40,12 +40,16 @@ const mencoes = (texto: string) => (semComentarios(texto).match(/fmtR\$Mi(?![A-Z
 
 /**
  * Os consumidores da exceção, e quantas vezes cada um a chama. Os cartões de
- * operação montam todo valor em reais por um único ponto (`reais()`, que põe o
- * exato em 2 casas no título). A aba Estrutura de capital entra aqui quando
- * passar a chamá-lo.
+ * operação montam todo valor em reais por um único ponto (`valorEmReais()`,
+ * que põe o exato em 2 casas no título); os totais e a tabela da sequência da
+ * aba Estrutura de capital usam o MESMO ponto (por `funding-estrutura-dados.ts`,
+ * que não chama o formatador direto), e a torre da aba escreve o valor de
+ * cada camada com uma chamada própria, com o exato no título e no nome
+ * acessível.
  */
 const CONSUMIDORES: { arquivo: string; chamadas: number }[] = [
   { arquivo: 'frontend/funding-cartao-dados.ts', chamadas: 1 },
+  { arquivo: 'frontend/grafico-stack-capital.ts', chamadas: 1 },
 ];
 
 /** Onde o símbolo PODE aparecer sem ser um call site de exibição. */
