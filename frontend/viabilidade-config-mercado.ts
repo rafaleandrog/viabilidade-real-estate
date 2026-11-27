@@ -140,11 +140,11 @@ export class ViabConfigMercado extends LitElement {
         </td>
         ${!this.somenteLeitura ? html`
           <td class="acoes">
-            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-list" title="Ver coletas"
+            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-list" .ariaLabel=${'Ver coletas'} title="Ver coletas"
               @click=${() => this._verColetas(r)}></urbi-botao>
-            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen" title="Editar"
+            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen" .ariaLabel=${'Editar região'} title="Editar região"
               @click=${() => this._editar(r)}></urbi-botao>
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover região'} title="Remover região"
               @click=${() => this.removerAlvo = r}></urbi-botao>
           </td>` : nothing}
       </tr>
