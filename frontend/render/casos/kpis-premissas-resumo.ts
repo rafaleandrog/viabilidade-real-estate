@@ -41,6 +41,7 @@ export const caso = {
     { seletor: 'table.prod', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-input.placeholder',
     'urbi-select.opcoes',
     'urbi-botao.icone',

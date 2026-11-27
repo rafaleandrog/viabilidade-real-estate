@@ -710,7 +710,7 @@ export class ViabTelaCenarios extends LitElement {
           : this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
         <td>
           ${this.editavel ? html`
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover cenário'} title="Remover cenário"
               @click=${() => this.removerId = Number(c.id)}></urbi-botao>` : nothing}
         </td>
       </tr>

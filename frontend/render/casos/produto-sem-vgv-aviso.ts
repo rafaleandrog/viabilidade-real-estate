@@ -24,6 +24,7 @@ export const caso = {
   ],
   // Mesma lista, e pela mesma natureza, de `area-alocada-excedente.ts`.
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-card.titulo',
     'urbi-input.placeholder',
     'urbi-select.opcoes',

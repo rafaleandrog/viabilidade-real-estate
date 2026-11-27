@@ -190,7 +190,7 @@ export class ViabTelaEstudo extends LitElement {
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
           ${p.funcao ? html`<span class="sec">· sua função: ${p.funcao}</span>` : nothing}
           ${podeEditarEstudo(st, funcaoEfetiva) ? html`
-            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen"
+            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen" .ariaLabel=${'Renomear estudo'}
               @click=${this._abrirEditarNome}
               title="Renomear estudo"></urbi-botao>` : nothing}
         </div>
