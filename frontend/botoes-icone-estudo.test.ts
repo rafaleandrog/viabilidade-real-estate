@@ -44,9 +44,14 @@ interface Botao { abertura: string; slot: string }
 function botoes(fonte: string): Botao[] {
   const out: Botao[] = [];
   let pos = 0;
+  // Fronteira de nome: `<urbi-botao` seguido de espaço, `>` ou `/` — sem ela,
+  // `<urbi-botao-voltar` casaria o prefixo e engoliria o botão seguinte.
+  const abre = /<urbi-botao(?=[\s>/])/g;
   for (;;) {
-    const ini = fonte.indexOf('<urbi-botao', pos);
-    if (ini < 0) break;
+    abre.lastIndex = pos;
+    const m = abre.exec(fonte);
+    if (!m) break;
+    const ini = m.index;
     const fimAb = fimTagAbertura(fonte, ini + '<urbi-botao'.length);
     assert.ok(fimAb > 0, 'tag <urbi-botao sem fim');
     const fecha = fonte.indexOf('</urbi-botao>', fimAb);
@@ -63,7 +68,7 @@ function botoes(fonte: string): Botao[] {
 const ARQUIVOS: Array<[string, number]> = [
   ['tela-premissas.ts', 1],
   ['tela-cenarios.ts', 1],
-  ['tela-estudo.ts', 1],
+  ['tela-estudo.ts', 2], // lápis "Renomear estudo" + lixeira de membro
   ['tela-dashboard.ts', 4],
   ['tela-apelo.ts', 1],
   ['tela-empreendimento-info.ts', 1],
