@@ -3,7 +3,7 @@
 // "o VALOR salta para fora do quadro do KPI"). Markup próprio (sem shadow
 // DOM), mesma família de defeito/defesa de `fluxo-tabela.ts` .kpi-card.
 //
-// `_renderIndicadores(o)` (frontend/tela-funding.ts:772) lê
+// `_renderIndicadores(o)` (frontend/tela-funding.ts:672) lê
 // `this.funding.operacoes` — não basta forçar `this.operacoes`, o `FundingCalc`
 // precisa ser real (`fundingDoEstudo`, a mesma função que a tela chama em
 // `_recalcular`). A dívida-exemplo é `DIVIDA_GOLDEN`
@@ -52,11 +52,10 @@ export const caso = {
     // pelo stub (`abas` é só-propriedade; `ativa` não dimensiona nada).
     'urbi-abas.abas',
     'urbi-abas.ativa',
-    // "Mês do aporte" (`_renderAncora`) — o formulário de Dívida acima do
-    // painel medido.
-    'urbi-select.desabilitado',
-    'urbi-select.opcoes',
-    'urbi-input.desabilitado',
+    // (O formulário de Dívida que ficava acima do painel saiu: a página da
+    // operação é leitura, e os campos vivem na janela de edição, medida em
+    // `funding-janela`. As declarações de `urbi-select` e `urbi-input` saíram
+    // junto, que o harness reprovaria como ociosas.)
     // `urbi-badge`/`urbi-botao` NÃO entram: `editavel: false` (o caso mede
     // só a leitura) esconde os 4 `urbi-botao` de edição, e `<urbi-badge>`
     // não liga `cor` em lugar nenhum desta tela — declará-los seria

@@ -106,6 +106,15 @@ test('sem passo (sequência ainda não calculada): TIR alavancada e exposição 
   semLixo(d);
 });
 
+test('"antes" ausente com "depois" presente: só o "depois", sem riscado e sem seta', () => {
+  // A operação faz a TIR alavancada passar a existir (antes sem troca de sinal).
+  const d = dadosDoCartao(entrada(DIVIDA, { operacao: DIVIDA.operacao, antes: est(-9_000_000, null), depois: est(-7_000_000, 22) }));
+  assert.equal(d.kpis[2].valor.texto, '22,0% a.a.');
+  assert.equal(d.kpis[2].antes, undefined, 'sem "—" riscado antes da seta');
+  assert.ok(d.kpis[3].antes, 'a exposição tem os dois lados');
+  semLixo(d);
+});
+
 test('operação de valor zero: KPIs "—", nunca zero nem NaN, e a grade continua com quatro', () => {
   const zero = serie('divida');
   const d = dadosDoCartao(entrada(zero, { operacao: zero.operacao, antes: est(-1_000_000, null), depois: est(-1_000_000, null) }));

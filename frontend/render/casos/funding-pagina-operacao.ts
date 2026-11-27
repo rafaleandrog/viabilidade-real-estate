@@ -8,9 +8,11 @@
 // botões da janela) e lê o DOM de volta — apagar a troca de estado do clique, o
 // handler do teclado no cartão ou o do botão de voltar deixa este caso vermelho.
 //
-// O `exigir` mede a página já ABERTA pelo clique (o formulário da dívida, com
-// as setas, o Remover e o Salvar de quem edita). `medir()` percorre o resto,
-// cada etapa numa tela nova, e devolve o que viu.
+// O `exigir` mede a página já ABERTA pelo clique (a dívida em leitura, com as
+// setas, o Editar e o Remover de quem edita). `medir()` percorre o resto, cada
+// etapa numa tela nova, e devolve o que viu. A janela de criar e editar tem
+// caso próprio (`funding-janela`); aqui só a ponta dela que toca a página:
+// "Nova operação" abre a janela, e criar abre a página da operação criada.
 
 import '../../tela-funding.js';
 import type { OperacaoFunding } from '../../funding-motor.js';
@@ -66,14 +68,14 @@ export const caso = {
     { seletor: 'div.pagina-operacao', minimo: 1 },
     // (O `urbi-botao-voltar` não entra aqui: o stub não desenha o `texto`, e a
     // caixa sai com área zero. Quem o confere é `medir()`, pelos atributos.)
-    // O formulário de hoje dentro da página: o painel "Visão do investidor".
+    // A página em leitura: os termos e o painel "Visão do investidor".
+    { seletor: 'div.pagina-operacao dl div.termo', minimo: 6 },
     { seletor: 'div.pagina-operacao div.ind-card', minimo: 6 },
   ],
   aceitaNaoReproduzido: [
     'urbi-banner.variante',
     'urbi-abas.abas',
     'urbi-abas.ativa',
-    'urbi-select.opcoes',
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
@@ -95,7 +97,9 @@ export const caso = {
     const editor = {
       setas: botoes(pagina).filter((b) => /arrow-(up|down)/.test(b.getAttribute('icone') ?? '')).length,
       remover: botoes(pagina).filter((b) => b.getAttribute('icone') === 'fa-solid fa-trash').length,
+      editar: porTexto(pagina, 'Editar') ? 1 : 0,
       salvar: porTexto(pagina, 'Salvar') ? 1 : 0,
+      campos: pagina.querySelectorAll('viab-num, urbi-input, urbi-select, urbi-checkbox').length,
     };
     // O resto roda em telas à parte, montadas fora da principal: a medição de
     // layout e o `exigir` acontecem DEPOIS de `medir()`, sobre a tela que
@@ -141,7 +145,7 @@ export const caso = {
     tecla(cartao(nav, EQUITY.id), ' ');
     await esperar(nav);
     const espaco = paginaAberta(nav)
-      && !!sr(nav).querySelector('div.pagina-operacao urbi-select'); // o formulário do equity
+      && !!sr(nav).querySelector('div.pagina-operacao div.termos-grupo[data-etapa="retorno"]'); // os termos do equity
     nav.remove();
 
     // ── Leitor: vê cartões e página, sem Nova operação, Salvar, Remover nem setas ──
@@ -163,7 +167,7 @@ export const caso = {
     const msgDesligado = sr(vazioDesligado).querySelector('urbi-estado-vazio')?.getAttribute('mensagem') ?? null;
     vazioDesligado.remove();
 
-    // ── Nova operação: janela com um botão por tipo; cria com os padrões e abre a página ──
+    // ── Nova operação: abre a janela; criar (com os padrões) abre a página da criada ──
     let lista: any[] = [{ ...DIVIDA }, fap(false)];
     let criado: any = null;
     let removido: string | null = null;
@@ -189,17 +193,20 @@ export const caso = {
     const ed = await tela(montagem, lista, true);
     porTexto(sr(ed), 'Nova operação')!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
     await esperar(ed);
-    const modal = sr(ed).querySelector('urbi-modal');
+    const jn = sr(ed).querySelector('viab-funding-janela') as any;
+    await jn?.updateComplete;
+    const modal = jn?.shadowRoot?.querySelector('urbi-modal');
     const janela = {
       aberta: !!modal,
       titulo: modal?.getAttribute('title') ?? null,
-      tipos: modal ? botoes(modal).map((b) => b.textContent?.trim()) : [],
+      tipos: ((jn?.shadowRoot?.querySelector('urbi-select[data-campo="tipo"]') as any)?.opcoes ?? []).map((o: any) => o.rotulo),
+      escritas: criado === null ? 0 : 1,
     };
-    porTexto(modal!, 'Dívida / Capital de giro')!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    jn.shadowRoot.querySelector('urbi-botao.confirmar')!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
     for (let i = 0; i < 5; i++) await esperar(ed);
     const aposCriar = {
       corpo: criado,
-      janelaFechada: !sr(ed).querySelector('urbi-modal'),
+      janelaFechada: !sr(ed).querySelector('viab-funding-janela'),
       paginaAberta: paginaAberta(ed),
       opAberta: ed.opAbertaId,
     };

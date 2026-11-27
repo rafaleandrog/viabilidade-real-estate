@@ -20,6 +20,10 @@ import {
 import './viab-num.js';
 import './funding-alternativas-painel.js';
 import './funding-cartao.js';
+import './funding-janela.js';
+import './funding-grafico-operacao.js';
+import type { ConfirmacaoJanela, SimulacaoJanela } from './funding-janela.js';
+import { nomePadrao, serieDoGrafico, termosDaOperacao, type TipoDaJanela } from './funding-janela-dados.js';
 import { passosDoPlano, type PlanoUsarAlternativa } from './funding-alternativas.js';
 import {
   indicadoresEstrutura, sequenciaDeEstrutura, type IndicadoresEstrutura, type SequenciaEstrutura,
@@ -97,24 +101,6 @@ const ABAS: { id: string; label: string; icone: string }[] = [
   { id: 'comparar', label: 'Comparar estruturas', icone: 'fa-solid fa-scale-balanced' },
 ];
 
-const MODOS_RETORNO: { valor: string; rotulo: string }[] = [
-  { valor: 'permuta_financeira', rotulo: 'Permuta financeira (% da receita líquida, mês a mês)' },
-  { valor: 'resultado_final', rotulo: '% do resultado final (pago no repasse)' },
-];
-
-// Mesmas âncoras das linhas de Custo (#249/#339) — número de mês absoluto
-// quebra quando o Cronograma muda; âncora acompanha (D11). Não se aplica a
-// `financiamento_producao`: a janela dele vem do Cronograma diretamente
-// (marcosObra), não de `inicio_mes`.
-const EVENTOS_ANCORA: { valor: string; rotulo: string }[] = [
-  { valor: 'planejamento', rotulo: 'Planejamento' },
-  { valor: 'pre_lancamento', rotulo: 'Pré-lançamento' },
-  { valor: 'lancamento', rotulo: 'Lançamento' },
-  { valor: 'obra', rotulo: 'Obra' },
-  { valor: 'pos_obra', rotulo: 'Pós-obras' },
-  { valor: 'customizado', rotulo: 'Mês específico' },
-];
-
 const rotuloTipo = (t: string) => TIPOS.find((x) => x.valor === t)?.rotulo ?? t;
 
 @customElement('viab-funding')
@@ -134,8 +120,16 @@ export class ViabFunding extends LitElement {
   // para a URL). Operação aberta que deixa de existir volta para a lista
   // (`_operacaoAberta`).
   @state() private opAbertaId: number | string | null = null;
-  // A janela "Nova operação", que pergunta o tipo.
-  @state() private escolhendoTipo = false;
+  // A janela de criar ou editar operação (`viab-funding-janela`): null fechada.
+  // Nada é gravado enquanto ela está aberta; quem grava é `_confirmarJanela`.
+  @state() private janela: { modo: 'criar' } | { modo: 'editar'; gravada: any } | null = null;
+  @state() private janelaGravando = false;
+  @state() private janelaErro = '';
+  // Para onde o foco vai quando a tela for desenhada de novo: o botão que abriu
+  // a janela, ou um alvo estável da aba Operações depois de remover. Semântico,
+  // e não a referência do elemento: `_carregar` troca a aba pelo carregando e o
+  // botão de antes deixa de existir.
+  private focarAlvo: 'nova' | 'editar' | 'lista' | null = null;
   // A sequência "antes → depois" por senioridade. Calculada em `_recalcular`,
   // NUNCA em `render()`: são N+1 simulações a cada tecla.
   @state() private sequencia: SequenciaEstrutura | null = null;
@@ -181,7 +175,13 @@ export class ViabFunding extends LitElement {
        Tab seguinte vai ao botão de voltar. Foco programático em contêiner não
        pede anel. */
     .pagina-operacao:focus { outline: none; }
-    .escolha-tipo { display: flex; flex-direction: column; gap: 8px; }
+    .op-nome { margin: 0; font-size: 1.05rem; color: var(--cor-texto); min-width: 0; overflow-wrap: anywhere; }
+    /* Termos da operação em leitura, por etapa da janela. */
+    .termos { display: grid; gap: 4px 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+    .termos dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+    .termos .termo { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; min-width: 0; }
+    .termos dt { color: var(--cor-texto-sec); }
+    .termos dd { margin: 0; color: var(--cor-texto); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
     .op-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .op-cab .espaco { flex: 1; }
     .op-cab urbi-input { min-width: 220px; }
@@ -367,14 +367,7 @@ export class ViabFunding extends LitElement {
 
   /** Nome padrão por tipo, no formato do #341 (maior sufixo + 1, não contagem). */
   private _nomePadrao(tipo: TipoOperacao): string {
-    if (tipo === 'financiamento_producao') return 'Financiamento à produção';
-    const rotulo = tipo === 'divida' ? 'Dívida' : tipo === 'equity' ? 'Equity' : 'Antecipação';
-    const usados = this.operacoes
-      .filter((o) => o.tipo === tipo)
-      .map((o) => /^(\d+)/.exec(String(o.nome ?? ''))?.[1])
-      .map((s) => Number(s) || 0);
-    const proximo = (usados.length ? Math.max(...usados) : 0) + 1;
-    return `${proximo}º ${rotulo}`;
+    return nomePadrao(tipo, this.operacoes);
   }
 
   /** Próxima `ordem` livre: MAX + 1, nunca `length` — ver o comentário em
@@ -445,38 +438,82 @@ export class ViabFunding extends LitElement {
     await this._carregar();
   }
 
-  private async _adicionar(tipo: TipoOperacao) {
-    if (this.criando) return;
-    this.criando = true;
+  /**
+   * O confirmar da janela: o POST da operação nova (com a `ordem` que a janela
+   * recebeu, `_proximaOrdem()`, a última do tipo na senioridade) ou o PATCH só
+   * com o que mudou. Recusa do servidor fica DENTRO da janela, que continua
+   * aberta com o rascunho; sucesso fecha a janela, recarrega e, na criação,
+   * abre a página da operação criada.
+   */
+  private async _confirmarJanela(c: ConfirmacaoJanela) {
+    if (this.janelaGravando || !this.editavel) return;
+    this.janelaGravando = true;
+    this.criando = c.modo === 'criar';
+    this.janelaErro = '';
     try {
-      const defaults = tipo === 'financiamento_producao'
-        ? this._defaultsFinanciamentoProducao()
-        : tipo === 'antecipacao_recebiveis'
-          // A cessão típica de loteamento: depois das chaves, metade do lastro.
-          ? { cronograma_evento: 'pos_obra', pct_carteira_cedida: 50, taxa_anual: 18 }
-        : eDivida(tipo)
-          ? { taxa_anual: 12, periodo_amortizacao_meses: 36, periodo_carencia_meses: 12, aporte_meses: 1 }
-          : { modo_retorno: 'permuta_financeira', pct_retorno: 0 };
-      const r = await criarFundingOperacao(this.estudo.id, {
-        // #586 (P2 do revisor): `ordem` é MAX + 1, não `length`. Com `length`,
-        // apagar uma operação do MEIO fazia a próxima nascer com uma `ordem`
-        // que já existia — e duas irmãs do mesmo tipo empatadas deixavam as
-        // setas ↑↓ mudas. `reordenarDentroDoTipo` passou a ser imune ao empate
-        // e ainda o repara, mas parar de CRIAR duplicata é a defesa na origem.
-        tipo, nome: this._nomePadrao(tipo), ordem: this._proximaOrdem(), ...defaults,
-      });
-      if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível criar a operação.', 'erro'); return; }
-      await this._carregar();
-      // A operação recém-criada abre na página dela, para a pessoa preencher
-      // os termos em seguida.
-      if (r?.id != null && tipo !== 'financiamento_producao') {
-        this.abaAtiva = 'operacoes';
-        this.opAbertaId = r.id;
+      const r = c.modo === 'criar'
+        ? await criarFundingOperacao(this.estudo.id, c.corpo)
+        : await atualizarFundingOperacao(this.estudo.id, c.id as number, c.patch);
+      if (r?.erro) {
+        this.janelaErro = r.mensagem || (c.modo === 'criar' ? 'Não foi possível criar a operação.' : 'Não foi possível salvar.');
+        return;
+      }
+      this.janela = null;
+      urbiVerso.notificar(c.modo === 'criar' ? 'Operação criada.' : 'Operação salva.', 'sucesso');
+      if (c.modo === 'criar') {
+        // A operação recém-criada abre na página dela; o foco vai para a página.
+        this.focarAlvo = null;
+        await this._carregar();
+        if (r?.id != null) { this.abaAtiva = 'operacoes'; this.opAbertaId = r.id; }
+      } else {
+        this.focarAlvo = 'editar';
+        await this._carregar();
       }
     } finally {
+      this.janelaGravando = false;
       this.criando = false;
     }
   }
+
+  private _abrirJanela(modo: 'criar' | 'editar', gravada?: any) {
+    if (!this.editavel) return;
+    this.janelaErro = '';
+    this.janela = modo === 'editar' ? { modo, gravada } : { modo: 'criar' };
+  }
+
+  /** Cancelar não grava nada: fecha e devolve o foco ao botão que abriu. */
+  private _fecharJanela() {
+    this.focarAlvo = this.janela?.modo === 'editar' ? 'editar' : 'nova';
+    this.janela = null;
+    this.janelaErro = '';
+  }
+
+  /**
+   * A simulação da janela: o funding do estudo e a sequência por senioridade
+   * sobre as operações dadas (as gravadas com o rascunho no lugar dele). O
+   * fluxo-base é refeito com essas operações, como em `_recalcular` com
+   * rascunho: senão o horizonte das gravadas truncaria uma operação levada para
+   * mais tarde. Arrow function para a janela receber o método sem perder o
+   * `this`; quem a chama é a janela, em `willUpdate`.
+   */
+  private _simularJanela = (ops: OperacaoFunding[]): SimulacaoJanela | null => {
+    if (!this.config) return null;
+    const calc = calcularFluxo({ ...this.config, operacoesFunding: ops });
+    const rl = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.custos);
+    const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
+    const simularFunding = (sub: OperacaoFunding[]) => fundingDoEstudo(
+      sub, calc.fluxoMensal, rl, resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
+      {
+        custosRaw: this.custos, linhasCusto: calc.linhasCusto, cronograma: this.crono,
+        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
+      },
+    );
+    return {
+      funding: simularFunding(ops),
+      sequencia: sequenciaDeEstrutura(ops, (sub) => indicadoresEstrutura(calc, sub.length ? simularFunding(sub) : null)),
+      vgvTotal: calc.vgvTotal,
+    };
+  };
 
   private async _salvar(o: any) {
     const patch = this.draft[o.id];
@@ -498,8 +535,10 @@ export class ViabFunding extends LitElement {
     this.removerId = null;
     const r = await removerFundingOperacao(this.estudo.id, id);
     if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível remover.', 'erro'); return; }
-    // Remover a operação aberta volta para a lista de cartões.
+    // Remover a operação aberta volta para a lista de cartões, com o foco num
+    // alvo estável dela (o primeiro cartão, ou "Nova operação").
     if (String(this.opAbertaId) === String(id)) this.opAbertaId = null;
+    this.focarAlvo = 'lista';
     await this._carregar();
   }
 
@@ -533,79 +572,6 @@ export class ViabFunding extends LitElement {
       .valor=${this._valor(o, campo) ?? null}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(o, campo, e.detail.valor ?? 0)}
     ></viab-num>`;
-  }
-
-  /** O mês que a simulação usa para a operação: o derivado da âncora quando há
-   * rascunho, o gravado caso contrário — a mesma regra de `_recalcular`. */
-  private _mesSimulado(o: any): number {
-    return Number(operacaoComRascunho(o, this.draft[o.id], this.crono).inicio_mes) || 0;
-  }
-
-  private _renderAncora(o: any, rotulo = 'Mês do aporte'): TemplateResult {
-    const evento = String(this._valor(o, 'cronograma_evento') ?? 'customizado');
-    return html`
-      <div class="sel-campo p2">
-        <span class="sel-rotulo">${rotulo}</span>
-        <urbi-select .valor=${evento} .opcoes=${EVENTOS_ANCORA.map((e) => ({ valor: e.valor, rotulo: e.rotulo }))}
-          ?desabilitado=${!this.editavel}
-          @urbi:select-change=${(e: CustomEvent) => this._set(o, 'cronograma_evento', e.detail.valor)}
-        ></urbi-select>
-      </div>
-      ${evento === 'customizado'
-        ? this._num(o, 'inicio_mes', 'Mês', 'º mês', 0)
-        : html`<div class="sel-campo">
-            <span class="sel-rotulo">Início derivado</span>
-            <span class="mes-derivado">${rotuloMesRelativo(this.dataInicio, this._mesSimulado(o))}
-              <urbi-icone class="cadeado" classe="fa-solid fa-lock" title="Derivado do Cronograma"></urbi-icone></span>
-          </div>`}
-    `;
-  }
-
-  private _renderCamposDivida(o: any): TemplateResult {
-    const distribuir = this._valor(o, 'distribuir_aporte') === true;
-    return html`
-      <div class="secao">
-        <h4>Operação</h4>
-        <div class="grid">
-          ${this._num(o, 'valor', 'Valor', 'R$')}
-          ${this._renderAncora(o)}
-        </div>
-      </div>
-      <div class="secao">
-        <h4>Liberação</h4>
-        <div class="grid">
-          <urbi-checkbox ?marcado=${distribuir} ?desabilitado=${!this.editavel}
-            label="Distribuir aporte"
-            @urbi:checkbox-change=${(e: CustomEvent) => this._set(o, 'distribuir_aporte', e.detail.marcado)}
-          ></urbi-checkbox>
-          ${distribuir ? this._num(o, 'aporte_meses', 'Aporte em', 'meses', 0) : nothing}
-        </div>
-      </div>
-      <div class="secao">
-        <h4>Custo e prazos</h4>
-        <div class="grid">
-          ${this._num(o, 'taxa_anual', 'Taxa', '% a.a.')}
-          ${this._num(o, 'periodo_amortizacao_meses', 'Amortização', 'meses', 0)}
-          ${this._num(o, 'periodo_carencia_meses', 'Carência', 'meses', 0)}
-        </div>
-        <p class="nota">A carência faz parte do prazo de amortização — a parcela é calculada sobre
-          <strong>amortização − carência</strong>. Durante a carência paga-se só os juros.</p>
-      </div>
-      <div class="secao">
-        <h4>Tarifas e encargos</h4>
-        <div class="grid">
-          ${this._num(o, 'taxa_estruturacao_pct', 'Estruturação', '%')}
-          ${this._num(o, 'taxa_administracao_mensal', 'Administração', 'R$/mês')}
-          ${this._num(o, 'outros_encargos_iniciais', 'Outros encargos', 'R$')}
-        </div>
-        <p class="nota">
-          Entram em <strong>saídas</strong> — reduzem a TIR do investidor e o fluxo alavancado —,
-          nunca no saldo devedor (não são principal). A estruturação é cobrada uma vez, no mês da
-          1ª liberação; os outros encargos, uma vez, no mês da contratação; a administração,
-          todo mês enquanto houver saldo devedor.
-        </p>
-      </div>
-    `;
   }
 
   /**
@@ -674,72 +640,6 @@ export class ViabFunding extends LitElement {
               }}
             ></urbi-checkbox>`)}
         </div>
-      </div>
-    `;
-  }
-
-  private _renderCamposEquity(o: any): TemplateResult {
-    const modo = String(this._valor(o, 'modo_retorno') ?? 'permuta_financeira');
-    return html`
-      <div class="secao">
-        <h4>Aporte</h4>
-        <div class="grid">
-          ${this._num(o, 'valor', 'Valor do aporte', 'R$')}
-          ${this._renderAncora(o)}
-        </div>
-      </div>
-      <div class="secao">
-        <h4>Retorno</h4>
-        <div class="grid">
-          <div class="sel-campo p2">
-            <span class="sel-rotulo">Modo</span>
-            <urbi-select .valor=${modo} .opcoes=${MODOS_RETORNO}
-              ?desabilitado=${!this.editavel}
-              @urbi:select-change=${(e: CustomEvent) => this._set(o, 'modo_retorno', e.detail.valor)}
-            ></urbi-select>
-          </div>
-          ${this._num(o, 'pct_retorno', '% de retorno', '%')}
-        </div>
-        <p class="nota">${modo === 'permuta_financeira'
-          ? html`Incide sobre a <strong>receita líquida</strong> de cada mês, progressivamente.`
-          : html`Incide sobre o <strong>resultado final do projeto</strong> e é pago de uma vez, no
-              repasse (${rotuloMesRelativo(this.dataInicio, mesRepasse(this.crono))}).`}
-          Base calculada pelo estudo — não é digitada aqui.</p>
-      </div>
-    `;
-  }
-
-  /**
-   * #851 — Antecipação de recebíveis. O mês da cessão é uma âncora do
-   * cronograma, como o aporte das outras operações; o valor NÃO é digitado:
-   * sai do lastro (as parcelas futuras das vendas feitas até a cessão) e da
-   * taxa de desconto.
-   */
-  private _renderCamposAntecipacao(o: any): TemplateResult {
-    return html`
-      <div class="secao">
-        <h4>Cessão</h4>
-        <div class="grid">
-          ${this._renderAncora(o, 'Mês da cessão')}
-          ${this._num(o, 'pct_carteira_cedida', 'Carteira cedida', '%')}
-          ${this._num(o, 'taxa_anual', 'Taxa de desconto', '% a.a.')}
-        </div>
-        <p class="nota">Cede esse percentual de tudo o que as vendas feitas até o mês da cessão ainda
-          vão pagar depois dele — parcelas, saldo a repassar e carteira própria —, descontado o que
-          outra antecipação anterior já cedeu. O cessionário paga à vista o valor presente dessas
-          parcelas à taxa de desconto; a partir do mês seguinte, as parcelas cedidas passam a ir para
-          ele. Só os planos de pagamento já aplicados entram no lastro.</p>
-      </div>
-      <div class="secao">
-        <h4>Tarifas e custos</h4>
-        <div class="grid">
-          ${this._num(o, 'taxa_estruturacao_pct', 'Estruturação', '%')}
-          ${this._num(o, 'taxa_administracao_mensal', 'Administração', 'R$/mês')}
-          ${this._num(o, 'outros_encargos_iniciais', 'Outros custos', 'R$')}
-        </div>
-        <p class="nota">A estruturação (sobre o valor presente) e os outros custos são cobrados no mês
-          da cessão; a administração, todo mês enquanto houver parcela cedida a receber. Entram nas
-          saídas e no custo efetivo — não reduzem o lastro.</p>
       </div>
     `;
   }
@@ -927,42 +827,47 @@ export class ViabFunding extends LitElement {
     return this.operacoes.filter((o) => o.tipo === tipo);
   }
 
+  /**
+   * A operação na página, em LEITURA: cabeçalho (nome, tipo, setas de ordem,
+   * Editar e Remover para quem edita), os termos por etapa da janela, os
+   * indicadores de sempre e o gráfico da operação — o mesmo componente da
+   * "Prévia do fluxo" da janela, aqui com a operação gravada. A edição é só
+   * pela janela.
+   */
   private _renderOperacao(o: any, i: number, irmaos: any[]): TemplateResult {
-    const temDraft = !!this.draft[o.id];
-    const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id));
+    const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id)) ?? null;
+    const grafico = serieDoGrafico(serie);
     return html`
       <urbi-card>
         <div class="op-cab">
           <urbi-icone classe=${TIPOS.find((t) => t.valor === o.tipo)?.icone ?? 'fa-solid fa-coins'}></urbi-icone>
-          <urbi-input .valor=${this._valor(o, 'nome') ?? ''} ?desabilitado=${!this.editavel}
-            @urbi:input-change=${(e: CustomEvent) => this._set(o, 'nome', e.detail.valor)}
-          ></urbi-input>
+          <h3 class="op-nome">${o.nome || rotuloTipo(o.tipo)}</h3>
           <urbi-badge>${rotuloTipo(o.tipo)}</urbi-badge>
           <span class="espaco"></span>
           ${this.editavel ? html`
-            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-arrow-up"
+            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-arrow-up" .ariaLabel=${'Mover para cima'}
               ?desabilitado=${i === 0 || !!this.movendoId} @click=${() => this._mover(o.id, 'cima')}></urbi-botao>
-            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-arrow-down"
+            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-arrow-down" .ariaLabel=${'Mover para baixo'}
               ?desabilitado=${i === irmaos.length - 1 || !!this.movendoId}
               @click=${() => this._mover(o.id, 'baixo')}></urbi-botao>
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+            <urbi-botao class="editar" variante="secundario" pequeno icone="fa-solid fa-pen"
+              @click=${() => this._abrirJanela('editar', o)}>Editar</urbi-botao>
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover operação'}
               @click=${() => { this.removerId = o.id; }}></urbi-botao>` : nothing}
         </div>
 
-        ${o.tipo === 'financiamento_producao' ? this._renderCamposFinanciamentoProducao(o)
-          : o.tipo === 'antecipacao_recebiveis' ? this._renderCamposAntecipacao(o)
-          : eDivida(o.tipo) ? this._renderCamposDivida(o) : this._renderCamposEquity(o)}
-        ${o.tipo === 'financiamento_producao' && serie
-          ? this._renderIndicadoresFinanciamentoProducao(serie)
-          : o.tipo === 'antecipacao_recebiveis' ? this._renderIndicadoresAntecipacao(o)
-          : this._renderIndicadores(o)}
+        <div class="termos">
+          ${termosDaOperacao(o, this.dataInicio).map((g) => html`
+            <div class="secao termos-grupo" data-etapa=${g.etapa}>
+              <h4>${g.label}</h4>
+              <dl>${g.termos.map((t) => html`<div class="termo"><dt>${t.rotulo}</dt><dd>${t.texto}</dd></div>`)}</dl>
+            </div>`)}
+        </div>
 
-        ${this.editavel ? html`
-          <div class="form-acoes">
-            <urbi-botao variante="primario" pequeno icone="fa-solid fa-floppy-disk"
-              ?desabilitado=${!temDraft || this.salvandoId === o.id}
-              @click=${() => this._salvar(o)}>Salvar</urbi-botao>
-          </div>` : nothing}
+        ${o.tipo === 'antecipacao_recebiveis' ? this._renderIndicadoresAntecipacao(o) : this._renderIndicadores(o)}
+        ${grafico ? html`<div class="secao grafico-operacao">
+          <viab-funding-grafico-operacao .serie=${grafico} titulo="Fluxo da operação"></viab-funding-grafico-operacao>
+        </div>` : nothing}
       </urbi-card>
     `;
   }
@@ -997,6 +902,16 @@ export class ViabFunding extends LitElement {
     if (mudou.has('opAbertaId') && mudou.get('opAbertaId') == null && this.opAbertaId !== null) {
       (this.shadowRoot?.querySelector('div.pagina-operacao') as HTMLElement | null)?.focus();
     }
+    if (this.focarAlvo !== null && !this.carregando && this.janela === null) {
+      const alvo = this.focarAlvo;
+      const r = this.shadowRoot;
+      const el = alvo === 'editar'
+        ? r?.querySelector('div.pagina-operacao urbi-botao.editar')
+        : alvo === 'nova'
+          ? r?.querySelector('urbi-botao.nova-operacao')
+          : (r?.querySelector('viab-funding-cartao') ?? r?.querySelector('urbi-botao.nova-operacao'));
+      if (el) { this.focarAlvo = null; (el as HTMLElement).focus(); }
+    }
     if (this.focarCartaoId !== null && this.opAbertaId === null) {
       const alvo = [...(this.shadowRoot?.querySelectorAll('viab-funding-cartao') ?? [])]
         .find((c) => (c as HTMLElement).dataset.id === String(this.focarCartaoId)) as HTMLElement | undefined;
@@ -1025,9 +940,9 @@ export class ViabFunding extends LitElement {
     return html`
       ${this.editavel ? html`
         <div class="acao-aba">
-          <urbi-botao variante="primario" pequeno icone="fa-solid fa-plus"
+          <urbi-botao class="nova-operacao" variante="primario" pequeno icone="fa-solid fa-plus"
             ?desabilitado=${this.criando}
-            @click=${() => { this.escolhendoTipo = true; }}>Nova operação</urbi-botao>
+            @click=${() => this._abrirJanela('criar')}>Nova operação</urbi-botao>
         </div>` : nothing}
       ${lista.length === 0
         ? html`<urbi-estado-vazio icone="fa-solid fa-coins"
@@ -1054,9 +969,9 @@ export class ViabFunding extends LitElement {
   }
 
   /**
-   * A página da operação, dentro da aba Operações: o botão de voltar e o
-   * formulário de edição de hoje (`_renderOperacao`) — campos do tipo, painel
-   * de indicadores, setas de ordem, Remover e Salvar.
+   * A página da operação, dentro da aba Operações: o botão de voltar e a
+   * operação em leitura (`_renderOperacao`) — termos, indicadores, gráfico,
+   * setas de ordem, Editar e Remover.
    *
    * O botão de voltar não leva `href` nem `auto-voltar`: `auto-voltar` chamaria
    * o histórico do navegador e tiraria a pessoa da tela do estudo. A volta é só
@@ -1075,25 +990,6 @@ export class ViabFunding extends LitElement {
         </div>
         ${this._renderOperacao(o, i, irmaos)}
       </div>
-    `;
-  }
-
-  /** A janela "Nova operação": um botão por tipo de cartão. Cria com os valores
-   * padrão (`_adicionar`) e abre a página da operação criada. */
-  private _renderEscolhaTipo(): TemplateResult {
-    return html`
-      <urbi-modal title="Nova operação" maxWidth="420px"
-        @urbi-modal:close=${() => { this.escolhendoTipo = false; }}>
-        <p>Que tipo de operação?</p>
-        <div class="escolha-tipo">
-          ${TIPOS_DE_CARTAO.map((tipo) => {
-            const t = TIPOS.find((x) => x.valor === tipo)!;
-            return html`<urbi-botao variante="secundario" icone=${t.icone}
-              ?desabilitado=${this.criando}
-              @click=${() => { this.escolhendoTipo = false; this._adicionar(tipo); }}>${t.rotulo}</urbi-botao>`;
-          })}
-        </div>
-      </urbi-modal>
     `;
   }
 
@@ -1208,7 +1104,17 @@ export class ViabFunding extends LitElement {
           </urbi-hospedeiro>`)}
       </urbi-abas>
 
-      ${this.escolhendoTipo ? this._renderEscolhaTipo() : nothing}
+      ${this.janela && this.editavel ? html`<viab-funding-janela
+        .modo=${this.janela.modo}
+        .gravada=${this.janela.modo === 'editar' ? this.janela.gravada : null}
+        .salvas=${this.operacoes} .ordemNova=${this._proximaOrdem()}
+        .crono=${this.crono} .dataInicio=${this.dataInicio}
+        .tipos=${TIPOS_DE_CARTAO.map((t) => ({ valor: t as TipoDaJanela, rotulo: rotuloTipo(t) }))}
+        .simular=${this._simularJanela}
+        .gravando=${this.janelaGravando} .erroServidor=${this.janelaErro}
+        @viab:janela-confirmar=${(e: CustomEvent) => this._confirmarJanela(e.detail)}
+        @viab:janela-cancelar=${() => this._fecharJanela()}
+      ></viab-funding-janela>` : nothing}
 
       ${this.removerId !== null ? html`
         <urbi-modal title="Remover operação" maxWidth="420px"

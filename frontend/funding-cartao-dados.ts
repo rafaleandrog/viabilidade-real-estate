@@ -170,17 +170,18 @@ function termosAntecipacao(e: EntradaCartao, valorAntecipado: number | null): Te
   ];
 }
 
-/** Os dois KPIs da sequência, em "antes → depois". Sem passo, "—" sem seta. */
+/** Os dois KPIs da sequência, em "antes → depois". Sem "antes" (sem passo, ou sem troca de
+ * sinal só no antes), mostra só o "depois", sem riscado e sem seta. */
 function kpisDaSequencia(k: ReturnType<typeof kpisDaOperacao> | null): KpiCartao[] {
   const tir = (antes: number | null, depois: number | null): KpiCartao => ({
     rotulo: 'TIR alavancada',
     valor: pct(depois, true),
-    ...(antes === null && depois === null ? {} : { antes: pct(antes, true) }),
+    ...(antes === null ? {} : { antes: pct(antes, true) }),
   });
   const exp = (antes: number | null, depois: number | null): KpiCartao => ({
     rotulo: 'Exposição máxima',
     valor: reais(depois),
-    ...(antes === null && depois === null ? {} : { antes: reais(antes) }),
+    ...(antes === null ? {} : { antes: reais(antes) }),
   });
   return [
     tir(k?.tirAlavancadaAntes ?? null, k?.tirAlavancadaDepois ?? null),

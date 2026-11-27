@@ -31,7 +31,7 @@ export class ViabFundingCartao extends LitElement {
       box-sizing: border-box;
       background: var(--cor-superficie);
       border: 1px solid var(--cor-borda);
-      border-radius: 8px;
+      border-radius: var(--raio-md);
       cursor: pointer;
       outline: none;
     }
@@ -40,7 +40,7 @@ export class ViabFundingCartao extends LitElement {
     .moldura {
       box-sizing: border-box;
       border-left: 4px solid;
-      border-radius: 8px 0 0 8px;
+      border-radius: var(--raio-md) 0 0 var(--raio-md);
       padding: 12px 14px;
       min-width: 0;
     }

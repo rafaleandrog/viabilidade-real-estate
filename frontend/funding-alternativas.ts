@@ -9,6 +9,7 @@
 // para a API até o usuário escolher "Usar esta", que aplica o plano abaixo
 // pelas rotas existentes de operação de funding.
 import type { FundingCalc, OperacaoFunding } from './funding-motor.js';
+import { CAMPOS_OPERACAO_ESPELHO, errosDoEstadoFinal as errosDoEstadoFinalDasOperacoes } from './funding-validacao.js';
 
 /** Máximo de alternativas guardadas por estudo. */
 export const MAX_ALTERNATIVAS = 3;
@@ -193,21 +194,6 @@ const igual = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) ===
  * Mudar o `tipo` de uma operação existente equivale a tirar a antiga e criar
  * a nova.
  */
-/**
- * Os campos que as rotas de operação gravam — espelho exato de
- * `CAMPOS_OPERACAO` (backend/rotas/avancado.ts), travado pelo teste de
- * paridade. Quem tira `ordem` da comparação do plano é `CAMPOS_GRAVAVEIS`.
- */
-export const CAMPOS_OPERACAO_ESPELHO = [
-  'tipo', 'nome', 'ordem', 'valor',
-  'cronograma_evento', 'fase_ancora_id', 'inicio_mes',
-  'distribuir_aporte', 'aporte_meses', 'taxa_anual',
-  'periodo_amortizacao_meses', 'periodo_carencia_meses',
-  'modo_retorno', 'pct_retorno',
-  'exposicao_minima', 'percentual_financiavel', 'amortizar_com_caixa_disponivel', 'custo_linha_ids',
-  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
-  'pct_carteira_cedida', 'ativo',
-];
 const CAMPOS_GRAVAVEIS = new Set(CAMPOS_OPERACAO_ESPELHO.filter((c) => c !== 'ordem'));
 
 export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: AlternativaFunding): PlanoUsarAlternativa {
@@ -250,162 +236,25 @@ export function planoUsarAlternativa(salvas: OperacaoFunding[], alt: Alternativa
 
 // ── validação do estado final ──────────────────────────────────────
 
-const ROTULO_MODO: Record<string, string> = {
-  permuta_financeira: 'Permuta financeira',
-  resultado_final: 'Resultado final',
-};
-
-// Espelham as listas de `backend/rotas/funding.ts` (o frontend não importa de
-// `backend/`: bundles separados). O teste de paridade em
-// `funding-alternativas.test.ts` trava a divergência contra `validarCamposOperacao`.
-const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
-const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
-const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
-const CAMPOS_NAO_NEGATIVOS = [
-  'valor', 'inicio_mes', 'aporte_meses', 'taxa_anual',
-  'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
-  'exposicao_minima', 'percentual_financiavel',
-  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
-  'pct_carteira_cedida',
-];
-const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct', 'pct_carteira_cedida'];
+// O espelho das regras do servidor (`validarOperacaoComoServidor`,
+// `recusaDoPostComoServidor`, `coagirComoServidor`, a soma de retorno do equity
+// por modo e `CAMPOS_OPERACAO_ESPELHO`) mudou para `funding-validacao.ts`, que a
+// janela de operação também usa e que sobrevive à saída desta aba. A
+// reexportação mantém os importadores de hoje compilando sem mudança.
+export {
+  validarOperacaoComoServidor, recusaDoPostComoServidor, coagirComoServidor, CAMPOS_OPERACAO_ESPELHO,
+} from './funding-validacao.js';
 
 /**
- * Reproduz TODAS as regras de `validarCamposOperacao` (backend/rotas/funding.ts),
- * na mesma ordem e com as mesmas condições. Devolve a mensagem ou `null`.
- * Fail-closed: o que o servidor recusaria, o painel recusa antes de gravar.
- */
-export function validarOperacaoComoServidor(dados: Record<string, any>): string | null {
-  if (dados.tipo !== undefined && !TIPOS_OPERACAO.includes(dados.tipo)) {
-    return `tipo deve ser um de: ${TIPOS_OPERACAO.join(', ')}`;
-  }
-  if (dados.modo_retorno !== undefined && !MODOS_RETORNO.includes(dados.modo_retorno)) {
-    return `modo_retorno deve ser um de: ${MODOS_RETORNO.join(', ')}`;
-  }
-  if (dados.cronograma_evento !== undefined && !EVENTOS_ANCORA.includes(dados.cronograma_evento)) {
-    return `cronograma_evento deve ser um de: ${EVENTOS_ANCORA.join(', ')}`;
-  }
-  for (const campo of CAMPOS_NAO_NEGATIVOS) {
-    if (dados[campo] === undefined || dados[campo] === null) continue;
-    const v = Number(dados[campo]);
-    if (!Number.isFinite(v)) return `${campo} deve ser numérico`;
-    if (v < 0) return `${campo} não pode ser negativo`;
-  }
-  for (const campo of CAMPOS_PERCENTUAL_0_100) {
-    if (dados[campo] === undefined || dados[campo] === null) continue;
-    if (Number(dados[campo]) > 100) return `${campo} não pode passar de 100`;
-  }
-  if (dados.custo_linha_ids !== undefined && dados.custo_linha_ids !== null) {
-    const lista = dados.custo_linha_ids;
-    if (!Array.isArray(lista) || !lista.every((v: any) => Number.isFinite(Number(v)))) {
-      return 'custo_linha_ids deve ser uma lista de números';
-    }
-  }
-  const amort = dados.periodo_amortizacao_meses;
-  const carencia = dados.periodo_carencia_meses;
-  if (amort !== undefined && carencia !== undefined && Number(carencia) >= Number(amort) && Number(amort) > 0) {
-    return 'periodo_carencia_meses deve ser menor que periodo_amortizacao_meses';
-  }
-  if (dados.aporte_meses !== undefined && Number(dados.aporte_meses) < 1) {
-    return 'aporte_meses deve ser pelo menos 1';
-  }
-  if (dados.ativo !== undefined && typeof dados.ativo !== 'boolean') {
-    return 'ativo deve ser um booleano';
-  }
-  if (dados.ativo === false && dados.tipo !== 'financiamento_producao') {
-    return 'ativo só é aplicável ao Financiamento à produção';
-  }
-  return null;
-}
-
-// Campos numéricos de `avancado_funding_operacoes` no `schema.json` (cópia local: o
-// frontend não importa de `backend/`); `true` = inteiro (`inteiro`/`referencia`), que
-// `coagirNumericosDeclarados` exige inteiro. O teste de paridade trava a divergência.
-const NUMERICOS_OPERACAO: Record<string, boolean> = {
-  estudo_id: true, ordem: true, fase_ancora_id: true, inicio_mes: true, aporte_meses: true,
-  periodo_amortizacao_meses: true, periodo_carencia_meses: true,
-  valor: false, taxa_anual: false, pct_retorno: false, exposicao_minima: false, percentual_financiavel: false,
-  taxa_estruturacao_pct: false, taxa_administracao_mensal: false, outros_encargos_iniciais: false, pct_carteira_cedida: false,
-};
-const RE_DECIMAL_ESTRITO = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/;
-
-/** Espelha `numeroEstrito` (backend/rotas/coercao-numerica.ts): número finito ou string decimal estrita. */
-function numeroEstritoComoServidor(v: unknown): number | null {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  if (typeof v !== 'string' || !RE_DECIMAL_ESTRITO.test(v)) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-/**
- * Espelha `coagirNumericosDeclarados` (a `coagirOuRecusar` do POST/PATCH): `null` e
- * `undefined` passam; os demais precisam ser número estrito e, nos inteiros, inteiro.
- * Devolve a mensagem do primeiro campo que o servidor recusaria, ou `null`.
- */
-export function coagirComoServidor(op: Record<string, any>): string | null {
-  for (const [campo, inteiro] of Object.entries(NUMERICOS_OPERACAO)) {
-    const v = op[campo];
-    if (v === null || v === undefined) continue;
-    const n = numeroEstritoComoServidor(v);
-    if (n === null) return `Campo "${campo}" deve ser um número`;
-    if (inteiro && !Number.isInteger(n)) return `Campo "${campo}" deve ser um número inteiro`;
-  }
-  return null;
-}
-
-const LIMITE_NOME = 100; // `limite` da coluna `nome` no schema.json
-
-/**
- * Tudo o que o POST de uma operação recusa, na ordem do servidor: coerção numérica,
- * `tipo` e `nome` obrigatórios, depois `validarCamposOperacao`. Mais conservador que o
- * servidor no `nome` (só espaços conta como vazio; o schema declara `obrigatorio` e
- * `limite: 100`).
- */
-export function recusaDoPostComoServidor(op: Record<string, any>): string | null {
-  const coercao = coagirComoServidor(op);
-  if (coercao) return coercao;
-  if (!op.tipo) return 'tipo é obrigatório';
-  if (typeof op.nome !== 'string' || !op.nome.trim()) return 'nome é obrigatório';
-  if (op.nome.length > LIMITE_NOME) return `nome não pode passar de ${LIMITE_NOME} caracteres`;
-  return validarOperacaoComoServidor(op);
-}
-
-/**
- * Espelho das regras do servidor (`somaRetornoExcede` e `validarCamposOperacao`
- * de `backend/rotas/funding.ts`) sobre o ESTADO FINAL da alternativa, antes de
- * gravar qualquer passo. Considera as operações que ficam gravadas: todas menos
- * as marcadas `__fora`, que o plano remove. O Financiamento à produção desligado
- * continua gravado e o servidor o valida inteiro no PATCH, então ele entra. Aplica `recusaDoPostComoServidor` a cada uma (coerção
- * numérica estrita, `tipo` e `nome` obrigatórios, `validarCamposOperacao`: tudo o que o
- * POST ou o PATCH recusariam no meio do plano, depois das remoções) e soma
- * `pct_retorno` dos equities por modo <= 100 (tolerância 100.01; modo padrão
- * permuta_financeira). Devolve uma mensagem por problema.
+ * O estado final da ALTERNATIVA: as operações que ficam gravadas, isto é,
+ * todas menos as marcadas `__fora`, que o plano remove (o Financiamento à
+ * produção desligado continua gravado e entra). Só delega a
+ * `errosDoEstadoFinal` de `funding-validacao.ts`, que opera sobre a lista.
  */
 export function errosDoEstadoFinal(alt: AlternativaFunding): string[] {
-  const erros: string[] = [];
-  const incluidas = (alt.operacoes as (OperacaoFunding & { __fora?: boolean })[])
-    .filter((o) => !o.__fora);
-  const porModo = new Map<string, number>();
-  for (const o of incluidas) {
-    const nome = o.nome || ROTULO_TIPO_ERRO[o.tipo] || o.tipo;
-    const msg = recusaDoPostComoServidor(o as any);
-    if (msg) erros.push(`"${nome}": ${msg}.`);
-    if (o.tipo !== 'equity') continue;
-    const pct = Number((o as any).pct_retorno) || 0;
-    const modo = String((o as any).modo_retorno ?? 'permuta_financeira');
-    porModo.set(modo, (porModo.get(modo) ?? 0) + pct);
-  }
-  for (const [modo, total] of porModo) {
-    if (total > 100.01) {
-      erros.push(`Equity em "${ROTULO_MODO[modo] ?? modo}": o retorno soma ${total.toFixed(2)}% e não pode passar de 100%.`);
-    }
-  }
-  return erros;
+  const incluidas = (alt.operacoes as (OperacaoFunding & { __fora?: boolean })[]).filter((o) => !o.__fora);
+  return errosDoEstadoFinalDasOperacoes(incluidas);
 }
-
-const ROTULO_TIPO_ERRO: Record<string, string> = {
-  financiamento_producao: 'Financiamento à produção', divida: 'Dívida', equity: 'Equity', antecipacao_recebiveis: 'Antecipação',
-};
 
 // ── persistência local ──────────────────────────────────────────────
 

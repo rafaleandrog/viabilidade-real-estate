@@ -1,22 +1,22 @@
-// Caso de render: trocar a âncora de uma operação no rascunho muda a prévia do
-// Funding na hora, antes de salvar — e, depois de salvar, a prévia e o mês
-// gravado coincidem.
+// Caso de render: trocar a âncora de uma operação na JANELA de edição muda a
+// prévia na hora, antes de salvar — e, depois de salvar, o mês que a prévia
+// mostrava e o mês gravado coincidem.
 //
 // A função pura (`operacaoComRascunho` em `fluxo-shared.ts`) tem teste próprio,
-// mas ele não prova que `_recalcular` a chama: apagar essa chamada deixaria a
-// suíte de função pura verde e a prévia simulando com o mês antigo. Este caso
-// fecha essa fiação: a operação está gravada em `obra` com um mês defasado (5,
-// quando o Cronograma diz 13 — o servidor não reancora operações de funding
-// quando o Cronograma muda), o rascunho troca para `lancamento` (mês 12) e o
-// caso exige o texto "Início derivado" novo E o painel "Visão do investidor"
-// recalculado com o mês 12.
+// mas ele não prova que a janela a chama: apagar essa chamada deixaria a suíte
+// de função pura verde e a prévia simulando com o mês antigo. Este caso fecha
+// essa fiação: a operação está gravada em `obra` com um mês defasado (5, quando
+// o Cronograma diz 13 — o servidor não reancora operações de funding quando o
+// Cronograma muda), o rascunho troca para `lancamento` (mês 12) e o caso exige
+// o texto "Início derivado" novo E o "Resumo" da janela recalculado com o mês 12.
+// (Antes da janela, o rascunho morava no formulário da página e o caso lia o
+// painel "Visão do investidor"; a prova é a mesma, no lugar novo.)
 //
-// O oráculo do painel é independente da função sob teste: `medir()` monta uma
-// segunda tela com a operação já GRAVADA no mês 12 (sem rascunho, então sem
-// derivação), com o fluxo-base que `_carregar` montaria depois do Salvar
-// (`operacoesFunding` com a operação gravada no mês 12), e lê o painel dela. A
-// taxa da dívida (18% a.a.) difere da taxa de desconto (12% a.a.) para o VPL e
-// a TIR mudarem com o mês do aporte.
+// O oráculo do resumo é independente da função sob teste: `medir()` monta uma
+// segunda tela com a operação já GRAVADA no mês 12 e abre a janela dela sem
+// mudar nada (sem rascunho, então sem derivação), e lê o resumo dela. A taxa da
+// dívida (18% a.a.) difere da taxa de desconto (12% a.a.), e o mês do aporte
+// move a exposição do projeto (o "capital do incorporador no pico").
 //
 // O horizonte: a amortização de 64 meses cabe no horizonte do fluxo com o
 // aporte no mês 5 (73 meses) e passa dele com o aporte no mês 12 (77). Uma prévia
@@ -63,19 +63,27 @@ const estadoCalc = (ops: any[]) => {
 export const caso = {
   nome: 'funding-ancora-rascunho',
   exigir: [
-    { seletor: 'urbi-card', minimo: 1 },
+    { seletor: 'section.campos', minimo: 1 },
     { seletor: 'span.mes-derivado', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     'urbi-banner.variante',
     'urbi-abas.abas',
     'urbi-abas.ativa',
-    'urbi-input.desabilitado',
-    'urbi-select.desabilitado',
-    'urbi-select.opcoes',
-    'urbi-checkbox.desabilitado',
+    'urbi-botao.desabilitado',
+    'urbi-botao.icone',
+    'urbi-botao.pequeno',
+    'urbi-botao.variante',
     'urbi-checkbox.label',
-    'urbi-checkbox.marcado',
+    // O cadeado do "Início derivado" (âncora do Cronograma).
+    'urbi-icone.classe',
+    'urbi-input.erro',
+    'urbi-input.label',
+    'urbi-modal.title',
+    'urbi-nav.ativo',
+    'urbi-nav.secoes',
+    'urbi-select.label',
+    'urbi-select.opcoes',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).__patchFunding = null;
@@ -96,82 +104,56 @@ export const caso = {
       if (rota.includes('/avancado/custos')) return { dados: CUSTOS };
       return { dados: [] };
     };
-
-    const el = document.createElement('viab-funding');
-    forcarEstado(el, {
-      // sem `id`: `updated()` não dispara o carregamento inicial (ver funding-fap-checkbox.ts)
-      estudo: { nivel_analise: 'avancado' },
-      carregando: false,
-      ...estadoCalc([{ ...DIVIDA }, FAP]),
-      operacoes: [{ ...DIVIDA }, FAP],
-      custos: CUSTOS,
-      crono: CRONO,
-      dataInicio: DATA_INICIO,
-      taxaDescontoAa: 12,
-      editavel: true,
-    });
-    raiz.appendChild(el);
-    await (el as any).updateComplete;
-    (el as any)._recalcular();
-    await (el as any).updateComplete;
-    // O formulário da dívida mora na página da operação, aberta pelo cartão.
-    await abrirCartao(el, DIVIDA.id);
+    const el = await montarTela(raiz, [{ ...DIVIDA }, FAP], true);
+    await abrirEdicao(el);
+    await irParaAporte(el);
   },
   async medir(raiz: HTMLElement) {
-    const tela = raiz.querySelector('viab-funding')! as any;
-    const sr = tela.shadowRoot!;
-    const mesTexto = () => sr.querySelector('span.mes-derivado')?.textContent?.trim() ?? null;
-    // O painel "Visão do investidor" inteiro: investimento, retorno, TIR, VPL, payback…
-    const painel = (r: ShadowRoot) => [...r.querySelectorAll('div.ind-card')]
-      .map((c) => `${c.querySelector('.rot')?.textContent?.trim()}=${c.querySelector('.val')?.textContent?.trim()}`)
-      .join(' | ');
+    // As interações rodam numa tela à parte: a que `montar()` deixou com a
+    // janela aberta na etapa Aporte é a que o `exigir` e as lentes medem.
+    const tela = await montarTela(raiz, [{ ...DIVIDA }, FAP], true);
+    await abrirEdicao(tela);
+    await irParaAporte(tela);
+    const janela = () => tela.shadowRoot.querySelector('viab-funding-janela') as any;
+    const mesTexto = () => janela()?.shadowRoot.querySelector('span.mes-derivado')?.textContent?.trim() ?? null;
     const esperar = async () => {
       await tela.updateComplete;
       await new Promise((r) => setTimeout(r, 0));
       await tela.updateComplete;
+      await janela()?.updateComplete;
     };
 
-    // Oráculo: uma segunda tela, com a operação já GRAVADA no mês novo (sem
-    // rascunho, então sem passar pela derivação sob teste) e o fluxo-base que
-    // `_carregar` montaria com ela, lida da mesma forma.
+    // Oráculo: uma segunda tela, com a operação já GRAVADA no mês novo, e a
+    // janela dela aberta sem mudar nada — sem rascunho, então sem passar pela
+    // derivação sob teste.
     const gravadaNova = [{ ...DIVIDA, cronograma_evento: EVENTO_NOVO, inicio_mes: MES_NOVO }, FAP];
-    const ref = document.createElement('viab-funding') as any;
-    forcarEstado(ref, {
-      estudo: { nivel_analise: 'avancado' }, carregando: false,
-      ...estadoCalc(gravadaNova),
-      operacoes: gravadaNova,
-      custos: CUSTOS, crono: CRONO, dataInicio: DATA_INICIO, taxaDescontoAa: 12,
-      editavel: false,
-    });
-    raiz.appendChild(ref);
-    await ref.updateComplete;
-    ref._recalcular();
-    await ref.updateComplete;
-    await abrirCartao(ref, DIVIDA.id);
-    const painelEsperado = painel(ref.shadowRoot!);
+    const ref = await montarTela(raiz, gravadaNova, true);
+    await abrirEdicao(ref);
+    const resumoEsperado = resumo(ref);
     ref.remove();
 
-    const antes = { mes: mesTexto(), painel: painel(sr) };
+    const antes = { mes: mesTexto(), resumo: resumo(tela) };
 
-    const select = [...sr.querySelectorAll('urbi-select')].find(
-      (s: any) => (s.opcoes ?? []).some((o: any) => o.valor === 'customizado'),
-    ) as HTMLElement;
-    select.dispatchEvent(new CustomEvent('urbi:select-change', {
-      detail: { valor: EVENTO_NOVO }, bubbles: true, composed: true,
-    }));
+    janela().shadowRoot.querySelector('urbi-select[data-campo="cronograma_evento"]')!
+      .dispatchEvent(new CustomEvent('urbi:select-change', { detail: { valor: EVENTO_NOVO }, bubbles: true, composed: true }));
     await esperar();
-    const rascunho = { mes: mesTexto(), painel: painel(sr) };
+    const rascunho = { mes: mesTexto(), resumo: resumo(tela) };
 
-    // O Salvar do card da dívida — o da FàP (inativa, sem rascunho) também está na árvore.
-    const salvar = sr.querySelector('span.mes-derivado')!.closest('urbi-card')!
-      .querySelector('.form-acoes urbi-botao') as HTMLElement;
-    salvar.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
-    await esperar();
-    await esperar();
-    const salvo = { mes: mesTexto(), patch: (globalThis as any).__patchFunding, temDraft: Object.keys(tela.draft).length > 0 };
+    janela().shadowRoot.querySelector('urbi-botao.confirmar')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    for (let i = 0; i < 4; i++) await esperar();
+    const termoMes = [...tela.shadowRoot.querySelectorAll('div.pagina-operacao dl div.termo')]
+      .find((t: any) => t.querySelector('dt')?.textContent?.trim() === 'Mês do aporte')
+      ?.querySelector('dd')?.textContent?.trim() ?? null;
+    const salvo = {
+      mes: termoMes,
+      patch: (globalThis as any).__patchFunding,
+      janelaFechada: !janela(),
+    };
 
+    tela.remove();
     return {
-      antes, rascunho, salvo, painelEsperado,
+      antes, rascunho, salvo, resumoEsperado,
       horizonteGravado: estadoCalc([{ ...DIVIDA, inicio_mes: MES_GRAVADO }, FAP]).calc.fluxoMensal.length,
       horizonteNovo: estadoCalc(gravadaNova).calc.fluxoMensal.length,
       mesGravadoEsperado: rotuloMesRelativo(DATA_INICIO, MES_GRAVADO),
@@ -179,3 +161,48 @@ export const caso = {
     };
   },
 };
+
+async function montarTela(raiz: HTMLElement, ops: any[], editavel: boolean): Promise<any> {
+  const el = document.createElement('viab-funding') as any;
+  forcarEstado(el, {
+    // sem `id`: `updated()` não dispara o carregamento inicial (ver funding-fap-checkbox.ts)
+    estudo: { nivel_analise: 'avancado' },
+    carregando: false,
+    ...estadoCalc(ops),
+    operacoes: ops,
+    custos: CUSTOS,
+    crono: CRONO,
+    dataInicio: DATA_INICIO,
+    taxaDescontoAa: 12,
+    editavel,
+  });
+  raiz.appendChild(el);
+  await el.updateComplete;
+  el._recalcular();
+  await el.updateComplete;
+  return el;
+}
+
+/** A página da dívida (pelo cartão) e o botão Editar dela, como a pessoa faz. */
+async function abrirEdicao(el: any) {
+  await abrirCartao(el, DIVIDA.id);
+  el.shadowRoot.querySelector('div.pagina-operacao urbi-botao.editar')!
+    .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  await el.updateComplete;
+  await el.shadowRoot.querySelector('viab-funding-janela')?.updateComplete;
+}
+
+async function irParaAporte(el: any) {
+  const j = el.shadowRoot.querySelector('viab-funding-janela');
+  j.shadowRoot.querySelector('urbi-nav')!
+    .dispatchEvent(new CustomEvent('urbi:nav-selecionar', { detail: { id: 'aporte' }, bubbles: true, composed: true }));
+  await j.updateComplete;
+}
+
+/** O "Resumo" da janela aberta: os quatro KPIs. */
+function resumo(el: any): string {
+  const j = el.shadowRoot.querySelector('viab-funding-janela');
+  return [...j.shadowRoot.querySelectorAll('div.kpi')]
+    .map((k: any) => `${k.querySelector('.rot')?.textContent?.trim()}=${k.querySelector('.val')?.textContent?.trim()}`)
+    .join(' | ');
+}

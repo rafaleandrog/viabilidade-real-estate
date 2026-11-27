@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarCamposOperacao, TIPOS_OPERACAO, conflitoFinanciamentoUnico, somaRetornoExcede, remocaoFinanciamentoBloqueada,
+  trocaDeTipoBloqueada,
 } from './funding.js';
 
 // #355 — validação das operações de Funding. Só lógica pura: as rotas em si
@@ -164,6 +165,15 @@ test('#587 remocaoFinanciamentoBloqueada: só o Financiamento à produção é f
   assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'financiamento_producao' }), true);
   assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'divida' }), false);
   assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'equity' }), false);
+});
+
+test('trocaDeTipoBloqueada: recusa só a troca, nunca o mesmo tipo nem o PATCH sem tipo', () => {
+  assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo: 'equity' }), true);
+  assert.equal(trocaDeTipoBloqueada({ tipo: 'equity' }, { tipo: 'antecipacao_recebiveis' }), true);
+  assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo: 'financiamento_producao' }), true);
+  assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo: 'divida' }), false);
+  assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { nome: 'X' }), false);
+  assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, {}), false);
 });
 
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────

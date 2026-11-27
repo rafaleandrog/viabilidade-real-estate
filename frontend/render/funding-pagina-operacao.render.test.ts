@@ -24,8 +24,9 @@ test('Funding: o cartão abre a página da operação, e a página volta para Op
   // O botão de voltar: texto "Operações", sem href e sem auto-voltar (que
   // chamaria o histórico e tiraria a pessoa do estudo).
   assert.deepEqual(x.botaoVoltar, { texto: 'Operações', href: false, autoVoltar: false });
-  // Quem edita: as duas setas, o Remover e o Salvar de hoje, dentro da página.
-  assert.deepEqual(x.editor, { setas: 2, remover: 1, salvar: 1 });
+  // Quem edita: as duas setas, o Editar e o Remover, dentro da página — que é
+  // leitura: nenhum campo editável e nenhum Salvar (a edição é pela janela).
+  assert.deepEqual(x.editor, { setas: 2, remover: 1, editar: 1, salvar: 0, campos: 0 });
 
   assert.equal(x.focoAoAbrir, 'pagina-operacao', 'ao abrir a página, o foco não foi para ela');
   assert.deepEqual(x.mover, { antes: ['1', '5'], depois: ['5', '1'], primeiroCartao: '5', antesDoPrimeiro: true },
@@ -38,11 +39,11 @@ test('Funding: o cartão abre a página da operação, e a página volta para Op
   assert.deepEqual(x.acessivel, { role: 'button', tabindex: '0', nome: 'Abrir operação Capital de giro', interativosDentro: 0 });
   assert.equal(x.outraTecla, false, 'tecla que não é Enter nem Espaço abriu a página');
   assert.equal(x.enter, true, 'Enter no cartão não abriu a página');
-  assert.equal(x.espaco, true, 'Espaço no cartão do equity não abriu a página dele');
+  assert.equal(x.espaco, true, 'Espaço no cartão do equity não abriu a página dele (com os termos de retorno)');
 
   assert.deepEqual(x.leitorLista, { novaOperacao: false, cartoes: 2 }, 'leitor: sem Nova operação, com os cartões');
   assert.equal(x.leitorPagina.aberta, true, 'leitor não abre a página');
-  assert.equal(x.leitorPagina.botoes, 0, 'leitor vê Salvar, Remover ou setas');
+  assert.equal(x.leitorPagina.botoes, 0, 'leitor vê Editar, Remover ou setas');
   assert.ok(x.leitorPagina.painel >= 6, 'leitor não vê o painel do investidor');
 
   assert.equal(x.msgLigado, 'Nenhuma operação além do Financiamento à produção, que tem aba própria.');
@@ -51,7 +52,8 @@ test('Funding: o cartão abre a página da operação, e a página volta para Op
   assert.deepEqual(x.janela, {
     aberta: true, titulo: 'Nova operação',
     tipos: ['Dívida / Capital de giro', 'Equity', 'Antecipação de recebíveis'],
-  });
+    escritas: 0,
+  }, '"Nova operação" não abriu a janela, ou gravou antes de "Criar operação"');
   // Os padrões de hoje (`_adicionar`) para a dívida.
   assert.equal(x.aposCriar.corpo?.tipo, 'divida');
   assert.equal(x.aposCriar.corpo?.taxa_anual, 12);

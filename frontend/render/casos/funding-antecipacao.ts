@@ -41,16 +41,16 @@ export const caso = {
     // painel genérico "Visão do investidor" também tem 6 cards, e contar só
     // `div.ind-card` deixava passar a troca de um pelo outro (achado de revisão).
     { seletor: 'div.resultado-antecipacao div.ind-card', minimo: 6 },
-    // pct cedido, taxa de desconto e as três tarifas (o mês da cessão é customizado, + 1)
-    { seletor: 'viab-num', minimo: 6 },
+    // Os termos da cessão, em leitura: mês da cessão, pct cedido, taxa de
+    // desconto e as três tarifas. Antes eram os seis campos do formulário na
+    // página; a edição foi para a janela (medida em `funding-janela`), e a
+    // página mostra os mesmos seis como termos.
+    { seletor: 'div.pagina-operacao dl div.termo', minimo: 6 },
   ],
   aceitaNaoReproduzido: [
     'urbi-banner.variante',
     'urbi-abas.abas',
     'urbi-abas.ativa',
-    'urbi-select.desabilitado',
-    'urbi-select.opcoes',
-    'urbi-input.desabilitado',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const calc = calcularFluxo({

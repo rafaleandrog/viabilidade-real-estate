@@ -1,0 +1,191 @@
+// Espelho das regras do servidor no navegador (`funding-validacao.ts`). Os
+// testes de paridade e os de `errosDoEstadoFinal` moravam em
+// `funding-alternativas.test.ts` e mudaram junto com as funções; o que eles
+// provam é o mesmo, agora sobre `OperacaoFunding[]`. O caso das operações
+// `__fora` (marcador da aba Comparar estruturas) ficou lá, porque é o filtro
+// que a função de lá aplica antes de delegar.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { OperacaoFunding } from './funding-motor.js';
+import { novaOperacaoAlternativa } from './funding-alternativas.js';
+import {
+  CAMPOS_OPERACAO_ESPELHO, errosDoEstadoFinal, errosRetornoPorModo, recusaDoNome, recusaDoPatchComoServidor,
+  recusaDoPostComoServidor, trocaDeTipoComoServidor, validarOperacaoComoServidor,
+} from './funding-validacao.js';
+
+const eq = (pct: number, modo?: string, extra: Record<string, unknown> = {}) =>
+  ({ ...novaOperacaoAlternativa('equity', `E${pct}`), pct_retorno: pct, ...(modo ? { modo_retorno: modo } : {}), ...extra }) as OperacaoFunding;
+const lista = (...ops: OperacaoFunding[]): OperacaoFunding[] => ops;
+
+// ── paridade com o servidor ─────────────────────────────────────────
+// O frontend não importa de `backend/`, mas este teste carrega o módulo do
+// servidor em tempo de execução: trava que `validarOperacaoComoServidor`
+// aceite/recuse exatamente o que `validarCamposOperacao` aceita/recusa. O
+// especificador é uma variável de propósito: um `import` estático arrastaria o
+// typecheck do backend (augmentação de tipos do SDK) para o do frontend.
+const CAMINHO_BACKEND_FUNDING = '../backend/rotas/funding.ts';
+const CAMINHO_BACKEND_COERCAO = '../backend/rotas/coercao-numerica.ts';
+async function validarCamposOperacao(op: Record<string, any>): Promise<string | null> {
+  const mod = await import(CAMINHO_BACKEND_FUNDING);
+  return mod.validarCamposOperacao(op);
+}
+
+const BASE_POR_TIPO: Record<string, Record<string, any>> = {
+  financiamento_producao: { tipo: 'financiamento_producao', nome: 'F', ativo: true, valor: 100, taxa_anual: 12, percentual_financiavel: 50, exposicao_minima: 10, periodo_amortizacao_meses: 24, periodo_carencia_meses: 6, aporte_meses: 3, inicio_mes: 1, custo_linha_ids: [1, 2] },
+  divida: { tipo: 'divida', nome: 'D', ativo: true, valor: 100, taxa_anual: 12, periodo_amortizacao_meses: 24, periodo_carencia_meses: 6, taxa_estruturacao_pct: 1, outros_encargos_iniciais: 0, inicio_mes: 2, aporte_meses: 1, cronograma_evento: 'obra' },
+  equity: { tipo: 'equity', nome: 'E', ativo: true, valor: 100, pct_retorno: 30, modo_retorno: 'permuta_financeira', taxa_administracao_mensal: 0, inicio_mes: 1, aporte_meses: 2 },
+  antecipacao_recebiveis: { tipo: 'antecipacao_recebiveis', nome: 'A', ativo: true, valor: 100, taxa_anual: 20, pct_carteira_cedida: 40, taxa_estruturacao_pct: 1, inicio_mes: 3 },
+};
+const CAMPOS_NUM = [
+  'valor', 'inicio_mes', 'aporte_meses', 'taxa_anual', 'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
+  'exposicao_minima', 'percentual_financiavel', 'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais', 'pct_carteira_cedida',
+];
+
+function casosDeParidade(): Array<[string, Record<string, any>]> {
+  const casos: Array<[string, Record<string, any>]> = [];
+  for (const [tipo, base] of Object.entries(BASE_POR_TIPO)) {
+    casos.push([`${tipo} base`, base]);
+    for (const campo of CAMPOS_NUM) {
+      for (const v of [-1, 101, 'x', null, 0, 50]) casos.push([`${tipo} ${campo}=${JSON.stringify(v)}`, { ...base, [campo]: v }]);
+    }
+    casos.push([`${tipo} carência>=amort`, { ...base, periodo_amortizacao_meses: 12, periodo_carencia_meses: 12 }]);
+    casos.push([`${tipo} carência>amort`, { ...base, periodo_amortizacao_meses: 12, periodo_carencia_meses: 20 }]);
+    casos.push([`${tipo} amort 0 carência 5`, { ...base, periodo_amortizacao_meses: 0, periodo_carencia_meses: 5 }]);
+    casos.push([`${tipo} aporte_meses 0`, { ...base, aporte_meses: 0 }]);
+    for (const a of ['sim', false, true, null, 1]) casos.push([`${tipo} ativo=${JSON.stringify(a)}`, { ...base, ativo: a }]);
+    casos.push([`${tipo} tipo inválido`, { ...base, tipo: 'xx' }]);
+    casos.push([`${tipo} modo inválido`, { ...base, modo_retorno: 'xx' }]);
+    casos.push([`${tipo} evento inválido`, { ...base, cronograma_evento: 'xx' }]);
+    casos.push([`${tipo} evento válido`, { ...base, cronograma_evento: 'lancamento' }]);
+    for (const l of [['a'], 'x', [1, '2'], [null], []]) casos.push([`${tipo} custo_linha_ids=${JSON.stringify(l)}`, { ...base, custo_linha_ids: l }]);
+  }
+  return casos;
+}
+
+// Reproduz a ordem do POST com as funções REAIS do servidor: coerção numérica,
+// `tipo`/`nome` obrigatórios e `validarCamposOperacao` (sobre os dados coagidos).
+// No `nome` vai além do servidor, de propósito (conservador): só espaços e mais de
+// 100 caracteres (schema `obrigatorio` + `limite: 100`).
+async function servidorRecusa(op: Record<string, any>): Promise<string | null> {
+  const coer = await import(CAMINHO_BACKEND_COERCAO);
+  const r = coer.coagirNumericosDeclarados('avancado_funding_operacoes', op);
+  if ('falha' in r) return r.falha.mensagem;
+  const dados = r.dados;
+  if (!dados.tipo) return 'tipo é obrigatório';
+  if (!dados.nome || typeof dados.nome !== 'string' || !dados.nome.trim()) return 'nome é obrigatório';
+  if (dados.nome.length > 100) return 'nome longo';
+  return validarCamposOperacao(dados);
+}
+
+const CAMINHO_BACKEND_AVANCADO = '../backend/rotas/avancado.ts';
+
+test('errosDoEstadoFinal: soma 120% num modo → um erro; modo padrão é permuta_financeira', () => {
+  const erros = errosDoEstadoFinal(lista(eq(70), eq(50, 'permuta_financeira')));
+  assert.equal(erros.length, 1);
+  assert.match(erros[0], /Permuta financeira.*120\.00%/);
+});
+
+test('errosDoEstadoFinal: 100 em cada um de dois modos → sem erro', () => {
+  assert.deepEqual(errosDoEstadoFinal(lista(eq(100, 'permuta_financeira'), eq(100, 'resultado_final'))), []);
+});
+
+test('errosDoEstadoFinal: retorno ou valor negativo e retorno acima de 100 por operação', () => {
+  assert.equal(errosDoEstadoFinal(lista(eq(-5))).length, 1);
+  assert.equal(errosDoEstadoFinal(lista(eq(10, undefined, { valor: -1 }))).length, 1);
+  assert.ok(errosDoEstadoFinal(lista(eq(101))).length >= 1);
+});
+
+test('paridade: validarOperacaoComoServidor aceita ⇔ validarCamposOperacao aceita', async () => {
+  const casos = casosDeParidade();
+  assert.ok(casos.length > 300);
+  for (const [nome, op] of casos) {
+    const servidor = await validarCamposOperacao(op);
+    assert.equal(validarOperacaoComoServidor(op) === null, servidor === null, nome);
+    assert.equal(validarOperacaoComoServidor(op), servidor, `${nome} (mensagem)`);
+  }
+});
+
+test('paridade do POST: recusaDoPostComoServidor ⇔ coerção + tipo/nome + validarCamposOperacao', async () => {
+  const INTEIROS = ['inicio_mes', 'aporte_meses', 'periodo_amortizacao_meses', 'periodo_carencia_meses', 'ordem'];
+  const casos: Array<[string, Record<string, any>]> = [];
+  for (const [tipo, base] of Object.entries(BASE_POR_TIPO)) {
+    casos.push([`${tipo} base`, base]);
+    for (const n of ['', '   ', 'x'.repeat(100), 'x'.repeat(101), undefined, null, 5]) {
+      casos.push([`${tipo} nome=${JSON.stringify(n)}`, { ...base, nome: n }]);
+    }
+    for (const t of [undefined, '', null]) casos.push([`${tipo} tipo=${JSON.stringify(t)}`, { ...base, tipo: t }]);
+    for (const campo of [...CAMPOS_NUM, 'ordem', 'estudo_id', 'fase_ancora_id']) {
+      for (const v of ['abc', '', '12', ' 7 ', '1e3', '0x10', 1.5, true, NaN, Infinity, {}, [], '1.5']) {
+        casos.push([`${tipo} ${campo}=${String(v)}`, { ...base, [campo]: v }]);
+      }
+    }
+  }
+  assert.ok(casos.some(([n]) => n.includes('1.5')) && INTEIROS.length === 5);
+  for (const [nome, op] of casos) {
+    const servidor = await servidorRecusa(op);
+    const front = recusaDoPostComoServidor(op);
+    assert.equal(front === null, servidor === null, `${nome}: front=${front} servidor=${servidor}`);
+  }
+  assert.equal(recusaDoPostComoServidor({ ...BASE_POR_TIPO.divida, nome: '' }), 'nome é obrigatório');
+});
+
+test('errosDoEstadoFinal: nome apagado, tipo ausente e número inválido são recusados antes de gravar', () => {
+  const div = BASE_POR_TIPO.divida as any;
+  assert.equal(errosDoEstadoFinal(lista({ ...div, nome: '' })).length, 1);
+  assert.equal(errosDoEstadoFinal(lista({ ...div, nome: 'x'.repeat(101) })).length, 1);
+  assert.equal(errosDoEstadoFinal(lista({ ...div, tipo: '' })).length, 1);
+  assert.equal(errosDoEstadoFinal(lista({ ...div, valor: 'abc' })).length, 1);
+  assert.equal(errosDoEstadoFinal(lista({ ...div, inicio_mes: 1.5 })).length, 1);
+});
+
+test('errosDoEstadoFinal: recusa o que o servidor recusa (taxa negativa, carência >= amortização, ativo inválido)', () => {
+  const div = { ...BASE_POR_TIPO.divida, taxa_anual: -3 } as unknown as OperacaoFunding;
+  const erros = errosDoEstadoFinal(lista(div));
+  assert.equal(erros.length, 1);
+  assert.match(erros[0], /taxa_anual não pode ser negativo/);
+  assert.equal(errosDoEstadoFinal(lista({ ...BASE_POR_TIPO.divida, periodo_carencia_meses: 30 } as unknown as OperacaoFunding)).length, 1);
+  assert.equal(errosDoEstadoFinal(lista({ ...BASE_POR_TIPO.divida, ativo: false } as unknown as OperacaoFunding)).length, 1);
+  assert.deepEqual(errosDoEstadoFinal(lista(BASE_POR_TIPO.divida as unknown as OperacaoFunding)), []);
+});
+
+test('paridade: CAMPOS_OPERACAO_ESPELHO é exatamente o CAMPOS_OPERACAO do backend', async () => {
+  const mod = await import(CAMINHO_BACKEND_AVANCADO);
+  assert.deepEqual([...CAMPOS_OPERACAO_ESPELHO].sort(), [...mod.CAMPOS_OPERACAO].sort());
+});
+
+test('errosRetornoPorModo: soma por modo, tolerância de 100,01', () => {
+  assert.deepEqual(errosRetornoPorModo([eq(60), eq(40)]), []);
+  assert.deepEqual(errosRetornoPorModo([eq(60), eq(40.01)]), []);
+  assert.equal(errosRetornoPorModo([eq(60), eq(40.02)]).length, 1);
+  assert.deepEqual(errosRetornoPorModo([eq(90, 'resultado_final'), eq(90)]), []);
+});
+
+test('recusaDoNome: vazio, só espaços e mais de 100 caracteres', () => {
+  assert.equal(recusaDoNome(''), 'nome é obrigatório');
+  assert.equal(recusaDoNome('   '), 'nome é obrigatório');
+  assert.equal(recusaDoNome(undefined), 'nome é obrigatório');
+  assert.equal(recusaDoNome('x'.repeat(100)), null);
+  assert.match(String(recusaDoNome('x'.repeat(101))), /100 caracteres/);
+});
+
+
+test('paridade: trocaDeTipoComoServidor ⇔ trocaDeTipoBloqueada', async () => {
+  const mod = await import(CAMINHO_BACKEND_FUNDING);
+  const tipos = ['divida', 'equity', 'antecipacao_recebiveis', 'financiamento_producao'];
+  for (const gravado of tipos) {
+    for (const patch of [{}, { nome: 'x' }, ...tipos.map((tipo) => ({ tipo }))]) {
+      assert.equal(trocaDeTipoComoServidor({ tipo: gravado }, patch), mod.trocaDeTipoBloqueada({ tipo: gravado }, patch),
+        `${gravado} ← ${JSON.stringify(patch)}`);
+    }
+  }
+});
+
+test('recusaDoPatchComoServidor: troca de tipo, estado final e coerção do patch', () => {
+  const gravada = { ...BASE_POR_TIPO.divida, id: 1 };
+  assert.equal(recusaDoPatchComoServidor(gravada, { nome: 'Outro' }), null);
+  assert.equal(recusaDoPatchComoServidor(gravada, { tipo: 'divida', nome: 'Outro' }), null);
+  assert.match(String(recusaDoPatchComoServidor(gravada, { tipo: 'equity' })), /tipo/);
+  // Estado final: o patch manda só a carência, e a amortização gravada a recusa.
+  assert.match(String(recusaDoPatchComoServidor(gravada, { periodo_carencia_meses: 24 })), /carencia/);
+  assert.match(String(recusaDoPatchComoServidor(gravada, { valor: '1e3' })), /"valor"/);
+});
