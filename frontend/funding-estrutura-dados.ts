@@ -46,8 +46,9 @@ export interface DadosEstrutura {
   totais: TotalEstrutura[];
   /**
    * Todas as camadas, inclusive as de valor zero. A torre não desenha a de
-   * valor zero; a alternativa em texto da aba é a tabela da sequência (onde a
-   * operação de valor zero continua sendo um passo) e os totais.
+   * valor zero; em texto, a operação de valor zero continua sendo um passo da
+   * tabela da sequência, e o incorporador de valor zero é o total
+   * "incorporador no pico".
    */
   camadas: CamadaDaTorre[];
   linhas: LinhaSequencia[];

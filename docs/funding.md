@@ -251,9 +251,10 @@ antecipação, "recebe sobre a receita" ou "participa do resultado" no equity (c
 incide sobre a receita líquida ou sobre o resultado final) e "recebe por último" no incorporador.
 Uma camada pequena tem uma altura mínima para o texto caber numa linha, e o percentual escrito
 continua sendo o verdadeiro; nome comprido é cortado com reticências, e o valor e o percentual
-ficam sempre visíveis. Camada de valor zero — uma antecipação sem parcela a ceder, por exemplo, ou
-o incorporador num projeto que nunca fica no vermelho — não é desenhada, mas aparece na tabela da
-sequência e nos totais.
+ficam sempre visíveis. Camada de valor zero não é desenhada, mas continua visível em texto: uma
+operação de valor zero (uma antecipação sem parcela a ceder, por exemplo) continua sendo uma linha
+da tabela da sequência, e o incorporador de um projeto que nunca fica no vermelho aparece como
+"incorporador no pico" zerado.
 Sem nenhuma camada com valor, a torre dá lugar ao texto "Nenhuma camada com valor.". Para leitor
 de tela, cada camada é um item de lista com o nome, o nível, o valor exato e o percentual.
 
@@ -265,7 +266,10 @@ novo, por isso a camada dele não é o total liberado.
 Por fim, a **tabela da sequência**: uma linha para o projeto sem funding e uma para cada operação,
 na ordem de senioridade, com a **TIR alavancada** e a **exposição máxima** depois daquele passo — os
 mesmos textos do "depois" de cada cartão. A última linha é a estrutura completa, e a exposição dela
-é o "incorporador no pico".
+é o "incorporador no pico". A exceção é o empate de duas antecipações no mesmo mês e na mesma
+posição: a ordem em que o app simula as duas muda o resultado, e a última linha (calculada na ordem
+de senioridade) pode diferir do "incorporador no pico" e da torre (calculados na ordem em que as
+operações estão salvas).
 
 O texto de apoio, abaixo da tabela, lembra como ler a aba:
 

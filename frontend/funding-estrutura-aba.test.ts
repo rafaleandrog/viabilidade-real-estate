@@ -163,7 +163,8 @@ test('tabela: começa no projeto sem funding, um passo por operação, termina n
   const ultima = D.linhas[D.linhas.length - 1];
   assert.deepEqual(ultima.exposicao, valorEmReais(Math.abs(completa.exposicaoMaxima)));
   assert.deepEqual(ultima.tir, valorPercentual(completa.tirAlavancada, true));
-  // E o "incorporador no pico" é a mesma figura da última linha.
+  // E o "incorporador no pico" é a mesma figura da última linha (fora do empate
+  // de antecipações, coberto no teste próprio).
   assert.deepEqual(D.totais[3].valor, ultima.exposicao);
 });
 

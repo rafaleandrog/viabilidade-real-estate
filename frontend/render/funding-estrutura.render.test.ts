@@ -128,7 +128,8 @@ test('aba Estrutura de capital: torre na senioridade com o FàP na base, totais,
       assert.equal(linha.exposicao, cartao.exposicao, `exposição da tabela ≠ cartão (${id})`);
       assert.equal(linha.tir, cartao.tir, `TIR da tabela ≠ cartão (${id})`);
     }
-    // A última linha é a estrutura completa: o "incorporador no pico".
+    // A última linha é a estrutura completa: o "incorporador no pico" (a
+    // fixture não tem o empate de antecipações, único caso em que diferem).
     assert.equal(x.tabelaTexto[3].exposicao, x.totais[3].valor, 'a última linha não é a estrutura completa');
     // O texto de apoio traz a D9 junto da frase do pagamento pelo contrato, e
     // não afirma que não há cascata: o Financiamento à produção varre o caixa.
