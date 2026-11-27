@@ -194,10 +194,9 @@ financiamento (custo financiável total, percentual financiado, principal máxim
 mês e valor da primeira liberação, total liberado, total de juros, pico do saldo devedor e o mês
 dele, primeiro mês de amortização, último mês com dívida e total amortizado) e o gráfico
 **Alavancagem mês a mês**, com o custo financiável acumulado, o principal liberado acumulado, o saldo
-devedor e as amortizações. O gráfico só aparece quando há alguma liberação: ligado mas sem liberar
-(sem custo elegível, ou sem atingir a exposição mínima), a aba fica sem ele. Quem só lê um estudo em
-que o financiamento à produção nunca foi criado vê, no lugar da aba, o aviso de que nenhum foi
-configurado.
+devedor e as amortizações. O gráfico só aparece quando há alguma liberação: se o banco não libera
+nada pelas regras abaixo, a aba fica sem ele. Quem só lê um estudo em que o financiamento à produção
+nunca foi criado encontra, ao abrir a aba, o aviso de que nenhum foi configurado.
 
 Como o banco libera: os custos elegíveis são reconhecidos quando incorridos; quando o percentual
 incorrido atinge a exposição mínima e a obra está ativa, a liberação daquele mês cobre tudo o que
