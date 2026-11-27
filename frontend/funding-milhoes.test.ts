@@ -39,11 +39,14 @@ const chamadas = (texto: string) => semComentarios(texto).split('fmtR$Mi(').leng
 const mencoes = (texto: string) => (semComentarios(texto).match(/fmtR\$Mi(?![A-Za-z0-9_$])/g) ?? []).length;
 
 /**
- * Os consumidores da exceção, e quantas vezes cada um a chama. Vazio nesta
- * fase: o formatador nasce antes da tela. Os cartões de operação e a aba
- * Estrutura de capital entram aqui quando passarem a chamá-lo.
+ * Os consumidores da exceção, e quantas vezes cada um a chama. Os cartões de
+ * operação montam todo valor em reais por um único ponto (`reais()`, que põe o
+ * exato em 2 casas no título). A aba Estrutura de capital entra aqui quando
+ * passar a chamá-lo.
  */
-const CONSUMIDORES: { arquivo: string; chamadas: number }[] = [];
+const CONSUMIDORES: { arquivo: string; chamadas: number }[] = [
+  { arquivo: 'frontend/funding-cartao-dados.ts', chamadas: 1 },
+];
 
 /** Onde o símbolo PODE aparecer sem ser um call site de exibição. */
 const EXCECOES = [

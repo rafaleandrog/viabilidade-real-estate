@@ -16,6 +16,12 @@
 > escrita à mão a partir do `dist/index.d.ts` do SDK fixado (`57.0.0`), porque o monorepo não estava
 > acessível. Com ela o conteúdo real é 29 primitivos · 198 props. O sincronizador regrava o bloco
 > acima e o `primitivos.json` inteiro, mas não esta nota: quem rodar o sincronizador a remove à mão.
+>
+> **Segunda entrada fora do carimbo:** a prop `texto` do `urbi-botao-voltar` (atributo `texto`,
+> `String`), escrita à mão a partir do `dist/index.d.ts` e do `docs/ui-componentes-conteudo.md` do SDK
+> fixado (`93.0.0`), porque o espelho é mais antigo que ela e o monorepo não estava acessível. É a
+> que mostra o rótulo visível ao lado do ícone; a página da operação do Funding a usa. Com ela, 199
+> props. Mesma regra da nota acima: o sincronizador a regrava, e quem o rodar remove esta nota.
 
 ## Por que este diretório existe
 

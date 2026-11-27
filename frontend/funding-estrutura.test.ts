@@ -333,7 +333,7 @@ test('unidade: custo efetivo e TIR alavancada saem em pontos percentuais, e a le
   assert.ok(k.custoEfetivoPct !== null && k.custoEfetivoPct > 1 && k.custoEfetivoPct < 100);
   // A leitura usa os dois números como estão, lado a lado, em % a.a.
   const fake: KpisOperacao = { ...k, custoEfetivoPct: 14, tirAlavancadaAntes: 20 };
-  const frases = leituraDaOperacao({ serie: s, kpis: fake, passo: null }, String);
+  const frases = leituraDaOperacao({ serie: s, kpis: fake, passo: null }, String, fmtMes);
   assert.ok(frases.some((f) => f.includes('14,0% a.a.') && f.includes('20,0% a.a.') && f.includes('abaixo')));
 });
 
@@ -417,10 +417,12 @@ const kpiDivida = (custo: number | null, tirAntes: number | null): KpisOperacao 
   tirAlavancadaAntes: tirAntes, tirAlavancadaDepois: null, exposicaoAntes: null, exposicaoDepois: null,
 });
 const fmt = (v: number) => `R$${v}`;
+/** Formatador de mês de teste: o índice 0-based do motor, como `rotuloMesRelativo` sem data de início. */
+const fmtMes = (i: number) => `M${i}`;
 const VAZIA = serie('divida');
 
 test('leitura (1): exposição reduz, aumenta ou não altera, com a fronteira do limiar', () => {
-  const ler = (a: number, d: number) => leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(null, null), passo: passo(est(a), est(d)) }, fmt);
+  const ler = (a: number, d: number) => leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(null, null), passo: passo(est(a), est(d)) }, fmt, fmtMes);
   assert.deepEqual(ler(-1000, -400), ['Reduz a exposição máxima do incorporador de R$1000 para R$400.']);
   assert.deepEqual(ler(-400, -1000), ['Aumenta a exposição máxima do incorporador de R$400 para R$1000.']);
   // Abaixo do limiar: não altera; no limiar: já altera.
@@ -428,51 +430,51 @@ test('leitura (1): exposição reduz, aumenta ou não altera, com a fronteira do
   assert.match(ler(-1000, -1000 + LIMIAR_EXPOSICAO_INALTERADA)[0], /^Reduz/);
 });
 
-test('leitura (2): quando recebe e paga, em meses que começam em 1', () => {
+test('leitura (2): quando recebe e paga, com o mês pelo formatador da tela (índice 0-based do motor)', () => {
   const s = serie('divida', { entradas: [0, 100, 0, 0], saidas: [0, 0, 60, 60] });
   assert.deepEqual(
-    leituraDaOperacao({ serie: s, kpis: kpiDivida(null, null), passo: null }, fmt),
-    ['O projeto recebe a partir do mês 2 e paga até o mês 4.'],
+    leituraDaOperacao({ serie: s, kpis: kpiDivida(null, null), passo: null }, fmt, fmtMes),
+    ['O projeto recebe a partir de M1 e paga até M3.'],
   );
   const eq = serie('equity', { entradas: [100, 0, 0, 0] });
   assert.deepEqual(
-    leituraDaOperacao({ serie: eq, kpis: { ...kpiDivida(null, null), tipo: 'equity', roiInvestidorPct: null, tirInvestidorPct: null } as KpisOperacao, passo: null }, fmt),
-    ['O investidor aporta a partir do mês 1.'],
+    leituraDaOperacao({ serie: eq, kpis: { ...kpiDivida(null, null), tipo: 'equity', roiInvestidorPct: null, tirInvestidorPct: null } as KpisOperacao, passo: null }, fmt, fmtMes),
+    ['O investidor aporta a partir de M0.'],
   );
   const so = serie('divida', { saidas: [0, 0, 0, 5] });
-  assert.deepEqual(leituraDaOperacao({ serie: so, kpis: kpiDivida(null, null), passo: null }, fmt), ['O projeto paga até o mês 4.']);
+  assert.deepEqual(leituraDaOperacao({ serie: so, kpis: kpiDivida(null, null), passo: null }, fmt, fmtMes), ['O projeto paga até M3.']);
 });
 
 test('leitura (2): fronteira de LIMIAR_MES_COM_VALOR — abaixo não conta como mês, no limiar conta', () => {
   const abaixo = LIMIAR_MES_COM_VALOR - 0.001;
-  const ler = (s: SerieOperacao) => leituraDaOperacao({ serie: s, kpis: kpiDivida(null, null), passo: null }, fmt);
+  const ler = (s: SerieOperacao) => leituraDaOperacao({ serie: s, kpis: kpiDivida(null, null), passo: null }, fmt, fmtMes);
   // Valores abaixo do limiar, nos dois sinais, não fazem frase.
   assert.deepEqual(ler(serie('divida', { entradas: [abaixo, 0, 0, 0], saidas: [0, 0, 0, -abaixo] })), []);
   // No limiar exato, o mês conta — na entrada (primeiro mês) e na saída (último mês).
   assert.deepEqual(
     ler(serie('divida', { entradas: [abaixo, LIMIAR_MES_COM_VALOR, 0, 0], saidas: [0, 0, LIMIAR_MES_COM_VALOR, abaixo] })),
-    ['O projeto recebe a partir do mês 2 e paga até o mês 3.'],
+    ['O projeto recebe a partir de M1 e paga até M2.'],
   );
 });
 
 test('leitura (3): custo contra a TIR alavancada antes, com veredito negativo e a fronteira do empate', () => {
-  const ler = (custo: number, tir: number) => leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(custo, tir), passo: null }, fmt);
+  const ler = (custo: number, tir: number) => leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(custo, tir), passo: null }, fmt, fmtMes);
   assert.match(ler(12, 20)[0], /abaixo .*alavanca o retorno/);
   assert.match(ler(25, 20)[0], /acima .*reduz o retorno/, 'veredito negativo');
   assert.match(ler(20 + LIMIAR_CUSTO_EMPATE_PP - 0.001, 20)[0], /praticamente/);
   assert.match(ler(20 + LIMIAR_CUSTO_EMPATE_PP, 20)[0], /acima/);
   // Sem um dos dois números, a frase não sai.
-  assert.deepEqual(leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(12, null), passo: null }, fmt), []);
-  assert.deepEqual(leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(null, 20), passo: null }, fmt), []);
+  assert.deepEqual(leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(12, null), passo: null }, fmt, fmtMes), []);
+  assert.deepEqual(leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(null, 20), passo: null }, fmt, fmtMes), []);
 });
 
 test('leitura: sem número nenhum devolve [] e nunca passa de três frases', () => {
-  assert.deepEqual(leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(null, null), passo: null }, fmt), []);
+  assert.deepEqual(leituraDaOperacao({ serie: VAZIA, kpis: kpiDivida(null, null), passo: null }, fmt, fmtMes), []);
   const cheia = serie('divida', { entradas: [100, 0, 0, 0], saidas: [0, 0, 0, 110] });
-  const frases = leituraDaOperacao({ serie: cheia, kpis: kpiDivida(12, 20), passo: passo(est(-10), est(-5)) }, fmt);
+  const frases = leituraDaOperacao({ serie: cheia, kpis: kpiDivida(12, 20), passo: passo(est(-10), est(-5)) }, fmt, fmtMes);
   assert.equal(frases.length, MAX_FRASES_LEITURA);
   assert.match(frases[0], /exposição/);
-  assert.match(frases[1], /mês/);
+  assert.match(frases[1], /M\d/);
   assert.match(frases[2], /TIR alavancada/);
 });
 
@@ -480,7 +482,7 @@ test('leitura sobre o motor real: o cartão de cada operação tem as três fras
   for (const id of [20, 30, 40]) {
     const s = serieDe(COMPLETA.funding, id);
     const p = passoDe(id);
-    const frases = leituraDaOperacao({ serie: s, kpis: kpisDaOperacao(s, VGV, p), passo: p }, fmt);
+    const frases = leituraDaOperacao({ serie: s, kpis: kpisDaOperacao(s, VGV, p), passo: p }, fmt, fmtMes);
     assert.equal(frases.length, 3, `operação ${id}: ${frases.join(' | ')}`);
   }
 });

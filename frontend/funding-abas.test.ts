@@ -2,68 +2,74 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { reordenarDentroDoTipo, camadasComOrdemAlterada } from './funding-motor.js';
+import { TIPOS_DE_CARTAO, operacoesDeCartao } from './funding-cartao-dados.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// #586 — a tela de Funding em `urbi-abas`: Operações · FàP · Dívida · Equity
+// A tela de Funding em `urbi-abas`: Operações (cartões) · Financiamento à
+// produção · Comparar estruturas
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Duas coisas são provadas aqui, e elas são de naturezas diferentes:
 //
-//  1. a REORDENAÇÃO por tipo, que é lógica pura e testável como tal;
-//  2. a IDENTIDADE do critério 2 — "o total de linhas da aba Operações é igual
-//     à soma das operações das outras três abas" — que é uma propriedade do
-//     PARTICIONAMENTO, não da tela.
+//  1. a PARTIÇÃO dos tipos entre cartões e abas — todo tipo tem lugar na tela,
+//     e nenhum em dois;
+//  2. a REORDENAÇÃO por tipo, que é lógica pura e testável como tal (as setas
+//     ficam na página da operação).
 //
-// ⚠️ O que este arquivo NÃO prova, e o caso de render prova: que as quatro abas
-// são montadas e que a tabela chega ao DOM. Teste de função pura não enxerga
-// fiação — é a classe de defeito nº 1 do `CLAUDE.md`. A defesa daquela metade é
-// `frontend/render/casos/funding-abas.ts`, com `exigir` sobre `urbi-abas` e
-// `urbi-tabela`.
+// ⚠️ O que este arquivo NÃO prova, e os casos de render provam: que os cartões
+// chegam ao DOM e que o clique abre a página. Teste de função pura não enxerga
+// fiação — é a classe de defeito nº 1 do `CLAUDE.md`. A defesa daquela metade
+// é `frontend/render/casos/funding-abas.ts` e `funding-pagina-operacao.ts`.
 
 const fonte = readFileSync(new URL('./tela-funding.ts', import.meta.url), 'utf8');
 
-// ── 1. O particionamento: a aba Operações é a UNIÃO das outras três ─────────
+// ── 1. O particionamento: todo tipo tem lugar — cartão ou aba ───────────────
 //
-// A tela filtra por `o.tipo === tipo` (`_operacoesDoTipo`) e a aba Operações
-// usa `this.operacoes` inteiro. A identidade só vale se os tipos particionarem
-// o conjunto — ou seja, se todo tipo existente estiver entre os três das abas.
-// Um tipo novo que ninguém pusesse numa aba sumiria da UI e QUEBRARIA a
-// identidade, sem nada mais ficar vermelho: as operações continuariam no banco,
-// contariam na tabela compilada, e não apareceriam em aba nenhuma.
-const TIPOS_COM_ABA = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
+// As abas por tipo saíram: dívida, equity e antecipação viram CARTÕES na aba
+// Operações (`operacoesDeCartao`), e o Financiamento à produção mora na aba
+// dele. A partição só vale se todo tipo estiver num dos dois lugares — um tipo
+// novo que ninguém pusesse em nenhum sumiria da UI sem nada mais ficar
+// vermelho: a operação continuaria no banco e no fluxo, e não apareceria em
+// lugar nenhum da tela.
+const TIPOS_CONHECIDOS = ['financiamento_producao', 'divida', 'equity', 'antecipacao_recebiveis'];
 
-test('#586 critério 2: a aba Operações lista a UNIÃO exata das outras três abas', () => {
+test('a lista de cartões é a UNIÃO exata dos três tipos de cartão, sem o Financiamento à produção', () => {
   const operacoes = [
     { id: 1, tipo: 'divida', ordem: 0 },
     { id: 2, tipo: 'financiamento_producao', ordem: 1 },
     { id: 3, tipo: 'equity', ordem: 2 },
     { id: 4, tipo: 'divida', ordem: 3 },
     { id: 5, tipo: 'equity', ordem: 4 },
+    { id: 6, tipo: 'antecipacao_recebiveis', ordem: 5 },
   ];
-  const porAba = TIPOS_COM_ABA.map((t) => operacoes.filter((o) => o.tipo === t));
-  const soma = porAba.reduce((s, l) => s + l.length, 0);
-  assert.equal(soma, operacoes.length, 'a soma das abas de tipo não bate com a tabela compilada');
-  // Não é só contagem: os IDs têm de ser os mesmos, senão duas listas de mesmo
-  // tamanho e conteúdo diferente passariam.
-  assert.deepEqual(
-    porAba.flat().map((o) => o.id).sort((a, b) => a - b),
-    operacoes.map((o) => o.id),
-  );
-  // E nenhuma operação em DUAS abas (o filtro por igualdade garante, mas a
-  // asserção é o que impede alguém trocar por um filtro sobreposto).
-  assert.equal(new Set(porAba.flat().map((o) => o.id)).size, operacoes.length);
+  const cartoes = operacoesDeCartao(operacoes);
+  const naAbaFap = operacoes.filter((o) => o.tipo === 'financiamento_producao');
+  // Cartões + aba do FàP cobrem tudo, sem sobra e sem repetição.
+  const ids = [...cartoes, ...naAbaFap].map((o) => o.id);
+  assert.deepEqual([...ids].sort((a, b) => a - b), operacoes.map((o) => o.id));
+  assert.equal(new Set(ids).size, operacoes.length, 'operação em dois lugares');
+  // E o FàP NÃO vira cartão.
+  assert.equal(cartoes.some((o) => o.tipo === 'financiamento_producao'), false);
+  // Os cartões são exatamente os três tipos listáveis.
+  assert.deepEqual([...TIPOS_DE_CARTAO].sort(), ['antecipacao_recebiveis', 'divida', 'equity']);
 });
 
-test('#586/#587: todo tipo declarado em TIPOS tem uma aba — tipo órfão sumiria da tela', () => {
-  // Lê a fonte porque `TIPOS` e `ABAS` são privados do módulo da tela. O que
-  // interessa é a relação entre as duas listas, e ela é o que quebra se alguém
-  // acrescentar um 4º tipo de operação sem dar aba a ele.
+test('os cartões saem na ordem de senioridade: dívidas → antecipações → equity, e dentro do tipo por `ordem`', () => {
+  const operacoes = [
+    { id: 1, tipo: 'equity', ordem: 0 },
+    { id: 2, tipo: 'divida', ordem: 9 },
+    { id: 3, tipo: 'antecipacao_recebiveis', ordem: 1 },
+    { id: 4, tipo: 'divida', ordem: 2 },
+  ];
+  assert.deepEqual(operacoesDeCartao(operacoes).map((o) => o.id), [4, 2, 3, 1]);
+});
+
+test('todo tipo declarado em TIPOS tem lugar — cartão ou aba; tipo órfão sumiria da tela', () => {
+  // Lê a fonte porque `TIPOS` e `ABAS` são privados do módulo da tela.
   //
   // ⚠️ O recorte por BLOCO não é zelo: `{ valor: 'x', rotulo:` é a forma de mais
-  // três arrays deste arquivo (`MODOS_RETORNO`, `EVENTOS_ANCORA`), e um regex
-  // solto sobre o arquivo inteiro devolve os 11 valores dos quatro juntos. A
-  // primeira versão deste teste fazia isso e reprovava com "TIPOS mudou" sobre
-  // um TIPOS que não tinha mudado.
+  // dois arrays deste arquivo (`MODOS_RETORNO`, `EVENTOS_ANCORA`), e um regex
+  // solto sobre o arquivo inteiro devolve os valores de todos juntos.
   const bloco = (nome: string): string => {
     const de = fonte.indexOf(`const ${nome}:`);
     assert.notEqual(de, -1, `não achei a declaração de ${nome}`);
@@ -72,25 +78,29 @@ test('#586/#587: todo tipo declarado em TIPOS tem uma aba — tipo órfão sumir
     return fonte.slice(de, ate);
   };
   const tipos = [...bloco('TIPOS').matchAll(/valor: '([a-z_]+)'/g)].map((m) => m[1]);
-  assert.deepEqual(tipos.sort(), [...TIPOS_COM_ABA].sort(), 'TIPOS mudou — dê aba ao tipo novo');
-  // ⚠️ #587: `financiamento_producao` NÃO carrega `tipo:` em `ABAS` de propósito
-  // — ela tem render PRÓPRIO, roteado por `id: 'financiamento_producao'`, não
-  // pelo despacho genérico `a.tipo ? _renderAbaTipo(a.tipo) : ...`. A cobertura
-  // dela é o `id`, não o `tipo`; os outros dois tipos continuam pelo despacho
-  // genérico, então a checagem soma as DUAS rotas.
-  const abasComTipo = [...bloco('ABAS').matchAll(/tipo: '([a-z_]+)'/g)].map((m) => m[1]);
-  const abasComId = [...bloco('ABAS').matchAll(/id: '([a-z_]+)'/g)].map((m) => m[1]);
-  const cobertos = [...abasComTipo, ...abasComId.filter((id) => TIPOS_COM_ABA.includes(id) && !abasComTipo.includes(id))];
-  assert.deepEqual(cobertos.sort(), [...TIPOS_COM_ABA].sort(), 'ABAS não cobre todos os tipos (nem por tipo, nem por id dedicado)');
+  assert.deepEqual(tipos.sort(), [...TIPOS_CONHECIDOS].sort(), 'TIPOS mudou — dê cartão ou aba ao tipo novo');
+  const abasDeTipo = [...bloco('ABAS').matchAll(/id: '([a-z_]+)'/g)].map((m) => m[1])
+    .filter((id) => TIPOS_CONHECIDOS.includes(id));
+  // Só o Financiamento à produção tem aba; os outros três NÃO têm mais.
+  assert.deepEqual(abasDeTipo, ['financiamento_producao'], 'voltou uma aba por tipo, ou o FàP perdeu a dele');
+  const cobertos = [...TIPOS_DE_CARTAO, ...abasDeTipo];
+  assert.deepEqual([...cobertos].sort(), [...TIPOS_CONHECIDOS].sort(), 'tipo sem cartão nem aba');
+  assert.equal(new Set(cobertos).size, cobertos.length, 'tipo com cartão E aba');
 });
 
-test('#586 critério 3: a barra de 3 botões do topo deixou de existir', () => {
-  // O critério de aceite é literal, e é greppável de propósito.
+test('as abas são Operações, Financiamento à produção e Comparar estruturas; a barra do topo não volta', () => {
   assert.equal(fonte.includes('class="barra"'), false, 'a barra do topo voltou');
-  // E as quatro abas estão declaradas com os nomes LITERAIS do pedido.
-  for (const label of ['Operações', 'Financiamento à produção', 'Dívida', 'Equity']) {
+  for (const label of ['Operações', 'Financiamento à produção', 'Comparar estruturas']) {
     assert.ok(fonte.includes(`label: '${label}'`), `aba ausente: ${label}`);
   }
+  for (const label of ['Dívida', 'Equity', 'Antecipação']) {
+    assert.equal(fonte.includes(`label: '${label}'`), false, `a aba por tipo "${label}" voltou`);
+  }
+});
+
+test('Nova operação não usa urbiVerso.formulario (exige SDK acima do piso do manifesto)', () => {
+  assert.equal(/\.formulario\s*\(/.test(fonte), false, 'tela-funding.ts chama formulario()');
+  assert.ok(fonte.includes('Nova operação'), 'o botão Nova operação sumiu');
 });
 
 // ── 2. Reordenar DENTRO do tipo ────────────────────────────────────────────

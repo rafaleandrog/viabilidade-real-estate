@@ -4,6 +4,89 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-26 — Funding R16, fase 3: aba Operações em cartões e página da operação (issue 1008)
+
+Terceira fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no servidor,
+no motor, no `schema.json` nem na `versao`.
+
+- **Abas.** Saem Dívida, Equity e Antecipação; ficam Operações, Financiamento à produção e Comparar
+  estruturas (esta sai na fase 6). `ABAS` perdeu o campo `tipo` e `render()` não despacha mais por
+  tipo. Saíram a tabela compilada (`_colunasOperacoes`, `_rotuloInicio`), `_renderAbaTipo`,
+  `_opAtiva` e `opAtivaPorTipo`.
+- **Cartões.** `viab-funding-cartao` (`frontend/funding-cartao.ts`) só desenha; o conteúdo sai de
+  `dadosDoCartao` (`frontend/funding-cartao-dados.ts`, puro): badge com a cor do tipo, quatro termos,
+  "Leitura da operação" e quatro KPIs, com TIR alavancada e exposição máxima em "antes → depois".
+  `operacoesDeCartao` filtra os três tipos de cartão e ordena por senioridade. A operação do cartão
+  é a mesclada com o rascunho (`operacaoComRascunho`), a mesma de `_recalcular`.
+- **Cores.** `frontend/funding-cores.ts`: uma tabela tipo → N para os quatro tipos; o badge usa
+  `variante_N` e o CSS, `corCategorica(N − 1)`.
+- **Sequência.** `_recalcular` calcula `sequenciaDeEstrutura` e a guarda em `@state`; cada passo
+  roda `fundingDoEstudo` sobre o mesmo `calc` do recálculo, sem refazer o fluxo por passo.
+- **Leitura.** `leituraDaOperacao` passou a receber o formatador de mês (obrigatório); o cartão passa
+  `rotuloMesRelativo`, e as frases dizem "a partir de jan/27" em vez de "a partir do mês 1".
+- **Página da operação.** Estado interno `opAbertaId`; `urbi-botao-voltar texto="Operações"`, sem
+  `href` nem `auto-voltar`; o conteúdo é o `_renderOperacao` de hoje. Remover a aberta, ou abrir uma
+  que deixou de existir, volta à lista. O foco volta ao cartão de origem.
+- **Nova operação.** `urbi-modal` com um botão por tipo; cria por `_adicionar` e abre a página. Não
+  usa `urbiVerso.formulario()` (teste de fonte).
+- **Espelho de UI.** A prop `texto` do `urbi-botao-voltar` entrou à mão em
+  `referencia/ui-urbiverso/primitivos.json`, lida do SDK fixado (`93.0.0`), com nota no `LEIA.md` —
+  o mesmo precedente do `urbi-prosa`. Sem ela, o guard de props reprovava o atributo.
+- **Guias.** `docs/funding.md` reescrito no que mudou; `docs/formulas.md` e `docs/modelo-de-dados.md`
+  passam a dizer quatro exceções de exibição; uma frase em `docs/avancado.md`.
+- **Testes.** Novos: `funding-cartao-dados.test.ts` e o caso de render `funding-pagina-operacao`.
+  Reescritos no lugar novo: a partição de `funding-abas.test.ts`, os casos `funding-abas` e
+  `funding-sub-abas`; `funding-antecipacao`, `ind-funding` e `funding-ancora-rascunho` abrem a página
+  pelo clique no cartão. Inventários: `fmtPctEntrada` passa de `tela-funding.ts` (3, tabela) para
+  `funding-cartao-dados.ts` (4, termos); `fmtR$Mi` ganha o primeiro consumidor.
+- **Endereços.** O diff deslocou `tela-funding.ts`; foram corrigidas as citações em
+  `tela-resumo.ts`, `tela-fluxo-ver.ts`, `tela-cenarios.ts`, `scripts/conferir-estudo.ts`,
+  `casos/ind-funding.ts` e `CLAUDE.md` (o aviso regulatório). Várias já não apontavam para o símbolo
+  antes deste PR.
+- **Revisão, rodada 1.** O App do Codex achou que mover uma operação pelas setas (`_mover`) gravava
+  a ordem nova sem recalcular: os cartões trocavam de lugar com o "antes → depois" da ordem antiga.
+  `_mover` passou a chamar `_recalcular` logo depois de aplicar a ordem. De passagem, abrir a página
+  da operação passou a pôr o foco nela (o cartão focado sai da tela, e o foco caía no corpo do
+  documento). O caso `funding-pagina-operacao` cobre os dois, e cada um fica vermelho se a linha
+  sair.
+
+---
+
+## 2026-11-26 — Funding R16, fase 2: mês da âncora do cronograma calculado no navegador (issue 1007)
+
+Segunda fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no servidor,
+no `schema.json` nem na `versao`.
+
+- **`mesDaAncora` e `operacaoComRascunho`** em `frontend/fluxo-shared.ts`: o primeiro é o mesmo
+  contrato de `ancorarLinhaCusto` restrito ao mês (`customizado`, evento ausente e cronograma vazio
+  devolvem `null`); o segundo monta a operação que a prévia simula — gravada + rascunho, com o mês
+  derivado quando há rascunho (qualquer campo) e não há `fase_ancora_id`, porque `resolverInicio`
+  rederiva o mês em **todo** PATCH, com a âncora gravada quando o corpo não a traz. A primeira
+  versão derivava só quando o rascunho tocava `cronograma_evento`, e um rascunho que mudasse só o
+  valor de uma operação com mês defasado mostrava um mês e gravava outro (achado do App do Codex
+  na revisão).
+- **`tela-funding.ts`**: `_recalcular` usa `operacaoComRascunho`; o "Início derivado" de
+  `_renderAncora` mostra o mês que a simulação usa (`_mesSimulado`). O PATCH não mudou.
+  Com rascunho, `_recalcular` também refaz o fluxo-base com as operações efetivas (a montagem de
+  `_simularEstrutura`): o horizonte de `this.calc` vem das operações gravadas, e uma dívida movida
+  para mais tarde tinha as parcelas truncadas na prévia e mudava de número ao salvar (achado do App
+  do Codex na rodada 2 da revisão; o defeito já existia na `main` para o mês digitado e o prazo).
+- **Paridade com o servidor** em `backend/rotas/funding-ancora-paridade.test.ts` (cinco eventos,
+  `customizado` e um desconhecido, com e sem pré-lançamento e num cronograma deslocado); a função
+  sozinha em `frontend/funding-ancora-rascunho.test.ts`.
+- **Ligação** no caso de render `funding-ancora-rascunho`: operação gravada em `obra` com mês
+  defasado, rascunho troca para `lancamento`; exige o mês novo e o painel do investidor igual ao de
+  uma tela com a operação já gravada no mês novo, com o fluxo-base que `_carregar` montaria; depois
+  do Salvar, o mês exibido é o gravado. A dívida amortiza em 64 meses para o aporte no mês novo
+  esticar o horizonte (73 → 77), e o caso exige esse estiramento. Medido: trocar a chamada em
+  `_recalcular` pela mescla antiga deixa o caso vermelho no painel; não refazer o fluxo-base também;
+  trocar a de `_mesSimulado` deixa vermelho no texto do mês.
+- **Observação fora do escopo** (já no painel): o servidor não reancora operações de funding quando
+  o Cronograma muda; por isso a operação sem rascunho segue com o mês gravado.
+- Dois endereços `arquivo:linha` (`casos/ind-funding.ts` e `referencia/padrao-incorporacao.md`)
+  tiveram o número de linha corrigido: as linhas que este PR acrescenta a `tela-funding.ts` e a
+  `fluxo-shared.ts` deslocaram os símbolos citados, e o guard de endereços acusou.
+
 ## 2026-11-26 — Funding R16, fase 1: núcleo de cálculo da Estrutura de capital (issue 1006)
 
 Primeira fase do arco da Rodada 16 (guarda-chuva: issue 1005). Nenhuma tela muda; o módulo novo não
