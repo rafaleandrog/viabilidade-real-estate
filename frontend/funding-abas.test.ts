@@ -6,7 +6,7 @@ import { TIPOS_DE_CARTAO, operacoesDeCartao } from './funding-cartao-dados.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A tela de Funding em `urbi-abas`: Operações (cartões) · Financiamento à
-// produção · Estrutura de capital · Comparar estruturas
+// produção · Estrutura de capital
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Duas coisas são provadas aqui, e elas são de naturezas diferentes:
@@ -88,18 +88,21 @@ test('todo tipo declarado em TIPOS tem lugar — cartão ou aba; tipo órfão su
   assert.equal(new Set(cobertos).size, cobertos.length, 'tipo com cartão E aba');
 });
 
-test('as abas são Operações, Financiamento à produção, Estrutura de capital e Comparar estruturas, nesta ordem; a barra do topo não volta', () => {
+test('as abas são Operações, Financiamento à produção e Estrutura de capital, nesta ordem; a barra do topo não volta', () => {
   assert.equal(fonte.includes('class="barra"'), false, 'a barra do topo voltou');
   const de = fonte.indexOf('const ABAS:');
   const bloco = fonte.slice(de, fonte.indexOf('];', de));
   const labels = [...bloco.matchAll(/label: '([^']+)'/g)].map((m) => m[1]);
   assert.deepEqual(
-    labels, ['Operações', 'Financiamento à produção', 'Estrutura de capital', 'Comparar estruturas'],
-    'a barra de abas mudou: a Estrutura de capital entra depois do Financiamento à produção',
+    labels, ['Operações', 'Financiamento à produção', 'Estrutura de capital'],
+    'a barra de abas mudou: são exatamente três, e a Estrutura de capital entra depois do Financiamento à produção',
   );
   for (const label of ['Dívida', 'Equity', 'Antecipação']) {
     assert.equal(fonte.includes(`label: '${label}'`), false, `a aba por tipo "${label}" voltou`);
   }
+  // A comparação de estruturas não existe: nem a aba, nem o painel que ela montava.
+  assert.equal(fonte.includes("id: 'comparar'"), false, 'a aba Comparar estruturas voltou');
+  assert.equal(fonte.includes('viab-funding-alternativas'), false, 'o painel de alternativas voltou à tela');
 });
 
 test('Nova operação não usa urbiVerso.formulario (exige SDK acima do piso do manifesto)', () => {

@@ -106,7 +106,7 @@ test('a fixture exercita os quatro tipos com valor', () => {
   }
 });
 
-// ── indicadoresEstrutura (cópia dos testes de funding-alternativas.test.ts, contra o módulo novo) ──
+// ── indicadoresEstrutura ──
 
 test('indicadores: estrutura idêntica (cópia profunda) reproduz os 4 indicadores', () => {
   const b = rodar(JSON.parse(JSON.stringify(QUATRO)));
@@ -142,11 +142,6 @@ test('indicadores: exposição com piso em zero e nunca -0', () => {
   const ind = indicadoresEstrutura({ fluxoMensal: [10, 20] }, null);
   assert.ok(Object.is(ind.exposicaoMaxima, 0));
   assert.equal(indicadoresEstrutura({ fluxoMensal: [-10, 4, -1] }, null).exposicaoMaxima, -10);
-});
-
-test('a reexportação de funding-alternativas.ts é a mesma função', async () => {
-  const alt = await import('./funding-alternativas.js');
-  assert.equal(alt.indicadoresEstrutura, indicadoresEstrutura);
 });
 
 // ── Ordem ────────────────────────────────────────────────────────────────

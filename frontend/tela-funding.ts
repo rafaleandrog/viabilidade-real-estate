@@ -18,15 +18,13 @@ import {
   type FundingCalc, type OperacaoFunding, type TipoOperacao, type SerieOperacao,
 } from './funding-motor.js';
 import './viab-num.js';
-import './funding-alternativas-painel.js';
 import './funding-cartao.js';
 import './funding-janela.js';
 import './funding-grafico-operacao.js';
 import type { ConfirmacaoJanela, SimulacaoJanela } from './funding-janela.js';
 import { nomePadrao, serieDoGrafico, termosDaOperacao, type TipoDaJanela } from './funding-janela-dados.js';
-import { passosDoPlano, type PlanoUsarAlternativa } from './funding-alternativas.js';
 import {
-  indicadoresEstrutura, sequenciaDeEstrutura, type IndicadoresEstrutura, type SequenciaEstrutura,
+  indicadoresEstrutura, sequenciaDeEstrutura, type SequenciaEstrutura,
 } from './funding-estrutura.js';
 import { AVISO_SEM_LASTRO, TIPOS_DE_CARTAO, dadosDoCartao, operacoesDeCartao, type ValorCartao } from './funding-cartao-dados.js';
 import { dadosDaEstrutura, type LinhaSequencia } from './funding-estrutura-dados.js';
@@ -100,12 +98,11 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
 //
 // A aba Estrutura de capital mostra o capital stack do projeto (totais, torre
 // por senioridade e a sequência "antes → depois"); só leitura, roteada por `id`
-// em `render()`. Comparar estruturas ainda existe nesta fase e sai na seguinte.
+// em `render()`.
 const ABAS: { id: string; label: string; icone: string }[] = [
   { id: 'operacoes', label: 'Operações', icone: 'fa-solid fa-table-list' },
   { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
   { id: 'estrutura', label: 'Estrutura de capital', icone: 'fa-solid fa-layer-group' },
-  { id: 'comparar', label: 'Comparar estruturas', icone: 'fa-solid fa-scale-balanced' },
 ];
 
 const rotuloTipo = (t: string) => TIPOS.find((x) => x.valor === t)?.rotulo ?? t;
@@ -338,8 +335,8 @@ export class ViabFunding extends LitElement {
     if (!this.calc) { this.funding = null; this.sequencia = null; this.calcDaSequencia = null; return; }
     const efetivas = this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)) as OperacaoFunding[];
     // O horizonte de `this.calc` vem das operações GRAVADAS (`_carregar`). Com
-    // rascunho, o fluxo-base é refeito com as efetivas — a montagem de
-    // `_simularEstrutura` —, senão uma operação movida para mais tarde é
+    // rascunho, o fluxo-base é refeito com as efetivas (a mesma montagem de
+    // `_simularJanela`), senão uma operação movida para mais tarde é
     // truncada pelo horizonte antigo e o Salvar muda o número.
     const comRascunho = !!this.config && Object.keys(this.draft).length > 0;
     const calc = comRascunho ? calcularFluxo({ ...this.config!, operacoesFunding: efetivas }) : this.calc;
@@ -726,59 +723,8 @@ export class ViabFunding extends LitElement {
     `;
   }
 
-  /** Config do fluxo montada em `_carregar`; a aba Comparar estruturas troca só as operações de funding. */
+  /** Config do fluxo montada em `_carregar`; `_recalcular` (com rascunho) e `_simularJanela` trocam só as operações de funding. */
   private config: FluxoConfig | null = null;
-
-  /**
-   * Os quatro indicadores de uma estrutura de capital: refaz o fluxo com as
-   * operações dadas e roda o funding do estudo sobre ele, com a mesma
-   * montagem de `_recalcular`. Arrow function de classe para a aba Comparar
-   * estruturas poder receber o método como callback sem perder o `this`.
-   */
-  private _simularEstrutura = (ops: OperacaoFunding[]): IndicadoresEstrutura | null => {
-    if (!this.config) return null;
-    const calc = calcularFluxo({ ...this.config, operacoesFunding: ops });
-    const rl = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.custos);
-    const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
-    const f = fundingDoEstudo(
-      ops, calc.fluxoMensal, rl,
-      resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
-      {
-        custosRaw: this.custos, linhasCusto: calc.linhasCusto, cronograma: this.crono,
-        recebimentoPorSafraMensal: calc.recebimentoPorSafraMensal,
-      },
-    );
-    return indicadoresEstrutura(calc, f);
-  };
-
-  /** "Usar esta": aplica o plano da alternativa pelas rotas de operação e recarrega a tela. */
-  private async _usarAlternativa(
-    plano: PlanoUsarAlternativa, nome: string, erros: string[] = [], aoCriar?: (criadas: OperacaoFunding[]) => void,
-  ) {
-    if (!this.editavel || this.criando) return;
-    // Defesa: estado final inválido para o servidor não grava nenhum passo.
-    if (erros.length) { urbiVerso.notificar(`Estrutura "${nome}" não aplicada: ${erros.join(' ')}`, 'erro'); return; }
-    this.criando = true;
-    const criados: OperacaoFunding[] = [];
-    try {
-      let ordem = this._proximaOrdem();
-      // A ordem de `passosDoPlano` é a que o servidor aceita (teto de retorno do equity por modo).
-      for (const passo of passosDoPlano(plano, this.operacoes)) {
-        const r = passo.acao === 'remover' ? await removerFundingOperacao(this.estudo.id, passo.id as number)
-          : passo.acao === 'atualizar' ? await atualizarFundingOperacao(this.estudo.id, passo.id as number, passo.campos)
-          : await criarFundingOperacao(this.estudo.id, { ...passo.op, ordem: ordem++ });
-        if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível aplicar a estrutura.', 'erro'); return; }
-        if (passo.acao === 'criar' && r?.id != null) criados.push(r as OperacaoFunding);
-      }
-      urbiVerso.notificar(`Estrutura "${nome}" aplicada ao funding.`, 'sucesso');
-    } finally {
-      this.criando = false;
-      // Mesmo parando no meio, o que foi criado é religado à alternativa.
-      if (criados.length) aoCriar?.(criados);
-      // Recarrega mesmo quando parou no meio: parte do plano pode ter sido gravada.
-      await this._carregar();
-    }
-  }
 
   /**
    * §37 — indicadores de resumo do Financiamento à produção. Lidos de
@@ -1185,11 +1131,6 @@ export class ViabFunding extends LitElement {
           <urbi-hospedeiro slot=${a.id}>
             ${a.id === 'financiamento_producao' ? this._renderAbaFinanciamentoProducao()
               : a.id === 'estrutura' ? (this.abaAtiva !== 'estrutura' ? nothing : this._renderAbaEstrutura())
-              : a.id === 'comparar' ? (this.abaAtiva !== 'comparar' ? nothing : html`<viab-funding-alternativas
-                  .estudoId=${this.estudo?.id ?? null} .editavel=${this.editavel}
-                  .salvas=${this.operacoes} .simular=${this._simularEstrutura} .dataInicio=${this.dataInicio}
-                  @viab:usar-alternativa=${(e: CustomEvent) => this._usarAlternativa(e.detail.plano, e.detail.nome, e.detail.erros, e.detail.aoCriar)}
-                ></viab-funding-alternativas>`)
               : this._renderAbaOperacoes()}
           </urbi-hospedeiro>`)}
       </urbi-abas>
