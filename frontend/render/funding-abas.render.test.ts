@@ -12,7 +12,7 @@ const pular = await motivoParaPular();
 
 const LARGURAS = [1280, 900, 600];
 
-test('Funding: a aba Operações mostra um cartão por operação listável, com leitura e "antes → depois"', { skip: pular ?? false }, async () => {
+test('Funding: três abas, e a aba Operações mostra um cartão por operação listável, com leitura e "antes → depois"', { skip: pular ?? false }, async () => {
   // O `exigir` do caso já reprova os cartões, a leitura e o "antes" ausentes
   // ANTES de medir pixel. As asserções abaixo cobrem o resto.
   const a = await verificarRender({ caso: 'funding-abas', larguras: LARGURAS });
@@ -30,6 +30,15 @@ test('Funding: a aba Operações mostra um cartão por operação listável, com
     const x = a.extra?.[String(l)] as any;
     assert.ok(x, `o caso não devolveu a medida extra em ${l}px — \`medir()\` não rodou` + relato(a));
     assert.equal(x.tabelas, 0, 'a tabela compilada da aba Operações voltou');
+    // A barra de abas: exatamente três, nesta ordem, cada uma com o seu painel.
+    assert.deepEqual(
+      x.abas, ['operacoes:Operações', 'financiamento_producao:Financiamento à produção', 'estrutura:Estrutura de capital'],
+      `a barra de abas em ${l}px não é a das três abas` + relato(a),
+    );
+    assert.deepEqual(x.slots, ['operacoes', 'financiamento_producao', 'estrutura'], `painéis das abas em ${l}px`);
+    // Quem abre a tela cai numa aba que existe.
+    assert.equal(x.ativa, 'operacoes', 'a tela não abre na aba Operações');
+    assert.equal(x.paineisAlternativas, 0, 'o painel de alternativas voltou à tela');
     // Dívida (sênior) antes do equity; o Financiamento à produção não vira cartão.
     assert.deepEqual(x.ids, ['1', '3'], `cartões fora da ordem de senioridade, ou com o FàP: ${x.ids}`);
     assert.deepEqual(x.kpisPorCartao, [4, 4], 'a grade de quatro KPIs não veio inteira');

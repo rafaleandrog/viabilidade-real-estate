@@ -52,8 +52,7 @@ import {
 import { fmtPct } from './viab-format.js';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Indicadores de uma estrutura (movidos de `funding-alternativas.ts`, que os
-// reexporta até a tela deixar de importá-los de lá)
+// Indicadores de uma estrutura
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface IndicadoresEstrutura {
