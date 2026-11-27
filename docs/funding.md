@@ -122,7 +122,8 @@ Na janela os valores aparecem em reais cheios. Indicador sem base de cálculo mo
 **Nada é gravado antes de Criar operação** (na edição, **Salvar alterações**). Cancelar, o botão de
 fechar e a tecla Esc fecham a janela sem gravar; se algo foi alterado, o app pergunta antes de
 descartar. Clicar fora da janela não a fecha. Ao fechar, o foco volta ao botão que a abriu. Na
-criação, a operação criada abre em seguida na página dela.
+criação, a operação criada abre em seguida na página dela. Enquanto a operação está sendo gravada,
+a janela fica travada até a resposta: os campos, Cancelar e Esc esperam.
 
 Antes de gravar, a janela aplica as mesmas regras do servidor e mostra a recusa na etapa do campo:
 valor, taxa ou prazo negativo, percentual acima de 100, carência igual ou maior que a amortização (quando a amortização é maior que zero),

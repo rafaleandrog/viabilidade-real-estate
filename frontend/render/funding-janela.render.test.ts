@@ -93,6 +93,11 @@ test('Funding: a janela de operação cria e edita só ao confirmar, com resumo 
   assert.equal(x.criar.opAberta, 99, 'a operação criada não abriu na página dela');
   assert.equal(x.criar.grafico, true, 'a página da criada não desenhou o gráfico da operação');
 
+  // ── Gravação em curso: a janela congela; Cancelar, Esc e digitar esperam ──
+  assert.deepEqual(x.emCurso, { aberta: true, perguntas: 0, escritas: 1, valor: 5_000_000, inerte: true, cancelarDesabilitado: true },
+    'com a gravação em curso a janela fechou, perguntou ou aceitou edição');
+  assert.deepEqual(x.emCursoDepois, { fechada: true, escritas: 1, valorGravado: 5_000_000, opAberta: 99 });
+
   // ── Cancelar e Esc ──
   assert.deepEqual(x.cancelar, { fechada: true, escritas: 0, perguntas: 0, foco: 'nova-operacao' });
   assert.deepEqual(x.escNao, { aberta: true, perguntas: 1, taxa: 15 }, 'Esc com alteração não perguntou, ou fechou sem confirmar');

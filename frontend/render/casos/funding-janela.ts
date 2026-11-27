@@ -36,6 +36,9 @@ const G = globalThis as any;
 let escritas: { metodo: string; rota: string; corpo: any }[] = [];
 let lista: any[] = [];
 let recusarProxima: string | null = null;
+/** Segura a próxima escrita até `liberar()`: a gravação fica em curso. */
+let segurarProxima = false;
+let liberar: (() => void) | null = null;
 let respostaConfirmar = false;
 let perguntas = 0;
 /** Os elementos em que `focus()` foi chamado, em ordem (o stub de primitivo não é focável). */
@@ -48,6 +51,10 @@ function instalarApi() {
     if (metodo !== 'GET') {
       const corpo = opts?.body ? JSON.parse(opts.body) : null;
       escritas.push({ metodo, rota, corpo });
+      if (segurarProxima) {
+        segurarProxima = false;
+        await new Promise<void>((r) => { liberar = r; });
+      }
       if (recusarProxima) {
         const mensagem = recusarProxima;
         recusarProxima = null;
@@ -319,6 +326,40 @@ export const caso = {
     };
     cr.remove();
 
+    // ── Gravação em curso: a janela congela até a resposta chegar ──
+    // Com o POST em voo, Cancelar, Esc e digitar não fazem nada: fechar não
+    // desfaria a criação, e o que se digitasse sumiria no sucesso.
+    instalarApi();
+    perguntas = 0;
+    const gc = await tela(montagem, [DIVIDA, FAP, EQUITY], true);
+    clicar(porTexto(sr(gc), 'Nova operação'));
+    await esperar(gc, 2);
+    await irPara(gc, 'aporte');
+    await digitar(gc, 'valor', 5_000_000);
+    segurarProxima = true;
+    clicar(jr(gc).querySelector('urbi-botao.confirmar'));
+    await esperar(gc, 2);
+    clicar(porTexto(jr(gc), 'Cancelar'));
+    await esperar(gc, 2);
+    jr(gc).querySelector('urbi-modal')!.dispatchEvent(new CustomEvent('urbi-modal:close', { bubbles: true, composed: true }));
+    await esperar(gc, 2);
+    jr(gc).querySelector('viab-num[data-campo="valor"]')!
+      .dispatchEvent(new CustomEvent('urbi:input-numero-change', { detail: { valor: 9_000_000 }, bubbles: true, composed: true }));
+    await esperar(gc, 2);
+    const emCurso = {
+      aberta: !!janelaDe(gc),
+      perguntas,
+      escritas: escritas.length,
+      valor: janelaDe(gc)?.valores?.valor ?? null,
+      inerte: jr(gc).querySelector('div.janela')?.hasAttribute('inert') ?? null,
+      cancelarDesabilitado: porTexto(jr(gc), 'Cancelar')?.hasAttribute('desabilitado') ?? null,
+    };
+    liberar?.();
+    liberar = null;
+    await esperar(gc, 5);
+    const emCursoDepois = { fechada: !janelaDe(gc), escritas: escritas.length, valorGravado: escritas[0]?.corpo?.valor ?? null, opAberta: gc.opAbertaId };
+    gc.remove();
+
     // ── Cancelar sem alteração: fecha, nada gravado, foco volta a "Nova operação" ──
     instalarApi();
     focados = [];
@@ -428,7 +469,7 @@ export const caso = {
     return {
       geoCriar, geoEditar,
       abrir, etapaAporte, resumoInicial, resumoComValor, graficoComValor, ancora, escritasAoDigitar,
-      regra, recusa, criar, cancelar, escNao, escSim, paginaLeitura, editar, nomeVazio, salvar, remover, leitor,
+      regra, recusa, criar, emCurso, emCursoDepois, cancelar, escNao, escSim, paginaLeitura, editar, nomeVazio, salvar, remover, leitor,
     };
   },
 };

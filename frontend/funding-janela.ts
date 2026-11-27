@@ -172,14 +172,21 @@ export class ViabFundingJanela extends LitElement {
     });
   }
 
+  /**
+   * Enquanto a gravação está em curso a janela fica congelada: o pedido já
+   * levou os valores, e o que se digitasse agora sumiria quando o sucesso
+   * fechasse a janela. Cancelar também espera: fechar com o POST em voo não
+   * desfaria a criação, e a recusa do servidor não teria onde aparecer.
+   */
   private _set(campo: string, valor: unknown) {
+    if (this.gravando) return;
     this.valores = { ...this.valores, [campo]: valor };
     this.tocado = true;
     if (campo === 'nome') this.nomeTocado = true;
   }
 
   private _trocarTipo(tipo: TipoDaJanela) {
-    if (this.modo !== 'criar' || tipo === this.tipo) return;
+    if (this.gravando || this.modo !== 'criar' || tipo === this.tipo) return;
     const nome = this.nomeTocado ? this.valores.nome : nomePadrao(tipo, this.salvas);
     this.tipo = tipo;
     this.valores = { nome, ...padroesDoTipo(tipo) };
@@ -203,7 +210,7 @@ export class ViabFundingJanela extends LitElement {
   // ── ações ───────────────────────────────────────────────────────────
 
   private async _cancelar() {
-    if (this.perguntando) return;
+    if (this.perguntando || this.gravando) return;
     if (this.alterada) {
       this.perguntando = true;
       let sair = false;
@@ -366,7 +373,7 @@ export class ViabFundingJanela extends LitElement {
     return html`
       <urbi-modal title=${titulo} maxWidth="980px" .closeOnBackdrop=${false}
         @urbi-modal:close=${() => this._cancelar()}>
-        <div class="janela">
+        <div class="janela" ?inert=${this.gravando} aria-busy=${this.gravando ? 'true' : 'false'}>
           <div class="topo">
             <urbi-input data-campo="nome" label="Nome da operação" .valor=${this.valores.nome ?? ''}
               erro=${erroNome ? erroNome.mensagem : ''}
@@ -411,7 +418,8 @@ export class ViabFundingJanela extends LitElement {
               ? html`<span class="pendencias" role="status">Corrija ${this.erros.length === 1 ? 'a etapa marcada' : 'as etapas marcadas'} antes de ${this.modo === 'criar' ? 'criar' : 'salvar'}.</span>`
               : nothing}
             <span class="espaco"></span>
-            <urbi-botao variante="fantasma" @click=${() => this._cancelar()}>Cancelar</urbi-botao>
+            <urbi-botao variante="fantasma" class="cancelar" ?desabilitado=${this.gravando}
+              @click=${() => this._cancelar()}>Cancelar</urbi-botao>
             <urbi-botao variante="primario" class="confirmar"
               ?desabilitado=${this.gravando || (this.modo === 'editar' && !this.alterada)}
               @click=${() => this._confirmar()}>${this.modo === 'criar' ? 'Criar operação' : 'Salvar alterações'}</urbi-botao>
