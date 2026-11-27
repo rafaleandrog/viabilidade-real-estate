@@ -176,7 +176,7 @@ custo do Avançado e o valor das operações de funding em `decimal(15,2)`); per
 decimais. `decimal(12,2)` já permitia centavos; a regra diz que o cálculo também é quantizado a
 duas casas. O valor canônico de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são
 representações derivadas, com precisão plena internamente e arredondamento só na exibição, nunca
-persistidas arredondadas. As três exceções de exibição estão em
+persistidas arredondadas. As quatro exceções de exibição estão em
 [Fórmulas da Proforma](formulas), na seção Estado de conformidade.
 
 **Entrada pela API** — a escrita de colunas numéricas em `/estudos` e nas rotas do Avançado de

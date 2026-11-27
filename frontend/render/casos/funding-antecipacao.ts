@@ -12,7 +12,7 @@ import '../../tela-funding.js';
 import { calcularFluxo } from '../../fluxo-caixa-motor.js';
 import { fundingDoEstudo, type OperacaoFunding } from '../../funding-motor.js';
 import { mesRepasse } from '../../fluxo-shared.js';
-import { CRONO, DATA_INICIO, CUSTOS, forcarEstado } from './dados.js';
+import { CRONO, DATA_INICIO, CUSTOS, abrirCartao, forcarEstado } from './dados.js';
 
 const LINHA = {
   id: 1, nome: 'Lotes', fase_label: 'lancamento',
@@ -74,9 +74,11 @@ export const caso = {
       dataInicio: DATA_INICIO,
       taxaDescontoAa: 12,
       editavel: false,
-      abaAtiva: 'antecipacao_recebiveis',
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
+    // A página da operação abre pelo clique no cartão, na aba Operações: é nela
+    // que o painel "Resultado da antecipação" mora.
+    await abrirCartao(el, OPERACAO.id);
   },
 };

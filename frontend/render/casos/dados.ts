@@ -10,8 +10,8 @@
 // conforme o ambiente.
 
 import { type EventoCrono } from '../../fluxo-shared.js';
-import { calcularFluxo, type FluxoCalc } from '../../fluxo-caixa-motor.js';
-import { fundingDoEstudo } from '../../funding-motor.js';
+import { calcularFluxo, type FluxoCalc, type FluxoConfig } from '../../fluxo-caixa-motor.js';
+import { fundingDoEstudo, receitaLiquidaComCorretagemMensal } from '../../funding-motor.js';
 
 export const DATA_INICIO = 'jan/2027';
 
@@ -223,4 +223,43 @@ export function fundingDeFluxo() {
     OPERACOES_FUNDING, c.fluxoMensal, c.receitaMensal, resultadoFinal, 42, 12,
     { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: CRONO },
   );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Funding: o estado que `_carregar` da tela montaria, sem passar pela API
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Config, fluxo e receita líquida que `viab-funding` guarda em `_carregar`,
+ * para o caso chamar `_recalcular()` de verdade — é ele que calcula o funding e
+ * a sequência "antes → depois" dos cartões.
+ */
+export function estadoFundingCarregado(ops: any[]) {
+  const config = {
+    dataInicio: DATA_INICIO, taxaDescontoAa: 12, jurosTabelaAaEstudo: 0, cronograma: CRONO,
+    linhasReceita: [LINHA_RECEITA], linhasCusto: LINHAS_CUSTO, curvas: [], areaTerreno: 4_800,
+    ret: { ativo: true, pct: 4 }, operacoesFunding: ops,
+  } as FluxoConfig;
+  const calc = calcularFluxo(config);
+  return {
+    config, calc,
+    receitaLiquida: receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, LINHAS_CUSTO),
+    operacoes: ops, custos: LINHAS_CUSTO, crono: CRONO, dataInicio: DATA_INICIO, taxaDescontoAa: 12,
+  };
+}
+
+/**
+ * Abre a página da operação como a pessoa faz: um CLIQUE no cartão dela, na aba
+ * Operações. Passa pelo evento real do cartão e pela troca de estado da tela —
+ * apagar qualquer um dos dois deixa a página fechada, e o caso que exige o
+ * conteúdo dela fica vermelho.
+ */
+export async function abrirCartao(tela: any, id: number | string): Promise<void> {
+  const cartao = [...tela.shadowRoot.querySelectorAll('viab-funding-cartao')]
+    .find((c: any) => c.dataset.id === String(id)) as HTMLElement | undefined;
+  if (!cartao) throw new Error(`cartão da operação ${id} não está na tela`);
+  cartao.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  await tela.updateComplete;
+  await new Promise((r) => setTimeout(r, 0));
+  await tela.updateComplete;
 }
