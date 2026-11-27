@@ -205,10 +205,16 @@ export function remocaoFinanciamentoBloqueada(operacao: { tipo?: unknown }): boo
  * Pura e testável, no molde de `remocaoFinanciamentoBloqueada`; o PATCH chama
  * logo depois da coerção e antes de `validarCamposOperacao`, para a troca não
  * ser mascarada por 400 de regra de campo. A coerção numérica vem antes: um
- * número malformado no mesmo PATCH ainda volta 400 `CAMPO_INVALIDO`.
+ * número malformado no mesmo PATCH ainda volta 400 `CAMPO_INVALIDO`. Só valor
+ * VÁLIDO e diferente do gravado é troca: `tipo` malformado (`''`, `null`,
+ * `'DIVIDA'`…) devolve `false` aqui e é recusado logo depois por
+ * `validarCamposOperacao`, cuja PRIMEIRA regra é o `tipo`, com o mesmo
+ * `400 CAMPO_INVALIDO` e a mesma mensagem da criação. Uma checagem só: sem o
+ * `includes` acima, o malformado volta a sair como `TIPO_IMUTAVEL`, e o teste
+ * HTTP de tipo malformado fica vermelho.
  */
 export function trocaDeTipoBloqueada(operacao: { tipo?: unknown }, dados: Record<string, any>): boolean {
-  return dados.tipo !== undefined && dados.tipo !== operacao.tipo;
+  return dados.tipo !== undefined && TIPOS_OPERACAO.includes(dados.tipo) && dados.tipo !== operacao.tipo;
 }
 
 /**

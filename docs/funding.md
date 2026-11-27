@@ -131,7 +131,8 @@ valor, taxa ou prazo negativo, percentual acima de 100, carência igual ou maior
 "Aporte em" menor que 1, número inválido, nome vazio ou com mais de 100 caracteres (também na
 edição) e, no equity, retorno somado acima de 100% entre as operações do mesmo modo. Criar operação
 com uma regra violada leva à etapa do erro e não grava. Se o servidor ainda assim recusar, a
-mensagem aparece dentro da janela, que continua aberta com tudo o que foi digitado.
+mensagem aparece dentro da janela, que continua aberta com tudo o que foi digitado, e o foco vai
+para essa mensagem.
 
 **O tipo é escolhido ao criar e não muda depois.** Na edição ele aparece travado; para outro tipo,
 crie uma operação nova. Na edição, só os campos alterados vão ao servidor.
@@ -178,9 +179,14 @@ recusa antes de gravar, e o servidor também.
 Uma por estudo, editada na aba própria, não na janela de operação. Informe a **Taxa** anual, a **Exposição mín. p/ liberação**, o percentual
 financiável do custo e as linhas de custo elegíveis — o botão **Usar base padrão** seleciona o
 pagamento do terreno (sem as permutas), a construção, a outorga, os projetos e as licenças e
-aprovações — e se o **Caixa disponível amortiza antes das chaves**. É a única operação com o
-interruptor **Ativo**: desligada, fica cadastrada e sai do fluxo. A janela de liberação e o mês das
-chaves vêm do Cronograma.
+aprovações — e se o **Caixa disponível amortiza antes das chaves**. É a única operação que liga e
+desliga: o interruptor no cabeçalho da aba, com o estado escrito ao lado (**Ligado** ou
+**Desligado**), grava na hora. Desligada, ela fica cadastrada, com os parâmetros guardados, sai do
+fluxo e da aba Estrutura de capital, e um aviso na aba lembra que ela não entra no Fluxo de Caixa;
+religar volta a aplicá-la sem digitar de novo. Se o servidor recusar a mudança, o interruptor volta à
+posição gravada. Quem só lê o estudo vê o interruptor desabilitado. Se a instância não oferecer o
+interruptor, aparece no lugar a caixa de seleção **Ativo**, que funciona do mesmo jeito. A janela de
+liberação e o mês das chaves vêm do Cronograma.
 
 Como o banco libera: os custos elegíveis são reconhecidos quando incorridos; quando o percentual
 incorrido atinge a exposição mínima e a obra está ativa, a liberação daquele mês cobre tudo o que
@@ -331,8 +337,11 @@ três tarifas da dívida; o mês da cessão é o `inicio_mes`.
 Só pode haver uma operação de `financiamento_producao` por estudo. Valores monetários saem com duas
 casas; percentuais são guardados como percentual.
 
-O `tipo` de uma operação é fixado na criação. Um `PATCH` com `tipo` diferente do gravado é recusado
-com **422** e código `TIPO_IMUTAVEL`, sem gravar nada. A recusa vem antes das regras de campo
+O `tipo` de uma operação é fixado na criação. Um `PATCH` com `tipo` válido e diferente do gravado é
+recusado com **422** e código `TIPO_IMUTAVEL`, sem gravar nada — nos dois sentidos, inclusive para
+deixar de ser `financiamento_producao`. Um `tipo` que não é nenhum dos quatro (vazio, `null`, em
+maiúsculas) não é troca de tipo: volta **400** `CAMPO_INVALIDO`, com a mesma mensagem que a criação
+dá, também sem gravar nada. A recusa vem antes das regras de campo
 (carência, percentuais, prazos), então uma regra violada no mesmo pedido não a esconde; só um número
 malformado no mesmo pedido volta antes, como 400 `CAMPO_INVALIDO`. Mandar o **mesmo** `tipo` já gravado é aceito, e o
 `PATCH` sem `tipo` continua como sempre. Para trocar de tipo, remova a operação e crie outra. Na

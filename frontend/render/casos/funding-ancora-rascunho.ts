@@ -165,7 +165,7 @@ export const caso = {
 async function montarTela(raiz: HTMLElement, ops: any[], editavel: boolean): Promise<any> {
   const el = document.createElement('viab-funding') as any;
   forcarEstado(el, {
-    // sem `id`: `updated()` não dispara o carregamento inicial (ver funding-fap-checkbox.ts)
+    // sem `id`: `updated()` não dispara o carregamento inicial (ver funding-fap-toggle.ts)
     estudo: { nivel_analise: 'avancado' },
     carregando: false,
     ...estadoCalc(ops),

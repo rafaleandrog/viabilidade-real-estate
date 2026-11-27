@@ -144,7 +144,8 @@ test('paridade: trocaDeTipoComoServidor ⇔ trocaDeTipoBloqueada', async () => {
   const mod = await import(CAMINHO_BACKEND_FUNDING);
   const tipos = ['divida', 'equity', 'antecipacao_recebiveis', 'financiamento_producao'];
   for (const gravado of tipos) {
-    for (const patch of [{}, { nome: 'x' }, ...tipos.map((tipo) => ({ tipo }))]) {
+    const malformados = ['', null, 'DIVIDA', 'financiamento'].map((tipo) => ({ tipo }));
+    for (const patch of [{}, { nome: 'x' }, ...tipos.map((tipo) => ({ tipo })), ...malformados]) {
       assert.equal(trocaDeTipoComoServidor({ tipo: gravado }, patch), mod.trocaDeTipoBloqueada({ tipo: gravado }, patch),
         `${gravado} ← ${JSON.stringify(patch)}`);
     }
@@ -155,7 +156,11 @@ test('recusaDoPatchComoServidor: troca de tipo, estado final e coerção do patc
   const gravada = { ...BASE_POR_TIPO.divida, id: 1 };
   assert.equal(recusaDoPatchComoServidor(gravada, { nome: 'Outro' }), null);
   assert.equal(recusaDoPatchComoServidor(gravada, { tipo: 'divida', nome: 'Outro' }), null);
-  assert.match(String(recusaDoPatchComoServidor(gravada, { tipo: 'equity' })), /tipo/);
+  assert.match(String(recusaDoPatchComoServidor(gravada, { tipo: 'equity' })), /não muda depois de criada/);
+  // Tipo malformado é valor inválido, com a mensagem da validação de campo, não a de troca.
+  for (const tipo of ['', null, 'DIVIDA']) {
+    assert.match(String(recusaDoPatchComoServidor(gravada, { tipo })), /^tipo deve ser um de: /, JSON.stringify(tipo));
+  }
   // Estado final: o patch manda só a carência, e a amortização gravada a recusa.
   assert.match(String(recusaDoPatchComoServidor(gravada, { periodo_carencia_meses: 24 })), /carencia/);
   assert.match(String(recusaDoPatchComoServidor(gravada, { valor: '1e3' })), /"valor"/);

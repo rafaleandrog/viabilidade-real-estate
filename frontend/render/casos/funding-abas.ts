@@ -65,6 +65,11 @@ export const caso = {
     // Formulário da aba Financiamento à produção, montada junto. (Os
     // checkboxes dele saem com caixa de área zero no stub e não entram na conta.)
     'urbi-input.desabilitado',
+    // O interruptor do Financiamento à produção: o stub emite o evento e
+    // desenha um botão do tamanho de um interruptor, mas não reproduz o markup
+    // real, que o SDK não traz (ver COMPORTAMENTOS em scripts/render-check.mjs).
+    'urbi-toggle.ariaLabel',
+    'urbi-toggle.disabled',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-funding') as any;

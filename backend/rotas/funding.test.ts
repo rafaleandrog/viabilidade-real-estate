@@ -174,7 +174,13 @@ test('trocaDeTipoBloqueada: recusa só a troca, nunca o mesmo tipo nem o PATCH s
   assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo: 'divida' }), false);
   assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { nome: 'X' }), false);
   assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, {}), false);
+  // Tipo malformado não é troca: é valor inválido, que `validarCamposOperacao` recusa.
+  for (const tipo of ['', null, 'DIVIDA', 'financiamento']) {
+    assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo }), false, JSON.stringify(tipo));
+    assert.match(String(validarCamposOperacao({ tipo })), /^tipo deve ser um de: /, JSON.stringify(tipo));
+  }
 });
+
 
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────
 //

@@ -59,6 +59,11 @@ export const caso = {
     'urbi-abas.ativa',
     'urbi-badge.cor',
     'urbi-input.desabilitado',
+    // O interruptor da aba Financiamento à produção, montada junto (ver
+    // COMPORTAMENTOS em scripts/render-check.mjs).
+    'urbi-toggle.ariaLabel',
+    'urbi-toggle.checked',
+    'urbi-toggle.disabled',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-funding') as any;

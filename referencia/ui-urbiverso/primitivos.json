@@ -3491,6 +3491,45 @@
       ],
       "risco_box_model": false,
       "risco_box_model_altura": false
+    },
+    "urbi-toggle": {
+      "classe": "UrbiToggle",
+      "arquivo": "node_modules/@urbiverso/sdk/dist/index.d.ts",
+      "origem_manual": "Entrada escrita à mão a partir de node_modules/@urbiverso/sdk/dist/index.d.ts (declare class UrbiToggle extends LitElement: checked, disabled, ariaLabel; SDK 93.0.0) e de docs/ui-componentes-conteudo.md § urbi-toggle (evento urbi-toggle:change, detail booleano), não do monorepo; a próxima execução do sincronizador a substitui. O .d.ts não traz o nome de atributo nem o reflect das props: checked e disabled seguem o default do Lit (atributo = nome em minúsculas, sem reflect); ariaLabel fica só como propriedade, porque o atributo dela não tem fonte — a app a passa por .ariaLabel. O :host do primitivo também não tem fonte, então host fica vazio.",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiToggle"
+      ],
+      "props": [
+        {
+          "propriedade": "checked",
+          "atributo": "checked",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiToggle"
+        },
+        {
+          "propriedade": "disabled",
+          "atributo": "disabled",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiToggle"
+        },
+        {
+          "propriedade": "ariaLabel",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiToggle"
+        }
+      ],
+      "atributos_convencao": [],
+      "host": [],
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     }
   }
 }
