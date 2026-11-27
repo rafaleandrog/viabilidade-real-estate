@@ -56,6 +56,7 @@ export const caso = {
   // Props que o espelho declara, o stub não reproduz e esta tela usa — todas
   // fora dos campos medidos (cabeçalho do card, ações, parâmetros do topo).
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-botao.desabilitado',
     'urbi-botao.icone',
     'urbi-botao.pequeno',
