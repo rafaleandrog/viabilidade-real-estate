@@ -4,6 +4,36 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-27 — Funding R16, fase 6: remoção da aba Comparar estruturas (issue 1011)
+
+Sexta fase do arco da Rodada 16 (guarda-chuva: issue 1005). A decisão D14 do dono manda apagar a
+aba, não escondê-la: a aba Estrutura de capital fica no lugar dela. Só frontend e guia; nada muda no
+motor, no `schema.json`, nas migrações, no backend nem na `versao`.
+
+- **Barra de abas:** Operações · Financiamento à produção · Estrutura de capital. Saíram de
+  `frontend/tela-funding.ts` a entrada `comparar` de `ABAS`, o ramo de `render()` que montava o
+  painel, o import do painel e de `funding-alternativas.js`, `_simularEstrutura` e
+  `_usarAlternativa`. O campo `config` fica: `_recalcular` (com rascunho) e `_simularJanela` o usam.
+- **Arquivos apagados:** `frontend/funding-alternativas-painel.ts`, `frontend/funding-alternativas.ts`
+  (sobravam nele só a comparação e as duas reexportações), `frontend/funding-alternativas.test.ts`,
+  `frontend/render/casos/funding-comparar.ts` e `frontend/render/funding-comparar.render.test.ts`.
+- **O que continua com teste, no lugar novo:** `indicadoresEstrutura` em
+  `frontend/funding-estrutura.test.ts` (sai só o teste da reexportação); a validação espelhada do
+  servidor em `frontend/funding-validacao.test.ts`, que deixa de importar a fábrica de operação da
+  comparação e escreve a operação de equity literal.
+- **Travas:** `frontend/funding-abas.test.ts` exige exatamente as três abas e recusa `id: 'comparar'`
+  e o painel na fonte; o caso de render `funding-abas` passa a medir a lista entregue ao `urbi-abas`,
+  um `urbi-hospedeiro` por aba e a aba que abre na montagem (`operacoes`), em 1280, 900 e 600 px.
+  A aba ativa é estado interno (não vai para a URL nem para o navegador), então ninguém reabre a
+  tela numa aba que não existe.
+- **Guia:** `docs/funding.md` fala em três abas, sem a seção da comparação; a frase da aba Operações
+  sobre a ordem das operações ganha a mesma ressalva do empate de antecipações que a seção da aba
+  Estrutura de capital já tinha.
+- As alternativas que cada navegador guardou (`localStorage`, chave `viab:funding-alternativas:<id>`)
+  deixam de aparecer; o PR não grava nem apaga nada no navegador.
+
+---
+
 ## 2026-11-27 — Funding R16, fase 5: aba Estrutura de capital — totais, torre por senioridade e tabela da sequência (issue 1010)
 
 Quinta fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no motor, no

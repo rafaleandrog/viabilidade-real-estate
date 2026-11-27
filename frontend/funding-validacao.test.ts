@@ -1,20 +1,16 @@
-// Espelho das regras do servidor no navegador (`funding-validacao.ts`). Os
-// testes de paridade e os de `errosDoEstadoFinal` moravam em
-// `funding-alternativas.test.ts` e mudaram junto com as funções; o que eles
-// provam é o mesmo, agora sobre `OperacaoFunding[]`. O caso das operações
-// `__fora` (marcador da aba Comparar estruturas) ficou lá, porque é o filtro
-// que a função de lá aplica antes de delegar.
+// Espelho das regras do servidor no navegador (`funding-validacao.ts`): os
+// testes de paridade com o servidor e os de `errosDoEstadoFinal`, sobre
+// `OperacaoFunding[]`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { OperacaoFunding } from './funding-motor.js';
-import { novaOperacaoAlternativa } from './funding-alternativas.js';
 import {
   CAMPOS_OPERACAO_ESPELHO, errosDoEstadoFinal, errosRetornoPorModo, recusaDoNome, recusaDoPatchComoServidor,
   recusaDoPostComoServidor, trocaDeTipoComoServidor, validarOperacaoComoServidor,
 } from './funding-validacao.js';
 
 const eq = (pct: number, modo?: string, extra: Record<string, unknown> = {}) =>
-  ({ ...novaOperacaoAlternativa('equity', `E${pct}`), pct_retorno: pct, ...(modo ? { modo_retorno: modo } : {}), ...extra }) as OperacaoFunding;
+  ({ tipo: 'equity', nome: `E${pct}`, valor: 0, inicio_mes: 0, modo_retorno: 'permuta_financeira', pct_retorno: pct, ...(modo ? { modo_retorno: modo } : {}), ...extra }) as OperacaoFunding;
 const lista = (...ops: OperacaoFunding[]): OperacaoFunding[] => ops;
 
 // ── paridade com o servidor ─────────────────────────────────────────

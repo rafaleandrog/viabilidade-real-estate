@@ -9,16 +9,14 @@
 // execução.
 //
 // Quem usa: a janela de criar e editar operação (recusa no próprio lugar, antes
-// de gravar) e a aba Comparar estruturas (que reexporta tudo isto de
-// `funding-alternativas.ts`). Fail-closed: o que o servidor recusaria, a tela
-// recusa antes de mandar.
+// de gravar). Fail-closed: o que o servidor recusaria, a tela recusa antes de
+// mandar.
 import type { OperacaoFunding } from './funding-motor.js';
 
 /**
  * Os campos que as rotas de operação gravam — espelho exato de
  * `CAMPOS_OPERACAO` (backend/rotas/avancado.ts), travado pelo teste de
- * paridade. Quem tira `ordem` da comparação do plano de "Usar esta" é
- * `funding-alternativas.ts`.
+ * paridade.
  */
 export const CAMPOS_OPERACAO_ESPELHO = [
   'tipo', 'nome', 'ordem', 'valor',

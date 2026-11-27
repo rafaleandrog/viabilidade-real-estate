@@ -17,8 +17,11 @@
 //     da sequência; apagar `sequenciaDeEstrutura` em `_recalcular` o tira.
 //
 // `medir()` acrescenta o que o `exigir` não diz: zero `urbi-tabela` (a tabela
-// compilada saiu) e a GEOMETRIA de cada cartão nos dois temas — nada transborda
-// do cartão nem da grade, e cada valor cabe na moldura.
+// compilada saiu), a GEOMETRIA de cada cartão nos dois temas — nada transborda
+// do cartão nem da grade, e cada valor cabe na moldura — e a BARRA DE ABAS que
+// a tela entrega ao `urbi-abas`: exatamente Operações, Financiamento à produção
+// e Estrutura de capital, um `urbi-hospedeiro` por aba, e a aba que abre na
+// montagem (a aba ativa é estado interno, não sai da URL nem do navegador).
 
 import '../../tela-funding.js';
 import type { OperacaoFunding } from '../../funding-motor.js';
@@ -104,7 +107,12 @@ export const caso = {
       };
     }
     document.documentElement.dataset.variante = '0';
+    const abas = sr.querySelector('urbi-abas') as any;
     return {
+      abas: (abas?.abas ?? []).map((a: { id: string; label: string }) => `${a.id}:${a.label}`),
+      slots: [...sr.querySelectorAll('urbi-abas > urbi-hospedeiro')].map((h) => h.getAttribute('slot')),
+      ativa: tela.abaAtiva,
+      paineisAlternativas: sr.querySelectorAll('viab-funding-alternativas').length,
       tabelas: sr.querySelectorAll('urbi-tabela').length,
       ids: cartoes.map((c) => c.dataset.id),
       kpisPorCartao: cartoes.map((c) => c.shadowRoot.querySelectorAll('.kpi').length),
