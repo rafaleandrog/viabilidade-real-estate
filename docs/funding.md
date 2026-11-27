@@ -189,13 +189,15 @@ fluxo e da aba Estrutura de capital, e um aviso na aba lembra que ela não entra
 religar volta a aplicá-la sem digitar de novo. Se o servidor recusar a mudança, o interruptor volta à
 posição gravada. Quem só lê o estudo vê o interruptor desabilitado. Se a instância não oferecer o
 interruptor, aparece no lugar a caixa de seleção **Ativo**, que funciona do mesmo jeito. A janela de
-liberação e o mês das chaves vêm do Cronograma. Ligado, a aba mostra também o **resumo** do
+liberação e o mês das chaves vêm do Cronograma. Ligado e com o que mostrar, a aba traz também o **resumo** do
 financiamento (custo financiável total, percentual financiado, principal máximo previsto, primeiro
 mês e valor da primeira liberação, total liberado, total de juros, pico do saldo devedor e o mês
 dele, primeiro mês de amortização, último mês com dívida e total amortizado) e o gráfico
 **Alavancagem mês a mês**, com o custo financiável acumulado, o principal liberado acumulado, o saldo
-devedor e as amortizações. Quem só lê um estudo em que o financiamento à produção nunca foi criado
-vê a aba vazia.
+devedor e as amortizações. O gráfico só aparece quando há alguma liberação: ligado mas sem liberar
+(sem custo elegível, ou sem atingir a exposição mínima), a aba fica sem ele. Quem só lê um estudo em
+que o financiamento à produção nunca foi criado vê, no lugar da aba, o aviso de que nenhum foi
+configurado.
 
 Como o banco libera: os custos elegíveis são reconhecidos quando incorridos; quando o percentual
 incorrido atinge a exposição mínima e a obra está ativa, a liberação daquele mês cobre tudo o que
@@ -250,8 +252,8 @@ coobrigação dá os mesmos números, e não há campo para isso.
 A aba **Estrutura de capital** mostra o capital stack do projeto: de onde vem o dinheiro que paga os
 usos, camada por camada, na ordem de senioridade. Ela só lê — não tem ação de edição, e quem só lê o
 estudo a vê inteira. Os números são os mesmos dos cartões da aba Operações, calculados juntos.
-Enquanto o Fluxo de Caixa do estudo não está calculado, a aba diz que a estrutura aparece quando ele
-estiver.
+A tela calcula o Fluxo de Caixa sozinha ao abrir; se esse cálculo não acontecer, a aba mostra só um
+aviso no lugar da estrutura.
 
 No topo, **quatro totais**: **usos totais** (a soma dos custos do projeto), **dívida** (as camadas
 de dívida e do financiamento à produção), **equity de terceiros** (os aportes) e **incorporador no

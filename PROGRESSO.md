@@ -20,7 +20,8 @@ Oitava e última fase do arco da Rodada 16 (guarda-chuva: issue 1005). Sem códi
   `docs/funding.md` ganhou o nome editável e o botão Salvar da aba Financiamento à produção, o resumo
   e o gráfico "Alavancagem mês a mês" quando ligado, o estado vazio para quem só lê, o Salvar
   alterações que só se habilita depois de mudar algo, o aviso de etapas no rodapé da janela, o
-  estado vazio da Estrutura de capital sem fluxo calculado e o quinto ponto do texto de apoio;
+  aviso da Estrutura de capital quando o fluxo não é calculado e o ponto do texto de apoio sobre o
+  tamanho das camadas;
   `docs/avancado.md` trocou o "interruptor Ativo" e a "página onde ela é editada" pela janela com
   etapas e citou a Estrutura de capital; `docs/formulas.md` estendeu a 4ª exceção à aba Estrutura de
   capital. Os demais guias que citam Funding seguem verdadeiros.

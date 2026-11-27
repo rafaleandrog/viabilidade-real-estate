@@ -66,7 +66,7 @@ arco.
 ## Método
 
 Primeira rodada conduzida pela skill `orquestrar`: uma sessão coordenadora que não escreve código;
-uma sessão Sonnet que refinou as oito sub-issues contra o código; e, para cada fase, uma sessão Opus
+uma sessão que refinou as oito sub-issues contra o código (Sonnet, segundo a coordenadora); e, para cada fase, uma sessão Opus
 de implementação e outra Opus de revisão (a `revisar-pr-apps` deste repositório, com no máximo três
 rodadas por sessão), em série. Merge autorizado pelo dono para o arco inteiro: "o merge é seu e de
 cada sessão que vai criar a finalizar cada PR."
@@ -79,9 +79,9 @@ commit da `main`, `mergeable_state` limpo, `Closes` no corpo e diff dentro do es
 **Tempos de relógio** (UTC, segundo a coordenadora), implementação / revisão por fase: refino das
 issues 14 min; 1 = 14 / 30 min; 2 = 15 / 56; 3 = 20 / 31; 4 = 165 (inclui a pausa da sessão no
 limite de uso da conta; ela contou 27 min de trabalho depois de retomar) / 48; 5 = 16 / 51;
-6 = 9 / 33; 7 = 23 / 40. O arco começou às 18:59 de 26/11 e ficou em pausa das 02:53 às 05:22 de
-27/11, por ordem do dono, à espera da renovação do limite de uso; voltou por uma tarefa agendada que
-ele mandou criar.
+6 = 9 / 33; 7 = 23 / 40. Também segundo a coordenadora, sem outra fonte pública: o arco começou às
+18:59 de 26/11 e ficou em pausa das 02:53 às 05:22 de 27/11, por ordem do dono, à espera da
+renovação do limite de uso; voltou por uma tarefa agendada que ele mandou criar.
 
 ## Motores de revisão
 
@@ -91,8 +91,8 @@ ele mandou criar.
   um P1 (reordenar não recalculava a sequência "antes → depois"); fase 4, um P2 (a janela não
   travava enquanto gravava); fase 5, um P2 (torre e totais saindo de simulações diferentes). Na
   fase 1 não respondeu no teto da primeira rodada e respondeu no head do conserto. Nas fases 1, 3 e
-  6 o bot também montou consertos equivalentes no ambiente dele (e disse ter aberto PR de
-  acompanhamento); nenhum PR novo apareceu no repositório.
+  6 o bot também montou consertos equivalentes no ambiente dele; nas fases 1 e 3 disse ter criado um
+  PR de acompanhamento, e na 6, só os metadados de um. Nenhum PR novo apareceu no repositório.
 - **Fan-out:** pelo Kimi (`kimi` 0.38.0, `kimi-k3`) em todas as fases, instalado pelo preflight do
   motor quando não estava no PATH; o CLI do Codex não existe no ambiente (sem `OPENAI_API_KEY`).
   Lentes que voltaram vazias ou estouraram o tempo foram re-despachadas (fases 4, 6 e 7).
