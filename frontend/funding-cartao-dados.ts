@@ -98,14 +98,18 @@ const SEM = '—';
 const finito = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const num = (v: unknown): number => Number(v) || 0;
 
-/** Valor em reais no formato do cartão, com o exato no título. Sem base, "—". */
-function reais(v: number | null | undefined): ValorCartao {
+/**
+ * Valor em reais no formato do cartão, com o exato no título. Sem base, "—".
+ * Exportado para a aba Estrutura de capital: os totais e a tabela da sequência
+ * saem deste MESMO formatador, e o texto da tabela é o mesmo do cartão.
+ */
+export function valorEmReais(v: number | null | undefined): ValorCartao {
   if (!finito(v)) return { texto: SEM };
   return { texto: fmtR$Mi(v), titulo: fmtR$(v) };
 }
 
-/** KPI percentual (uma casa); "a.a." quando é taxa anual. */
-function pct(v: number | null | undefined, anual = false): ValorCartao {
+/** KPI percentual (uma casa); "a.a." quando é taxa anual. Exportado pelo mesmo motivo de `valorEmReais`. */
+export function valorPercentual(v: number | null | undefined, anual = false): ValorCartao {
   if (!finito(v)) return { texto: SEM };
   return { texto: anual ? `${fmtPct(v)} a.a.` : fmtPct(v) };
 }
@@ -130,7 +134,7 @@ function termosDivida(e: EntradaCartao): TermoCartao[] {
   const valor = num(o.valor);
   const meses = Math.max(1, Math.round(num(o.aporte_meses)));
   const distribuido = o.distribuir_aporte === true && meses > 1;
-  const aporte = reais(valor > 0 ? valor : null);
+  const aporte = valorEmReais(valor > 0 ? valor : null);
   const amort = Math.max(0, Math.round(num(o.periodo_amortizacao_meses)));
   const car = Math.max(0, Math.round(num(o.periodo_carencia_meses)));
   return [
@@ -153,10 +157,10 @@ function termosEquity(e: EntradaCartao): TermoCartao[] {
     ? 'da receita líquida' : 'do resultado final';
   const retornoTotal = e.serie ? indicadoresOperacao(e.serie, 0).retornoTotal : null;
   return [
-    { rotulo: 'Aporte', valor: reais(valor > 0 ? valor : null) },
+    { rotulo: 'Aporte', valor: valorEmReais(valor > 0 ? valor : null) },
     { rotulo: 'Retorno', valor: { texto: `${fmtPctEntrada(num(o.pct_retorno))} ${modo}` } },
     { rotulo: 'Quando recebe', valor: periodo(e.serie?.saidas, e.dataInicio) },
-    { rotulo: 'Retorno total', valor: reais(retornoTotal !== null && retornoTotal > 0 ? retornoTotal : null) },
+    { rotulo: 'Retorno total', valor: valorEmReais(retornoTotal !== null && retornoTotal > 0 ? retornoTotal : null) },
   ];
 }
 
@@ -166,7 +170,7 @@ function termosAntecipacao(e: EntradaCartao, valorAntecipado: number | null): Te
     { rotulo: 'Carteira cedida', valor: { texto: fmtPctEntrada(num(o.pct_carteira_cedida)) } },
     { rotulo: 'Taxa de desconto', valor: { texto: `${fmtPctEntrada(num(o.taxa_anual))} a.a.` } },
     { rotulo: 'Mês da cessão', valor: { texto: rotuloMesRelativo(e.dataInicio, num(o.inicio_mes)) } },
-    { rotulo: 'Valor antecipado', valor: reais(valorAntecipado) },
+    { rotulo: 'Valor antecipado', valor: valorEmReais(valorAntecipado) },
   ];
 }
 
@@ -175,13 +179,13 @@ function termosAntecipacao(e: EntradaCartao, valorAntecipado: number | null): Te
 function kpisDaSequencia(k: ReturnType<typeof kpisDaOperacao> | null): KpiCartao[] {
   const tir = (antes: number | null, depois: number | null): KpiCartao => ({
     rotulo: 'TIR alavancada',
-    valor: pct(depois, true),
-    ...(antes === null ? {} : { antes: pct(antes, true) }),
+    valor: valorPercentual(depois, true),
+    ...(antes === null ? {} : { antes: valorPercentual(antes, true) }),
   });
   const exp = (antes: number | null, depois: number | null): KpiCartao => ({
     rotulo: 'Exposição máxima',
-    valor: reais(depois),
-    ...(antes === null ? {} : { antes: reais(antes) }),
+    valor: valorEmReais(depois),
+    ...(antes === null ? {} : { antes: valorEmReais(antes) }),
   });
   return [
     tir(k?.tirAlavancadaAntes ?? null, k?.tirAlavancadaDepois ?? null),
@@ -201,29 +205,29 @@ export function dadosDoCartao(e: EntradaCartao): DadosCartao {
   if (tipo === 'divida') {
     termos = termosDivida(e);
     proprios = [
-      { rotulo: 'LTV', valor: pct(k?.tipo === 'divida' ? k.ltvPct : null) },
-      { rotulo: 'Custo efetivo', valor: pct(k?.tipo === 'divida' ? k.custoEfetivoPct : null, true) },
+      { rotulo: 'LTV', valor: valorPercentual(k?.tipo === 'divida' ? k.ltvPct : null) },
+      { rotulo: 'Custo efetivo', valor: valorPercentual(k?.tipo === 'divida' ? k.custoEfetivoPct : null, true) },
     ];
   } else if (tipo === 'antecipacao_recebiveis') {
     const ind = e.serie ? indicadoresAntecipacao(e.serie) : null;
     semLastro = !ind || !(ind.valorFace > 0);
     termos = termosAntecipacao(e, semLastro || !ind ? null : ind.valorPresente);
     proprios = [
-      { rotulo: 'Deságio', valor: pct(k?.tipo === 'antecipacao_recebiveis' ? k.desagioPct : null) },
-      { rotulo: 'Custo efetivo', valor: pct(k?.tipo === 'antecipacao_recebiveis' ? k.custoEfetivoPct : null, true) },
+      { rotulo: 'Deságio', valor: valorPercentual(k?.tipo === 'antecipacao_recebiveis' ? k.desagioPct : null) },
+      { rotulo: 'Custo efetivo', valor: valorPercentual(k?.tipo === 'antecipacao_recebiveis' ? k.custoEfetivoPct : null, true) },
     ];
   } else {
     termos = termosEquity(e);
     proprios = [
-      { rotulo: 'ROI do investidor', valor: pct(k?.tipo === 'equity' ? k.roiInvestidorPct : null) },
-      { rotulo: 'TIR do investidor', valor: pct(k?.tipo === 'equity' ? k.tirInvestidorPct : null, true) },
+      { rotulo: 'ROI do investidor', valor: valorPercentual(k?.tipo === 'equity' ? k.roiInvestidorPct : null) },
+      { rotulo: 'TIR do investidor', valor: valorPercentual(k?.tipo === 'equity' ? k.tirInvestidorPct : null, true) },
     ];
   }
 
   const leitura = e.serie && k
     ? leituraDaOperacao(
       { serie: e.serie, kpis: k, passo: e.passo },
-      (v) => reais(v).texto,
+      (v) => valorEmReais(v).texto,
       (mes) => rotuloMesRelativo(e.dataInicio, mes),
     )
     : [];

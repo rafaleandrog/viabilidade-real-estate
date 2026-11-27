@@ -4,6 +4,48 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-27 — Funding R16, fase 5: aba Estrutura de capital — totais, torre por senioridade e tabela da sequência (issue 1010)
+
+Quinta fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no motor, no
+`schema.json`, nas migrações, no backend nem na `versao`.
+
+- **Aba nova.** `estrutura` entra em `ABAS` de `frontend/tela-funding.ts` depois do Financiamento à
+  produção (Operações · Financiamento à produção · Estrutura de capital · Comparar estruturas), com
+  render próprio (`_renderAbaEstrutura`), desenhado só quando a aba está ativa. Só leitura: quem não
+  edita vê a aba inteira. Quatro totais, a torre, a tabela da sequência (`urbi-tabela`) e o texto de
+  apoio (a D9 na mesma nota da frase de que o app paga todo terceiro pelo contrato).
+- **Mesmos números dos cartões.** A aba não simula: lê a `sequencia` que `_recalcular` já calcula e o
+  `funding` da estrutura completa, mais o fluxo com que a sequência foi calculada
+  (`calcDaSequencia`, para os usos totais não misturarem duas versões do projeto). Os textos saem de
+  `frontend/funding-estrutura-dados.ts` (`dadosDaEstrutura`, puro), que usa os formatadores do
+  cartão — `valorEmReais` e `valorPercentual`, agora exportados de `funding-cartao-dados.ts` — e
+  por isso a tabela repete o "depois" de cada cartão letra por letra. As camadas, a do
+  incorporador e os totais saem da mesma simulação, o `funding` da estrutura completa
+  (`indicadoresEstrutura`); a última linha da tabela é o "depois" do último passo. Os dois só
+  divergem no empate de duas antecipações com o mesmo `inicio_mes` e a mesma `ordem` (achado do App
+  do Codex na revisão), e o teste cobre esse caso.
+- **Rótulo de nível** (adendo da coordenadora): `rotuloNivelCamada` em `frontend/funding-estrutura.ts`,
+  puro, a partir do `tipo` e, no equity, do `modo_retorno` da operação achada pelo `id`. A camada da
+  fase 1 não mudou de formato. Cor do incorporador: o quinto N (`COR_DO_INCORPORADOR` em
+  `funding-cores.ts`).
+- **Torre** `viab-grafico-stack-capital` (`frontend/grafico-stack-capital.ts`), componente próprio
+  com só tokens: preenchimento por `color-mix` da cor da categoria com `--cor-superficie-elevada` a
+  28%, borda esquerda na cor pura, texto em `--cor-texto`/`--cor-texto-forte`. DOM na ordem de
+  senioridade (o leitor de tela lê na ordem da tabela), base embaixo por `column-reverse`; cada
+  camada `role="listitem"` com nome acessível (nome, nível, valor exato, %). Camada de valor zero
+  fora do desenho; sem nenhuma, "Nenhuma camada com valor.". Geometria pura em
+  `frontend/stack-capital-desenho.ts` (`alturasDasCamadas`: proporcional, piso de 28 px só para quem
+  ficaria abaixo dele, torre cresce se o piso de todas não couber; uma linha abaixo de 46 px).
+- **Testes.** `frontend/funding-estrutura-aba.test.ts` (rótulo por tipo, dados da aba contra o
+  núcleo, mesmas strings do cartão, geometria, pureza, fiação na fonte); render em
+  `frontend/render/funding-estrutura.render.test.ts` com três casos (`grafico-stack-capital`,
+  `grafico-stack-capital-vazio`, `funding-estrutura`) e a sonda `casos/medir-stack.ts` (geometria e
+  contraste WCAG por variante de tema). Inventários: `funding-milhoes.test.ts` ganha
+  `grafico-stack-capital.ts` (1 chamada); `funding-abas.test.ts` trava a ordem das quatro abas.
+- **Documentação.** `docs/funding.md` ganha a seção da aba; `CLAUDE.md` atualiza a frase do
+  inventário de `fmtR$Mi` e o endereço do aviso regulatório, e `render/casos/ind-funding.ts` o de
+  `_renderIndicadores` — os dois que este diff deslocou.
+
 ## 2026-11-27 — Funding R16, fase 4: janela com etapas para criar e editar operação; tipo travado no servidor (issue 1009)
 
 Quarta fase do arco da Rodada 16 (guarda-chuva: issue 1005). Frontend e uma regra de servidor; nada

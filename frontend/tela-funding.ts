@@ -28,7 +28,9 @@ import { passosDoPlano, type PlanoUsarAlternativa } from './funding-alternativas
 import {
   indicadoresEstrutura, sequenciaDeEstrutura, type IndicadoresEstrutura, type SequenciaEstrutura,
 } from './funding-estrutura.js';
-import { AVISO_SEM_LASTRO, TIPOS_DE_CARTAO, dadosDoCartao, operacoesDeCartao } from './funding-cartao-dados.js';
+import { AVISO_SEM_LASTRO, TIPOS_DE_CARTAO, dadosDoCartao, operacoesDeCartao, type ValorCartao } from './funding-cartao-dados.js';
+import { dadosDaEstrutura, type LinhaSequencia } from './funding-estrutura-dados.js';
+import './grafico-stack-capital.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Sub-aba "Viabilidade → Funding" (#355, item 48 da Rodada 7).
@@ -96,11 +98,13 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
 // `id` em `render()`. Todo tipo de `TIPOS` tem lugar — cartão ou aba —, e
 // `frontend/funding-abas.test.ts` trava essa partição.
 //
-// Comparar estruturas ainda existe nesta fase; sai quando a aba Estrutura de
-// capital entrar.
+// A aba Estrutura de capital mostra o capital stack do projeto (totais, torre
+// por senioridade e a sequência "antes → depois"); só leitura, roteada por `id`
+// em `render()`. Comparar estruturas ainda existe nesta fase e sai na seguinte.
 const ABAS: { id: string; label: string; icone: string }[] = [
   { id: 'operacoes', label: 'Operações', icone: 'fa-solid fa-table-list' },
   { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
+  { id: 'estrutura', label: 'Estrutura de capital', icone: 'fa-solid fa-layer-group' },
   { id: 'comparar', label: 'Comparar estruturas', icone: 'fa-solid fa-scale-balanced' },
 ];
 
@@ -136,6 +140,10 @@ export class ViabFunding extends LitElement {
   // A sequência "antes → depois" por senioridade. Calculada em `_recalcular`,
   // NUNCA em `render()`: são N+1 simulações a cada tecla.
   @state() private sequencia: SequenciaEstrutura | null = null;
+  // O fluxo do projeto com que a sequência foi calculada (com o rascunho,
+  // quando houver): os totais da aba Estrutura de capital leem os usos dele, e
+  // não de `calc`, para não misturarem duas versões do projeto.
+  private calcDaSequencia: FluxoCalc | null = null;
   // Cartão a focar quando a lista voltar a ser desenhada (volta da página).
   private focarCartaoId: number | string | null = null;
   // #587: guarda contra criar duas vezes o Financiamento à produção — a
@@ -174,6 +182,25 @@ export class ViabFunding extends LitElement {
       grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
     }
     .pagina-operacao .voltar { margin-bottom: 10px; }
+    /* Aba Estrutura de capital. */
+    .estrutura { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    .totais {
+      display: grid; gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+    }
+    .total {
+      padding: 10px 12px; min-width: 0;
+      border: 1px solid; border-color: var(--cor-borda); border-radius: var(--raio-sm);
+      background: var(--cor-superficie);
+    }
+    .total .rot { font-size: 12px; color: var(--cor-texto-sec); }
+    .total .val {
+      font-size: 1.1rem; font-weight: 700; margin-top: 4px; color: var(--cor-texto-forte);
+      font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+    }
+    .bloco-estrutura h4 { margin: 0 0 10px; font-size: 13px; color: var(--cor-texto-sec); font-weight: 600; }
+    .apoio { margin: 0; padding-left: 18px; font-size: 12px; color: var(--cor-texto-sec); line-height: 1.5; }
+    .apoio li + li { margin-top: 4px; }
     /* A página recebe o foco ao abrir (o cartão que o tinha saiu da tela); o
        Tab seguinte vai ao botão de voltar. Foco programático em contêiner não
        pede anel. */
@@ -308,7 +335,7 @@ export class ViabFunding extends LitElement {
    * mesmo que o servidor vai gravar no PATCH (`operacaoComRascunho`); operação
    * sem rascunho simula com o `inicio_mes` gravado, como as outras telas. */
   private _recalcular() {
-    if (!this.calc) { this.funding = null; this.sequencia = null; return; }
+    if (!this.calc) { this.funding = null; this.sequencia = null; this.calcDaSequencia = null; return; }
     const efetivas = this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)) as OperacaoFunding[];
     // O horizonte de `this.calc` vem das operações GRAVADAS (`_carregar`). Com
     // rascunho, o fluxo-base é refeito com as efetivas — a montagem de
@@ -329,6 +356,7 @@ export class ViabFunding extends LitElement {
       },
     );
     this.funding = simularFunding(efetivas);
+    this.calcDaSequencia = calc;
     // A sequência "antes → depois" dos cartões: cada passo roda o funding do
     // estudo sobre o MESMO fluxo do projeto (`calc`), com as operações mais
     // seniores até aquela — sem refazer o fluxo por passo. Lista vazia é o
@@ -1050,6 +1078,65 @@ export class ViabFunding extends LitElement {
     `;
   }
 
+  /**
+   * A aba Estrutura de capital: os quatro totais, a torre por senioridade e a
+   * tabela da sequência, mais o texto de apoio. Só leitura — não tem ação de
+   * edição, e quem só lê vê a aba inteira.
+   *
+   * Nada é simulado aqui: a sequência e o funding são os que `_recalcular` já
+   * calculou para os cartões da aba Operações, e os textos saem dos mesmos
+   * formatadores do cartão (`dadosDaEstrutura`). Com rascunho, a aba reflete o
+   * rascunho como o resto da tela.
+   */
+  private _renderAbaEstrutura(): TemplateResult {
+    if (!this.sequencia || !this.calcDaSequencia) {
+      return html`<urbi-estado-vazio icone="fa-solid fa-layer-group"
+        mensagem="A estrutura de capital aparece quando o Fluxo de Caixa do estudo estiver calculado."></urbi-estado-vazio>`;
+    }
+    const d = dadosDaEstrutura({
+      calc: this.calcDaSequencia,
+      funding: this.funding,
+      sequencia: this.sequencia,
+      operacoes: this.operacoes.map((o) => operacaoComRascunho(o, this.draft[o.id], this.crono)),
+      rotuloTipo,
+    });
+    const celula = (v: ValorCartao) => html`<span title=${v.titulo ?? nothing}>${v.texto}</span>`;
+    const colunas = [
+      { id: 'passo', label: 'Passo', render: (l: LinhaSequencia) => html`<span>${l.passo}</span>` },
+      { id: 'tir', label: 'TIR alavancada', alinhamento: 'direita', render: (l: LinhaSequencia) => celula(l.tir) },
+      { id: 'exposicao', label: 'Exposição máxima', alinhamento: 'direita', render: (l: LinhaSequencia) => celula(l.exposicao) },
+    ];
+    return html`
+      <div class="estrutura">
+        <div class="totais">
+          ${d.totais.map((t) => html`
+            <div class="total"><div class="rot">${t.rotulo}</div><div class="val">${celula(t.valor)}</div></div>`)}
+        </div>
+        <section class="bloco-estrutura">
+          <h4>Camadas por senioridade</h4>
+          <viab-grafico-stack-capital .camadas=${d.camadas}></viab-grafico-stack-capital>
+        </section>
+        <section class="bloco-estrutura">
+          <h4>Sequência antes → depois</h4>
+          <urbi-tabela class="sequencia" .colunas=${colunas} .linhas=${d.linhas}></urbi-tabela>
+        </section>
+        <ul class="apoio">
+          <li>Senioridade aqui é a ordem de pagamento e a ordem de entrada na comparação. O app paga
+            todo terceiro pelo contrato, e o incorporador cobre a falta de caixa: nenhuma operação
+            recebe menos do que o contrato dela prevê por estar abaixo de outra.</li>
+          <li>O restante dos usos é pago pelas vendas ao longo do projeto.</li>
+          <li>As camadas não acontecem no mesmo mês, então a soma delas não é um saldo numa data.</li>
+          <li>O tamanho de cada camada é o maior valor que aquela parte teve dentro do projeto. O
+            Financiamento à produção amortiza e libera de novo, por isso a camada dele não é o total
+            liberado.</li>
+          <li>A camada do Financiamento à produção é medida na estrutura completa, e o "depois" dele na
+            tabela é medido sozinho: os dois não se comparam, porque ele lê o caixa depois das outras
+            operações.</li>
+        </ul>
+      </div>
+    `;
+  }
+
   render() {
     if (this.estudo?.nivel_analise !== 'avancado') return html`${nothing}`;
     if (this.carregando) return html`<urbi-loading mensagem="Carregando funding..."></urbi-loading>`;
@@ -1097,6 +1184,7 @@ export class ViabFunding extends LitElement {
         ${ABAS.map((a) => html`
           <urbi-hospedeiro slot=${a.id}>
             ${a.id === 'financiamento_producao' ? this._renderAbaFinanciamentoProducao()
+              : a.id === 'estrutura' ? (this.abaAtiva !== 'estrutura' ? nothing : this._renderAbaEstrutura())
               : a.id === 'comparar' ? (this.abaAtiva !== 'comparar' ? nothing : html`<viab-funding-alternativas
                   .estudoId=${this.estudo?.id ?? null} .editavel=${this.editavel}
                   .salvas=${this.operacoes} .simular=${this._simularEstrutura} .dataInicio=${this.dataInicio}

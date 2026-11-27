@@ -33,8 +33,8 @@ varredura do caixa disponível.
 
 ## Para usuários
 
-A página **Funding** tem três abas: **Operações**, **Financiamento à produção** e **Comparar
-estruturas**. Acima delas há um aviso permanente: o app simula contratos privados e não valida a
+A página **Funding** tem quatro abas: **Operações**, **Financiamento à produção**, **Estrutura de
+capital** e **Comparar estruturas**. Acima delas há um aviso permanente: o app simula contratos privados e não valida a
 legalidade da captação — uma oferta ao público pode ter obrigações regulatórias próprias.
 
 ### A aba Operações
@@ -228,6 +228,58 @@ A página da operação mostra, em **Resultado da antecipação**:
 
 Quem compra assume o risco das parcelas. Como o app não modela inadimplência, a cessão com ou sem
 coobrigação dá os mesmos números, e não há campo para isso.
+
+### A aba Estrutura de capital
+
+A aba **Estrutura de capital** mostra o capital stack do projeto: de onde vem o dinheiro que paga os
+usos, camada por camada, na ordem de senioridade. Ela só lê — não tem ação de edição, e quem só lê o
+estudo a vê inteira. Os números são os mesmos dos cartões da aba Operações, calculados juntos.
+
+No topo, **quatro totais**: **usos totais** (a soma dos custos do projeto), **dívida** (as camadas
+de dívida e do financiamento à produção), **equity de terceiros** (os aportes) e **incorporador no
+pico** (a exposição máxima do incorporador com toda a estrutura). Os valores aparecem em milhões,
+com uma casa ("R$ 20,1 mi"); passar o ponteiro sobre o valor mostra o número exato.
+
+Abaixo, a **torre das camadas**: uma barra só, com a camada mais sênior embaixo e o incorporador no
+topo — financiamento à produção (quando ligado; desligado, não aparece), dívidas, antecipações,
+equity e, por último, o incorporador. Dentro do mesmo tipo vale a posição da operação. Ao lado, um
+eixo diz o sentido: "mais sênior" embaixo, "mais júnior" em cima. Cada camada tem a cor do tipo (a
+mesma da etiqueta do cartão; o incorporador tem cor própria) e a altura proporcional ao valor, e
+traz escritos dentro dela o nome, o nível, o valor e o percentual sobre o total das camadas. O nível
+é "sênior · base" no financiamento à produção, "dívida" na dívida, "cessão de recebíveis" na
+antecipação, "recebe sobre a receita" ou "participa do resultado" no equity (conforme o retorno
+incide sobre a receita líquida ou sobre o resultado final) e "recebe por último" no incorporador.
+Uma camada pequena tem uma altura mínima para o texto caber numa linha, e o percentual escrito
+continua sendo o verdadeiro; nome comprido é cortado com reticências, e o valor e o percentual
+ficam sempre visíveis. Camada de valor zero não é desenhada, mas continua visível em texto: uma
+operação de valor zero (uma antecipação sem parcela a ceder, por exemplo) continua sendo uma linha
+da tabela da sequência, e o incorporador de um projeto que nunca fica no vermelho aparece como
+"incorporador no pico" zerado.
+Sem nenhuma camada com valor, a torre dá lugar ao texto "Nenhuma camada com valor.". Para leitor
+de tela, cada camada é um item de lista com o nome, o nível, o valor exato e o percentual.
+
+O tamanho de cada camada é o **maior valor que aquela parte teve dentro do projeto**: o maior
+saldo devedor na dívida e no financiamento à produção, o valor antecipado na antecipação, o aporte
+no equity e a exposição máxima no incorporador. O financiamento à produção amortiza e libera de
+novo, por isso a camada dele não é o total liberado.
+
+Por fim, a **tabela da sequência**: uma linha para o projeto sem funding e uma para cada operação,
+na ordem de senioridade, com a **TIR alavancada** e a **exposição máxima** depois daquele passo — os
+mesmos textos do "depois" de cada cartão. A última linha é a estrutura completa, e a exposição dela
+é o "incorporador no pico". A exceção é o empate de duas antecipações no mesmo mês e na mesma
+posição: a ordem em que o app simula as duas muda o resultado, e a última linha (calculada na ordem
+de senioridade) pode diferir do "incorporador no pico" e da torre (calculados na ordem em que as
+operações estão salvas).
+
+O texto de apoio, abaixo da tabela, lembra como ler a aba:
+
+- senioridade aqui é a ordem de pagamento e a ordem de entrada na comparação; o app paga todo
+  terceiro pelo contrato, e o incorporador cobre a falta de caixa — nenhuma operação recebe menos do
+  que o contrato dela prevê por estar abaixo de outra;
+- o restante dos usos é pago pelas vendas ao longo do projeto, que ficam fora da torre;
+- as camadas não acontecem no mesmo mês, então a soma delas não é um saldo numa data;
+- a camada do financiamento à produção é medida na estrutura completa, e o "depois" dele na tabela
+  é medido sozinho; os dois não se comparam, porque ele lê o caixa depois das outras operações.
 
 ### Comparar estruturas
 

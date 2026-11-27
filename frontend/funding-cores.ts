@@ -21,8 +21,15 @@ export const COR_DO_TIPO: Readonly<Record<TipoOperacao, number>> = {
   equity: 4,
 };
 
+/**
+ * O incorporador não é operação, mas tem camada no topo do stack: o quinto N,
+ * distinto dos quatro tipos.
+ */
+export const COR_DO_INCORPORADOR = 5;
+
 /** N do tipo; tipo desconhecido cai numa posição que nenhum tipo conhecido usa. */
 export function numeroDaCor(tipo: string): number {
+  if (tipo === 'incorporador') return COR_DO_INCORPORADOR;
   return (COR_DO_TIPO as Record<string, number>)[tipo] ?? 8;
 }
 
