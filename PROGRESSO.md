@@ -18,7 +18,7 @@ Oitava e última fase do arco da Rodada 16 (guarda-chuva: issue 1005). Sem códi
 - **Guias conferidos contra a tela** (`render()` e as `_render…` de `frontend/tela-funding.ts`,
   `frontend/funding-janela.ts`, `frontend/funding-cartao.ts`, `frontend/grafico-stack-capital.ts`):
   `docs/funding.md` ganhou o nome editável e o botão Salvar da aba Financiamento à produção, o resumo
-  e o gráfico "Alavancagem mês a mês" quando ligado, o estado vazio para quem só lê, o Salvar
+  quando ligado, o gráfico "Alavancagem mês a mês" quando há liberação, o aviso para quem só lê, o Salvar
   alterações que só se habilita depois de mudar algo, o aviso de etapas no rodapé da janela, o
   aviso da Estrutura de capital quando o fluxo não é calculado e o ponto do texto de apoio sobre o
   tamanho das camadas;
