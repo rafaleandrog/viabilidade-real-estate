@@ -153,11 +153,13 @@ giro), **Equity**, **Financiamento à produção** e **Antecipação de recebív
 fase do cronograma ou um mês específico) e a taxa ou o retorno — o Equity pode ser remunerado como
 percentual do resultado final ou como permuta financeira sobre a receita líquida. O Financiamento à
 produção não tem valor nem início digitados: a janela vem do Cronograma e o principal, da base
-financiável; é a única operação com o interruptor **Ativo**. A Antecipação de recebíveis cede, num
+financiável; é a única operação que liga e desliga, por um interruptor. A Antecipação de recebíveis cede, num
 mês escolhido, um percentual do que as vendas já feitas ainda vão pagar, e recebe à vista o valor
 presente dessas parcelas à taxa de desconto. Na aba **Operações**, cada dívida, equity e
 antecipação é um cartão com os termos, a leitura e os indicadores dela; clicar no cartão abre a
-página da operação, onde ela é editada. O Financiamento à produção tem aba própria. As regras de
+página da operação, e **Editar** (ou **Nova operação**, na lista) abre a janela com etapas onde ela
+é criada ou editada. O Financiamento à produção tem aba própria, e a aba **Estrutura de capital**
+mostra as camadas do capital por senioridade. As regras de
 cada tipo estão em [Funding](funding).
 
 ### Resultados

@@ -134,3 +134,52 @@ test('PATCH de funding: sem tipo, continua como antes', async () => {
     assert.equal(linha.tipo, 'divida');
   });
 });
+
+// Sentido contrário da troca: a operação gravada É o Financiamento à produção e
+// o PATCH tenta fazê-la deixar de ser. Mesma recusa, nada gravado — senão o
+// estudo perderia a única operação com liga/desliga por uma porta lateral.
+function cenarioFinanciamento() {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise', tipo_empreendimento: 'incorporacao' });
+  const id = dados.semear('avancado_funding_operacoes', {
+    estudo_id: 1, tipo: 'financiamento_producao', nome: 'Financiamento à produção', valor: 0, taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, ativo: true, ordem: 0,
+  });
+  return { dados, id, caminho: `/estudos/1/avancado/funding/${id}` };
+}
+
+test('PATCH de funding: o Financiamento à produção não deixa de ser Financiamento à produção (422, nada gravado)', async () => {
+  for (const tipo of ['divida', 'equity', 'antecipacao_recebiveis']) {
+    const { dados, id, caminho } = cenarioFinanciamento();
+    await comServidor(criarApp(dados), async (base) => {
+      const r = await patch(base, caminho, { tipo, ativo: false });
+      assert.equal(r.status, 422, JSON.stringify(r.corpo));
+      assert.equal(r.corpo.codigo, 'TIPO_IMUTAVEL');
+      assert.equal(dados.escritas, 0, 'a recusa não pode gravar');
+      const linha = await dados.buscar('avancado_funding_operacoes', id);
+      assert.equal(linha.tipo, 'financiamento_producao');
+      assert.equal(linha.ativo, true);
+    });
+  }
+});
+
+// `tipo` malformado não é troca de tipo: é valor inválido. Volta o mesmo
+// `400 CAMPO_INVALIDO` com a mesma mensagem que a validação de campo dá na
+// criação, e não o `422 TIPO_IMUTAVEL`, cuja mensagem ("não muda depois de
+// criada") não descreve o que houve. Vale nos dois sentidos de gravada.
+test('PATCH de funding: tipo malformado volta 400 CAMPO_INVALIDO (não TIPO_IMUTAVEL) e não grava nada', async () => {
+  for (const montar of [cenario, cenarioFinanciamento]) {
+    for (const tipo of ['', null, 'DIVIDA', 'Financiamento_Producao']) {
+      const { dados, id, caminho } = montar();
+      const antes = { ...(await dados.buscar('avancado_funding_operacoes', id)) };
+      await comServidor(criarApp(dados), async (base) => {
+        const r = await patch(base, caminho, { tipo, nome: 'Trocado' });
+        assert.equal(r.status, 400, `${JSON.stringify(tipo)}: ${JSON.stringify(r.corpo)}`);
+        assert.equal(r.corpo.codigo, 'CAMPO_INVALIDO', JSON.stringify(tipo));
+        assert.match(String(r.corpo.mensagem), /tipo deve ser um de: financiamento_producao, divida, equity, antecipacao_recebiveis/);
+        assert.equal(dados.escritas, 0, 'a recusa não pode gravar');
+        assert.deepEqual(await dados.buscar('avancado_funding_operacoes', id), antes);
+      });
+    }
+  }
+});

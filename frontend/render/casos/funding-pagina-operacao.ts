@@ -80,6 +80,9 @@ export const caso = {
     'urbi-botao.pequeno',
     'urbi-botao.variante',
     'urbi-botao.desabilitado',
+    // O interruptor da aba Financiamento à produção, montada junto (ver
+    // COMPORTAMENTOS em scripts/render-check.mjs).
+    'urbi-toggle.ariaLabel',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = await tela(raiz, [DIVIDA, fap(false), EQUITY], true);

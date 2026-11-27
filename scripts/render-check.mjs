@@ -270,6 +270,24 @@ export function inventarioDeReproducao() {
   return fora;
 }
 
+/**
+ * Primitivos cujo stub EMITE o evento do primitivo real, porque um caso precisa
+ * da interação e não só da geometria. O espelho não carrega eventos, então cada
+ * entrada aqui cita a fonte do contrato.
+ *
+ * `interruptor` — `urbi-toggle`. O SDK fixado declara o evento
+ * `urbi-toggle:change` com `detail` booleano (`docs/ui-componentes-conteudo.md`
+ * § urbi-toggle) e as props `checked`, `disabled` e `ariaLabel`
+ * (`dist/index.d.ts`). O stub desenha um `button` nativo com `role="switch"`,
+ * `aria-checked` e o nome acessível da prop `ariaLabel`; o clique (e, por ser
+ * botão nativo, Espaço e Enter) inverte `checked` e emite o evento com o estado
+ * NOVO no `detail`; desabilitado, o botão fica `disabled` e não emite nada.
+ * O que ele NÃO reproduz: o markup e o estilo reais do primitivo (o SDK não os
+ * traz), e se o real propaga o evento para fora do shadow root — a tela escuta
+ * no próprio elemento, então isso não muda a medida.
+ */
+const COMPORTAMENTOS = { 'urbi-toggle': 'interruptor' };
+
 function gerarPrimitivos() {
   if (!existsSync(ESPELHO_PRIMITIVOS)) {
     throw new Error(`referencia/ui-urbiverso/primitivos.json não existe — rode scripts/sincronizar-referencia-ui.mjs.`);
@@ -293,7 +311,7 @@ function gerarPrimitivos() {
     // tudo que o template escreve como atributo.
     const props = p.props.filter((x) => x.atributo).map((x) => [x.propriedade, x.atributo]);
     const dimensiona = PROPS_QUE_DIMENSIONAM[tag] ?? {};
-    defs.push({ tag, regras, props, dimensiona });
+    defs.push({ tag, regras, props, dimensiona, comportamento: COMPORTAMENTOS[tag] ?? null });
   }
   return `// GERADO por scripts/render-check.mjs a partir de referencia/ui-urbiverso/primitivos.json
 // Espelho de ${carimbo.sha.slice(0, 8)} (monorepo ${carimbo.versao_monorepo}, ${carimbo.data_do_commit}).
@@ -307,12 +325,18 @@ const INTERNO = \`
   .rc-valor{font-size:var(--texto-destaque,1rem);color:var(--cor-texto-forte,#fff);
     font-weight:700;white-space:nowrap}
   .rc-corpo{display:flex;flex-direction:column;min-width:0}
+  .rc-interruptor{display:inline-block;vertical-align:middle;width:2.25rem;height:1.25rem;padding:0;
+    border:0;border-radius:999px;background:var(--cor-borda,#555)}
+  .rc-interruptor[aria-checked="true"]{background:var(--cor-controle-ativo,#2e7d32)}
+  .rc-interruptor:disabled{opacity:.5}
 \`;
-for (const { tag, regras, props, dimensiona } of DEFS) {
+for (const { tag, regras, props, dimensiona, comportamento } of DEFS) {
   if (customElements.get(tag)) continue;
   const ATRIBUTOS = props.map(([, atributo]) => atributo);
   class Stub extends HTMLElement {
-    static get observedAttributes() { return ATRIBUTOS; }
+    // aria-label: o ariaLabel nativo do HTMLElement reflete no atributo, e e por
+    // ele que o stub do interruptor fica sabendo do nome acessivel.
+    static get observedAttributes() { return comportamento === 'interruptor' ? [...ATRIBUTOS, 'aria-label'] : ATRIBUTOS; }
     constructor() {
       super();
       const r = this.attachShadow({ mode: 'open' });
@@ -322,7 +346,30 @@ for (const { tag, regras, props, dimensiona } of DEFS) {
       this._corpo = document.createElement('div');
       this._corpo.className = 'rc-corpo';
       r.appendChild(this._corpo);
+      if (comportamento === 'interruptor') {
+        // Ver COMPORTAMENTOS em scripts/render-check.mjs. O botao fica FORA do
+        // painel, que _pintar() esvazia a cada prop: recriado, ele perderia o foco.
+        this._corpo.style.display = 'contents';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'rc-interruptor';
+        b.setAttribute('role', 'switch');
+        b.addEventListener('click', () => {
+          if (this._bool('disabled')) return;
+          const novo = !this._bool('checked');
+          this.checked = novo;
+          this.dispatchEvent(new CustomEvent('urbi-toggle:change', { detail: novo, bubbles: true, composed: true }));
+        });
+        r.appendChild(b);
+        this._interruptor = b;
+      }
       this._pintar();
+    }
+    /** Prop booleana: propriedade JS primeiro; sem ela, a PRESENCA do atributo. */
+    _bool(nome) {
+      const viaProp = this['_p_' + nome];
+      if (viaProp !== undefined && viaProp !== null) return !!viaProp;
+      return this.hasAttribute(nome);
     }
     /** Valor efetivo de uma prop: propriedade JS primeiro, atributo depois. */
     _v(nome) {
@@ -378,6 +425,13 @@ for (const { tag, regras, props, dimensiona } of DEFS) {
         const s = document.createElement('slot');
         s.setAttribute('name', nome);
         this._corpo.appendChild(s);
+      }
+      if (this._interruptor) {
+        this._interruptor.setAttribute('aria-checked', String(this._bool('checked')));
+        this._interruptor.disabled = this._bool('disabled');
+        const nomeAcessivel = this.ariaLabel;
+        if (nomeAcessivel) this._interruptor.setAttribute('aria-label', nomeAcessivel);
+        else this._interruptor.removeAttribute('aria-label');
       }
     }
     attributeChangedCallback() { this._pintar(); }

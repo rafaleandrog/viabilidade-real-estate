@@ -120,7 +120,8 @@ ordem de senioridade (uma operação nova entra como a última do tipo):
 
 Na janela os valores aparecem em reais cheios. Indicador sem base de cálculo mostra "—", nunca zero.
 
-**Nada é gravado antes de Criar operação** (na edição, **Salvar alterações**). Cancelar, o botão de
+**Nada é gravado antes de Criar operação** (na edição, **Salvar alterações**, que só se habilita
+depois de alguma mudança). Cancelar, o botão de
 fechar e a tecla Esc fecham a janela sem gravar; se algo foi alterado, o app pergunta antes de
 descartar. Clicar fora da janela não a fecha. Ao fechar, o foco volta ao botão que a abriu. Na
 criação, a operação criada abre em seguida na página dela. Enquanto a operação está sendo gravada,
@@ -130,8 +131,10 @@ Antes de gravar, a janela aplica as mesmas regras do servidor e mostra a recusa 
 valor, taxa ou prazo negativo, percentual acima de 100, carência igual ou maior que a amortização (quando a amortização é maior que zero),
 "Aporte em" menor que 1, número inválido, nome vazio ou com mais de 100 caracteres (também na
 edição) e, no equity, retorno somado acima de 100% entre as operações do mesmo modo. Criar operação
-com uma regra violada leva à etapa do erro e não grava. Se o servidor ainda assim recusar, a
-mensagem aparece dentro da janela, que continua aberta com tudo o que foi digitado.
+com uma regra violada leva à etapa do erro, avisa no rodapé que é preciso corrigir as etapas
+marcadas e não grava. Se o servidor ainda assim recusar, a
+mensagem aparece dentro da janela, que continua aberta com tudo o que foi digitado, e o foco vai
+para essa mensagem.
 
 **O tipo é escolhido ao criar e não muda depois.** Na edição ele aparece travado; para outro tipo,
 crie uma operação nova. Na edição, só os campos alterados vão ao servidor.
@@ -175,12 +178,25 @@ recusa antes de gravar, e o servidor também.
 
 ### Financiamento à produção
 
-Uma por estudo, editada na aba própria, não na janela de operação. Informe a **Taxa** anual, a **Exposição mín. p/ liberação**, o percentual
-financiável do custo e as linhas de custo elegíveis — o botão **Usar base padrão** seleciona o
+Uma por estudo, editada na aba própria, não na janela de operação. No cabeçalho da aba ficam o
+nome, editável, e o liga/desliga. Informe a **Taxa** anual, a **Exposição mín. p/ liberação**, o
+**% do custo financiado** e as linhas de custo elegíveis — o botão **Usar base padrão** seleciona o
 pagamento do terreno (sem as permutas), a construção, a outorga, os projetos e as licenças e
-aprovações — e se o **Caixa disponível amortiza antes das chaves**. É a única operação com o
-interruptor **Ativo**: desligada, fica cadastrada e sai do fluxo. A janela de liberação e o mês das
-chaves vêm do Cronograma.
+aprovações — e se o **Caixa disponível amortiza antes das chaves**; esses campos e o nome são gravados pelo
+botão **Salvar** da aba. É a única operação que liga e desliga: o interruptor no cabeçalho da aba, com o estado escrito ao lado (**Ligado** ou
+**Desligado**), grava na hora. Desligada, ela fica cadastrada, com os parâmetros guardados, sai do
+fluxo e da aba Estrutura de capital, e um aviso na aba lembra que ela não entra no Fluxo de Caixa;
+religar volta a aplicá-la sem digitar de novo. Se o servidor recusar a mudança, o interruptor volta à
+posição gravada. Quem só lê o estudo vê o interruptor desabilitado. Se a instância não oferecer o
+interruptor, aparece no lugar a caixa de seleção **Ativo**, que funciona do mesmo jeito. A janela de
+liberação e o mês das chaves vêm do Cronograma. Ligado e com o que mostrar, a aba traz também o **resumo** do
+financiamento (custo financiável total, percentual financiado, principal máximo previsto, primeiro
+mês e valor da primeira liberação, total liberado, total de juros, pico do saldo devedor e o mês
+dele, primeiro mês de amortização, último mês com dívida e total amortizado) e o gráfico
+**Alavancagem mês a mês**, com o custo financiável acumulado, o principal liberado acumulado, o saldo
+devedor e as amortizações. O gráfico só aparece quando há alguma liberação: se o banco não libera
+nada pelas regras abaixo, a aba fica sem ele. Quem só lê um estudo em que o financiamento à produção
+nunca foi criado encontra, ao abrir a aba, o aviso de que nenhum foi configurado.
 
 Como o banco libera: os custos elegíveis são reconhecidos quando incorridos; quando o percentual
 incorrido atinge a exposição mínima e a obra está ativa, a liberação daquele mês cobre tudo o que
@@ -235,6 +251,8 @@ coobrigação dá os mesmos números, e não há campo para isso.
 A aba **Estrutura de capital** mostra o capital stack do projeto: de onde vem o dinheiro que paga os
 usos, camada por camada, na ordem de senioridade. Ela só lê — não tem ação de edição, e quem só lê o
 estudo a vê inteira. Os números são os mesmos dos cartões da aba Operações, calculados juntos.
+A tela calcula o Fluxo de Caixa sozinha ao abrir; se esse cálculo não acontecer, a aba mostra só um
+aviso no lugar da estrutura.
 
 No topo, **quatro totais**: **usos totais** (a soma dos custos do projeto), **dívida** (as camadas
 de dívida e do financiamento à produção), **equity de terceiros** (os aportes) e **incorporador no
@@ -279,6 +297,8 @@ O texto de apoio, abaixo da tabela, lembra como ler a aba:
   que o contrato dela prevê por estar abaixo de outra;
 - o restante dos usos é pago pelas vendas ao longo do projeto, que ficam fora da torre;
 - as camadas não acontecem no mesmo mês, então a soma delas não é um saldo numa data;
+- o tamanho de cada camada é o maior valor que aquela parte teve dentro do projeto, e por isso a do
+  financiamento à produção não é o total liberado;
 - a camada do financiamento à produção é medida na estrutura completa, e o "depois" dele na tabela
   é medido sozinho; os dois não se comparam, porque ele lê o caixa depois das outras operações.
 
@@ -331,8 +351,11 @@ três tarifas da dívida; o mês da cessão é o `inicio_mes`.
 Só pode haver uma operação de `financiamento_producao` por estudo. Valores monetários saem com duas
 casas; percentuais são guardados como percentual.
 
-O `tipo` de uma operação é fixado na criação. Um `PATCH` com `tipo` diferente do gravado é recusado
-com **422** e código `TIPO_IMUTAVEL`, sem gravar nada. A recusa vem antes das regras de campo
+O `tipo` de uma operação é fixado na criação. Um `PATCH` com `tipo` válido e diferente do gravado é
+recusado com **422** e código `TIPO_IMUTAVEL`, sem gravar nada — nos dois sentidos, inclusive para
+deixar de ser `financiamento_producao`. Um `tipo` que não é nenhum dos quatro (vazio, `null`, em
+maiúsculas) não é troca de tipo: volta **400** `CAMPO_INVALIDO`, com a mesma mensagem que a criação
+dá, também sem gravar nada. A recusa vem antes das regras de campo
 (carência, percentuais, prazos), então uma regra violada no mesmo pedido não a esconde; só um número
 malformado no mesmo pedido volta antes, como 400 `CAMPO_INVALIDO`. Mandar o **mesmo** `tipo` já gravado é aceito, e o
 `PATCH` sem `tipo` continua como sempre. Para trocar de tipo, remova a operação e crie outra. Na
