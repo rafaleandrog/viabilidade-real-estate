@@ -83,11 +83,12 @@ export function botoes(fonte: string): Botao[] {
   return out;
 }
 
-// Slot sem texto visível: só espaço, comentário HTML, `${nothing}` ou `${''}`.
+// Slot sem texto visível: só espaço, comentário HTML ou interpolação que não
+// desenha nada (`${nothing}`, `${null}`, `${undefined}`, `${''}`).
 export function soIcone(slot: string): boolean {
   const resto = slot
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\$\{\s*(nothing|''|""|``)\s*\}/g, '');
+    .replace(/\$\{\s*(nothing|null|undefined|''|""|``)\s*\}/g, '');
   return resto.trim() === '';
 }
 
@@ -158,6 +159,8 @@ test('#908: o parser e os predicados fecham as frestas conhecidas', () => {
   assert.equal(soIcone('  ${nothing} '), true);
   assert.equal(soIcone('<!-- x --> '), true);
   assert.equal(soIcone("${''}"), true);
+  assert.equal(soIcone('${null}'), true);
+  assert.equal(soIcone(' ${undefined} '), true);
   assert.equal(soIcone('Salvar'), false);
   assert.equal(soIcone("${cond ? 'Editar' : nothing}"), false);
   // nome vazio de mentira
