@@ -4,6 +4,64 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-27 — Funding R16, fase 4: janela com etapas para criar e editar operação; tipo travado no servidor (issue 1009)
+
+Quarta fase do arco da Rodada 16 (guarda-chuva: issue 1005). Frontend e uma regra de servidor; nada
+muda no motor, no `schema.json`, nas migrações nem na `versao`.
+
+- **Janela de operação.** `viab-funding-janela` (`frontend/funding-janela.ts`) num `urbi-modal`
+  (`maxWidth="980px"`, `closeOnBackdrop` falso): nome no topo, trilho de etapas em `urbi-nav`
+  (`descricao` com o resumo da etapa, `indicador: 'alerta'` na etapa com erro), campos da etapa no
+  centro, "Resumo" com quatro KPIs do tipo e "Prévia do fluxo" à direita; Cancelar e Criar operação
+  (Salvar alterações) no rodapé. As colunas empilham abaixo de 1000 px de tela. A janela não grava:
+  entrega o corpo do POST, ou o PATCH só com os campos alterados, por `viab:janela-confirmar`, e a
+  tela grava (`_confirmarJanela`); recusa do servidor volta por `erroServidor` e a janela fica aberta.
+- **Dados puros da janela** em `frontend/funding-janela-dados.ts`: as etapas por tipo (só os campos
+  que o formulário da página tinha), os padrões de criação, `corpoDeCriacao` (antecipação sem `valor`;
+  âncora do Cronograma sem `inicio_mes`), `patchDaEdicao` (nunca `tipo`), `errosDaJanela` (a recusa na
+  etapa dona do campo, com o rótulo da janela), `resumoDaJanela`, `serieDoGrafico` e
+  `termosDaOperacao` (a página em leitura).
+- **Prévia.** A janela recalcula em `willUpdate` com `simular`, que a tela lhe passa
+  (`_simularJanela`): refaz o fluxo-base com as operações em rascunho e roda o funding e a
+  `sequenciaDeEstrutura`. Na criação a operação entra sem `id` (última do tipo); na edição, com
+  `id` e `ordem`. O mês da âncora é o de `operacaoComRascunho`.
+- **Gráfico da operação.** `viab-funding-grafico-operacao` (`frontend/funding-grafico-operacao.ts`):
+  entradas, saídas e saldo (devedor na dívida, acumulado nos demais), SVG com tokens. O mesmo
+  componente na prévia da janela e na página.
+- **Página da operação em leitura.** Termos por etapa, os indicadores de sempre, o gráfico, setas,
+  Editar e Remover. Saíram da tela o formulário inline de dívida, equity e antecipação, o modal de
+  escolha de tipo e `_adicionar`; `draft`, `_set` e `_salvar` ficam para o Financiamento à produção.
+- **Validação.** O espelho das regras do servidor saiu de `funding-alternativas.ts` para
+  `frontend/funding-validacao.ts`, com `errosDoEstadoFinal` sobre `OperacaoFunding[]`,
+  `recusaDoPatchComoServidor`, `trocaDeTipoComoServidor`, `errosRetornoPorModo` e `recusaDoNome`.
+  `funding-alternativas.ts` reexporta o que a aba Comparar estruturas usa e mantém
+  `errosDoEstadoFinal(alt)`, que tira as operações `__fora` e delega. Os testes de paridade e de
+  `errosDoEstadoFinal` mudaram junto para `funding-validacao.test.ts`.
+- **Servidor.** `trocaDeTipoBloqueada` (pura, em `backend/rotas/funding.ts`): o PATCH que troca o
+  `tipo` volta 422 `TIPO_IMUTAVEL`, logo depois da coerção e antes de `validarCamposOperacao`; o
+  mesmo `tipo` reenviado passa. Teste unitário e teste HTTP contra Express real
+  (`backend/rotas/funding-tipo-imutavel-rota.test.ts`).
+- **Foco.** Ao abrir, o seletor de tipo (criação) ou o nome (edição); ao fechar, o botão de origem;
+  depois de remover, o primeiro cartão ou "Nova operação". Esc e o fechar do modal perguntam por
+  `urbiVerso.confirmar` quando há alteração (o tipo do método entrou em `viabilidade-api.ts`).
+- **Pontos herdados da revisão da fase 3.** Cartão sem o "—" riscado quando só o "antes" falta; raio
+  do cartão pelo token `--raio-md`; caso de render do cartão de antecipação sem lastro.
+- **Testes.** Novos: `funding-janela-dados.test.ts`, `funding-validacao.test.ts`, os casos de render
+  `funding-janela` e `funding-cartao-sem-lastro`, e o teste HTTP. Reescritos no lugar novo:
+  `funding-ancora-rascunho` (a âncora trocada na janela de edição, com o mesmo oráculo
+  independente), `funding-pagina-operacao` (página em leitura, "Nova operação" abre a janela) e
+  `funding-antecipacao` (os seis termos em leitura no lugar dos seis campos). `ind-funding` perdeu
+  as declarações de `urbi-select` e `urbi-input`, que ficaram ociosas.
+- **Endereços.** O diff deslocou `tela-funding.ts`: corrigidas as citações de `casos/ind-funding.ts`
+  (`_renderIndicadores`) e do `CLAUDE.md` (o aviso regulatório).
+- **Fica registrado.** O `urbi-modal` do stub de render não implementa foco nem Esc, e o pacote de
+  UI não vem no bundle do SDK: não deu para medir se o modal real prende o Tab dentro da janela.
+  Lacuna da plataforma, sem armadilha de foco própria. O nome vazio é recusado pela tela também na
+  edição, mais estrito que o PATCH do servidor, de propósito. A pendência do `valor` da antecipação
+  (Q12 do issue 858) segue só em parte: a tela não o manda, o servidor ainda grava 0 por padrão.
+
+---
+
 ## 2026-11-26 — Funding R16, fase 3: aba Operações em cartões e página da operação (issue 1008)
 
 Terceira fase do arco da Rodada 16 (guarda-chuva: issue 1005). Só frontend; nada muda no servidor,

@@ -198,6 +198,20 @@ export function remocaoFinanciamentoBloqueada(operacao: { tipo?: unknown }): boo
 }
 
 /**
+ * O tipo de uma operação é escolhido ao criar e não muda depois: tipos
+ * diferentes têm campos, motor e indicadores diferentes, e trocar o tipo de uma
+ * linha gravada a deixaria com campos do tipo antigo que o novo não lê. Mandar
+ * o MESMO tipo já gravado é aceito, para cliente que reenvia o objeto inteiro.
+ * Pura e testável, no molde de `remocaoFinanciamentoBloqueada`; o PATCH chama
+ * logo depois da coerção e antes de `validarCamposOperacao`, para a troca não
+ * ser mascarada por 400 de regra de campo. A coerção numérica vem antes: um
+ * número malformado no mesmo PATCH ainda volta 400 `CAMPO_INVALIDO`.
+ */
+export function trocaDeTipoBloqueada(operacao: { tipo?: unknown }, dados: Record<string, any>): boolean {
+  return dados.tipo !== undefined && dados.tipo !== operacao.tipo;
+}
+
+/**
  * Financiamento à produção é ÚNICO por estudo — exigência explícita do autor.
  * Devolve a operação conflitante, ou `null` quando pode criar/alterar.
  * `ignorarId` existe para o PATCH não conflitar consigo mesmo.
@@ -377,6 +391,12 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
     const coagidos = coagirOuRecusar(res, 'avancado_funding_operacoes', dados);
     if (!coagidos) return;
     dados = coagidos;
+
+    if (trocaDeTipoBloqueada(operacao, dados)) {
+      erro(res, 422, 'TIPO_IMUTAVEL',
+        'O tipo de uma operação não muda depois de criada. Para outro tipo, crie uma operação nova.');
+      return;
+    }
 
     // Validação sobre o estado FINAL (atual + patch): senão um PATCH que manda
     // só a carência escaparia da regra carência < amortização.

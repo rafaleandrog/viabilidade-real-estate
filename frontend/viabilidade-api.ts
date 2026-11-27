@@ -56,6 +56,11 @@ interface UrbiVersoApi {
   href(sub: string): string;
   navegarSub(sub: string): void;
   escutarRota(cb: (subRota: string) => void): () => void;
+  // Diálogo sim/não do shell (SDK `OpcoesConfirmar`). Piso: sdk_min 86 e
+  // shell_min 0.56.18, que o manifesto já atende.
+  confirmar(opcoes: string | {
+    mensagem?: string; titulo?: string; rotuloConfirmar?: string; rotuloCancelar?: string; perigo?: boolean;
+  }): Promise<boolean>;
 }
 
 declare global {

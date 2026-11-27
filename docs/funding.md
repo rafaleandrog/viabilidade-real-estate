@@ -73,12 +73,11 @@ Valores em reais nos cartões aparecem em milhões, com uma casa ("R$ 20,1 mi");
 sobre o valor mostra o número exato. Os percentuais digitados (taxa, retorno, carteira cedida) saem
 com duas casas; os indicadores em percentual, com uma.
 
-Enquanto uma operação está em edição, o cartão dela já mostra os números do que está sendo
-digitado, como a página da operação.
+Os cartões mostram a operação gravada. O que está sendo digitado aparece na prévia da janela de
+operação, até ser gravado.
 
-Com permissão de edição, **Nova operação** pergunta o tipo — Dívida / Capital de giro, Equity ou
-Antecipação de recebíveis — e cria a operação com os valores padrão, abrindo em seguida a página
-dela. Sem nenhuma dívida, equity ou antecipação, a aba diz que não há operação de funding e que o
+Com permissão de edição, **Nova operação** abre a janela de operação (abaixo) em **Detalhes gerais**,
+com a escolha do tipo — Dívida / Capital de giro, Equity ou Antecipação de recebíveis. Sem nenhuma dívida, equity ou antecipação, a aba diz que não há operação de funding e que o
 Fluxo de Caixa é igual ao Livre; se o financiamento à produção estiver ligado, diz que não há
 operação além dele, que tem aba própria.
 
@@ -86,20 +85,61 @@ operação além dele, que tem aba própria.
 
 Clicar num cartão — ou focá-lo pelo teclado e apertar Enter ou Espaço — abre a página da operação,
 no lugar da lista, com o foco nela (o próximo Tab vai ao botão de voltar). O botão **Operações**, no topo, volta para a lista, com o foco de volta no
-cartão de onde se saiu. A página tem o formulário da operação: o nome, os campos do tipo (abaixo),
-o painel de indicadores — **Visão do investidor** na dívida e no equity, **Resultado da
-antecipação** na antecipação —, as setas que mudam a posição da operação entre as do mesmo tipo,
-**Remover** e **Salvar**. Quem só lê vê a página sem as setas, sem Remover e sem Salvar. Remover a
-operação aberta volta para a lista. Na página, os valores aparecem em reais cheios.
+cartão de onde se saiu. A página mostra a operação em leitura: o nome e o tipo, os **termos**
+agrupados pelas etapas da janela (os campos do tipo, abaixo, com os valores gravados), o painel de
+indicadores — **Visão do investidor** na dívida e no equity, **Resultado da antecipação** na
+antecipação —, o **gráfico da operação** (entradas, saídas e saldo, mês a mês; o mesmo gráfico da
+prévia da janela, aqui com a operação gravada) e, para quem edita, as setas que mudam a posição da
+operação entre as do mesmo tipo, **Editar** e **Remover**. Operação sem movimento não desenha o
+gráfico. Quem só lê vê a página sem as setas, sem Editar e sem Remover. Remover a operação aberta
+volta para a lista, com o foco no primeiro cartão (ou em **Nova operação**, se não sobrar cartão).
+Na página, os valores aparecem em reais cheios.
 
-Uma edição ainda não salva continua guardada ao voltar para a lista; o Salvar é o da página.
+### A janela de operação
+
+**Nova operação** e **Editar** abrem a mesma janela. No topo, o **nome da operação**. À esquerda,
+as **etapas** do tipo, cada uma com o resumo do que já foi preenchido nela; a etapa com um valor
+que o app recusaria ganha um ponto vermelho. No centro, os campos da etapa escolhida. À direita, o
+**Resumo**, com quatro indicadores do tipo, e a **Prévia do fluxo**, o gráfico de entradas, saídas
+e saldo da operação. Em telas estreitas as três partes ficam uma abaixo da outra.
+
+| Tipo | Etapas |
+|---|---|
+| Dívida / Capital de giro | Detalhes gerais · Aporte · Amortização · Juros · Custos |
+| Equity | Detalhes gerais · Aporte · Retorno |
+| Antecipação de recebíveis | Detalhes gerais · Cessão · Desconto · Custos |
+
+O Resumo e a prévia recalculam a cada tecla, sem gravar nada, com a operação na posição dela na
+ordem de senioridade (uma operação nova entra como a última do tipo):
+
+- **Dívida**: custo efetivo, custo financeiro (juros mais tarifas), maior saldo devedor e capital
+  do incorporador no pico (a exposição máxima do projeto depois desta operação);
+- **Equity**: ROI do investidor, TIR do investidor, retorno total e capital do incorporador no pico;
+- **Antecipação**: valor antecipado, deságio, custo efetivo e capital do incorporador no pico.
+
+Na janela os valores aparecem em reais cheios. Indicador sem base de cálculo mostra "—", nunca zero.
+
+**Nada é gravado antes de Criar operação** (na edição, **Salvar alterações**). Cancelar, o botão de
+fechar e a tecla Esc fecham a janela sem gravar; se algo foi alterado, o app pergunta antes de
+descartar. Clicar fora da janela não a fecha. Ao fechar, o foco volta ao botão que a abriu. Na
+criação, a operação criada abre em seguida na página dela. Enquanto a operação está sendo gravada,
+a janela fica travada até a resposta: os campos, Cancelar e Esc esperam.
+
+Antes de gravar, a janela aplica as mesmas regras do servidor e mostra a recusa na etapa do campo:
+valor, taxa ou prazo negativo, percentual acima de 100, carência igual ou maior que a amortização (quando a amortização é maior que zero),
+"Aporte em" menor que 1, número inválido, nome vazio ou com mais de 100 caracteres (também na
+edição) e, no equity, retorno somado acima de 100% entre as operações do mesmo modo. Criar operação
+com uma regra violada leva à etapa do erro e não grava. Se o servidor ainda assim recusar, a
+mensagem aparece dentro da janela, que continua aberta com tudo o que foi digitado.
+
+**O tipo é escolhido ao criar e não muda depois.** Na edição ele aparece travado; para outro tipo,
+crie uma operação nova. Na edição, só os campos alterados vão ao servidor.
 
 Para dívida, equity e antecipação, o **Mês do aporte** (na antecipação, o **Mês da cessão**) é uma
 **âncora do cronograma** — Planejamento, Pré-lançamento, Lançamento, Obra, Pós-obras, com o mês
 derivado mostrado ao lado, só para leitura — ou um **Mês específico** digitado; assim a operação
-acompanha o cronograma quando ele muda. Enquanto uma operação ancorada está em edição — a âncora
-trocada ou qualquer outro campo alterado —, o mês derivado e os indicadores dela já usam o mês que o
-Salvar vai gravar, antes de salvar; um evento que o estudo não tem (Pré-lançamento num estudo sem
+acompanha o cronograma quando ele muda. Na janela, com a âncora trocada ou qualquer outro campo
+alterado, o mês derivado, o Resumo e a prévia já usam o mês que a gravação vai registrar; um evento que o estudo não tem (Pré-lançamento num estudo sem
 pré-lançamento) mantém o mês que a operação já tinha. Operação sem edição em andamento usa o mês
 gravado — o mesmo que Fluxo de Caixa, Cenários e Resumo usam —, ainda que o Cronograma tenha mudado
 depois: o mês só é rederivado quando a operação é salva de novo. A janela do financiamento à
@@ -107,7 +147,8 @@ produção vem sempre do Cronograma (a obra).
 
 ### Dívida / Capital de giro
 
-Informe o **Valor**, o **Mês do aporte**, a **Taxa** anual, a **Amortização** (prazo em meses) e a
+Na janela: **Aporte** (valor, mês e distribuição), **Amortização** (prazo, carência e o sistema
+Price), **Juros** (taxa) e **Custos** (as três tarifas). Informe o **Valor**, o **Mês do aporte**, a **Taxa** anual, a **Amortização** (prazo em meses) e a
 **Carência**. Com **Distribuir aporte** ligado, o valor entra em tranches mensais iguais ao longo do
 número de meses informado em **Aporte em**, e a parcela é calculada sobre o valor futuro das
 tranches, com os juros do período de liberação capitalizados no saldo. Durante a carência paga-se só
@@ -120,18 +161,20 @@ tipo no Orçamento, a página avisa: o custo estaria contado duas vezes.
 
 ### Equity
 
-Informe o **Valor do aporte**, o **Mês do aporte** e o modo de retorno:
+Na janela: **Aporte** (valor e mês) e **Retorno** (modo e percentual). Informe o **Valor do
+aporte**, o **Mês do aporte** e o modo de retorno:
 
 - **Permuta financeira (% da receita líquida, mês a mês)** — o investidor recebe o percentual sobre
   a receita líquida de cada mês, enquanto houver receita.
 - **% do resultado final (pago no repasse)** — o investidor recebe o percentual sobre o resultado
   final, de uma vez, no mês do repasse.
 
-A soma dos percentuais de retorno das operações de equity é validada no servidor.
+A soma dos percentuais de retorno das operações de equity do mesmo modo não passa de 100%: a janela
+recusa antes de gravar, e o servidor também.
 
 ### Financiamento à produção
 
-Uma por estudo. Informe a **Taxa** anual, a **Exposição mín. p/ liberação**, o percentual
+Uma por estudo, editada na aba própria, não na janela de operação. Informe a **Taxa** anual, a **Exposição mín. p/ liberação**, o percentual
 financiável do custo e as linhas de custo elegíveis — o botão **Usar base padrão** seleciona o
 pagamento do terreno (sem as permutas), a construção, a outorga, os projetos e as licenças e
 aprovações — e se o **Caixa disponível amortiza antes das chaves**. É a única operação com o
@@ -148,7 +191,8 @@ caixa** disponível, calculado sem a liberação do próprio mês.
 ### Antecipação de recebíveis
 
 É a cessão de parte da carteira de recebíveis a uma securitizadora (CRI), um fundo (FIDC) ou um
-banco, que paga à vista o valor presente das parcelas cedidas. Informe:
+banco, que paga à vista o valor presente das parcelas cedidas. Na janela: **Cessão** (mês e
+carteira cedida), **Desconto** (taxa) e **Custos** (as três tarifas). Informe:
 
 - o **Mês da cessão** (âncora do cronograma ou mês específico);
 - a **Carteira cedida**, em percentual;
@@ -254,7 +298,7 @@ Rotas do estudo (membro com alçada de edição para escrever):
 |---|---|
 | `GET /estudos/:id/avancado/funding` | lista as operações do estudo |
 | `POST /estudos/:id/avancado/funding` | cria uma operação (`tipo`: `divida`, `equity`, `financiamento_producao` ou `antecipacao_recebiveis`) |
-| `PATCH /estudos/:id/avancado/funding/:oid` | altera uma operação |
+| `PATCH /estudos/:id/avancado/funding/:oid` | altera uma operação; o `tipo` não muda (veja abaixo) |
 | `PATCH /estudos/:id/avancado/funding/:oid/remover` | remove uma operação |
 
 Campos por tipo: todos têm `tipo`, `nome`, `ordem`, `valor` e `inicio_mes` (mês relativo, começando
@@ -268,6 +312,16 @@ Antecipação de recebíveis: `pct_carteira_cedida` (0 a 100), `taxa_anual` (a t
 três tarifas da dívida; o mês da cessão é o `inicio_mes`.
 Só pode haver uma operação de `financiamento_producao` por estudo. Valores monetários saem com duas
 casas; percentuais são guardados como percentual.
+
+O `tipo` de uma operação é fixado na criação. Um `PATCH` com `tipo` diferente do gravado é recusado
+com **422** e código `TIPO_IMUTAVEL`, sem gravar nada. A recusa vem antes das regras de campo
+(carência, percentuais, prazos), então uma regra violada no mesmo pedido não a esconde; só um número
+malformado no mesmo pedido volta antes, como 400 `CAMPO_INVALIDO`. Mandar o **mesmo** `tipo` já gravado é aceito, e o
+`PATCH` sem `tipo` continua como sempre. Para trocar de tipo, remova a operação e crie outra. Na
+antecipação de recebíveis o `valor` não é lido pelo cálculo; a tela não o manda.
+
+O `POST` recusa `nome` vazio (400 `NOME_OBRIGATORIO`); o `PATCH` não recusa. A tela é mais estrita:
+recusa nome vazio, ou só com espaços, também na edição.
 
 ## Veja também
 
