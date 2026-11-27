@@ -22,6 +22,16 @@
 > fixado (`93.0.0`), porque o espelho é mais antigo que ela e o monorepo não estava acessível. É a
 > que mostra o rótulo visível ao lado do ícone; a página da operação do Funding a usa. Com ela, 199
 > props. Mesma regra da nota acima: o sincronizador a regrava, e quem o rodar remove esta nota.
+>
+> **Terceira entrada fora do carimbo:** o `urbi-toggle` inteiro (`checked`, `disabled`, `ariaLabel`),
+> escrito à mão a partir do `declare class UrbiToggle extends LitElement` do `dist/index.d.ts` e da
+> seção `urbi-toggle` do `docs/ui-componentes-conteudo.md` do SDK fixado (`93.0.0`), porque o espelho
+> não o trazia (o SDK o lista fora do registro global de primitivos) e o monorepo não estava
+> acessível. O interruptor do Financiamento à produção o usa. O `.d.ts` não diz o nome de atributo nem
+> o reflect das props: `checked` e `disabled` seguem o default do Lit (atributo em minúsculas, sem
+> reflect), `ariaLabel` entra só como propriedade (a app a passa por `.ariaLabel`), e o `:host` fica
+> vazio, porque o estilo do primitivo não tem fonte no SDK. Com ela, o espelho fica com 30 primitivos
+> e 202 props (contagem do `guard-props-urbi.mjs` e do JSON). Mesma regra das notas acima.
 
 ## Por que este diretório existe
 

@@ -4,6 +4,45 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-27 — Funding R16, fase 7: liga/desliga do Financiamento à produção com interruptor, mais quatro sobras da janela (issue 1012)
+
+Sétima fase do arco da Rodada 16 (guarda-chuva: issue 1005, decisão D6). Nada muda no motor, no
+`schema.json`, nas migrações nem na `versao`; o servidor muda só no trecho do PATCH de funding.
+
+- **Interruptor.** O cabeçalho da aba Financiamento à produção troca a caixa "Ativo" pelo
+  `urbi-toggle`, usado pela tag (o SDK proíbe a app de importá-lo por subcaminho), com o estado em
+  texto ao lado (Ligado / Desligado) e nome acessível por `.ariaLabel`. Grava `ativo` na hora, como
+  antes; `checked`/`marcado` vêm por `live()`, então a recusa do servidor devolve o controle à
+  posição gravada. Com o PATCH em curso o controle fica desabilitado e um segundo evento não dispara
+  outro PATCH (`ligandoFinanciamento`). O leitor vê o controle desabilitado, e o handler também
+  recusa sem `editavel`.
+- **Queda.** Sem `urbi-toggle` registrado, a tela desenha a caixa de seleção "Ativo" de antes. A
+  escolha é `controleLigaDesliga` (`frontend/funding-liga-desliga.ts`, pura, com o registro por
+  parâmetro), feita uma vez por tela: o controle não troca de forma depois de desenhado.
+- **Espelho de UI.** Entrada do `urbi-toggle` escrita à mão em
+  `referencia/ui-urbiverso/primitivos.json` a partir do SDK 93 (`checked`, `disabled`,
+  `ariaLabel` só como propriedade), com nota no `LEIA.md` (30 primitivos, 202 props).
+- **Harness de render.** O stub do `urbi-toggle` emite `urbi-toggle:change` com o estado novo no
+  `detail` (booleano, como o SDK declara) a partir de um `button` nativo com `role="switch"`;
+  desabilitado, não emite. Não reproduz markup nem estilo reais (`COMPORTAMENTOS` em
+  `scripts/render-check.mjs`). O caso `funding-fap-checkbox` virou `funding-fap-toggle` e mede as
+  duas formas: desligar, religar, recusa, cliques seguidos, leitor, estudo sem a operação, queda, e
+  a geometria do cabeçalho em 1280, 900 e 600 px nas variantes 0 e 1 do espelho.
+- **Janela (adendo 1).** Quando a gravação termina com a janela aberta (recusa), o foco volta para o
+  aviso do servidor (`role="alert"`, `tabindex="-1"`) ou, sem ele, para o primeiro campo da etapa.
+- **Foco guardado (adendo 2).** `focarAlvo` é limpo no desenho em que o alvo deveria estar, ache ou
+  não o elemento.
+- **Servidor (adendos 3 e 4).** No PATCH, `tipo` fora dos quatro volta `400 CAMPO_INVALIDO` com a
+  mensagem da criação (`tipoInvalidoNoPatch`), e `TIPO_IMUTAVEL` fica só para tipo válido e
+  diferente do gravado; espelho em `frontend/funding-validacao.ts` com paridade. Teste HTTP novo
+  para "deixar de ser Financiamento à produção".
+- **Guia.** `docs/funding.md`: o interruptor, a queda, o foco na recusa e o 400 do tipo malformado.
+- **Pendente do dono:** conferir o interruptor na instância (o `urbi-toggle` registrado é fato da
+  instância, não do SDK; sem ele aparece a caixa de seleção). O texto do `422 FINANCIAMENTO_FIXO`
+  ainda fala em checkbox "Ativo"; ficou como observação no painel.
+
+---
+
 ## 2026-11-27 — Funding R16, fase 6: remoção da aba Comparar estruturas (issue 1011)
 
 Sexta fase do arco da Rodada 16 (guarda-chuva: issue 1005). A decisão D14 do dono manda apagar a

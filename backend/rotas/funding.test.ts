@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   validarCamposOperacao, TIPOS_OPERACAO, conflitoFinanciamentoUnico, somaRetornoExcede, remocaoFinanciamentoBloqueada,
   trocaDeTipoBloqueada,
+  tipoInvalidoNoPatch,
 } from './funding.js';
 
 // #355 — validação das operações de Funding. Só lógica pura: as rotas em si
@@ -174,6 +175,21 @@ test('trocaDeTipoBloqueada: recusa só a troca, nunca o mesmo tipo nem o PATCH s
   assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo: 'divida' }), false);
   assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { nome: 'X' }), false);
   assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, {}), false);
+  // Tipo malformado não é troca: é valor inválido, recusado antes por `tipoInvalidoNoPatch`.
+  for (const tipo of ['', null, 'DIVIDA', 'financiamento']) {
+    assert.equal(trocaDeTipoBloqueada({ tipo: 'divida' }, { tipo }), false, JSON.stringify(tipo));
+  }
+});
+
+test('tipoInvalidoNoPatch: só os quatro tipos passam; ausente não é inválido', () => {
+  for (const tipo of ['', null, 'DIVIDA', 'financiamento', 0, false]) {
+    assert.equal(tipoInvalidoNoPatch({ tipo }), true, JSON.stringify(tipo));
+  }
+  for (const tipo of ['divida', 'equity', 'antecipacao_recebiveis', 'financiamento_producao']) {
+    assert.equal(tipoInvalidoNoPatch({ tipo }), false, tipo);
+  }
+  assert.equal(tipoInvalidoNoPatch({}), false);
+  assert.equal(tipoInvalidoNoPatch({ nome: 'X' }), false);
 });
 
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────

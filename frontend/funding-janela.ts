@@ -99,6 +99,7 @@ export class ViabFundingJanela extends LitElement {
     .cadeado { font-size: 0.75em; margin-left: 4px; color: var(--cor-texto-sec); }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin-top: 8px; }
     .erro-etapa { margin-top: 10px; }
+    .erro-servidor-foco { outline-offset: 2px; }
     .lado { display: flex; flex-direction: column; gap: 12px; }
     .lado h4 {
       margin: 0 0 6px; font-size: var(--texto-rotulo); text-transform: uppercase;
@@ -205,6 +206,24 @@ export class ViabFundingJanela extends LitElement {
   protected firstUpdated() {
     const alvo = this.shadowRoot?.querySelector(this.modo === 'criar' ? '[data-campo="tipo"]' : '[data-campo="nome"]') as HTMLElement | null;
     alvo?.focus();
+  }
+
+  /**
+   * Enquanto grava, a janela fica `inert` e o foco sai dela (o botão de
+   * confirmar deixa de ser focável). Quando a gravação termina com a janela
+   * ainda aberta — o sucesso a fecha, então aqui só chega a recusa —, o foco
+   * volta para DENTRO: para o aviso do servidor (`role="alert"`,
+   * `tabindex="-1"`), que diz o que houve; na falta dele, para o primeiro campo
+   * da etapa aberta.
+   */
+  protected updated(mudou: PropertyValues<this>) {
+    super.updated?.(mudou);
+    if (mudou.has('gravando') && mudou.get('gravando') === true && !this.gravando) {
+      const r = this.shadowRoot;
+      const alvo = (r?.querySelector('div.erro-servidor-foco')
+        ?? r?.querySelector('section.campos [data-campo]')) as HTMLElement | null;
+      alvo?.focus();
+    }
   }
 
   // ── ações ───────────────────────────────────────────────────────────
@@ -410,9 +429,11 @@ export class ViabFundingJanela extends LitElement {
             </aside>
           </div>
           ${this.erroServidor ? html`
-            <urbi-banner class="erro-servidor" variante="erro" icone="fa-solid fa-triangle-exclamation">
-              ${this.erroServidor}
-            </urbi-banner>` : nothing}
+            <div class="erro-servidor-foco" role="alert" tabindex="-1">
+              <urbi-banner class="erro-servidor" variante="erro" icone="fa-solid fa-triangle-exclamation">
+                ${this.erroServidor}
+              </urbi-banner>
+            </div>` : nothing}
           <div class="rodape">
             ${this.tentouConfirmar && this.erros.length
               ? html`<span class="pendencias" role="status">Corrija ${this.erros.length === 1 ? 'a etapa marcada' : 'as etapas marcadas'} antes de ${this.modo === 'criar' ? 'criar' : 'salvar'}.</span>`
