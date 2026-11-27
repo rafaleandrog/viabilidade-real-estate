@@ -8,7 +8,8 @@ export const caso = {
   nome: 'estudo-derivar-sem-botao',
   // O botão Membros prova que o cabeçalho montou; sem ele o caso mediria o vazio.
   exigir: [{ seletor: 'urbi-botao[icone="fa-solid fa-users"]', minimo: 1 }],
-  aceitaNaoReproduzido: ACEITA_NAO_REPRODUZIDO,
+  // Sem o botão de renomear (só leitura), o ariaLabel dele não é renderizado: declarar seria ocioso.
+  aceitaNaoReproduzido: ACEITA_NAO_REPRODUZIDO.filter((p) => p !== 'urbi-botao.ariaLabel'),
   async montar(raiz: HTMLElement): Promise<void> {
     const el = await montarEstudo(raiz, {
       estudo: { ...ESTUDO_PRELIMINAR, _permissao: { podeEditar: false, podeAprovar: false, funcao: 'leitor' } },

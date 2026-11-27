@@ -84,6 +84,7 @@ export const caso = {
     { seletor: 'table.cen tbody tr', minimo: 2 },
   ],
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-badge.ativo',
     'urbi-badge.interativo',
     'urbi-modal.title',

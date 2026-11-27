@@ -46,6 +46,7 @@ export const caso = {
   // `urbi-shell-page.dashboard` não chegam a "participar da medição" e não
   // entram nem como reproduzidas nem como não-reproduzidas.
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-abas.abas',
     'urbi-abas.ativa',
     'urbi-abas.expandir',

@@ -1170,7 +1170,7 @@ export class ViabTelaPremissas extends LitElement {
         ${colunas.map((c) => celula(c.chave))}
         ${dis ? nothing : html`
           <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover produto'} title="Remover produto"
               @click=${() => { this.confirmRemoverProduto = p; }}></urbi-botao>
           </td>`}
       </tr>

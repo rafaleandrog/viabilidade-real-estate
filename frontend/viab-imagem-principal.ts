@@ -120,7 +120,7 @@ export class ViabImagemPrincipal extends LitElement {
           ></urbi-seletor-arquivo>
           ${this.doc ? html`
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" ?carregando=${this.enviando}
-              title="Remover" @click=${this._remover}></urbi-botao>` : nothing}
+              .ariaLabel=${'Remover imagem'} title="Remover imagem" @click=${this._remover}></urbi-botao>` : nothing}
         </div>` : nothing}
     `;
   }

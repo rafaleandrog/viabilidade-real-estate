@@ -81,7 +81,7 @@ export class ViabTelaApelo extends LitElement {
                       : nothing}
                   </span>
                   ${this.editavel
-                    ? html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+                    ? html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover fonte'} title="Remover fonte"
                         @click=${() => this._remover(d.id)}></urbi-botao>`
                     : nothing}
                 </div>`)}

@@ -534,6 +534,7 @@ export class ViabTelaDashboard extends LitElement {
                 variante=${this.mostrarArquivados ? 'secundario' : 'fantasma'}
                 pequeno
                 icone="fa-solid fa-box-archive"
+                .ariaLabel=${this.mostrarArquivados ? 'Ocultar arquivados' : 'Mostrar arquivados'}
                 title=${this.mostrarArquivados ? 'Ocultar arquivados' : 'Mostrar arquivados'}
                 @click=${() => { this.mostrarArquivados = !this.mostrarArquivados; }}
               ></urbi-botao>

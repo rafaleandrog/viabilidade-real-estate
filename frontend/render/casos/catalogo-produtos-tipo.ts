@@ -49,6 +49,7 @@ export const caso = {
   // harness confronta nos dois sentidos (usada e não declarada → falha; declarada
   // e sem uso → falha), então a lista não envelhece em silêncio.
   aceitaNaoReproduzido: [
+    'urbi-botao.ariaLabel',
     'urbi-card.titulo',
     // Binding de PROPRIEDADE (o Lit nem escreve atributo); o stub não desenha
     // opção nenhuma — mesma natureza documentada em modal-pagamento.ts,

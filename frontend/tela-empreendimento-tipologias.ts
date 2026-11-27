@@ -303,9 +303,9 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <td class="num acoes">
             <div class="acoes-grupo">
               ${nomeSujo ? html`
-                <urbi-botao variante="primario" pequeno icone="fa-solid fa-check" title="Salvar nome"
+                <urbi-botao variante="primario" pequeno icone="fa-solid fa-check" .ariaLabel=${'Salvar nome'} title="Salvar nome"
                   @click=${() => this._salvarNome(t)}></urbi-botao>` : nothing}
-              <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" .ariaLabel=${'Remover tipologia'} title="Remover tipologia"
                 @click=${() => { this.confirmRemover = t; }}></urbi-botao>
             </div>
           </td>`}
