@@ -60,8 +60,11 @@ import { AVISO_SEM_LASTRO, TIPOS_DE_CARTAO, dadosDoCartao, operacoesDeCartao } f
 // `calcularFluxo`. É o que impede esta aba de contar uma história diferente
 // da aba Resultados.
 //
-// Prévia por tecla: cada campo recalcula sobre um DRAFT em memória, sem tocar
-// a API; só "Salvar" persiste — mesmo padrão da tela anterior e do #51/#252.
+// Dívida, equity e antecipação são criadas e editadas na janela de operação
+// (`viab-funding-janela`), com prévia por tecla sobre o rascunho dela, sem
+// tocar a API; só "Criar operação" ou "Salvar alterações" gravam. A página da
+// operação é leitura. O Financiamento à produção continua com o formulário na
+// aba própria, com o rascunho em `draft` e o "Salvar" dele.
 // ─────────────────────────────────────────────────────────────────────────
 
 // #466: `divida` já É o produto de capital de giro por calendário — a própria
@@ -224,9 +227,8 @@ export class ViabFunding extends LitElement {
     .ind-card.pos .val { color: var(--cor-sucesso); }
     .ind-card.neg .val { color: var(--cor-erro); }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec); margin-top: 8px; }
-    /* Ícones no lugar de emoji: aviso (triângulo) e campo travado (cadeado). */
+    /* Ícone no lugar de emoji: aviso (triângulo). */
     .icone-aviso { color: var(--cor-alerta); margin-right: 6px; }
-    .cadeado { font-size: 0.75em; margin-left: 4px; color: var(--cor-texto-sec); }
 
     /* §39 — mesmo padrão de gráfico SVG inline da antiga tela-capital-stack.ts. */
     .grafico-card { margin-top: 12px; }
