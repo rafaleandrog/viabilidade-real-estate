@@ -4,6 +4,35 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 2026-11-27 — Funding R16, fase 8: fechamento da rodada (issue 1013)
+
+Oitava e última fase do arco da Rodada 16 (guarda-chuva: issue 1005). Sem código de produto, sem
+`schema.json`, migração nem `versao`.
+
+- **Registro.** `historico/rodada-16/planejamento.md`: pedido, decisões D1 a D14, as fases com o PR
+  e o squash de cada uma, método (skill `orquestrar`, sessões de implementação e revisão separadas,
+  merge pela coordenadora), tempos, motores de revisão, o que cada revisão achou e consertou, as
+  sobras que viraram adendo, as decisões vetáveis da coordenadora, a conferência do estudo 82, as
+  lacunas da plataforma, lições e o que fica para o dono.
+- **`CLAUDE.md`.** A linha da Rodada 16 na tabela "Estado do backlog" e o título da seção.
+- **Guias conferidos contra a tela** (`render()` e as `_render…` de `frontend/tela-funding.ts`,
+  `frontend/funding-janela.ts`, `frontend/funding-cartao.ts`, `frontend/grafico-stack-capital.ts`):
+  `docs/funding.md` ganhou o nome editável e o botão Salvar da aba Financiamento à produção, o resumo
+  quando ligado, o gráfico "Alavancagem mês a mês" quando há liberação, o aviso para quem só lê, o Salvar
+  alterações que só se habilita depois de mudar algo, o aviso de etapas no rodapé da janela, o
+  aviso da Estrutura de capital quando o fluxo não é calculado e o ponto do texto de apoio sobre o
+  tamanho das camadas;
+  `docs/avancado.md` trocou o "interruptor Ativo" e a "página onde ela é editada" pela janela com
+  etapas e citou a Estrutura de capital; `docs/formulas.md` estendeu a 4ª exceção à aba Estrutura de
+  capital. Os demais guias que citam Funding seguem verdadeiros.
+- **Na guarda-chuva:** a lista de verificação visual consolidada para o dono e os pedidos à
+  plataforma, conferidos contra o SDK 93.
+- **Fica para o dono:** release, instalação na instância de teste, lista visual e homologação; os
+  pedidos à plataforma; o item 0.4 do Estado da Arte; o texto do `422 FINANCIAMENTO_FIXO`; a chave
+  órfã no `localStorage`.
+
+---
+
 ## 2026-11-27 — Funding R16, fase 7: liga/desliga do Financiamento à produção com interruptor, mais quatro sobras da janela (issue 1012)
 
 Sétima fase do arco da Rodada 16 (guarda-chuva: issue 1005, decisão D6). Nada muda no motor, no
